@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "300771058852",
+    "project_id": "rutero-mde",
+    "storage_bucket": "rutero-mde.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:300771058852:android:d89b55f65692168bfc3231",
+        "android_client_info": {
+          "package_name": "com.example.rutero_mde"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA37snNyEz7h-mOXcar1pnsNnzBntSbFTg"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
