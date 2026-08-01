@@ -17353,7 +17353,10 @@ class _RouteCard extends StatelessWidget {
                   const SizedBox(height: 4),
                   // Sitios emblemáticos — primeros 3 del sitiosList
                   Builder(builder: (_) {
-                    final sitios = List<String>.from(ruta['sitiosList'] ?? []);
+                    final rawSitios = ruta['sitiosList'];
+                    final sitios = rawSitios is List
+                        ? List<String>.from(rawSitios.map((e) => e.toString()))
+                        : <String>[];
                     final preview = sitios.take(3).join(' · ');
                     if (preview.isEmpty) return const SizedBox.shrink();
                     return Text(
@@ -17511,8 +17514,12 @@ class _ConsejosCardState extends State<_ConsejosCard> {
   bool _expandido = false; // Usuario despliega manualmente
   @override
   Widget build(BuildContext context) {
-    final List<String> consejos = List<String>.from(
-      (kLang == 'en' ? widget.ruta['consejosEN'] : widget.ruta['consejos']) ?? []);
+    final raw = (kLang == 'en' ? widget.ruta['consejosEN'] : widget.ruta['consejos']);
+    final List<String> consejos = raw is List
+        ? List<String>.from(raw.map((e) => e.toString()))
+        : raw is String && raw.isNotEmpty
+          ? [raw]
+          : [];
     if (consejos.isEmpty) return const SizedBox.shrink();
     final Color acento = kRutaColor(widget.ruta['acento'], kGreen);
     final String momentoClave = (kLang == 'en'
