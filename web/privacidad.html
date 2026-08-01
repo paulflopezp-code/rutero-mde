@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Rutero MDE — Política de Privacidad / Privacy Policy</title>
+<meta name="description" content="Política de privacidad de Rutero MDE — gamified travel app for Medellín & Antioquia.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:ital,wght@0,300;0,400;0,500;0,700;1,300&display=swap" rel="stylesheet">
+<style>
+:root {
+  --verde: #5BAD6F;
+  --verde-osc: #1B5E3A;
+  --dorado: #C9A84C;
+  --dorado-light: #F5E4A0;
+  --negro: #0D0D0D;
+  --card: #1C2018;
+  --texto: #F5F0E8;
+  --muted: #8A9278;
+  --acento: #E85D26;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html { scroll-behavior: smooth; }
+
+body {
+  background: var(--negro);
+  color: var(--texto);
+  font-family: 'DM Sans', sans-serif;
+  line-height: 1.7;
+}
+
+[data-en], [data-es] { transition: opacity 0.3s; }
+.hide { display: none !important; }
+
+/* ── LANG TOGGLE ── */
+.lang-toggle {
+  position: fixed; top: 20px; right: 20px; z-index: 100;
+  display: flex; gap: 6px;
+}
+.lang-btn {
+  background: rgba(255,255,255,0.08);
+  border: 0.5px solid rgba(255,255,255,0.15);
+  color: var(--muted);
+  padding: 5px 12px; border-radius: 20px;
+  font-size: 12px; font-family: 'DM Sans', sans-serif;
+  cursor: pointer; transition: all 0.2s;
+  letter-spacing: 0.5px;
+}
+.lang-btn.active {
+  background: var(--verde);
+  border-color: var(--verde);
+  color: white;
+}
+
+/* ── CONTAINER ── */
+.wrap {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 100px 24px 80px;
+}
+
+.back-link {
+  display: inline-block;
+  margin-bottom: 32px;
+  color: var(--verde);
+  text-decoration: none;
+  font-size: 14px;
+  letter-spacing: 0.5px;
+}
+.back-link:hover { color: var(--dorado); }
+
+h1 {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: clamp(36px, 7vw, 56px);
+  letter-spacing: 2px;
+  background: linear-gradient(135deg, var(--dorado) 0%, var(--dorado-light) 40%, var(--dorado) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  margin-bottom: 8px;
+}
+
+.updated {
+  color: var(--muted);
+  font-size: 13px;
+  margin-bottom: 40px;
+  letter-spacing: 0.5px;
+}
+
+h2 {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 24px;
+  letter-spacing: 1px;
+  color: var(--verde);
+  margin: 36px 0 12px;
+}
+
+p, li {
+  color: var(--texto);
+  font-size: 15px;
+  margin-bottom: 12px;
+}
+
+ul { padding-left: 22px; margin-bottom: 12px; }
+li { margin-bottom: 6px; }
+
+a { color: var(--verde); text-decoration: none; }
+a:hover { color: var(--dorado); }
+
+.card {
+  background: var(--card);
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 16px;
+  padding: 20px 24px;
+  margin: 24px 0;
+}
+
+.card p { margin-bottom: 0; color: var(--muted); font-size: 13px; }
+
+footer {
+  text-align: center;
+  padding: 40px 24px;
+  color: var(--muted);
+  font-size: 12px;
+  border-top: 1px solid rgba(255,255,255,0.05);
+  margin-top: 40px;
+}
+</style>
+</head>
+<body>
+
+<div class="lang-toggle">
+  <button class="lang-btn active" onclick="setLang('es')" id="btn-es">ES</button>
+  <button class="lang-btn" onclick="setLang('en')" id="btn-en">EN</button>
+</div>
+
+<div class="wrap">
+
+  <a href="/" class="back-link">
+    <span data-es>← Volver a Rutero MDE</span>
+    <span data-en class="hide">← Back to Rutero MDE</span>
+  </a>
+
+  <h1>
+    <span data-es>Política de Privacidad</span>
+    <span data-en class="hide">Privacy Policy</span>
+  </h1>
+  <div class="updated">
+    <span data-es>Última actualización: junio de 2026</span>
+    <span data-en class="hide">Last updated: June 2026</span>
+  </div>
+
+  <!-- INTRO -->
+  <p data-es>
+    Rutero MDE ("la app", "nosotros") es una aplicación de turismo gamificado para Medellín y Antioquia, Colombia,
+    desarrollada por Paul Fernando López Prieto como parte del Programa Créame de la Alcaldía de Medellín.
+    Esta política explica qué información recopilamos, cómo la usamos y cómo la protegemos.
+  </p>
+  <p data-en class="hide">
+    Rutero MDE ("the app", "we") is a gamified tourism application for Medellín and Antioquia, Colombia,
+    developed by Paul Fernando López Prieto as part of the Créame Program by the Medellín Mayor's Office.
+    This policy explains what information we collect, how we use it, and how we protect it.
+  </p>
+
+  <!-- DATOS RECOPILADOS -->
+  <h2>
+    <span data-es>1. Información que recopilamos</span>
+    <span data-en class="hide">1. Information We Collect</span>
+  </h2>
+  <ul>
+    <li>
+      <span data-es><strong>Cuenta de Google:</strong> al iniciar sesión con Google, recibimos tu nombre, correo electrónico y foto de perfil para crear tu cuenta de usuario.</span>
+      <span data-en class="hide"><strong>Google Account:</strong> when you sign in with Google, we receive your name, email address, and profile photo to create your user account.</span>
+    </li>
+    <li>
+      <span data-es><strong>Ubicación GPS:</strong> usamos tu ubicación únicamente para verificar que estás físicamente en el sitio turístico que deseas validar dentro de una ruta.</span>
+      <span data-en class="hide"><strong>GPS Location:</strong> we use your location only to verify that you are physically at the tourist site you want to validate within a route.</span>
+    </li>
+    <li>
+      <span data-es><strong>Fotos de validación y perfil:</strong> las fotos que tomas para validar sitios y tu foto de perfil se almacenan de forma segura en Firebase Storage, asociadas a tu cuenta.</span>
+      <span data-en class="hide"><strong>Validation and profile photos:</strong> photos you take to validate sites and your profile photo are securely stored in Firebase Storage, linked to your account.</span>
+    </li>
+    <li>
+      <span data-es><strong>Progreso en la app:</strong> rutas completadas, sitios validados, puntos, insignias y nivel se guardan en nuestra base de datos (Firebase Firestore) para que tu progreso se sincronice entre dispositivos.</span>
+      <span data-en class="hide"><strong>App progress:</strong> completed routes, validated sites, points, badges, and level are stored in our database (Firebase Firestore) so your progress syncs across devices.</span>
+    </li>
+    <li>
+      <span data-es><strong>Información técnica:</strong> tipo de dispositivo, versión de Android y datos de uso básicos para mejorar la estabilidad de la app.</span>
+      <span data-en class="hide"><strong>Technical information:</strong> device type, Android version, and basic usage data to improve app stability.</span>
+    </li>
+  </ul>
+
+  <!-- USO -->
+  <h2>
+    <span data-es>2. Cómo usamos tu información</span>
+    <span data-en class="hide">2. How We Use Your Information</span>
+  </h2>
+  <ul>
+    <li>
+      <span data-es>Para crear y mantener tu cuenta y perfil de usuario.</span>
+      <span data-en class="hide">To create and maintain your user account and profile.</span>
+    </li>
+    <li>
+      <span data-es>Para verificar la validación de sitios mediante GPS y fotos, y otorgarte puntos e insignias.</span>
+      <span data-en class="hide">To verify site validation via GPS and photos, and award you points and badges.</span>
+    </li>
+    <li>
+      <span data-es>Para mostrarte tu progreso, logros y estadísticas dentro de la app.</span>
+      <span data-en class="hide">To show you your progress, achievements, and stats within the app.</span>
+    </li>
+    <li>
+      <span data-es>Para enviarte notificaciones relacionadas con eventos, rutas nuevas y novedades de la Feria de las Flores y otras temporadas.</span>
+      <span data-en class="hide">To send you notifications about events, new routes, and updates for Feria de las Flores and other seasons.</span>
+    </li>
+  </ul>
+
+  <!-- COMPARTIR -->
+  <h2>
+    <span data-es>3. Compartir información</span>
+    <span data-en class="hide">3. Sharing Information</span>
+  </h2>
+  <p data-es>
+    No vendemos ni compartimos tu información personal con terceros para fines de marketing.
+    Tus datos se almacenan en la infraestructura de Google Firebase (Firestore, Authentication y Storage),
+    sujeta a las políticas de seguridad de Google.
+  </p>
+  <p data-en class="hide">
+    We do not sell or share your personal information with third parties for marketing purposes.
+    Your data is stored on Google Firebase infrastructure (Firestore, Authentication, and Storage),
+    subject to Google's security policies.
+  </p>
+
+  <!-- ALIADOS -->
+  <h2>
+    <span data-es>4. Aliados y comercios (Rutero Aliados)</span>
+    <span data-en class="hide">4. Partners and Businesses (Rutero Aliados)</span>
+  </h2>
+  <p data-es>
+    Cuando reclamas una recompensa o beneficio en un aliado comercial (hostal, restaurante, tienda, etc.),
+    compartimos únicamente la información necesaria para validar el beneficio
+    (por ejemplo, tu nombre y el código de recompensa). No compartimos tu correo electrónico ni tu ubicación
+    con los aliados.
+  </p>
+  <p data-en class="hide">
+    When you redeem a reward or benefit at a partner business (hostel, restaurant, shop, etc.),
+    we share only the information necessary to validate the benefit
+    (for example, your name and the reward code). We do not share your email address or location with partners.
+  </p>
+
+  <!-- PERMISOS -->
+  <h2>
+    <span data-es>5. Permisos del dispositivo</span>
+    <span data-en class="hide">5. Device Permissions</span>
+  </h2>
+  <ul>
+    <li>
+      <span data-es><strong>Ubicación:</strong> requerida para validar sitios en las rutas. Puedes desactivarla, pero algunas funciones no estarán disponibles.</span>
+      <span data-en class="hide"><strong>Location:</strong> required to validate sites along routes. You can disable it, but some features won't be available.</span>
+    </li>
+    <li>
+      <span data-es><strong>Cámara y galería:</strong> usadas para tomar o seleccionar fotos de validación y de perfil. Solo se usan cuando tú lo solicitas explícitamente.</span>
+      <span data-en class="hide"><strong>Camera and gallery:</strong> used to take or select validation and profile photos. Only accessed when you explicitly request it.</span>
+    </li>
+    <li>
+      <span data-es><strong>Almacenamiento:</strong> para guardar las fotos con marca de agua en tu galería local.</span>
+      <span data-en class="hide"><strong>Storage:</strong> to save watermarked photos to your local gallery.</span>
+    </li>
+  </ul>
+
+  <!-- DERECHOS -->
+  <h2>
+    <span data-es>6. Tus derechos</span>
+    <span data-en class="hide">6. Your Rights</span>
+  </h2>
+  <p data-es>
+    Puedes solicitar acceso, corrección o eliminación de tu información personal y de tu cuenta en cualquier momento
+    escribiéndonos al correo de contacto al final de esta página. Procesaremos tu solicitud en un plazo razonable.
+  </p>
+  <p data-en class="hide">
+    You may request access to, correction of, or deletion of your personal information and account at any time
+    by emailing the contact address at the bottom of this page. We will process your request within a reasonable timeframe.
+  </p>
+
+  <!-- ELIMINACION -->
+  <h2 id="eliminacion">
+    <span data-es>7. Eliminación de cuenta y datos</span>
+    <span data-en class="hide">7. Account & Data Deletion</span>
+  </h2>
+  <p data-es>
+    Puedes solicitar la eliminación completa de tu cuenta y todos tus datos personales en cualquier momento.
+    Al eliminar tu cuenta se borrarán permanentemente: tu perfil, fotos de validación, progreso, puntos e insignias.
+    Esta acción no se puede deshacer.
+  </p>
+  <p data-en class="hide">
+    You may request complete deletion of your account and all personal data at any time.
+    Deleting your account will permanently remove: your profile, validation photos, progress, points, and badges.
+    This action cannot be undone.
+  </p>
+  <p data-es><strong>Para solicitar la eliminación de tu cuenta:</strong></p>
+  <p data-en class="hide"><strong>To request account deletion:</strong></p>
+  <ul>
+    <li>
+      <span data-es>Envía un correo a <a href="mailto:paullopez474@gmail.com">paullopez474@gmail.com</a> con el asunto <strong>"Eliminar mi cuenta Rutero MDE"</strong> desde el correo asociado a tu cuenta de Google.</span>
+      <span data-en class="hide">Send an email to <a href="mailto:paullopez474@gmail.com">paullopez474@gmail.com</a> with the subject <strong>"Delete my Rutero MDE account"</strong> from the email address linked to your Google account.</span>
+    </li>
+    <li>
+      <span data-es>Procesaremos tu solicitud dentro de los 7 días hábiles siguientes.</span>
+      <span data-en class="hide">We will process your request within 7 business days.</span>
+    </li>
+    <li>
+      <span data-es>Recibirás confirmación por correo cuando la eliminación se haya completado.</span>
+      <span data-en class="hide">You will receive email confirmation once deletion is complete.</span>
+    </li>
+  </ul>
+
+  <!-- MENORES -->
+  <h2>
+    <span data-es>8. Menores de edad</span>
+    <span data-en class="hide">8. Children's Privacy</span>
+  </h2>
+  <p data-es>
+    Rutero MDE no está dirigida a niños menores de 13 años y no recopilamos intencionalmente información de menores
+    sin el consentimiento de sus padres o tutores.
+  </p>
+  <p data-en class="hide">
+    Rutero MDE is not directed at children under 13, and we do not knowingly collect information from minors
+    without parental or guardian consent.
+  </p>
+
+  <!-- CAMBIOS -->
+  <h2>
+    <span data-es>9. Cambios a esta política</span>
+    <span data-en class="hide">9. Changes to This Policy</span>
+  </h2>
+  <p data-es>
+    Podemos actualizar esta política de privacidad ocasionalmente. Publicaremos cualquier cambio en esta misma página
+    junto con la fecha de actualización.
+  </p>
+  <p data-en class="hide">
+    We may update this privacy policy from time to time. Any changes will be posted on this same page
+    along with the updated date.
+  </p>
+
+  <!-- CONTACTO -->
+  <div class="card">
+    <p>
+      <span data-es>
+        📧 <strong style="color:var(--texto)">Contacto:</strong> Para preguntas sobre privacidad, escribe a
+        <a href="mailto:paullopez474@gmail.com">paullopez474@gmail.com</a>
+      </span>
+      <span data-en class="hide">
+        📧 <strong style="color:var(--texto)">Contact:</strong> For privacy questions, email
+        <a href="mailto:paullopez474@gmail.com">paullopez474@gmail.com</a>
+      </span>
+    </p>
+  </div>
+
+</div>
+
+<footer>
+  <div>
+    © 2025-2026 Felo · Medellín, Colombia<br>
+    <span data-es>Proyecto beneficiario · Programa Créame · Alcaldía de Medellín</span>
+    <span data-en class="hide">Beneficiary project · Créame Program · Medellín Mayor's Office</span>
+  </div>
+</footer>
+
+<script>
+let currentLang = 'es';
+function setLang(lang) {
+  currentLang = lang;
+  document.getElementById('btn-en').classList.toggle('active', lang === 'en');
+  document.getElementById('btn-es').classList.toggle('active', lang === 'es');
+  document.querySelectorAll('[data-en]').forEach(el => el.classList.toggle('hide', lang !== 'en'));
+  document.querySelectorAll('[data-es]').forEach(el => el.classList.toggle('hide', lang !== 'es'));
+}
+</script>
+
+</body>
+</html>

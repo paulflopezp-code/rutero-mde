@@ -1,0 +1,64 @@
+{
+  "flutter": {
+    "platforms": {
+      "android": {
+        "default": {
+          "projectId": "rutero-mde",
+          "appId": "1:300771058852:android:d89b55f65692168bfc3231",
+          "fileOutput": "android/app/google-services.json"
+        }
+      },
+      "dart": {
+        "lib/firebase_options.dart": {
+          "projectId": "rutero-mde",
+          "configurations": {
+            "android": "1:300771058852:android:d89b55f65692168bfc3231",
+            "ios": "1:300771058852:ios:25061151515af895fc3231",
+            "macos": "1:300771058852:ios:25061151515af895fc3231",
+            "web": "1:300771058852:web:1b21fe476d0268defc3231",
+            "windows": "1:300771058852:web:c79fd3c73915a90ffc3231"
+          }
+        }
+      }
+    }
+  },
+  "hosting": {
+    "public": "web",
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**"
+    ],
+    "headers": [
+      {
+        "source": "/images/**",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "public, max-age=86400"
+          }
+        ]
+      }
+    ],
+    "rewrites": [
+      {
+        "source": "/images/**",
+        "destination": "/images/**"
+      }
+    ]
+  },
+  "functions": [
+    {
+      "source": "functions",
+      "codebase": "default",
+      "disallowLegacyRuntimeConfig": true,
+      "ignore": [
+        "node_modules",
+        ".git",
+        "firebase-debug.log",
+        "firebase-debug.*.log",
+        "*.local"
+      ]
+    }
+  ]
+}

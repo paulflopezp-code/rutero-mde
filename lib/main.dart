@@ -61,6 +61,53 @@ import 'package:timezone/data/latest.dart' as tzdata;
 // ─────────────────────────────────────────────────────────────
 
 
+// ─────────────────────────────────────────────────────────────────────────────
+//  TIPS SERVICE — reemplaza kTipsPorSitio y kTipsPorSitioEN
+//  Tips cargados desde Firestore (colección: tips_por_sitio) con caché en memoria
+// ─────────────────────────────────────────────────────────────────────────────
+class TipsService {
+  static final TipsService _instance = TipsService._internal();
+  factory TipsService() => _instance;
+  TipsService._internal();
+
+  final Map<String, Map<String, String>> _cache = {};
+  bool _cargado = false;
+
+  Future<void> precargar() async {
+    if (_cargado) return;
+    try {
+      final snapshot = await FirebaseFirestore.instance
+          .collection('tips_por_sitio')
+          .get(GetOptions(source: fs.Source.serverAndCache));
+      for (final doc in snapshot.docs) {
+        final data = doc.data();
+        final nombre = data['nombre']?.toString() ?? doc.id;
+        _cache[nombre] = {
+          'es': data['es']?.toString() ?? '',
+          'en': data['en']?.toString() ?? '',
+        };
+      }
+      _cargado = true;
+      debugPrint('✅ TipsService: \${_cache.length} tips cargados');
+    } catch (e) {
+      debugPrint('⚠️ TipsService: error cargando tips — \$e');
+    }
+  }
+
+  String getTip(String sitioNombre) {
+    final entry = _cache[sitioNombre];
+    if (entry == null) return '';
+    if (kLang == 'en') {
+      return entry['en']?.isNotEmpty == true ? entry['en']! : (entry['es'] ?? '');
+    }
+    return entry['es']?.isNotEmpty == true ? entry['es']! : (entry['en'] ?? '');
+  }
+
+  bool containsKey(String sitioNombre) => _cache.containsKey(sitioNombre);
+}
+
+final tipsService = TipsService();
+
 // ─────────────────────────────────────────
 //  AUDIO MANAGER — Música épica
 // ─────────────────────────────────────────
@@ -333,42 +380,100 @@ class NotificationManager {
     }
   }
 
-  /// 🌹 Programa notificaciones de cuenta regresiva para Feria de las Flores
-  /// Se llama una vez al iniciar la app — usa IDs fijos para no duplicar
+  /// 🌹 Programa notificaciones completas de Feria de las Flores 2026
+  /// — Cuenta regresiva pre-feria
+  /// — Notificación diaria 8am con evento del día (hora, lugar, tip)
+  /// — Recordatorio noche anterior para los 3 eventos estrella (6pm)
+  /// — Recordatorio tarde (4pm) día del Desfile de Silleteros
+  /// Se llama una vez al iniciar la app — IDs fijos para no duplicar
   Future<void> programarFeria() async {
     if (!_inicializado) await inicializar();
 
-    // Fecha inicio Feria de las Flores 2026
-    final feria = DateTime(2026, 7, 31, 8, 0, 0);
     final ahora = DateTime.now();
 
-    // Días antes de la feria en que se envía la notificación
+    // ── 1. CUENTA REGRESIVA PRE-FERIA ─────────────────────────────────────
+    final inicioFeria = DateTime(2026, 7, 31, 8, 0);
     final recordatorios = [
-      {'dias': 45, 'id': 4500, 'msg': '🌹 Faltan 45 días para la Feria de las Flores. ¡Marca tu calendario!'},
-      {'dias': 30, 'id': 3000, 'msg': '🌸 Un mes para la Feria de las Flores. Edición 69 · ¡Entrada gratis!'},
-      {'dias': 15, 'id': 1500, 'msg': '🌹 ¡15 días para la Feria! Prepara tu ruta en Rutero MDE.'},
-      {'dias': 5,  'id': 500,  'msg': '🌸 ¡Solo 5 días para la Feria de las Flores! Todo listo en la app.'},
-      {'dias': 3,  'id': 300,  'msg': '🌹 ¡3 días! La Feria de las Flores llega el 31 de julio. ¡No te la pierdas!'},
-      {'dias': 1,  'id': 100,  'msg': '🌸 ¡Mañana empieza la Feria de las Flores! Abre Rutero MDE y empieza a explorar.'},
+      {'dias': 15, 'id': 4015, 'titulo': '🌹 ¡15 días para la Feria!',
+       'msg': 'La Feria de las Flores 2026 empieza el 31 de julio. Edición 69 · 120+ eventos gratuitos. Abrí Rutero MDE y armá tu itinerario.'},
+      {'dias': 7,  'id': 4007, 'titulo': '🌸 ¡Una semana para la Feria!',
+       'msg': '31 jul – 9 ago · 10 días de fiesta. Desfile de Silleteros, Trova, Autos Clásicos y más. Todo en Rutero MDE.'},
+      {'dias': 3,  'id': 4003, 'titulo': '🌹 ¡3 días para la Feria!',
+       'msg': 'El jueves 31 de julio arranca el Concierto Inaugural en el Obelisco 🎤 · Noche · Gratuito. ¡Llegá temprano!'},
+      {'dias': 1,  'id': 4001, 'titulo': '🌸 ¡Mañana empieza la Feria!',
+       'msg': 'Mañana 31 jul: Concierto Inaugural · Obelisco · Noche · Gratuito. Abrí Rutero MDE y activá el Tab Feria 🌹'},
     ];
 
     for (final r in recordatorios) {
-      final dias = r['dias'] as int;
-      final id   = r['id'] as int;
-      final msg  = r['msg'] as String;
-      final cuando = feria.subtract(Duration(days: dias));
+      final dias = (r['dias'] as int?) ?? 0;
+      final id   = (r['id'] as int?) ?? 0;
+      final titulo = r['titulo']?.toString() ?? '';
+      final msg  = r['msg']?.toString() ?? '';
+      final cuando = inicioFeria.subtract(Duration(days: dias));
+      if (cuando.isAfter(ahora)) {
+        await programar(id: id, titulo: titulo, mensaje: msg,
+          cuando: cuando, payload: 'rutero://feria');
+      }
+    }
 
-      // Solo programar si la fecha aún no pasó
+    // ── 2. NOTIFICACIONES DIARIAS 8am — evento del día con detalle ────────
+    // Formato: título corto + cuerpo con hora, lugar y tip breve
+    const notifsDiarias = [
+      {'dia': 31, 'mes': 7, 'hora': 8, 'id': 8731, 'titulo': '🎤 Hoy en la Feria — Concierto Inaugural', 'msg': 'Obelisco de Medellín · Esta noche · Gratuito\n💡 Llegá 1 hora antes, el Obelisco se llena rápido. Llevá ropa abrigada.', 'payload': 'rutero://feria/concierto_inaugural'},
+      {'dia': 1, 'mes': 8, 'hora': 8, 'id': 8801, 'titulo': '🚴 Hoy en la Feria — Feria a Ritmo de Bicicleta', 'msg': 'EPM → Parque de Belén · 10:00 am · Gratuito\n💡 Decorá tu bici con flores — hay premios. Tarde: 🚌 Desfile Chivas y Flores · 2pm · Av. del Ferrocarril.', 'payload': 'rutero://feria/bicicleta'},
+      {'dia': 2, 'mes': 8, 'hora': 8, 'id': 8802, 'titulo': '🌸 Hoy en la Feria — Desfile Avenida Primavera', 'msg': 'Av. Primavera · 2:00 pm · Gratuito · 3a edición\n💡 Vestite con algo floral. Noche: Parque Cultural Nocturno Afro · Plaza Gardel · 7pm.', 'payload': 'rutero://feria/primavera'},
+      {'dia': 3, 'mes': 8, 'hora': 8, 'id': 8803, 'titulo': '🌸 Hoy en la Feria — Florecer en el Jardín Botánico', 'msg': 'Jardín Botánico · Todo el día · Gratuito · Orquídeas y tradiciones\n💡 Arranca la exposición de flores más hermosa de la Feria. Noche: Música Colombiana · Plaza Gardel · 7pm.', 'payload': 'rutero://feria'},
+      {'dia': 4, 'mes': 8, 'hora': 8, 'id': 8804, 'titulo': '🌺 Hoy en la Feria — Fincas Silleteras', 'msg': 'Santa Elena · Todo el día · Consultar transporte\n💡 Visitá una finca silletetera y conocé el origen de las flores. Noche: Homenaje Suramérica · Plaza Gardel · 7pm.', 'payload': 'rutero://feria'},
+      {'dia': 5, 'mes': 8, 'hora': 8, 'id': 8805, 'titulo': '🌹 Hoy en la Feria — Plaza de Flores', 'msg': 'Parques del Río + Parque de los Deseos · Todo el día · Gratuito\n💡 La Plaza de Flores más grande está en Parques del Río. Noche: Son · Plaza Gardel · 7pm.', 'payload': 'rutero://feria'},
+      {'dia': 6, 'mes': 8, 'hora': 8, 'id': 8806, 'titulo': '🎤 Hoy en la Feria — Final de la Trova', 'msg': '🎤 Final de la Trova · Plaza Gardel · 6pm · Gratuito\n💡 La trova paisa es improvisación en tiempo real — retá a un trovador con tu nombre. Hoy arrancan las Fondas de mi Pueblo · Jumbo la 65.', 'payload': 'rutero://feria/trova'},
+      {'dia': 7, 'mes': 8, 'hora': 8, 'id': 8807, 'titulo': '🚗 Hoy en la Feria — Autos Clásicos y Antiguos', 'msg': '🚗 Desfile Autos Clásicos · UPB Laureles · Mañana · Gratuito\n💡 Un viaje en el tiempo sobre ruedas. Noche: Tropical · Plaza Gardel · 7pm. Mañana: Súper Concierto — ¿tenés boleta?', 'payload': 'rutero://feria'},
+      {'dia': 8, 'mes': 8, 'hora': 8, 'id': 8808, 'titulo': '🎸 Hoy en la Feria — Súper Concierto', 'msg': 'Estadio Atanasio · 7:00 pm · REQUIERE BOLETA\n💡 Llegá 2 horas antes. También: Héroes de la Patria · Av. El Poblado · 2pm · Gratuito.', 'payload': 'rutero://feria/superconcierto'},
+      {'dia': 9, 'mes': 8, 'hora': 8, 'id': 8809, 'titulo': '🌹 HOY — Desfile de Silleteros · Edición 69', 'msg': 'Av. El Poblado → Plaza Mayor · 2:00 pm · Gratuito\n💡 ¡Llegá 2 HORAS antes! Mejor punto: Av. El Poblado entre Calles 9 y 11. Metro gratis hoy 🚇', 'payload': 'rutero://feria/silleteros'},
+    ];
+
+    for (final n in notifsDiarias) {
+      final cuando = DateTime(2026, (n['mes'] as int?) ?? 0, (n['dia'] as int?) ?? 0, (n['hora'] as int?) ?? 0, 0);
       if (cuando.isAfter(ahora)) {
         await programar(
-          id: id,
-          titulo: '🌹 Feria de las Flores 2026',
-          mensaje: msg,
+          id: (n['id'] as int?) ?? 0,
+          titulo: n['titulo']?.toString() ?? '',
+          mensaje: n['msg']?.toString() ?? '',
           cuando: cuando,
-          payload: 'feria_flores',
+          payload: n['payload']?.toString() ?? '',
         );
-        debugPrint('✅ Notificación Feria programada: $dias días antes → ${cuando.toIso8601String()}');
       }
+    }
+
+    // ── 3. RECORDATORIOS NOCHE ANTERIOR — eventos estrella (6pm) ──────────
+    const recordatoriosNoche = [
+      {'dia': 30, 'mes': 7, 'hora': 18, 'id': 9730, 'titulo': '🎤 ¡Mañana arranca la Feria!', 'msg': 'Concierto Inaugural · Obelisco · Esta noche (31 jul). Llegá temprano — el Obelisco se llena. Abrí Rutero MDE para el itinerario completo 🌹', 'payload': 'rutero://feria'},
+      {'dia': 7, 'mes': 8, 'hora': 18, 'id': 9807, 'titulo': '🎸 Mañana: Súper Concierto · Estadio Atanasio', 'msg': 'Carin León, Grupo Niche, Silvestre Dangond y más · 7pm · Requiere boleta.\n⚠️ Si no tenés boleta todavía, conseguila hoy.', 'payload': 'rutero://feria/superconcierto'},
+      {'dia': 8, 'mes': 8, 'hora': 18, 'id': 9808, 'titulo': '🌹 Mañana: Desfile de Silleteros — Edición 69', 'msg': 'El evento más grande de la Feria. Domingo 9 ago · 2pm · Av. El Poblado.\n💡 Llegá 2 horas antes. Metro gratis mañana. ¡No te lo perdás!', 'payload': 'rutero://feria/silleteros'},
+    ];
+    for (final r in recordatoriosNoche) {
+      final cuando = DateTime(2026, (r['mes'] as int?) ?? 0, (r['dia'] as int?) ?? 0, (r['hora'] as int?) ?? 0, 0);
+      if (cuando.isAfter(ahora)) {
+        await programar(
+          id: (r['id'] as int?) ?? 0,
+          titulo: r['titulo']?.toString() ?? '',
+          mensaje: r['msg']?.toString() ?? '',
+          cuando: cuando,
+          payload: r['payload']?.toString() ?? '',
+        );
+      }
+    }
+
+    // ── 4. RECORDATORIO TARDE — día del Desfile (4pm) ─────────────────────
+    // Cuando ya están en la ciudad y pueden moverse hacia Av. El Poblado
+    final tardeSilleteros = DateTime(2026, 8, 9, 16, 0);
+    if (tardeSilleteros.isAfter(ahora)) {
+      await programar(
+        id: 9809,
+        titulo: '🌹 El Desfile empieza en 2 horas',
+        mensaje: 'Desfile de Silleteros · Av. El Poblado · 2pm → 5pm aprox.\n💡 Si no saliste todavía, este es el momento. Metro gratis · directo a Est. El Poblado.',
+        cuando: tardeSilleteros,
+        payload: 'rutero://feria/silleteros',
+      );
     }
   }
 
@@ -462,7 +567,6 @@ class DeepLinkManager {
       final segments = uri.pathSegments;
       // Detectar host o primer segmento como tipo
       final tipo = uri.host.isNotEmpty ? uri.host : (segments.isNotEmpty ? segments[0] : '');
-
 
       final ctx = kNavKey.currentContext;
       if (ctx == null) return;
@@ -714,8 +818,6 @@ class PerfilPublicoScreen extends StatelessWidget {
   }
 }
 
-
-
 // ─── MODO DEMO ───────────────────────────
 // Sistema dual: por defecto FALSE (GPS real para usuarios)
 // Solo el admin (paulflopezp@gmail.com) puede activarlo desde Ajustes
@@ -776,29 +878,35 @@ const List<_CiudadRegistrada> kCiudadesRegistradas = [
   //   taglineEN: 'History and magic in every cobblestone street 🌊',
   // ),
 
-  // ── Bogotá ACTIVA — Parque Jaime Duque ───────────────────────
-  _CiudadRegistrada(
-    ciudad: 'Bogotá', pais: 'Colombia',
-    lat: 4.7110, lng: -74.0721, radioKm: 60,
-    codigo: 'BTA', emoji: '🏔️',
-    nombreApp: 'RUTERO BTA',
-    taglineES: 'La ciudad que nunca deja de sorprender 🏔️',
-    taglineEN: 'The city that never stops surprising 🏔️',
-  ),
+
+  // ── Arquitectura multi-ciudad: cada ciudad activa aquí se detecta por GPS ──
+  // Al activar una ciudad, sus rutas se filtran automáticamente por ciudad/depto/país.
+  // Categorías por ciudad: Urbana · Alrededores · Temporada (Feria, festivales).
+
+  // ── Bogotá — activar cuando haya rutas ──────────────────────
+  // _CiudadRegistrada(
+  //   ciudad: 'Bogotá', pais: 'Colombia',
+  //   lat: 4.7110, lng: -74.0721, radioKm: 35,
+  //   codigo: 'BTA', emoji: '🏔️',
+  //   nombreApp: 'RUTERO BTA',
+  //   taglineES: 'La ciudad que nunca deja de sorprender 🏔️',
+  //   taglineEN: 'The city that never stops surprising 🏔️',
+  // ),
+
+  // ── Popayán — activar cuando haya rutas ─────────────────────
+  // _CiudadRegistrada(
+  //   ciudad: 'Popayán', pais: 'Colombia',
+  //   lat: 2.4448, lng: -76.6147, radioKm: 20,
+  //   codigo: 'PPN', emoji: '🏛️',
+  //   nombreApp: 'RUTERO PPN',
+  //   taglineES: 'La ciudad blanca de Colombia 🏛️',
+  //   taglineEN: 'Colombia\'s white city 🏛️',
+  // ),
 
   // ── Otras ciudades futuras ───────────────────────────────────
   // _CiudadRegistrada(ciudad: 'Cali',  pais: 'Colombia', lat: 3.4516,   lng: -76.5320, radioKm: 30, codigo: 'CLO', emoji: '💃', nombreApp: 'RUTERO CLO', taglineES: 'La capital mundial de la salsa 💃', taglineEN: 'The world capital of salsa 💃'),
   // _CiudadRegistrada(ciudad: 'Lima',  pais: 'Perú',     lat: -12.0464, lng: -77.0428, radioKm: 45, codigo: 'LIM', emoji: '🦙', nombreApp: 'RUTERO LIM', taglineES: 'La ciudad del sabor y la historia 🦙', taglineEN: 'The city of flavor and history 🦙'),
 
-  // ── Popayán ACTIVA ───────────────────────────────────────────
-  _CiudadRegistrada(
-    ciudad: 'Popayán', pais: 'Colombia',
-    lat: 2.4448, lng: -76.6147, radioKm: 20,
-    codigo: 'PPN', emoji: '🏛️',
-    nombreApp: 'RUTERO PPN',
-    taglineES: 'La ciudad blanca de Colombia 🏛️',
-    taglineEN: 'Colombia\'s white city 🏛️',
-  ),
 ];
 
 Future<_CiudadRegistrada?> detectarCiudadActual() async {
@@ -823,14 +931,68 @@ Future<_CiudadRegistrada?> detectarCiudadActual() async {
   } catch (_) { return null; }
 }
 
+/// Helper global: parsea sitiosDetalle de una ruta sin importar si viene
+/// como List<dynamic> (Firestore normal) o String (JSON serializado).
+/// Nunca lanza excepción — devuelve [] en caso de error.
+List<dynamic> parseSitiosDetalle(dynamic raw) {
+  if (raw == null) return [];
+  if (raw is List) return raw;
+  if (raw is String) {
+    try {
+      final parsed = jsonDecode(raw);
+      if (parsed is List) return parsed;
+      if (parsed is Map) return [parsed];
+    } catch (_) {}
+  }
+  if (raw is Map) return [raw];
+  return [];
+}
+
+/// Helper: extrae sitiosList desde una ruta (soporta sitiosList y sitiosDetalle como List o String JSON)
+List<String> parseSitiosList(Map<String, dynamic> ruta) {
+  // 1. Intentar sitiosList primero
+  final rawList = ruta['sitiosList'];
+  if (rawList != null) {
+    final lista = parseSitiosDetalle(rawList);
+    if (lista.isNotEmpty) {
+      return lista.map((e) {
+        if (e is String) return e;
+        if (e is Map) return e['nombre']?.toString() ?? '';
+        return e.toString();
+      }).where((n) => n.isNotEmpty).toList();
+    }
+  }
+  // 2. Fallback a sitiosDetalle
+  return parseSitiosDetalle(ruta['sitiosDetalle'])
+      .map((d) {
+        if (d is Map) return (d as Map)['nombre']?.toString() ?? '';
+        if (d is String) return d;
+        return '';
+      })
+      .where((n) => n.isNotEmpty)
+      .toList();
+}
+
 List<Map<String, dynamic>> filtrarRutasPorCiudad(_CiudadRegistrada? ciudad) {
-  // Admin siempre ve todas las rutas de todas las ciudades
-  if (esAdmin) return RutasService().rutas;
-  if (ciudad == null) return RutasService().rutas;
-  return RutasService().rutas.where((r) {
+  // Excluir rutas pausadas o inactivas (no visibles para el usuario)
+  final rutasActivas = RutasService().rutas.where((r) {
+    if (r['pausada'] == true) return false;
+    if (r['activa'] == false) return false;
+    return true;
+  }).toList();
+  // Admin siempre ve todas las rutas activas de todas las ciudades
+  if (esAdmin) return rutasActivas;
+  if (ciudad == null) return rutasActivas;
+  return rutasActivas.where((r) {
     final rutaCiudad = r['ciudad']?.toString() ?? 'Medellín';
     final rutaPais = r['pais']?.toString();
-    // Si la ruta no tiene pais definido, filtrar solo por ciudad
+    // Rutas de temporada de Feria (Santa Elena, corregimientos) → siempre en Medellín
+    final tempMeses = r['temporadaMeses'];
+    if (tempMeses is List && tempMeses.contains(7) || tempMeses is List && tempMeses.contains(8)) {
+      if (rutaPais == 'Colombia' && (rutaCiudad == 'Medellín' || rutaCiudad == 'Santa Elena')) {
+        return ciudad.ciudad == 'Medellín';
+      }
+    }
     if (rutaPais == null || rutaPais.isEmpty) {
       return rutaCiudad == ciudad.ciudad;
     }
@@ -919,6 +1081,50 @@ void setLang(String lang) {
   SharedPreferences.getInstance().then((prefs) => prefs.setString('app_lang', lang));
 }
 String t(String es, String en) => kLang == 'en' ? en : es;
+
+/// Elimina precios individuales de descripciones de sitios
+/// Ej: "Desayuno paisa · $60.000" → "Desayuno paisa"
+/// Aplica a descripciones de sitiosDetalle para no asustar al turista con precios
+String _limpiarPrecioSitio(String texto) {
+  // Eliminar patrones de precio: $60.000, $60,000, COP 60000, 60.000 COP, etc.
+  return texto
+      .replaceAll(RegExp(r'\s*·?\s*\\\$[\d\.,]+'), '')
+      .replaceAll(RegExp(r'\s*·?\s*\$[\d\.,]+\s*(COP|pesos)?'), '')
+      .replaceAll(RegExp(r'\s*·?\s*COP\s*[\d\.,]+'), '')
+      .replaceAll(RegExp(r'\s*·?\s*[\d]{2,3}[\.,][\d]{3}\s*(COP|pesos)?'), '')
+      .trim();
+}
+
+/// Renderiza texto con "Whoosh", "🛴" y "patineta" en amarillo kGold
+Widget _textoConWhoosh(String texto, {
+  double fontSize = 12,
+  Color baseColor = kText,
+  FontWeight fontWeight = FontWeight.normal,
+}) {
+  const amarillo = kGold;
+  // Palabras/frases a resaltar en amarillo
+  final pattern = RegExp(r'(Whoosh|whoosh|🛴|patineta[s]?|scooter[s]?)', caseSensitive: false);
+  final spans = <TextSpan>[];
+  int last = 0;
+  for (final match in pattern.allMatches(texto)) {
+    if (match.start > last) {
+      spans.add(TextSpan(text: texto.substring(last, match.start)));
+    }
+    spans.add(TextSpan(
+      text: match.group(0),
+      style: const TextStyle(color: amarillo, fontWeight: FontWeight.w700),
+    ));
+    last = match.end;
+  }
+  if (last < texto.length) spans.add(TextSpan(text: texto.substring(last)));
+  return RichText(
+    text: TextSpan(
+      style: TextStyle(color: baseColor, fontSize: fontSize,
+          fontWeight: fontWeight, height: 1.4),
+      children: spans,
+    ),
+  );
+}
 
 // ─────────────────────────────────────────
 //  MONEDA — COP para Colombia, USD para el resto
@@ -1164,38 +1370,28 @@ String _tDificultad(String d) {
 String _filtroLabel(String f) {
   const Map<String, List<String>> labels = {
     'Todas':                                    ['Todas',                          'All'],
-    // ── Parque Jaime Duque ──
-    'PARQUE JAIME DUQUE — CLÁSICA':            ['Jaime Duque · Clásica',          'Jaime Duque · Classic'],
-    'PARQUE JAIME DUQUE — FAMILIA':            ['Jaime Duque · Familia',          'Jaime Duque · Family'],
-    'PARQUE JAIME DUQUE — NATURALEZA':         ['Jaime Duque · Naturaleza',       'Jaime Duque · Nature'],
-    'PARQUE JAIME DUQUE — AVENTURA FAMILIAR':  ['Jaime Duque · Aventura',         'Jaime Duque · Adventure'],
     // ── Medellín ──
     'RUTA TRANSFORMACIÓN URBANA':               ['Transformación Urbana',          'Urban Transformation'],
-    'CORREDOR CULTURAL DE LA 45':               ['Corredor Cultural de la 45',     'The 45th Cultural Corridor'],
-    'RUTA PATRIMONIAL DEL CENTRO':              ['Patrimonial del Centro',         'Downtown Heritage'],
-    'RUTA CENTRO REPUBLICANO':                  ['Centro Republicano',             'Republican Center'],
+    'VIVE MANRIQUE':                            ['Vive Manrique',                   'Experience Manrique'],
+    // [eliminado] VIVE EL CENTRO — sitios redistribuidos en otras rutas
+    'FINCAS SILLETERAS':                        ['Fincas Silleteras',               'Silletera Farms'],
+    'FINCAS AGROTURÍSTICAS':                    ['Fincas Agroturísticas',           'Agrotourism Farms'],
+    'TURISMO CREATIVO':                         ['Turismo Creativo',                'Creative Tourism'],
+    'TRANSFORMACIÓN MEMORIA E HISTORIA':        ['Transformación, Memoria e Historia', 'Transformation, Memory & History'],
+    'DISEÑO MODA Y COMPRAS':                    ['Diseño, Moda y Compras',          'Design, Fashion & Shopping'],
+  // [eliminado] 'RUTA PATRIMONIAL DEL CENTRO':              ['Patrimonial del Centro',         '
+  // [eliminado] 'RUTA CENTRO REPUBLICANO':                  ['Centro Republicano',             '
     'RUTA VERDE DEL NORTE':                     ['Verde del Norte',                'Green North'],
     'RUTA DEL METROCABLE & ARVÍ':              ['Metrocable & Arví',              'Metrocable & Arví'],
-    'RUTA LAURELES & TRADICIÓN':               ['Laureles & Tradición',           'Laureles & Tradition'],
     'RUTA DE LOS MIRADORES':                    ['Ruta de los Miradores',          'Viewpoints Route'],
-    'RUTA CULTURAL NOCTURNA':                   ['Cultural Nocturna',              'Night Culture'],
+  // [eliminado] 'RUTA CULTURAL NOCTURNA':                   ['Cultural Nocturna',              '
     'RUTA MEMORIA Y REFLEXIÓN':                ['Memoria y Reflexión',            'Memory & Reflection'],
     'RUTA GUATAPÉ & LA PIEDRA':               ['Guatapé & La Piedra',            'Guatapé & The Rock'],
-    'RUTA DEL CAFÉ EN SANTA ELENA':           ['Café en Santa Elena',            'Coffee in Santa Elena'],
-    'RUTA SAN CARLOS & CHARCOS':               ['San Carlos & Charcos',           'San Carlos & Pools'],
-    'RUTA JARDÍN COLONIAL':                    ['Jardín Colonial',                'Colonial Jardín'],
-    'RUTA SANTA FE DE ANTIOQUIA':              ['Santa Fe de Antioquia',          'Santa Fe de Antioquia'],
-    'RUTA ENVIGADO NATURAL':                    ['Envigado Natural',               'Natural Envigado'],
-    'ALUMBRADO NAVIDEÑO — RÍO MEDELLÍN':      ['Alumbrado Navideño',             'Christmas Lights'],
-    'RUTA ESPÍRITU ARRIERO — JERICÓ':         ['Espíritu Arriero · Jericó',      'Muleteer Spirit · Jericó'],
-    'RUTA PARAÍSO NATURAL — SAN RAFAEL':      ['Paraíso Natural · San Rafael',   'Natural Paradise · San Rafael'],
-    'RUTA MONTAÑA Y ANCESTRALIDAD — TÁMESIS': ['Montaña Ancestral · Támesis',    'Mountain Ancestry · Támesis'],
-    'RUTA JOYA COLONIAL OCULTA — CONCEPCIÓN': ['Joya Colonial · Concepción',     'Hidden Gem · Concepción'],
-    'RUTA CARIBE ANTIOQUEÑO — NECOCLÍ':       ['Caribe Antioqueño · Necoclí',    'Caribbean · Necoclí'],
+    'VIVE EL POBLADO':                         ['Vive El Poblado',                'Live El Poblado'],
     // ── Feria de las Flores 2026 ────────────────────────────────────────────
     'FERIA CLÁSICA':                           ['Feria Clásica',                  'Classic Festival'],
-    'TABLADOS Y RUMBA':                        ['Tablados y Rumba',               'Stages & Nightlife'],
-    'RUTA SILLETERA':                          ['Ruta Silletera',                 'Silletera Route'],
+  // [eliminado] 'TABLADOS Y RUMBA':                        ['Tablados y Rumba',               'S
+  // [eliminado] 'RUTA SILLETERA':                          ['Ruta Silletera',                 'S
   };
   final entry = labels[f];
   if (entry == null) return f;
@@ -1212,271 +1408,20 @@ String _mesNombre(int m) {
 }
 
 // ── Avatar tips EN ──
-const Map<String, String> kTipsPorSitioEN = {
-  // ── Corredor Cultural de la 45 (Manrique) ──
-  'Estación Gardel — Puerta de Manrique': 'You arrive in Manrique through Carlos Gardel. The Zorzal Criollo never set foot in this neighborhood, but his music did — and it stayed forever. The Carrera 45 that begins here is the musical heart of northeast Medellín. 🚇',
-  'Casa Gardeliana': 'Opened in 1935, this house-museum pays tribute to Carlos Gardel, the king of tango. Here you can listen to his original records and understand why Manrique became the tango capital of Colombia. Live performances every Friday. 🎶',
-  'Casa de la Cultura Manrique': 'One of the most active cultural centers in the northeast. This is where the artists, musicians and cultural leaders who keep the neighborhood identity alive are trained. Ask about the events calendar — something is always happening. 🎭',
-  'La 45 Gastronómica': 'The main artery of Manrique is also a festival of flavors. From traditional mondongo and bandeja paisa to specialty coffee. This is the Medellín that conventional tourists never see — and miss out on the best. 🍽️',
-  'Hangar M45 Azotea': 'A rooftop restaurant built around a real Aerolíneas de Antioquia aircraft. The views of the Medellín valley from here are spectacular, especially at sunset. One of the most unique experiences in the city. ✈️',
-  'UVA La Armonía — Punto de Inicio Constelaciones': 'The UVAs (Articulated Life Units) are public spaces built over former water treatment plants. This is the official starting point for the Constelaciones tour — the largest mural in Colombia. 💧',
-  'Macromural Constelaciones': '14,819 square meters of collective art on the facades of San José de La Cima II and Brisas del Jardín. Four artist collectives transformed 500 building facades into a canvas of resilience and memory. Each mural tells a real story of someone who lives here. 🌌',
-  'Mirador El Ojo de Dios': 'The highest point of this route, with a panoramic view of the Medellín valley that few people know about. There is a bar at the top where you can have a coffee or a beer while contemplating the city from above. The effort is worth every step. 👁️',
-  // Centro Republicano — end of route
-  'Teatro Pablo Tobón Uribe (Centro)': "This theater represents today's Medellín: a city that bets on culture, art, and expression as part of its identity. One of the most important performance venues in the country. 🎭",
-  'Museo Casa de la Memoria': "We close the route with a very special stop! Opened in 2012, this museum is dedicated to the victims of the armed conflict in Antioquia. Its architecture, designed by Juan Pablo Ortiz, earned several awards. Admission is free, and the exhibitions change the way you see the city. Congratulations Rutero! 🕊️",
-  // Laureles & Tradition route
-  'Estadio Atanasio Girardot': "Welcome to Laureles! We start at the most modern stadium in Colombia, with capacity for 45,943 people. Nacional and Medellin play here — the most passionate rivalry in the country. ⚽",
-  'Avenida Carrera la 70 (Laureles)': "The liveliest avenue in Laureles. Restaurants, bars and cafes stretch for kilometers. The gastronomic heart of the neighborhood! 🌮",
-  'U.P.B Porteria': "Universidad Pontificia Bolivariana is one of the most respected universities in the country. Its campus is a green oasis in the middle of the city. 🎓",
-  'Primer Parque de Laureles': "The city's living room! Locals gather here, walk their dogs and drink tinto coffee. Pure paisa life at its best. 🌳",
-  'Segundo Parque de Laureles': "The quietest and most family-friendly park in the area. Surrounded by traditional Antioquian restaurants. Order a sancocho at sunset! 🍲",
-  'Restaurante local (Aliado)': "You made it to the perfect closing! A partner restaurant where paisa cuisine happens without the tourist filter. Use your 10% discount and ask the waiter for the day's recommendation. Congratulations Rutero! 🍽️",
-  // Viewpoints route
-  'Cerro Nutibara': "We start at the most emblematic hill in Medellín! From here you get a 360° view of the entire city. At the top is the famous Pueblito Paisa, a replica of a 19th-century Antioquian village. ⛰️",
-  'Mirador Avenida Las Palmas': "The most spectacular road in Medellín. The view of the Aburrá Valley is impressive by day and absolutely magical at night. 🌃",
-  'Cerro El Picacho (fachada)': "The tallest hill within Medellín's urban perimeter at nearly 3,000 meters. From its facade you can see 6 municipalities of the Aburrá Valley. 🦅",
-  'Cerro de las Tres Cruces': "The favorite viewpoint for paisa athletes. You climb through steep trails and at the top three crosses await — along with an unforgettable panoramic view. ✝️",
-  'Mirador de Belén': "We close with the most authentic and least touristy viewpoint! Locals from the neighborhood come here to watch the sunset. Keep the secret. Congratulations Rutero! 🌅",
-  // Memory & Reflection route
-  'Museo Beyond Escobar': 'This is where the route begins. This privately-run museum in San Javier, led by Laura Escobar, shares the family and local account of a complex chapter in Medellín\'s history. The context they give you here makes the rest of the route much more meaningful. Visit by appointment. 🏛️',
-  'Barrio Los Olivos — El Techo': 'Carrera 79B N.° 45D-94. On the rooftop of this house, on December 2, 1993, one of the most violent periods in Medellín came to an end. Today it is a quiet residential street with neighbors, children, and everyday life. The contrast speaks for itself. 🏘️',
-  'Cementerio Jardines Montesacro': 'One of the largest garden cemeteries in Colombia. Pablo Escobar is buried here. Walk through it with respect and in silence — many families in the city have memories here. 🌿',
-  'Parque Memorial Inflexión': 'This park was built in honor of the victims of drug-related violence. A landmark property of that era once stood here. Today it is a place of memory, with 46 trees planted through community participation. 🕊️',
-  'Estación San Javier (Metro)': "Welcome to San Javier! This station is the gateway to Medellín's most famous transformation. Back in 2011, this place looked very different... 🚇",
-  'Biblioteca de San Javier': "This library is more than books — it's a symbol that education can transform an entire neighborhood. Over 80,000 visitors a year! 📚",
-  'Ciudadela de la 4° Revolución': 'This is where the concept of "social urbanism" was born — the idea that won Medellín the award for most innovative city in the world in 2013. 🌍',
-  'Parque de la Paz': 'This park marks the start of the escalator trail. Once a site of conflict — today a symbol of peace and reconciliation. 🕊️',
-  'Murales Hip Hop': 'The most impressive urban art in Colombia! These murals tell the story of Comuna 13 through color and rap. 🎨',
-  'Escaleras electricas': "The world's first outdoor escalators used as public transit! They climb 384 meters across 6 sections. ⚡",
-  'Tienda de artesanos locales (Aliado)': 'Everything you buy here directly supports a local family. 100% handmade! 🛍️',
-  'Parque Berrío': "This is where it all began. Medellín's urban life was organized around this square — commerce, religion, and daily encounters. It remains the heart of downtown. 🔵",
-  'Plaza Botero': "You're standing in an open-air museum. Botero's sculptures transformed this area into a cultural landmark where art blends with everyday life. 🎨",
-  'Museo de Antioquia': "This museum holds much of the region's artistic heritage. Its presence here reinforces the cultural importance of this historic district. 🖼️",
-  'Jardín Botánico Joaquín Antonio Uribe': "A green oasis in the middle of the city. This garden has been Medellín's lungs for over a century. 🌺",
-  'Orquideorama': 'This iconic wooden structure hosts some of the most beautiful orchids in Colombia — the national flower. 🌸 Los paisas dicen "las gordas de Botero" con cariño — las esculturas voluminosas son el símbolo más reconocido de Medellín en el mundo. Abraza la más cercana — está permitido y es tradición.',
-  'Parque Explora': 'One of the best science parks in Latin America. Perfect for curious minds of all ages. 🔬',
-  'Planetario de Medellín': "The stars of Medellín's night sky, anytime of day. The planetarium has been inspiring generations of young scientists. 🪐",
-  'Metrocable Línea K': "Hop on and enjoy views of the city you'll never forget. The cable car was a turning point in mobility for hillside communities. 🚡",
-  'Biblioteca España (Santo Domingo)': 'This iconic building transformed a once-marginalized neighborhood into a symbol of inclusion and architecture. 📚',
-  'Mirador El Alto del Chocho': 'You reached the viewpoint where your route begins! From here you can already see part of the reservoir and the contrast with the valley. Get ready for an amazing day. 🌄',
-  'Peñol (pueblo)': 'This is the NEW Peñol. The original town was submerged under the reservoir waters in 1978 to build the hydroelectric dam. Notice how its people rebuilt everything from scratch. 🏘️',
-  'Réplica Viejo Peñol': 'A gem of memory! This is the submerged town recreated to scale. Walking it means understanding what it meant for its 5,000 inhabitants to lose everything in the name of progress. 🏛️',
-  'La Casa al Revés': 'A fun stop along the way — the house is upside down and the furniture hangs from the ceiling. Perfect for crazy photos. You will laugh! 🏠',
-  'Piedra del Peñol (740 escalones)': 'The key moment of the route! 740 steps, 220 meters of height, a 360° view that changes your life. Breathe, take breaks and enjoy every stretch. The top is worth every step. ⛰️',
-  'Parque Principal de Guatapé': 'You are in the most colorful town in Colombia! This park is the heart of Guatapé. Grab a coffee, watch the zócalos and soak in the paisa-tourist vibe. 🎨',
-  'Plazoleta de los Zócalos': 'Zócalos are decorative friezes that tell each family story. Every house is a work of art — the whole town is an open-air museum. 🖼️ ¡Los zócalos son el alma visual de Guatapé! Cada relieve de colores en las paredes cuenta una historia de la familia que vive adentro. Lee al menos 5 antes de irte. 🎨 Dato paisa: BERRACO significa valiente y capaz — subir 740 escalones te convirtió en berraco.',
-  'Calle del Recuerdo': 'One of the most colorful streets of the town. The walls are full of images of the old Peñol and everyday life scenes. Stop at every house. 🌸',
-  'Malecón de Guatapé': 'We close the route in front of the reservoir! This is where tourist boats depart, with fresh trout restaurants and one of the most beautiful sunsets in Antioquia. Congratulations Rutero! 🚤',
-  'Parque El Poblado': 'The heart of El Poblado neighborhood — one of the most vibrant spots in Medellín for food, culture, and nightlife. 🌳',
-  'Café de Origen Pergamino': 'One of the best specialty coffee shops in Colombia. This is where you truly taste what Colombian coffee is all about. ☕',
-
-  // ── New routes — Antioquia towns ──
-  // Jardín
-  'Terminal del Sur (Inicio Jardín)': 'Your journey to one of the most celebrated towns in southwest Antioquia begins here. The trip takes 3 to 4 hours through mountain landscapes that preview the beauty of the destination. 🚌',
-  'Parque Principal de Jardín': 'Declared an Architectural Heritage of Colombia, this park is one of the most beautiful in the country. Its colors, vegetation, and colonial architecture make it the heart of local life. Everything in Jardín begins and returns here. 🌳',
-  'Basílica Menor Nuestra Señora del Carmen': 'This neo-Gothic church dominates the main park with towers up to 43 meters tall. Built between 1916 and 1942, it is one of the most impressive religious buildings in Antioquia, featuring stained glass and significant artwork. ⛪',
-  'Teleférico de Jardín': 'Opened in 2011, this cable car connects the town with mountain viewpoints in under 10 minutes. From above, the view over Jardín and the San Juan river canyon is breathtaking. An unmissable perspective. 🚠',
-  'Cascada La Escalera': "One of the most accessible waterfalls in the municipality. Its name comes from the stepped shape in which water flows down the rocks. The trail to reach it is short but reveals the natural richness of the surroundings. 💧",
-  'Café local de origen (Jardín)': 'Jardín is one of the most recognized coffee municipalities in Antioquia. Coffee here is not just a drink — it\'s identity, economy, and culture. A cup of single-origin coffee is the perfect way to close your route with the true taste of the territory. ☕',
-
-  // Santa Fe
-  'Terminal del Norte (Inicio Santa Fe)': 'Santa Fe de Antioquia is about 80 km northwest of Medellín. The bus takes approximately 2 hours through the Cauca river canyon — a spectacular route that sets the tone for the colonial destination ahead. 🚌',
-  'Parque Principal Santa Fe de Antioquia': 'Founded in 1541 by Jorge Robledo, Santa Fe was the first capital of Antioquia. Its main park preserves the scale and rhythm of the 18th century. Walking here is stepping back through the history of the region. 🌳',
-  'Puente de Occidente (1887)': 'This suspension bridge over the Cauca river was built between 1887 and 1895 by engineer José María Villa. With 291 meters in length, it was for decades the longest bridge in Latin America. Crossing it means touching a piece of engineering history. 🌉',
-  'Museo Juan del Corral': 'This museum is located in the house where Juan del Corral lived — the man who declared the freedom of slaves in Antioquia in 1814. Its collections present the colonial and republican history of the region in an accessible way. 🏺',
-  'Calles coloniales de Santa Fe': 'The cobblestone streets and whitewashed facades of the historic center have been carefully preserved. Every corner is a photograph. Every door is a story. Santa Fe has the largest number of heritage buildings in the department. 🏘️',
-  'Zona gastronómica típica': 'The perfect closing: empanadas, chicha, mazamorra, and traditional Antioquian dishes at local eateries. Santa Fe\'s food is authentic and affordable. A final experience before heading back. 🍽️',
-
-  // Jericó
-  'Terminal del Sur (Inicio Jericó)': 'Jericó is about 3 hours from Medellín through southwest Antioquia. The bus ride crosses mountain terrain and coffee landscapes. The journey is already part of the experience. 🚌',
-  'Parque Principal de Jericó': 'Declared a national monument, this park is the cultural and religious center of Jericó. It is deeply marked by the legacy of Laura Montoya, the first Colombian canonized as a saint in 2013. 🌳',
-  'Casa Natal de Santa Laura Montoya': 'This house is where Laura Montoya was born in 1874 — the first saint born in Colombia. She was a missionary, writer, and founder of the Congregation of the Missionary Sisters of Mary Help of Christians. A place of history, faith, and national culture. 🏠',
-  'Mirador de Jericó': 'From the heights of the municipality, the view over the mountains of southwest Antioquia is remarkable. Jericó sits at over 1,700 meters above sea level, which explains its fresh climate and green panorama. 🌄',
-  'Taller de carriel artesanal': 'The carriel is the traditional leather bag of the Antioquian muleteer, recognized as a cultural symbol of the department. In Jericó there are still workshops where they are handmade. Understanding the process is understanding part of the Paisa soul. 🎒',
-  'Café local de origen (Jericó)': 'Southwest Antioquia is one of the most important coffee regions in the country. Jericó produces high-altitude coffees with fruity, mild profiles. A cup here is the perfect way to close the route with the true flavor of the territory. ☕',
-
-  // San Rafael
-  'Terminal del Norte (Inicio San Rafael)': 'San Rafael is about 2 hours from Medellín through eastern Antioquia. The bus crosses mountains and reservoirs that preview the water-rich destination ahead. 🚌',
-  'Parque Principal de San Rafael': 'This park is the meeting point of the municipality and the base for all routes toward rivers and waterfalls. San Rafael is considered one of the most hydrologically rich municipalities in Antioquia, with over 50 natural water sources. 🌳',
-  'Río Arenal': 'Río Arenal is one of the most representative rivers of San Rafael. Its origin in high mountain zones explains the purity and cool temperature of its waters. Its banks are ideal for swimming and complete disconnection. 💧',
-  'Charco El Trocadero': 'This natural pool is one of the most visited in the municipality for its depth and blue-green color. It was formed by the erosion of water on granite rock over thousands of years — a living example of how nature sculpts the land. 🏞️',
-  'Cascada Los Patios': 'Surrounded by dense vegetation, this waterfall is the most impressive point of the water route. The sound of the falling water dominates the environment and creates a sense of complete isolation from the urban world. 🌊',
-  'Sendero Ecológico La Planta': 'This trail allows you to understand the biodiversity of the territory. Endemic birds, insects, and tropical rainforest plants are commonly found here. A natural and mindful closing for the route. 🌿',
-
-  // ── RUTAS GASTRONÓMICAS — Tips Avatar (EN) ──
-  'Empanarrica · Empanada paisa desde las 5am': 'The most authentic paisa empanada in downtown. Fried dough, meat and mashed potato filling... this is what paisa grandparents ate at the market. Order one chicken AND one pipián to compare. 🫔',
-  'La Jugosa Centro · Salpicón con helado y queso': 'Salpicón with ice cream and fresh cheese! The combination tourists look at sideways and paisas love. Sweet, sour and salty in one glass. Try it before judging. 🧃',
-  'Restaurante Hacienda Junín · Bandeja paisa': 'The most iconic bandeja paisa on Calle Junín! Beans, chicharrón, ground beef, chorizo, avocado, rice, arepa and fried egg. Mission: identify all 8 ingredients and learn their names — that earns the badge. 🍽️',
-  "¡AHH QUÉ RICURA! · Chicharrón · Plaza de mercado": "The crunchiest chicharrón downtown! At the market plaza you find the flavors Medellín doesn't show in tourist guides. Order the chicharrón with chócolo arepa — the perfect combination. 🐷",
-  "El Llanerito Centro · Chorizo + guarapo · vista al Centro": "Antioquian chorizo with sugarcane guarapo from a downtown viewpoint! Guarapo is the muleteer's drink — fermented sugarcane water that refreshes differently. Order the combo and enjoy the view. 🌆",
-  "Fonda Típicos · Desayuno paisa · limonada natural": "The most complete paisa breakfast in Laureles! Calentado, arepa, hot chocolate, egg and cheese. Paisas say those who don't eat a proper breakfast can't work well — today that applies. Order the house natural lemonade. ☕",
-  'Antioquena Capital · Bandeja paisa · abuela en cocina': 'Bandeja paisa cooked the way grandma made it! No shortcuts here — everything is made in clay pots. The owner has been at the same stove for over 20 years. Say hello when you see her. 👵',
-  'AREPAPAS · Arepa rellena a la brasa': 'The paisa evolution of the arepa! AREPAPAS takes tradition to the next level — creative grilled fillings on Calle 70. Mission: choose your favorite filling and name it in paisa slang. 🌽',
-  "La Tienda de la 70 · Empanadas + guarapo · 4685 reseñas": "4,685 reviews don't lie! La Tienda de la 70 has been the Laureles meeting point for decades. Empanadas with hot sauce + sugarcane guarapo is the combination paisas call 'the perfect combo'. ⭐",
-  'Fonda de Laureles · Mondongo · 5.0 estrellas': 'Perfect 5 stars — the most beloved mondongo in Laureles! Mondongo is the offal soup that divides tourists. The brave ones who try it almost always become converts. Do you dare? 🍲',
-  "Finas Frutas N°1 · Jugo de fruta exótica": "Fruits you probably don't know! Lulo, guanábana, maracuyá, chontaduro, borojó... Colombia has the world's greatest variety of tropical fruits. Order the juice of the rarest fruit you can find. 🍓",
-  "Q'empanada de la 10 · Empanada paisa · 24 horas": "24 hours and always just as good! In El Poblado the paisa empanada coexists with \$200,000 restaurants. Q'empanada proves that the best of Medellín isn't always the most expensive. 🫔",
-  'Medellín Es Sabor-Champi · Bandeja paisa · 4453 reseñas': '4,453 reviews — the most photographed bandeja in El Poblado! Epic mission: identify the 8 ingredients — beans, chicharrón, ground beef, chorizo, avocado, rice, arepa and egg. Name them all to earn the Paisa Master badge. 🏆',
-  "Ajiacos y Mondongos · Mondongo emblema de Medellín": "The mondongo that El Poblado expats discover and can't leave behind! This offal soup with corn, potato and aromatic herbs is the most underrated dish in paisa cuisine. One spoonful convinces. 🍲",
-  "Típicos Parce · Premio + código Rutero": "Last stop — time to claim your reward! Show your app progress to the Típicos Parce staff and receive your special courtesy. Parce means close friend in paisa — here you're already one of us. 🤝",
-  "La Gloria de Gloria · 1kg chicharrón · 4262 reseñas · Mié-Dom": "4,262 reviews and decades of tradition! La Gloria de Gloria serves 1 kg of crunchy chicharrón that Envigado residents consider gastronomic heritage. Closed Monday and Tuesday — if you're here you planned well. 🐷",
-  'El Trifásico · Plato trifásico emblema Envigado': 'The most emblematic dish of Envigado! Trifásico because it has three proteins: chicharrón, beef and chorizo. Envigado residents defend it as the only dish that surpasses the bandeja paisa. Do you agree? 🍽️',
-  'Restaurante Bar Donde Gloria · Cazuela de barrio': "The neighborhood cazuela that Medellín chefs recognize as a reference point! Epic mission: ask the waiter what the cazuela has that the bandeja paisa doesn't. Their answer is part of Envigado's gastronomic culture. 🍲",
-  'Calle Jardín · Ambiente local · música en vivo fines de semana': 'The most beloved street in Envigado! Between stops walk along Calle Jardín and absorb the atmosphere that makes this municipality different from the rest of the Metropolitan Area. Live music on weekends from 5pm. 🎵',
-  'Darisa · Sancocho y mondongo auténtico': "The sancocho that Envigado grandparents recognize from their childhood! Darisa is one of those places where the menu hasn't changed in 30 years because it doesn't need to. Order the mondongo and close the route like the locals. 🍲",
-  'Mercado de La Playa · Food hall urbano Centro': 'The most authentic food hall downtown! Mercado de La Playa mixes traditional downtown with modern gastronomic concepts. The perfect starting point for the urban route before reaching Mercado del Río. 🛒',
-  'La Jugosa Laureles · Helado con frutas y queso': 'Laureles version of the La Jugosa classic! Ice cream with fruits and fresh cheese is one of the most paisa gastronomic experiences that exist. In Laureles the atmosphere is different — more relaxed than downtown. 🍦',
-  'Mercado del Río · Versión moderna clásico paisa · 24.000+ reseñas': '24,000+ reviews — the most visited food hall in Colombia! Epic mission: try a modern version of a paisa classic and decide · is it better than the original? Your verdict gets shared with the Rutero community. ⚖️',
-  'Cerdología · Crispetas de chicharrón · dentro Mercado del Río': 'The reinvented chicharrón that went viral across Colombia! Cerdología took traditional chicharrón and turned it into crunchy popcorn-style bites with special sauces. Sacrilege or evolution? You decide. 🐷',
-  // ── AVENTURA EN FAMILIA — 12 Stations (EN) ──
-  'Estación 1 — Monumento a Dios · ¿Por qué están agradecidos?': 'In front of the most imposing monument in the park — 38 meters and 750 tons — each family member says out loud one thing they are grateful for today. Whoever finishes first earns 10 bonus points. 🙏',
-  'Estación 2 — Jardines del Amor · Carta de amor familiar': 'In this garden each person writes on their phone a loving message dedicated to another family member. Then read them aloud. Group photo among the flowers — best pose wins. 💌',
-  'Estación 3 — Taj Mahal · Sueño familiar compartido': 'This Taj Mahal is a replica of eternal love. Challenge: the family chooses ONE destination they all want to visit together someday. Creative photo in front of the most famous replica in Colombia. 🕌',
-  'Estación 4 — Fontana Mitológica · El poder de la imaginación': 'The winged horses represent limitless imagination. Challenge: in 30 seconds each person invents a superpower they would give to another family member. The most creative one wins. ⛲',
-  'Estación 5 — Gran Mapa de Colombia · Nuestro lugar favorito': 'From the walkways 12 meters high you can see the whole country. Challenge: each member points to the place in Colombia they most want to visit with the family. Aerial group photo. 🗺️',
-  'Estación 6 — Siete Maravillas · La maravilla de nuestra familia': 'The seven wonders of the ancient world are here. Challenge: the family chooses their own "family wonder" — the achievement they are most proud of together. Photo at your favorite wonder. 🏛️',
-  'Estación 7 — Mar Caribe · La aventura que queremos vivir juntos': 'A complete Caribbean Sea with pirate ship and warship. Challenge: each person describes in one word the next adventure they want to live with the family. Photo on the pirate ship. 🌊',
-  'Estación 8 — Kayaks del Caribe · Trabajo en equipo': 'Caribbean waters surround this station. Team challenge: if any family member rides a kayak — everyone earns 50 bonus points. If not, creative team photo by the water. 🚣',
-  'Estación 9 — Bioparque Wakatá · Cuidar lo que amamos': "Colombia's most complete zoo. Challenge: each person picks an animal and explains why it looks like another family member. The funniest answer earns bonus points. 🦁",
-  'Estación 10 — Comarca del Cóndor · Volar alto juntos': 'The Andean Condor — symbol of freedom and altitude. Challenge: each member shares the biggest dream they have for the family in the next 5 years. Photo with arms spread like wings. 🦅',
-  'Estación 11 — Ecoparque Sabana · Sembrar para el futuro': '70 hectares of restored Andean forest. Challenge: the family makes a collective promise of one environmental action they will do together when they get home. Photo in the middle of the forest. 🌿',
-  'Estación 12 — Mirador Panorámico · La foto familiar del año': 'The top of the park — all of Cundinamarca at your feet. Final challenge: the most creative family photo of the day. Those who complete all 12 challenges receive the Family Adventurer Badge. 📸',
-  // ── PARQUE JAIME DUQUE (EN) — Completo ──
-  'Monumento a Dios': '38 meters tall and 750 tons — this giant hand holds the entire world! Take a moment to breathe and feel grateful. They say those who visit with an open heart always come back. Spot the tiny visitors at its base to understand the true scale. 🌍',
-  'Taj Mahal Réplica': 'You are standing before the Colombian Taj Mahal! Built with the same level of detail as the original in India. Find the interior museum — the love story behind the original will surprise you. Best photo: stand at the far end of the reflecting pool at sunset. 🕌',
-  'Gran Mapa de Colombia en Relieve': 'You are 12 meters above ground looking at all of Colombia! Find your hometown and the cities you have visited. Don\'t forget to look up — the aviary above has species found only in Colombia. Count how many departments you can identify. 🗺️',
-  'Gran Mapa de Colombia & Aviario': 'You are 12 meters above ground looking at all of Colombia! Find your hometown and the cities you have visited. Don\'t forget to look up — the aviary has species found only in Colombia. Count how many departments you can identify. 🗺️',
-  'Fontana Mitológica': 'Winged horses from Greek mythology representing limitless imagination! Make a wish — visitors say that here dreams become plans. Challenge: each person describes the mythological creature they would be and why. ⛲',
-  'Las Siete Maravillas del Mundo Antiguo': 'Seven wonders in one place! The Gardens of Babylon, the Colossus of Rhodes, the Great Pyramid... Challenge: vote as a family for your favorite wonder before moving on. The debate will be epic. 🏛️',
-  'Mar Caribe & Barco Pirata': 'A real warship and a pirate ship in the middle of the savanna! The ARC Córdoba participated in real Colombian Navy operations. Board her — Colombia\'s history was also written at sea. Find the captain\'s wheel and take the helm. 🌊',
-  'Zoológico Bioparque Wakatá': 'Wakatá means "The Sacred" in Muisca language! 60% of the animals here were rescued from illegal wildlife trafficking. Every visit contributes directly to their care. Find the hippo — at over 1,500kg it is the largest animal in the park. 🦁',
-  'Bioparque Wakatá — Ruta de la Biodiversidad': 'The most complete biodiversity route in the park! Pink flamingos, capuchin monkeys, Amazonian tapirs and bison — all in one walk. Challenge: count how many different species you can spot. The record is 23 in one visit. 🌱',
-  'Museo Aeroespacial FAC': '33 real aircraft that narrate the history of Colombian skies! Some of these planes flew real combat missions. Find the oldest aircraft — it has over 70 years of history. You can climb into several of them. ✈️',
-  'Mirador Panorámico del Parque': 'The highest point of Jaime Duque Park — the entire park unfolds at your feet! On clear days you can see the mountains of Bogotá. The climb through mythological figures makes the journey as rewarding as the view. Best family photo spot in the park. 🌄',
-  'Parque Infantil Chiquimundo': 'The kingdom of young explorers! Chiquimundo is designed for children to discover the world at their size. Adults are fully allowed to play today. Challenge: parents must try at least one attraction alongside their kids. 🎠',
-  'Jardín de los Dinosaurios': 'Welcome to the Colombian Jurassic! Full-scale replicas of species that existed 65 million years ago. Did you know Colombia had real dinosaurs? Their fossils have been found in the Tatacoa Desert. Find the T-Rex and stand next to it for scale. 🦕',
-  'Castillo Medieval': 'A medieval castle on the Cundinamarca savanna! Replicating 12th century European architecture. Inside you will find armor collections and the history of medieval knights. Challenge: find the hidden coat of arms inside the castle. 🏰',
-  'Atracciones Mecánicas Plaza Cundinamarca': 'The highest adrenaline zone of the park! Rides for all ages and heights. Check the minimum height requirements before queuing — and let yourself feel like a kid again. Team challenge: everyone tries at least one ride. 🎡',
-  'Kayaks del Caribe': 'Row on the Caribbean Sea of the savanna! Kayaks take you alongside the ARC Córdoba destroyer — harder than it looks. Teamwork is essential. Challenge: reach the far end of the lake and back without stopping. 🚣',
-  'Comarca del Cóndor & Oso Andino': 'The Andean Condor — largest bird in the Western Hemisphere with up to 3.2 meters wingspan! Seeing it fly is unforgettable. The Spectacled Bear is equally impressive — both critically endangered. Watch in silence and let the moment sink in. 🦅',
-  'Reserva Natural Ecoparque Sabana': '70 hectares of restored Andean forest — a living, breathing ecosystem! This reserve protects the Green-billed Teal and vital pollinators. Over 200,000 native trees planted by hand. Entry closes at 1pm — arrive early. 🌿',
-  'Sendero de la Memoria Muisca (5km)': '5 kilometers of living Muisca history! This indigenous civilization inhabited the savanna for centuries before the Spanish arrived. The trail sculptures tell their cosmogony — the story of sun, moon and water. Rent a bicycle to cover the full trail. 🏺',
-  'Casa de la Tingua & Avistamiento de Aves': 'The Green-billed Teal almost disappeared from the savanna — today its population is recovering thanks to the park! Bring binoculars if you have them. Challenge: spot at least 5 different bird species before leaving this station. 🦜',
-
-  // San Carlos
-  'Terminal del Norte (Inicio San Carlos)': 'San Carlos is about 3 hours from Medellín through eastern Antioquia. It is known internationally both for its natural wealth and for its remarkable peace and reconciliation process. 🚌',
-  'Parque Principal de San Carlos': 'This park is a symbol of the municipality\'s reconstruction. After difficult years, San Carlos reinvented itself as an ecotourism destination recognized worldwide. The park reflects that transformation. 🌳',
-  'Cascada Velo de Novia': 'Its name comes from the shape of the falling water, resembling a bridal veil. It is one of the most accessible and photographed waterfalls in the municipality, just minutes from the town center. 💧',
-  'Charco El Balseadero': 'This clear, cool natural pool is the locals\' favorite for swimming. Its depth allows jumping from rocks and the green surroundings make it easy to stay longer than planned. 🏞️',
-  'Río San Carlos': 'This river has been fundamental to the life of the municipality both economically and culturally. Its clean waters and constant flow are the result of the environmental preservation maintained by residents for decades. 🌊',
-  'Mirador La Planta': 'From this viewpoint you can observe the mountainous geography that explains the abundance of waterfalls in San Carlos. The rugged terrain and high rainfall create perfect conditions for water to flow everywhere. 🌄',
-
-  // Támesis
-  'Terminal del Sur (Inicio Támesis)': 'Támesis is about 3 hours from Medellín through southwest Antioquia. The journey crosses coffee towns and landscapes that change shade with altitude — a trip that already prepares the senses for what lies ahead. 🚌',
-  'Parque Principal de Támesis': 'This park preserves the typical republican architecture of the southwest. From here the daily life of the municipality is organized and it is the natural starting point for all routes. 🌳',
-  'Petroglifos de Támesis': 'These carved stones are evidence of indigenous cultures that inhabited the region over 1,000 years ago. The petroglyphs of Támesis are considered one of the most important archaeological heritages in the department. Each symbol is an unanswered question. 🗿',
-  'Cerro Cristo Rey': 'From this viewpoint the panoramic view over the municipality and southwest mountains is complete. At over 1,800 meters above sea level, Cerro Cristo Rey is both a visual landmark and a place of spiritual significance for the community. 🌄',
-  'Sendero de La Oculta': 'This trail connects the town center with preserved natural areas. The name evokes the hidden character of the landscapes it holds. Ideal for moderate-intensity hikes with high visual value. 🌿',
-  'Finca cafetera local (Támesis)': 'Southwest Antioquia is coffee country by nature and culture. On the farms of Támesis, coffee is grown at altitudes that produce high-quality beans. Learning the process — from plant to cup — is understanding a core part of Antioquian identity. ☕',
-
-  // Concepción
-  'Terminal del Norte (Inicio Concepción)': 'Concepción is about 2 hours from Medellín through eastern Antioquia. It is one of the least touristy destinations in the region, which makes the experience more authentic and peaceful. The road itself is a preview of the town\'s rhythm. 🚌',
-  'Parque Principal de Concepción': 'Unlike other tourist destinations, in Concepción the park still belongs to its residents. Local life has not been displaced by mass tourism. Observing slowly and walking calmly is the best way to understand this place. 🌳',
-  'Iglesia Nuestra Señora de la Inmaculada Concepción': 'This church gives the municipality its name and has been the center of its spiritual and cultural life for centuries. Its sober, well-preserved architecture reflects the religious history of eastern Antioquia. ⛪',
-  'Calles empedradas de Concepción': 'Original stones still cover much of the streets in the historic center. Walking on them is connecting with the time of mules and muleteers. Concepción preserves this heritage with pride and without excessive intervention. 🏘️',
-  'Charco El Aguacate': 'A natural pool of clean water surrounded by vegetation, frequented mainly by local residents. Getting here means stepping away from the center and into the natural surroundings of the municipality. 💧',
-  'Mirador Alto de la Virgen': 'From this point the entire municipality, the Concepción river, and the eastern mountains can be observed. It is the perfect closing for a route that invites you to see with calm and detail. 🌄',
-
-  // Necoclí
-  'Terminal del Norte (Inicio Necoclí)': 'Necoclí is 8 to 10 hours from Medellín by road, in the Urabá region of Antioquia. It\'s a long journey, but also a complete geographic and cultural transition — from the mountains to the Caribbean Sea. Pack snacks, music, and an open mind. 🚌',
-  'Playa Principal de Necoclí': 'This warm-water beach is the heart of the municipality. Its dark sand and long stretch allow you to walk for miles along the sea. The contrast between the Antioquian Caribbean and the mountains you came from is total. 🏖️',
-  'Malecón de Necoclí': 'The waterfront is the social meeting place of the municipality. From here you can see the Gulf of Urabá, hear cumbia, and feel the Caribbean hospitality of northern Antioquia. A place to walk without hurry. 🌊',
-  'Muelle Turístico de Necoclí': 'Boats depart from this dock to Capurganá, Sapzurro, and the Panama border. Necoclí is the entry point to the Darién from the Colombian Caribbean. Watching the dock activity is understanding the strategic role of this municipality. 🚤',
-  'Mercado Local de Necoclí': 'Here you can find fresh fish, tropical fruits, and the typical gastronomy of Urabá. The market reflects the mestizo and Afro-Colombian culture of the territory. Tasting its flavors is the best way to understand the Antioquian Caribbean. 🛍️',
-  'Playa Oeste — Zona de Atardecer': 'The sunset over the Caribbean Sea from the west beach of Necoclí is one of the most impressive natural spectacles Antioquia can offer. The sky turns orange, red, and purple over the water. The perfect ending for this route. 🌅',
-  // ── TRANVÍA CULTURAL — traducciones EN ──
-  'Tranvía de Ayacucho (recorrido)': "Welcome aboard the Ayacucho Tram! Watch the city center transform through the window. This system revives the history of Medellín old tram, adapted to the modern city. Riding it is already part of the experience. 🚃",
-  'Estación Bicentenario': "Named after 200 years of the Boyacá Battle (1819), this station opened in 2019. A stop that connects daily life with Colombian history. 🇨🇴",
-  'Barrio Buenos Aires': "One of the most active tango communities in Medellín lives here — a legacy from Carlos Gardel visit to the city. Listen closely and you might hear a bandoneón through an open window. 🎵",
-  'Calle 49 Ayacucho (comercio)': "One of Medellín oldest commercial streets, serving as the main cargo route since the 19th century. Today it is a living museum of informal trade and paisa daily life. 🛒",
-  'Placita de Flórez': "Founded in 1891, this is Medellín oldest traditional market. The same family stalls have passed from grandparents to grandchildren for generations. Buy fresh flowers and feel the real city. 🌸",
-  // ── SITIOS ACTIVOS SIN TRADUCCIÓN EN (prioridad) ──
-  'Escaleras eléctricas': "One of the most iconic transformations in Latin America! These outdoor escalators were built in 2011 and connect 6 sectors of the neighborhood in just 6 minutes. Before them, the journey took 45 minutes on foot. 🚡",
-  'Parque de la paz': "The Park of Peace was created to reclaim this space for the community. A symbol of the neighborhood transformation. Sit on its benches and see how children play where once fear reigned. 🕊️",
-  'Parque Pies Descalzos': "Barefoot Park was designed by Rogelio Salmona so that both adults and children could reconnect with nature through their senses. Remove your shoes and feel the sand, water, and bamboo. 🌿",
-  'Parque Norte': "An iconic recreation park that has welcomed several generations of families from Medellín. Its roller coaster and games are a piece of living city history. 🎡",
-  'Estación Universidad (Metro)': "Gateway to the university heart of Medellín. Just steps away are the Botanical Garden, Parque Explora, and UdeA — a cultural corridor that defines the city. 🎓",
-  'Mirador Santo Domingo': "From this viewpoint you can see the entire Aburrá Valley below. The cable car brought not just transport but hope to a neighborhood that felt disconnected from the city. 📸",
-  'Metrocable Línea L': "This cable car takes you from Santo Domingo all the way to Parque Arví, rising 1,800 meters above sea level. The views over Medellín are breathtaking — especially at sunrise. 🚠",
-  'Parque Lleras (cierre)': "El Poblado heart at night. The perfect closing stop — surrounded by restaurants, terraces and the energy of Medellín international life. You earned this ending! 🌃",
-  'Parque de las Luces (escenario)': "The Lights Park transforms into a stage during festivals. 300 lit columns create a surreal atmosphere that makes this one of the most photographed corners of Medellín at night. ✨",
-  'Parque de los Deseos (lecturas)': "During the Book Fair this park becomes a giant open library. Locals read, listen, and debate under the stars. Culture without walls. 📚",
-  'Plaza Gardel (música de cuerda)': "This plaza pays tribute to Carlos Gardel, who visited Medellín in 1935 and left a permanent mark on the city. Tango lives here — in its music, its architecture, and its people. 🎶",
-  // ── FERIA DE LAS FLORES 2026 — traducciones EN ──
-  'Parque de los Deseos (trova)': "Live paisa trova music! Verse improvisers compete in wit and humor in real time. A unique tradition in the world. 🌹 MISSION: Challenge a trovador to invent a couplet with your name — if they do it, you earn 30 bonus points.",
-  'Orquideorama — Exposición flores': "Over 500 species of orchids and exotic flowers from Antioquia on display. The scent is absolutely intoxicating. 🌸 MISSION: Identify 3 orchid varieties and learn the Latin name of one.",
-  'Finca Silletera Santa Elena': "The Feria de las Flores silletas are born here! A silletera family has spent generations growing flowers for the Festival. 💐 MISSION: Meet a silletera family and find out how many flowers go into one silleta — a photo with them is worth 50 bonus points.",
-  'Plaza Mayor (exhibición silletas)': "The winning silletas from the competition are displayed here. Each one tells a different story of Colombia. 🏆 MISSION: Find the silleta that moves you most and share why with the Rutero community.",
-  'Placita de Flórez — Plaza de Flores': "The most authentic flower market in Medellín! This is where silleteros buy the flowers they will carry on their backs. 🌺 MISSION: Buy a flower and give it to someone local — that is the essence of the Feria.",
-  'Avenida Guayabal (Desfile Silleteros)': "The most important Silleteros Parade in history — 69th Edition! 600 families, 80 kilos of flowers on each back, kilometers of color. 🌹 MISSION: Photograph a monumental silleta and find the hidden symbol in its design — worth 50 bonus points.",
-  'Parques del Río (tablado musical)': "The most authentic paisa music during the Feria! Neighborhood stages with cumbia, vallenato and string music until dawn. 🎵 MISSION: Dance with a local and learn a paisa music step — the Rutero community wants to see the video.",
-  'Atanasio Girardot (Autos Clásicos)': "The Classic Cars Parade at the Atanasio! Mechanical jewels with decades of history parade through Colombia most modern stadium. 🚗 MISSION: Find the oldest car in the parade and find out its year — that number is your badge code.",
-  // ── SABOR VIAJERO — EL POBLADO (EN) ──
-  'Pergamino Café · Café de especialidad El Poblado': "Colombian specialty coffee at its finest. Single-origin Antioquia beans prepared with precision. ☕ Order the V60 with Jardín coffee — a unique experience.",
-  'Encocadas · Cocina del Pacífico en El Poblado': "Afro-Colombian Pacific cuisine in El Poblado: shrimp in coconut sauce, patacones and coconut rice. Colombia on a plate. 🦐",
-  'Zorba El Griego · Fusión mediterránea paisa': "Mediterranean cuisine adapted with Colombian ingredients. The avocado hummus and gyro with ají are their signature. 🫙",
-  'Mercado del Río (terraza) · Vista y cocina artesanal': "The Mercado del Río terrace overlooking Parques del Río. Artisan Colombian gastronomy at the epicenter of the new Medellín. 🌆",
-  'Parque Lleras · Cócteles y bares internacionales': "The heart of El Poblado at night. Cocktails with tropical Colombian fruits: maracuyá sour, lulo fizz and chirimoya daiquiri. 🍹",
-  // ── SABOR PAISA PROFUNDO — ENVIGADO (EN) ──
-  'Mercado Campesino Envigado · Productos locales': "Farmers market from the southern Aburrá Valley. Fresh fruit, quesillo, panela and farm coffee. 🌾 Wednesdays and Sundays only.",
-  'La Fritanguería Envigado · Fritanga tradicional': "Classic paisa fritanga: blood sausage, chorizo, chicharrón, papa criolla and chócolo arepa. Southern Aburrá culinary tradition. 🥩",
-  'Quesería Artesanal Las Palmas · Quesos de finca': "Artisan cheeses from farms in Envigado and El Retiro. Try the quesillo with bocadillo. 🧀",
-  'Panadería Envigado · Pan de bono y almojábanas': "Traditional paisa bakery with pan de bono, almojábanas and pandebono. Recipes unchanged for 50 years. 🥐",
-  'Parque El Chinguí · Jugo de lulo con pueblo paisa': "Juice bars serving lulo, maracuyá and guanábana for decades. The central park of Envigado. 🧃",
-  // ── SABOR URBANO — MERCADO DEL RÍO (EN) ──
-  'Mercado del Río · Hall principal': "Mercado del Río: Medellín most ambitious food project — 30 restaurants under one roof. The new Colombian cuisine in action. 🌆",
-  'El Colmado · Tapas colombianas': "Colombian tapas: tilapia ceviche with yellow ají, yuca buñuelos with cheese and bandeja paisa croquettes. 🍢",
-  'Canasta · Cocina de mercado': "Market kitchen with daily ingredients. The menu changes based on what local farmers bring that week. 🧺",
-  'La Barraca · Charcutería artesanal colombiana': "Artisan Colombian charcuterie: santarrosano chorizo, longaniza and Cali salchichón. 🥩",
-  'Bar Míster Babilla · Cócteles tropicales': "Cocktails with seasonal tropical fruits at Mercado del Río. 🍹 MISSION: Try a fruit you have never tasted before.",
-
-};
 
 const Map<String, String> kTipsPorRutaEN = {
   'RUTA MEMORIA Y REFLEXIÓN': 'This is not a typical tourist route — it is a space to understand. Please walk it with respect, without judgment, without idealizing. Medellin went through something very difficult, but also showed a capacity for transformation that today is studied around the world. 🕊️',
   'RUTA TRANSFORMACIÓN URBANA': "Welcome to the most famous route in Medellín! Comuna 13 went from the world's most dangerous neighborhood to a global symbol of social transformation. Get ready to be moved! 🎨",
-  'RUTA PATRIMONIAL DEL CENTRO': "Medellín's historic center holds over 200 years of history on every corner. Start early to make the most of the daylight! ☀️",
+  // [eliminado] 'RUTA PATRIMONIAL DEL CENTRO': "Medellín's historic center holds over 200 years 
   'RUTA VERDE DEL NORTE': "The greenest route in the city! You're about to walk through gardens, science, and culture in less than 1 km. 🌿",
   'RUTA DEL METROCABLE & ARVÍ': "Adventure guaranteed! You'll rise over 1,800 meters above sea level by cable car. The views are unmatched. Bring a light jacket. 🚡",
-  'RUTA LAURELES & TRADICIÓN': 'The favorite neighborhood of Medellín locals. Peaceful, full of parks, and with the best neighborhood food scene in the city. 🌸',
   'RUTA DE LOS MIRADORES': "You're about to see Medellín from above! Have your camera ready — the views from Cerro Nutibara at sunset are spectacular. 📸",
-  'RUTA CULTURAL NOCTURNA': "Medellín's night life awaits! This city comes alive after 6pm. Bring energy and curiosity. 🌙",
-  'SENDEROS DE AGUA Y NATURALEZA': 'Hidden Natural Medellín! This route takes you along streams and green trails all the way to El Castillo. Wear comfortable shoes and stay hydrated! 🌿',
-  'ARTE, CIUDAD Y SABORES': "Art, gastronomy, and urban transformation in one route! Connecting Medellín's historic roots with its most creative and modern side. 🎨",
+  // [eliminado] 'RUTA CULTURAL NOCTURNA': "Medellín's night life awaits! This city comes alive a
   'DEL ORIGEN PAISA A LA MEDELLÍN MODERNA': 'From roots to modernity! This route descends from Cerro Nutibara to the institutional heart of Medellín. 🏘️',
   'TRANVÍA CULTURAL': 'Hop on the tram and discover authentic Medellín! This route takes you through neighborhoods, markets, and streets that tourist circuits miss. 🚃',
   'RUTA GUATAPÉ & LA PIEDRA': 'One of the most spectacular day trips from Medellín! Climb the famous rock and explore the colorful town of Guatapé. Pure magic. 🏔️',
-  'RUTA DEL CAFÉ EN SANTA ELENA': "A journey into Medellín's flower and coffee culture. The silleteros of Santa Elena are living heritage! 🌸",
-  'RUTA SAN CARLOS & CHARCOS': "Adventure and nature at their finest! San Carlos's crystal-clear pools are among the most beautiful in Antioquia. 🌊",
-  'RUTA JARDÍN COLONIAL': "Step into one of Colombia's most beautiful towns. Jardín is a living postcard — colonial architecture, cable car, and coffee at every corner. 🏡",
-  'RUTA SANTA FE DE ANTIOQUIA': 'The colonial capital of Antioquia. White streets, historic churches, and the iconic 1887 suspension bridge await you. ⛪',
-  'RUTA ENVIGADO NATURAL': "Discover the natural side of Envigado, Medellín's most loved neighboring city. Trails, streams, and local art. 🦋",
-  'SENDEROS DEL ARRIERO Y LA MONTAÑA': "A journey to the heart of Antioquia's rural culture. Muleteers, waterfalls, and mountain landscapes that will take your breath away. 🐎",
-  'SEMANA SANTA PATRIMONIAL': "Experience Easter Week through Medellín's most traditional processions and sacred art exhibitions. A deeply moving cultural experience. ✝️",
-  'FESTIVAL INTERNACIONAL DE TANGO': 'Medellín breathes tango like no other city outside Buenos Aires. Join the milongas and feel the rhythm! 🎷',
-  'FESTIVAL DE POESÍA INTERNACIONAL': 'Words that move the world. The Medellín Poetry Festival is one of the largest in the world. 🌷',
-  'COLOMBIAMODA — MODA & DISEÑO': "Colombia's fashion capital shines brightest during Colombiamoda. Designers, showrooms, and style everywhere. 👗",
-  'FERIA DE LAS FLORES': 'The most iconic festival in Medellín! The Silleteros Parade is a UNESCO cultural heritage event — a once-in-a-lifetime experience. 🌹',
-  'MEDEJAZZ — FESTIVAL DE JAZZ': "Medellín's jazz festival brings world-class musicians to intimate venues around the city. A treat for music lovers. 🎵",
-  'FIESTA DEL LIBRO Y LA CULTURA': 'One of the largest book fairs in Latin America, free and open to everyone. Knowledge and culture for all. 📚',
-  'FERIA DE LA ANTIOQUEÑIDAD': 'Paisa identity on full display — folk music, traditional food, crafts, and the pride of Antioquia. 🎭',
-  'ALUMBRADO NAVIDEÑO — RÍO MEDELLÍN': "Medellín's Christmas lights are world-famous. The Río Medellín transforms into a river of light and color. Pure magic! 🎇",
-  'RUTA ESPÍRITU ARRIERO — JERICÓ': "Welcome to Jericó, home of Colombia's first saint and the birthplace of the muleteer culture of the southwest. This municipality, sitting above 1,700 meters, combines faith, artisan tradition, and single-origin coffee into one authentic experience. The carriel you'll see is not a souvenir — it's living history. 🐎",
-  'RUTA PARAÍSO NATURAL — SAN RAFAEL': "Today you head to one of the most water-rich municipalities in Antioquia. San Rafael has over 50 natural water sources and is considered one of the best ecotourism destinations in the east. Along the way you'll discover how water has shaped both the landscape and the lives of its people. 🌿",
-  'RUTA MONTAÑA Y ANCESTRALIDAD — TÁMESIS': "Today you visit Támesis, a territory where traces of pre-Hispanic cultures are still preserved through its petroglyphs. This route combines archaeology, nature, and coffee tradition in a single day. Walking these lands is walking on living memory. ☕",
-  'RUTA JOYA COLONIAL OCULTA — CONCEPCIÓN': "Welcome to Concepción, a municipality where time seems to stand still. Its stone streets and preserved architecture make it one of the most authentic towns in eastern Antioquia, still largely undiscovered by mass tourism. Today you don't come to rush — you come to observe with calm and curiosity. 🏛️",
-  'RUTA CARIBE ANTIOQUEÑO — NECOCLÍ': "You have arrived in Necoclí, Antioquia's gateway to the Caribbean Sea and a strategic point in the Urabá region. The rhythm here changes completely — heat, sea breeze, and the sound of the ocean mark the time. Boats from the dock reach Capurganá and the Panama border. This is not just a tourist route — it's a complete cultural transition. 🏝️",
+  'FERIA DE LAS FLORES': '🌹 The most iconic festival in Colombia! "Medellín loves you and blooms for you" — the 69th Silleteros Parade, 120+ free events, 21 stages across all 16 communes, and for the first time: neurodiverse silleteros. July 31 to August 9, 2026. Everything is better with a Rutero route. 🌺',
+  'VIVE EL POBLADO': "Discover the other side of El Poblado — beyond the bars and restaurants, this community route reveals the neighborhood's soul: public libraries on the hilltops, local farmers' markets, and streets with 400 years of history. 🌿",
 };
 
 void main() async {
@@ -1505,9 +1450,9 @@ void main() async {
     persistenceEnabled: true,
     cacheSizeBytes: Settings.CACHE_SIZE_UNLIMITED,
   );
-  // AppCheck en modo debug — elimina los warnings que causaban latencia de 15-30s
+  // AppCheck producción — playIntegrity para verificación real en Play Store
   await FirebaseAppCheck.instance.activate(
-    androidProvider: AndroidProvider.debug,
+    androidProvider: AndroidProvider.playIntegrity,
   );
   // Cargar configuraciones persistentes (modo demo admin, sonido, ruta activa)
   // Esto permite que la app recuerde el estado del usuario entre cierres.
@@ -1523,11 +1468,16 @@ void main() async {
       statusBarIconBrightness: Brightness.light,
     ),
   );
-  // Notificaciones locales + deep links
+  // Notificaciones locales — solo inicializar (bloquea mínimo, necesario antes de runApp)
   await NotificationManager().inicializar();
-  await NotificationManager().programarFeria(); // 🌹 Cuenta regresiva Feria de las Flores
-  await DeepLinkManager().inicializar();
   runApp(const RuteroApp());
+  // ── Post-runApp: tareas en background que no bloquean el primer frame ──
+  // Mover aquí reduce el splash negro en todos los arranques
+  Future.microtask(() async {
+    await tipsService.precargar();                // 🗒️ Tips desde Firestore
+    await NotificationManager().programarFeria(); // 🌹 Cuenta regresiva Feria
+    await DeepLinkManager().inicializar();        // 🔗 Deep links
+  });
 }
 
 // ─────────────────────────────────────────
@@ -1535,11 +1485,9 @@ void main() async {
 // ─────────────────────────────────────────
 const kGold       = Color(0xFFC9A84C);  // Dorado clásico
 
-
 // ═══════════════════════════════════════════════════════════════════════════════
 //  MÓDULO FERIA DE LAS FLORES 2026 — DATOS GLOBALES
 // ═══════════════════════════════════════════════════════════════════════════════
-
 
 /// Verifica si un sitio de la Feria se puede validar hoy según su fecha
 /// Retorna null si puede validar, o un mensaje explicativo si no puede
@@ -1575,10 +1523,13 @@ String? verificarFechaEvento({
   } else {
     final nombres = {
       [8, 9]: 'Desfile de Silleteros · 9 ago · 2 pm',
-      [8, 8]: 'Super Concierto · 8 ago · 7 pm',
-      [8, 7]: 'Final de la Trova / Desfile Chivas · 7 ago',
-      [8, 6]: 'Desfile Autos Clásicos · 6 ago · 10 am',
-      [7, 31]: 'Concierto inaugural · 31 jul · 5 pm',
+      [8, 8]: 'Súper Concierto + Héroes de la Patria · 8 ago',
+      [8, 7]: 'Desfile Autos Clásicos y Chivas · 7 ago',
+      [8, 6]: 'Final Festival de la Trova · 6 ago · 6 pm',
+      [8, 3]: 'Caminata Canina · 3 ago · 10 am',
+      [8, 2]: 'Desfile Avenida Primavera · 2 ago · 2 pm',
+      [8, 1]: 'Feria a Ritmo de Bicicleta + Chivas · 1 ago · 10 am',
+      [7, 31]: 'Concierto Inaugural · 31 jul · Noche',
     };
     final nombre = nombres.entries.firstWhere(
       (e) => e.key[0] == fecha[0] && e.key[1] == fecha[1],
@@ -1595,16 +1546,19 @@ const kFeriaDorado  = Color(0xFFC9A84C);  // Dorado feria
 
 /// Fecha base Feria 2026
 const kFeriaAno     = 2026;
-const kFeriaLema    = 'Medellín te quiere';  // Lema oficial Feria 2026 ✅ Medellín.Travel
-const kFeriaLemaEN  = 'Medellín loves you';
+const kFeriaLema    = 'Medellín te quiere y florece para ti';  // Lema oficial Feria 2026 ✅ Alcaldía
+const kFeriaLemaEN  = 'Medellín loves you and blooms for you';
 const kFeriaInicio  = [7, 31];   // 31 julio
 const kFeriaFin     = [8, 9];    // 9 agosto
 const kFeriaDesfile = [8, 9];    // Desfile Silleteros — domingo
-const kFeriaConcierto = [8, 8];  // Super Concierto — sábado
-const kFeriaTrova   = [8, 7];    // Final Trova — viernes
-const kFeriaAutos   = [8, 6];    // Autos Clásicos — jueves
-const kFeriaChivas  = [8, 7];    // Desfile Chivas — viernes
-const kFeriaBicis   = [8, 1];    // Feria a ritmo de bicicleta — sábado
+const kFeriaConcierto = [8, 8];  // Súper Concierto — sábado
+const kFeriaTrova   = [8, 6];    // Final Trova — jueves ✅ (era 7, corregido a 6)
+const kFeriaAutos   = [8, 7];    // Autos Clásicos — viernes ✅ (era 6, corregido a 7)
+const kFeriaChivas  = [8, 1];    // Desfile Chivas y Flores — sábado ✅
+const kFeriaBicis   = [8, 1];    // Feria a ritmo de bicicleta — sábado ✅
+const kFeriaHeroes  = [8, 8];    // Héroes de la Patria — sábado ✅ (nuevo 2026)
+const kFeriaPrimavera = [8, 2];  // Desfile Avenida Primavera — domingo ✅ (3era edición)
+const kFeriaCanina  = [8, 3];    // Caminata Canina — lunes ✅ (era 2, corregido a 3)
 
 /// Verifica si hoy está dentro de la Feria
 /// Pre-feria arranca 19 julio — módulo activo desde entonces
@@ -1613,14 +1567,14 @@ const kFeriaPreInicio = [7, 19]; // 19 julio · inicio pre-feria
 /// Módulo visible: desde 19 jul (pre-feria) hasta 9 ago (cierre)
 /// El admin (paulflopezp@gmail.com) siempre lo puede ver para desarrollo
 bool get feriaModuloActivo {
-  // FIX 8/07/2026: Forzado activo para todos los testers — validar UX antes del 19 jul
-  // TODO: restaurar la lógica de fechas antes de publicar a producción:
-  // if (FirebaseAuth.instance.currentUser?.email?.toLowerCase() == kAdminEmail) return true;
-  // final now = DateTime.now();
-  // final preInicio = DateTime(kFeriaAno, kFeriaPreInicio[0], kFeriaPreInicio[1]);
-  // final fin = DateTime(kFeriaAno, kFeriaFin[0], kFeriaFin[1], 23, 59);
-  // return now.isAfter(preInicio.subtract(const Duration(days: 1))) && now.isBefore(fin);
-  return true;
+  // Admin siempre puede ver el módulo para desarrollo
+  final user = FirebaseAuth.instance.currentUser;
+  if (user?.email == kAdminEmail) return true;
+  // Visible para todos: desde 18 jul (pre-feria -1) hasta 9 ago 23:59
+  final now = DateTime.now();
+  final preInicio = DateTime(kFeriaAno, kFeriaPreInicio[0], kFeriaPreInicio[1]);
+  final fin = DateTime(kFeriaAno, kFeriaFin[0], kFeriaFin[1], 23, 59);
+  return now.isAfter(preInicio.subtract(const Duration(days: 1))) && now.isBefore(fin);
 }
 
 /// Feria oficial activa: 31 jul – 9 ago
@@ -1646,15 +1600,15 @@ bool get preFeriaActiva {
 /// - Si está en feria → días para el Desfile (9 ago)
 int get diasParaFeria {
   final now = DateTime.now();
-  if (preFeriaActiva) {
-    // En pre-feria: contar hacia la apertura oficial
-    final apertura = DateTime(kFeriaAno, kFeriaInicio[0], kFeriaInicio[1]);
-    return apertura.difference(now).inDays;
-  }
   if (feriaActiva) {
     // En feria: contar hacia el Desfile de Silleteros
     final desfile = DateTime(kFeriaAno, kFeriaDesfile[0], kFeriaDesfile[1]);
     return desfile.difference(now).inDays;
+  }
+  if (preFeriaActiva) {
+    // En pre-feria: contar hacia la apertura oficial
+    final apertura = DateTime(kFeriaAno, kFeriaInicio[0], kFeriaInicio[1]);
+    return apertura.difference(now).inDays;
   }
   // Antes de todo: contar hacia la pre-feria
   final preInicio = DateTime(kFeriaAno, kFeriaPreInicio[0], kFeriaPreInicio[1]);
@@ -1663,16 +1617,20 @@ int get diasParaFeria {
 
 /// Texto del contador según el momento
 String get textoContadorFeria {
-  if (preFeriaActiva) {
-    final d = diasParaFeria;
-    return d == 0 ? '¡Hoy abre la Feria!' : 'Faltan $d días para la apertura oficial';
-  }
   if (feriaActiva) {
     final d = diasParaFeria;
-    return d == 0 ? '¡Hoy es el Desfile de Silleteros! 🌹' : 'Faltan $d días para el Desfile 🌹';
+    return d == 0
+      ? t('¡Hoy es el Desfile de Silleteros! 🌹', 'Today is the Silleteros Parade! 🌹')
+      : t('$d días para el Desfile · ¡La Feria está activa! 🌹', '$d days to the Parade · Festival is live! 🌹');
+  }
+  if (preFeriaActiva) {
+    final d = diasParaFeria;
+    return d == 0
+      ? t('¡Hoy abre la Feria!', 'The Festival opens today!')
+      : t('Faltan $d días para la apertura oficial', '$d days to the official opening');
   }
   final d = diasParaFeria;
-  return 'La pre-feria arranca en $d días · 19 julio';
+  return t('La pre-feria arranca en $d días · 19 julio', 'Pre-festival starts in $d days · July 19');
 }
 
 /// Verifica si hoy es el día de un evento específico [mes, dia]
@@ -1712,196 +1670,504 @@ List<Map<String, dynamic>> get agendaManana {
 
 /// Agenda completa Feria 2026
 const List<Map<String, dynamic>> kFeriaAgenda = [
-  // PRE-FERIA — COLOMBIAMODA 2026 (25-31 julio)
+
+  // ══ PRE-FERIA ════════════════════════════════════════════════════════════
+
+  // Colombiamoda 25-31 jul
   {'dia': 25, 'mes': 7, 'titulo': 'Colombiamoda — Opening Show', 'tituloEN': 'Colombiamoda — Opening Show',
     'lugar': 'Plaza Mayor Medellín', 'hora': 'Todo el día', 'emoji': '👗', 'tipo': 'preferia', 'gratuito': false,
     'transporte': '🚇 Est. Industriales → caminata 5 min', 'lat': 6.2445, 'lng': -75.5762,
-    'tip': 'La Semana de la Moda más importante de Latinoamérica arranca con el Opening Show. 70.000 asistentes de 50 países. Concepto 2026: "Uniqueness is the New Luxury" 👗'},
-  {'dia': 27, 'mes': 7, 'titulo': 'Colombiamoda — Desfile Inaugural (Manuela Álvarez)', 'tituloEN': 'Colombiamoda — Opening Runway (Manuela Álvarez)',
+    'tip': 'La Semana de la Moda más importante de Latinoamérica. Concepto 2026: "Uniqueness is the New Luxury" 👗',
+    'tipEN': 'The most important Fashion Week in Latin America. 2026 concept: "Uniqueness is the New Luxury" 👗'},
+  {'dia': 27, 'mes': 7, 'titulo': 'Colombiamoda — Desfile Inaugural (Manuela Álvarez)', 'tituloEN': 'Colombiamoda — Opening Runway',
     'lugar': 'Plaza Mayor Medellín', 'hora': 'Noche', 'emoji': '✨', 'tipo': 'preferia', 'gratuito': false,
     'transporte': '🚇 Est. Industriales → caminata 5 min', 'lat': 6.2445, 'lng': -75.5762,
-    'tip': 'La diseñadora Manuela Álvarez presenta "Oh My Heart" — su colección MAZ con la Orquesta Filarmónica y Sinfónica de Medellín en vivo. Moda colombiana en su máximo nivel. ✨'},
+    'tip': 'La diseñadora Manuela Álvarez presenta su colección MAZ con la Orquesta Filarmónica de Medellín en vivo. ✨',
+    'tipEN': 'Designer Manuela Álvarez presents her MAZ collection with the Medellín Philharmonic Orchestra live. ✨'},
   {'dia': 28, 'mes': 7, 'titulo': 'Colombiamoda — Muestra Comercial', 'tituloEN': 'Colombiamoda — Trade Show',
     'lugar': 'Plaza Mayor Medellín', 'hora': '9:00 am – 6:00 pm', 'emoji': '🏛️', 'tipo': 'preferia', 'gratuito': false,
     'transporte': '🚇 Est. Industriales → caminata 5 min', 'lat': 6.2445, 'lng': -75.5762,
-    'tip': 'Del 28 al 30 de julio — Plaza Mayor se convierte en la capital de la moda latinoamericana. 17.000 compradores de 50 países. Colombia, Brasil, Perú, Ecuador y España lideran la participación. 🌎'},
-  {'dia': 29, 'mes': 7, 'titulo': 'Colombiamoda — Ciudad Textil · Teatro Metropolitano', 'tituloEN': 'Colombiamoda — Ciudad Textil · Teatro Metropolitano',
+    'tip': 'Del 28 al 30 de julio — Plaza Mayor como capital de la moda latinoamericana. 🌎',
+    'tipEN': 'July 28-30 — Plaza Mayor as the capital of Latin American fashion. 🌎'},
+  {'dia': 29, 'mes': 7, 'titulo': 'Colombiamoda — Ciudad Textil · Teatro Metropolitano', 'tituloEN': 'Colombiamoda — Ciudad Textil',
     'lugar': 'Teatro Metropolitano', 'hora': 'Noche · acceso libre con registro', 'emoji': '🎭', 'tipo': 'preferia', 'gratuito': true,
     'transporte': '🚇 Est. Alpujarra → caminata 5 min', 'lat': 6.2393, 'lng': -75.5727,
-    'tip': 'Ciudad Textil — una puesta en escena de la Institución Universitaria Pascual Bravo con apoyo de Sapiencia. Entrada libre con registro previo. El Teatro Metropolitano en su máximo esplendor. 🎭'},
-  {'dia': 31, 'mes': 7, 'titulo': 'Colombiamoda — Homenaje Rafael Escalona 100 años', 'tituloEN': 'Colombiamoda — Rafael Escalona 100th Anniversary Tribute',
-    'lugar': 'Teatro Metropolitano', 'hora': 'Noche', 'emoji': '🪗', 'tipo': 'preferia', 'gratuito': false,
-    'transporte': '🚇 Est. Alpujarra → caminata 5 min', 'lat': 6.2393, 'lng': -75.5727,
-    'tip': 'El cierre de Colombiamoda es un homenaje a los 100 años del Juglar Mayor del vallenato. El mismo día que arranca la Feria de las Flores — Medellín vive dos fiestas en una. 🌺🎶'},
+    'tip': 'Puesta en escena de la I.U. Pascual Bravo con apoyo de Sapiencia. Entrada libre con registro previo. 🎭',
+    'tipEN': 'Performance by I.U. Pascual Bravo supported by Sapiencia. Free entry with prior registration. 🎭'},
+  // Festival de Sancochos — pre-feria (26 jul, domingo)
+  {'dia': 26, 'mes': 7, 'titulo': 'Festival de Sancochos de Santa Elena', 'tituloEN': 'Santa Elena Sancocho Festival',
+    'lugar': 'Vereda El Placer · Santa Elena (Acueducto Mutiveral)', 'hora': '11:00 am', 'emoji': '🍲', 'tipo': 'preferia', 'gratuito': true,
+    'transporte': '🚕 Taxi desde El Centro ~30 min', 'lat': 6.2359, 'lng': -75.4986,
+    'tip': '🍲 El sancocho de gallina criolla de Santa Elena es legendario. Este festival pre-feria es la antesala perfecta para conocer el corazón silletero antes del gran desfile.',
+    'tipEN': '🍲 Santa Elena\'s criolla hen stew is legendary. This pre-festival event is the perfect prelude to discovering the silletero heartland before the main parade.'},
 
-  // PRE-FERIA
-  {'dia': 19, 'mes': 7, 'titulo': 'Medellín Urbana Fest', 'tituloEN': 'Medellín Urban Fest', 'lugar': 'Comuna 13', 'hora': 'Todo el día', 'emoji': '🏙️', 'tipo': 'preferia', 'gratuito': true,
-    'transporte': '🚇 Est. San Javier → caminata 10 min', 'lat': 6.2548, 'lng': -75.5973},
-  {'dia': 19, 'mes': 7, 'titulo': 'Desfile Silleteritos', 'tituloEN': 'Mini Silleteros Parade', 'lugar': 'Santa Elena', 'hora': 'Mañana', 'emoji': '🌸', 'tipo': 'preferia', 'gratuito': true,
-    'transporte': '🚕 Taxi desde El Centro ~30 min', 'lat': 6.2359, 'lng': -75.4986},
-  {'dia': 20, 'mes': 7, 'titulo': 'Arví florece + ciclada silletera', 'tituloEN': 'Arví blooms + silletera cycling tour', 'lugar': 'Parque Arví', 'hora': '8:00 am', 'emoji': '🌿', 'tipo': 'preferia', 'gratuito': true,
-    'transporte': '🚇 Acevedo → 🚡 Cable K → Cable L → Arví', 'lat': 6.2713, 'lng': -75.4842},
-  // FERIA — DÍA 1
-  {'dia': 31, 'mes': 7, 'titulo': 'Concierto Inaugural 🎆', 'tituloEN': 'Opening Concert 🎆', 'lugar': 'Obelisco · frente al Atanasio Girardot', 'hora': 'Noche · gratuito', 'emoji': '🎤', 'tipo': 'concierto', 'gratuito': true, 'esEstrellaFeria': true,
-    'transporte': '🚇 Est. Industriales → caminata 5 min', 'lat': 6.2512, 'lng': -75.5649,
-    'tip': '¡El gran arranque de la Feria! Concierto masivo al aire libre con artistas nacionales. Llega temprano para buen lugar — es gratuito y se llena. 🎶'},
-  {'dia': 31, 'mes': 7, 'titulo': 'Plaza de Flores — apertura', 'tituloEN': 'Flowers Square — opening', 'lugar': 'Parques del Río', 'hora': '4:00 pm', 'emoji': '🌹', 'tipo': 'flores', 'gratuito': true,
-    'transporte': '🚇 Est. Industriales → caminata 5 min', 'lat': 6.2436, 'lng': -75.5795},
-  {'dia': 31, 'mes': 7, 'titulo': 'Trova semifinal "Ñito Restrepo"', 'tituloEN': 'Trova Semifinal "Ñito Restrepo"', 'lugar': 'Parque de los Deseos', 'hora': '6:00 pm', 'emoji': '🎤', 'tipo': 'trova', 'gratuito': true,
-    'transporte': '🚇 Est. Universidad → caminata 8 min', 'lat': 6.2684, 'lng': -75.5661},
-  {'dia': 31, 'mes': 7, 'titulo': 'Caiga Pues — Calle de los Artistas', 'tituloEN': 'Caiga Pues — Artist Street', 'lugar': 'Parque Botero', 'hora': 'Tarde/Noche', 'emoji': '🎶', 'tipo': 'tablado', 'gratuito': true,
-    'transporte': '🚇 Est. Alpujarra → caminata 3 min', 'lat': 6.2527, 'lng': -75.5647},
-  // FERIA — DÍA 2
-  {'dia': 1, 'mes': 8, 'titulo': 'Feria a ritmo de bicicleta', 'tituloEN': 'Festival by Bicycle', 'lugar': 'Edf. Inteligente EPM — 12 km', 'hora': '10:00 am', 'emoji': '🚴', 'tipo': 'especial', 'gratuito': true,
-    'transporte': '🚇 Est. Prado → caminata 5 min', 'lat': 6.2524, 'lng': -75.5631},
-  {'dia': 1, 'mes': 8, 'titulo': 'Parque Infantil Zona que Suena', 'tituloEN': 'Kids Park — Music Zone', 'lugar': 'Parque Norte', 'hora': 'Todo el día', 'emoji': '🎡', 'tipo': 'familiar', 'gratuito': true,
-    'transporte': '🚇 Est. Acevedo → caminata 10 min', 'lat': 6.2776, 'lng': -75.5632},
-  {'dia': 1, 'mes': 8, 'titulo': 'Trova semifinal "Salvo Ruiz"', 'tituloEN': 'Trova Semifinal "Salvo Ruiz"', 'lugar': 'Parque de los Deseos', 'hora': '6:00 pm', 'emoji': '🎤', 'tipo': 'trova', 'gratuito': true,
-    'transporte': '🚇 Est. Universidad → caminata 8 min', 'lat': 6.2684, 'lng': -75.5661},
-  {'dia': 1, 'mes': 8, 'titulo': 'Tablados comunas + Fiesta Blanca', 'tituloEN': 'Community Stages + White Party', 'lugar': 'Comunas de Medellín', 'hora': 'Noche', 'emoji': '🪗', 'tipo': 'tablado', 'gratuito': true,
-    'transporte': '🚇 Metro + buseta según zona', 'lat': 6.2518, 'lng': -75.5636},
-  // FERIA — DÍA 3
-  {'dia': 2, 'mes': 8, 'titulo': 'Desfile Avenida Primavera', 'tituloEN': 'Spring Avenue Parade', 'lugar': 'Av. Regional → Plaza Mayor', 'hora': '2:00 pm', 'emoji': '🌸', 'tipo': 'desfile', 'gratuito': true,
-    'transporte': '🚇 Est. Industriales → caminata 5 min', 'lat': 6.2376, 'lng': -75.5814},
-  {'dia': 2, 'mes': 8, 'titulo': 'Caminata canina y mascotas', 'tituloEN': 'Dog & Pet Walk', 'lugar': 'Estadio Metro → Tierragro', 'hora': '10:00 am', 'emoji': '🐾', 'tipo': 'familiar', 'gratuito': true,
-    'transporte': '🚇 Est. Estadio → caminata 5 min', 'lat': 6.2552, 'lng': -75.5880},
-  {'dia': 2, 'mes': 8, 'titulo': 'Parque Cultural Noche Afro', 'tituloEN': 'Afro Night — Cultural Park', 'lugar': 'Parque Gardel', 'hora': '7:00 pm', 'emoji': '🥁', 'tipo': 'tablado', 'gratuito': true,
-    'transporte': '🚇 Est. Hospital → caminata 12 min', 'lat': 6.2590, 'lng': -75.5725},
-  {'dia': 2, 'mes': 8, 'titulo': 'Tablado Santa Elena', 'tituloEN': 'Santa Elena Stage', 'lugar': 'Parque central Santa Elena', 'hora': 'Noche', 'emoji': '🌺', 'tipo': 'tablado', 'gratuito': true,
-    'transporte': '🚕 Taxi desde El Centro ~30 min', 'lat': 6.2315, 'lng': -75.4950},
-  // FERIA — DÍA 4
-  {'dia': 3, 'mes': 8, 'titulo': 'Noche de Música Colombiana', 'tituloEN': 'Colombian Music Night', 'lugar': 'Parque Gardel', 'hora': '6:00 pm', 'emoji': '🎻', 'tipo': 'concierto', 'gratuito': true,
-    'transporte': '🚇 Est. Hospital → caminata 12 min', 'lat': 6.2590, 'lng': -75.5725},
-  {'dia': 3, 'mes': 8, 'titulo': 'Tablados: Manrique, La América, El Poblado', 'tituloEN': 'Stages: Manrique, La América, El Poblado', 'lugar': 'Comunas', 'hora': 'Noche', 'emoji': '🪗', 'tipo': 'tablado', 'gratuito': true,
-    'transporte': '🚇 Metro según zona · consultar mapa', 'lat': 6.2518, 'lng': -75.5636},
-  // FERIA — DÍA 5
-  {'dia': 4, 'mes': 8, 'titulo': 'Tablados comunas — noche', 'tituloEN': 'Community Stages — night', 'lugar': 'Comunas de Medellín', 'hora': 'Noche', 'emoji': '🪗', 'tipo': 'tablado', 'gratuito': true,
-    'transporte': '🚇 Metro según zona · consultar mapa', 'lat': 6.2518, 'lng': -75.5636},
-  {'dia': 4, 'mes': 8, 'titulo': 'Fincas silleteras + Parque Arví', 'tituloEN': 'Silletera Farms + Arví Park', 'lugar': 'Santa Elena', 'hora': 'Todo el día', 'emoji': '🌿', 'tipo': 'silletera', 'gratuito': false,
-    'transporte': '🚕 Taxi desde El Centro ~30 min', 'lat': 6.2365, 'lng': -75.4986},
-  // FERIA — DÍA 6
-  {'dia': 5, 'mes': 8, 'titulo': 'Noche de Son y Bolero', 'tituloEN': 'Son & Bolero Night', 'lugar': 'Parque Gardel', 'hora': '7:00 pm', 'emoji': '🎷', 'tipo': 'concierto', 'gratuito': true,
-    'transporte': '🚇 Est. Hospital → caminata 12 min', 'lat': 6.2590, 'lng': -75.5725},
-  {'dia': 5, 'mes': 8, 'titulo': 'Tablados: Popular, La Candelaria, San Javier', 'tituloEN': 'Stages: Popular, La Candelaria, San Javier', 'lugar': 'Comunas', 'hora': 'Noche', 'emoji': '🪗', 'tipo': 'tablado', 'gratuito': true,
-    'transporte': '🚇 Metro según zona · consultar mapa', 'lat': 6.2518, 'lng': -75.5636},
-  {'dia': 5, 'mes': 8, 'titulo': 'Plaza Flores Ciudad del Río', 'tituloEN': 'Flowers Square — Ciudad del Río', 'lugar': 'MAMM — Ciudad del Río', 'hora': '4:00 pm', 'emoji': '🌹', 'tipo': 'flores', 'gratuito': true,
-    'transporte': '🚇 Est. Industriales → caminata 8 min', 'lat': 6.2388, 'lng': -75.5779},
-  // FERIA — DÍA 7
-  {'dia': 6, 'mes': 8, 'titulo': 'Desfile Autos Clásicos', 'tituloEN': 'Classic Cars Parade', 'lugar': 'UPB', 'hora': '10:00 am', 'emoji': '🚗', 'tipo': 'desfile', 'gratuito': true,
-    'transporte': '🚇 Est. Laureles → caminata 10 min', 'lat': 6.2631, 'lng': -75.5892},
-  {'dia': 6, 'mes': 8, 'titulo': 'Parque Cultural Nocturno Tropical', 'tituloEN': 'Tropical Night — Cultural Park', 'lugar': 'Parque Gardel', 'hora': '7:00 pm', 'emoji': '🌴', 'tipo': 'concierto', 'gratuito': true,
-    'transporte': '🚇 Est. Hospital → caminata 12 min', 'lat': 6.2590, 'lng': -75.5725},
-  {'dia': 6, 'mes': 8, 'titulo': 'Tablados: Villa Hermosa, Altavista, Castilla', 'tituloEN': 'Stages: Villa Hermosa, Altavista, Castilla', 'lugar': 'Comunas', 'hora': 'Noche', 'emoji': '🪗', 'tipo': 'tablado', 'gratuito': true,
-    'transporte': '🚇 Metro según zona · consultar mapa', 'lat': 6.2518, 'lng': -75.5636},
-  // FERIA — DÍA 8
-  {'dia': 7, 'mes': 8, 'titulo': 'Final Festival de la Trova', 'tituloEN': 'Trova Festival Final', 'lugar': 'Parque Gardel', 'hora': '6:00 pm', 'emoji': '🎤', 'tipo': 'trova', 'gratuito': true,
-    'transporte': '🚇 Est. Hospital → caminata 12 min', 'lat': 6.2590, 'lng': -75.5725},
-  {'dia': 7, 'mes': 8, 'titulo': 'Desfile Chivas y Flores', 'tituloEN': 'Chivas & Flowers Parade', 'lugar': 'Parque Guayaquil → Av. Ferrocarril', 'hora': '2:00 pm', 'emoji': '🚌', 'tipo': 'desfile', 'gratuito': true,
-    'transporte': '🚇 Est. Cisneros → caminata 5 min', 'lat': 6.2426, 'lng': -75.5710},
-  {'dia': 7, 'mes': 8, 'titulo': 'Tablados: Santa Cruz, Robledo', 'tituloEN': 'Stages: Santa Cruz, Robledo', 'lugar': 'Comunas', 'hora': 'Noche', 'emoji': '🪗', 'tipo': 'tablado', 'gratuito': true,
-    'transporte': '🚇 Metro según zona · consultar mapa', 'lat': 6.2518, 'lng': -75.5636},
-  // FERIA — DÍA 9 (SUPER CONCIERTO)
-  {'dia': 8, 'mes': 8, 'titulo': 'Súper Concierto', 'tituloEN': 'Super Concert', 'lugar': 'Estadio Atanasio Girardot', 'hora': '7:00 pm', 'emoji': '🎸', 'tipo': 'concierto', 'gratuito': false, 'esEstrellaFeria': true, 'artistas': 'Carin León · Silvestre Dangond · Grupo Niche · Luis Alfonso · Felipe Peláez · Aria Vega',
+  // Silleteritos Santa Elena — pre-feria (19 jul)
+  {'dia': 19, 'mes': 7, 'titulo': 'Desfile de Silleteritos Santa Elena', 'tituloEN': 'Mini Silleteros Parade — Santa Elena',
+    'lugar': 'Santa Elena', 'hora': 'Mañana', 'emoji': '🌸', 'tipo': 'preferia', 'gratuito': true,
+    'transporte': '🚕 Taxi desde El Centro ~30 min', 'lat': 6.2359, 'lng': -75.4986,
+    'tip': '🌸 Los niños de Santa Elena portan sus primeras silletas. La tradición se renueva en cada generación.',
+    'tipEN': '🌸 Santa Elena children carry their first silletas. The tradition is renewed with every generation.'},
+
+  // ══ DÍA 1 — Viernes 31 julio ═══════════════════════════════════════════
+
+  {'dia': 31, 'mes': 7, 'titulo': 'Concierto Inaugural 🎆', 'tituloEN': 'Opening Concert 🎆',
+    'lugar': 'Sector Obelisco · Av. Centenario con Cra. 74 · Laureles', 'hora': 'Noche · gratuito', 'emoji': '🎤', 'tipo': 'concierto', 'gratuito': true, 'esEstrellaFeria': true,
+    'transporte': '🚇 Est. Suramericana (L.B) → caminata 8 min por Av. Centenario (Cra 74)', 'lat': 6.257020, 'lng': -75.591759,
+    'tip': '¡El gran arranque de la Feria! Concierto masivo al aire libre. Llegá temprano — es gratuito y se llena. 🎶',
+    'tipEN': 'The big Festival kickoff! Massive open-air concert. Arrive early — it\'s free and fills up fast. 🎶'},
+
+  {'dia': 31, 'mes': 7, 'titulo': 'Trova semifinal "Ñito Restrepo"', 'tituloEN': 'Trova Semifinal "Ñito Restrepo"',
+    'lugar': 'Parque de los Deseos', 'hora': '6:00 pm', 'emoji': '🎤', 'tipo': 'trova', 'gratuito': true,
+    'transporte': '🚇 Est. Universidad → caminata 8 min', 'lat': 6.268617, 'lng': -75.565699},
+
+  {'dia': 31, 'mes': 7, 'titulo': 'Loops — Música Electrónica', 'tituloEN': 'Loops — Electronic Music Festival',
+    'lugar': 'Parque de las Luces', 'hora': 'Noche', 'emoji': '🎧', 'tipo': 'especial', 'gratuito': true,
+    'transporte': '🚇 Est. Cisneros → caminata 2 min', 'lat': 6.245907, 'lng': -75.572735,
+    'tip': '🎧 Festival de música electrónica que abre la Feria. El Parque de las Luces se transforma en el club más grande de Medellín.',
+    'tipEN': '🎧 Electronic music festival that kicks off the Feria. Parque de las Luces becomes the biggest club in Medellín.'},
+
+  {'dia': 31, 'mes': 7, 'titulo': 'Tablado Laureles-Estadio', 'tituloEN': 'Laureles-Estadio Stage',
+    'lugar': 'Sector Obelisco · Laureles (Av. Centenario con Cra 74)', 'hora': 'Noche', 'emoji': '🪗', 'tipo': 'tablado', 'gratuito': true,
+    'transporte': '🚇 Est. Suramericana (L.B) → caminata 8 min', 'lat': 6.257020, 'lng': -75.591759},
+
+  {'dia': 31, 'mes': 7, 'titulo': 'Plaza de las Flores · Parque de los Deseos', 'tituloEN': 'Flowers Square · Parque de los Deseos',
+    'lugar': 'Parque de los Deseos', 'hora': 'Todo el día', 'emoji': '🌺', 'tipo': 'flores', 'gratuito': true,
+    'transporte': '🚇 Est. Universidad → caminata 8 min', 'lat': 6.268617, 'lng': -75.565699,
+    'tip': 'Las Plazas de Flores tienen silleteros en vivo, exhibición de silletas, venta de flores y gastronomía. 🌹',
+    'tipEN': 'The Flores Plazas feature live silleteros, silleta exhibitions, flower sales and gastronomy. 🌹'},
+
+  // ══ DÍA 2 — Sábado 1 agosto ════════════════════════════════════════════
+
+  {'dia': 1, 'mes': 8, 'titulo': 'Feria a ritmo de bicicleta', 'tituloEN': 'Festival by Bicycle',
+    'lugar': 'Parque de las Luces (Plaza Cisneros)', 'hora': '10:00 am', 'emoji': '🚴', 'tipo': 'especial', 'gratuito': true,
+    'transporte': '🚇 Est. Cisneros (L.A) → caminata 2 min', 'lat': 6.2458, 'lng': -75.5722,
+    'tip': 'Ciclopaseo de 12 km con bicicletas decoradas con flores. Hay premios para la más creativa. Familiar y gratis. 🚴🌸',
+    'tipEN': '12 km bike ride with flower-decorated bicycles. Prizes for the most creative. Family-friendly and free. 🚴🌸'},
+
+  {'dia': 1, 'mes': 8, 'titulo': 'Desfile de Chivas y Flores', 'tituloEN': 'Chivas & Flowers Parade',
+    'lugar': 'Parque Guayaquil → Av. Ferrocarril', 'hora': 'Tarde', 'emoji': '🚌', 'tipo': 'desfile', 'gratuito': true,
+    'transporte': '🚇 Est. Cisneros → caminata 5 min', 'lat': 6.236639, 'lng': -75.575864,
+    'tip': '🚌 Las chivas más coloridas de Antioquia decoradas con flores. Un clásico de la Feria que no te podés perder.',
+    'tipEN': '🚌 Antioquia\'s most colorful chivas decorated with flowers. A Festival classic you can\'t miss.'},
+
+  {'dia': 1, 'mes': 8, 'titulo': 'Trova semifinal "Salvo Ruiz"', 'tituloEN': 'Trova Semifinal "Salvo Ruiz"',
+    'lugar': 'Parque de los Deseos', 'hora': '6:00 pm', 'emoji': '🎤', 'tipo': 'trova', 'gratuito': true,
+    'transporte': '🚇 Est. Universidad → caminata 8 min', 'lat': 6.268617, 'lng': -75.565699},
+
+  {'dia': 1, 'mes': 8, 'titulo': 'Zona que Suena — Ciudad de los Niños', 'tituloEN': 'Zona que Suena — Kids City',
+    'lugar': 'Parque Norte', 'hora': 'Todo el día', 'emoji': '🎡', 'tipo': 'familiar', 'gratuito': true,
+    'transporte': '🚇 Est. Acevedo → caminata 10 min', 'lat': 6.272178, 'lng': -75.56564,
+    'tip': 'Zona familiar con música en vivo, talleres de silletas para niños y juegos. El Parque Norte en su mejor versión. 🎡🌸',
+    'tipEN': 'Family zone with live music, kids\' silleta workshops and games. Parque Norte at its best. 🎡🌸'},
+
+  {'dia': 1, 'mes': 8, 'titulo': 'Desfile Silleteritos La Floresta', 'tituloEN': 'Silleteritos Parade — La Floresta',
+    'lugar': 'Parque La Floresta · Laureles', 'hora': 'Mañana', 'emoji': '🌸', 'tipo': 'especial', 'gratuito': true,
+    'transporte': '🚇 Est. Estadio → caminata 10 min', 'lat': 6.256048, 'lng': -75.567981,
+    'tip': '🌸 El Desfile Infantil de Silleteritos de La Floresta en su edición XXXVI. Los niños de Laureles rinden homenaje a la tradición silletera.',
+    'tipEN': '🌸 La Floresta\'s 36th Children\'s Silleteritos Parade. Laureles kids pay tribute to the silletera tradition.'},
+
+  {'dia': 1, 'mes': 8, 'titulo': 'Calle de Artistas · Plaza Botero', 'tituloEN': 'Artists Street · Plaza Botero',
+    'lugar': 'Plaza Botero · Peatonal Carabobo', 'hora': 'Todo el día', 'emoji': '🎨', 'tipo': 'especial', 'gratuito': true,
+    'transporte': '🚇 Est. Alpujarra → caminata 3 min', 'lat': 6.252310, 'lng': -75.567981,
+    'tip': '🎨 El corazón artístico del centro. Artistas plásticos, músicos y artesanos convierten la Peatonal Carabobo en una galería abierta.',
+    'tipEN': '🎨 The artistic heart of downtown. Painters, musicians and artisans turn Peatonal Carabobo into an open gallery.'},
+
+    {'dia': 1, 'mes': 8, 'titulo': 'Tablado Corregimiento Santa Elena', 'tituloEN': 'Stage Corregimiento Santa Elena',
+    'lugar': 'Parque Principal de Santa Elena', 'hora': 'Noche · desde 7:00 pm', 'emoji': '🪗', 'tipo': 'tablado', 'gratuito': true,
+    'transporte': '🚌 Bus desde Parque Berrío → 40 min', 'lat': 6.210093, 'lng': -75.498444,
+    'tip': '🎵 Tablado en Corregimiento Santa Elena. Música en vivo gratis — cumbia, vallenato, salsa. Noche de Feria en el barrio.',
+    'tipEN': '🎵 Stage in Corregimiento Santa Elena. Free live music — cumbia, vallenato, salsa. Festival night in the neighborhood.'},
+  {'dia': 1, 'mes': 8, 'titulo': 'Tablado C15 Guayabal — cancha San Rafael', 'tituloEN': 'Stage Comuna 15 · Guayabal',
+    'lugar': 'Cancha San Rafael, Guayabal', 'hora': 'Noche · desde 7:00 pm', 'emoji': '🪗', 'tipo': 'tablado', 'gratuito': true,
+    'transporte': '🚇 Est. Industriales (L.A) → buseta Guayabal 10 min', 'lat': 6.2017, 'lng': -75.594,
+    'tip': '🎵 Tablado en Comuna 15 · Guayabal. Música en vivo gratis — cumbia, vallenato, salsa. Noche de Feria en el barrio.',
+    'tipEN': '🎵 Stage in Comuna 15 · Guayabal. Free live music — cumbia, vallenato, salsa. Festival night in the neighborhood.'},
+  {'dia': 1, 'mes': 8, 'titulo': 'Tablado C13 San Javier — cancha El Salado', 'tituloEN': 'Stage Comuna 13 · San Javier',
+    'lugar': 'Cancha El Salado, San Javier', 'hora': 'Noche · desde 7:00 pm', 'emoji': '🪗', 'tipo': 'tablado', 'gratuito': true,
+    'transporte': '🚇 Est. San Javier (L.B) → 10 min a pie', 'lat': 6.25349, 'lng': -75.624122,
+    'tip': '🎵 Tablado en Comuna 13 · San Javier. Música en vivo gratis — cumbia, vallenato, salsa. Noche de Feria en el barrio.',
+    'tipEN': '🎵 Stage in Comuna 13 · San Javier. Free live music — cumbia, vallenato, salsa. Festival night in the neighborhood.'},
+
+
+  {'dia': 2, 'mes': 8, 'titulo': 'Caminata Canina y de mascotas', 'tituloEN': 'Dog & Pet Walk',
+    'lugar': 'Estación Estadio Metro → Tierragro (2 km)', 'hora': '10:00 am', 'emoji': '🐾', 'tipo': 'familiar', 'gratuito': true,
+    'transporte': '🚇 Est. Estadio → aquí empieza el recorrido', 'lat': 6.2550, 'lng': -75.5895,
+    'tip': 'Llevá a tu mascota decorada con flores — hay premios para los disfraces más creativos. Recorrido de 2 km. 🐶🌸',
+    'tipEN': 'Bring your flower-decorated pet — prizes for the most creative costumes. 2 km walk. 🐶🌸'},
+
+  {'dia': 2, 'mes': 8, 'titulo': 'Parque Cultural Nocturno — Noche Afro', 'tituloEN': 'Cultural Night Park — Afro Night',
+    'lugar': 'Plaza Gardel', 'hora': '7:00 pm', 'emoji': '🥁', 'tipo': 'concierto', 'gratuito': true,
+    'transporte': '🚇 Est. Exposiciones (L.A) → taxi o bus ~5 min hasta Plaza Gardel (Cra. 65 con Cl. 34)', 'lat': 6.2197, 'lng': -75.5897},
+
+  {'dia': 2, 'mes': 8, 'titulo': 'Zona que Suena — Parque Norte', 'tituloEN': 'Zona que Suena — Parque Norte',
+    'lugar': 'Parque Norte', 'hora': 'Todo el día', 'emoji': '🎶', 'tipo': 'familiar', 'gratuito': true,
+    'transporte': '🚇 Est. Acevedo → caminata 10 min', 'lat': 6.272178, 'lng': -75.56564},
+
+    {'dia': 2, 'mes': 8, 'titulo': 'Cultura Parque Boston', 'tituloEN': 'Boston Park Culture',
+    'lugar': 'Parque de Boston · La Candelaria', 'hora': 'Tarde · gratuito', 'emoji': '🎭', 'tipo': 'cultural', 'gratuito': true,
+    'transporte': '🚇 Est. Prado (L.A) → caminata 12 min hacia el oriente', 'lat': 6.24807, 'lng': -75.55762,
+    'tip': '🎭 Evento cultural en el corazón de la comuna La Candelaria. El Parque Boston es uno de los más emblemáticos del centro de Medellín.',
+    'tipEN': '🎭 Cultural event in the heart of La Candelaria commune. Boston Park is one of the most iconic in downtown Medellín.',
+    'curiosidad': '🧠 Boston es un barrio histórico del centro oriental de Medellín, conocido por sus casas republicanas y su vida cultural.',
+    'curiosidadEN': '🧠 Boston is a historic neighborhood in eastern downtown Medellín, known for its republican houses and cultural life.',
+    'reto': '🎯 Encontrá el árbol más viejo del Parque Boston. ¿Sabés de qué especie es?',
+    'retoEN': '🎯 Find the oldest tree in Boston Park. Do you know what species it is?'},
+  {'dia': 2, 'mes': 8, 'titulo': 'Salsaludando a Medellín', 'tituloEN': 'Salsaludando Medellín',
+    'lugar': 'Parque de las Luces', 'hora': 'Tarde', 'emoji': '💃', 'tipo': 'especial', 'gratuito': true,
+    'transporte': '🚇 Est. Cisneros → caminata 2 min', 'lat': 6.245907, 'lng': -75.572735,
+    'tip': '💃 Un homenaje a la salsa con clases abiertas, exhibiciones y música en vivo en el Parque de las Luces.',
+    'tipEN': '💃 A salsa tribute with open classes, exhibitions and live music at Parque de las Luces.'},
+
+    {'dia': 2, 'mes': 8, 'titulo': 'Tablado C4 Aranjuez — cancha La Brasilia', 'tituloEN': 'Stage Comuna 4 · Aranjuez',
+    'lugar': 'Cancha La Brasilia, Aranjuez', 'hora': 'Noche · desde 7:00 pm', 'emoji': '🪗', 'tipo': 'tablado', 'gratuito': true,
+    'transporte': '🚇 Est. Caribe (L.A) → buseta Aranjuez', 'lat': 6.285419, 'lng': -75.555903,
+    'tip': '🎵 Tablado en Comuna 4 · Aranjuez. Música en vivo gratis — cumbia, vallenato, salsa. Noche de Feria en el barrio.',
+    'tipEN': '🎵 Stage in Comuna 4 · Aranjuez. Free live music — cumbia, vallenato, salsa. Festival night in the neighborhood.'},
+  {'dia': 2, 'mes': 8, 'titulo': 'Tablado Corregimiento Altavista', 'tituloEN': 'Stage Corregimiento Altavista',
+    'lugar': 'Parque Principal de Altavista', 'hora': 'Noche · desde 7:00 pm', 'emoji': '🪗', 'tipo': 'tablado', 'gratuito': true,
+    'transporte': '🚌 Bus desde el Centro → 30 min', 'lat': 6.205, 'lng': -75.617,
+    'tip': '🎵 Tablado en Corregimiento Altavista. Música en vivo gratis — cumbia, vallenato, salsa. Noche de Feria en el barrio.',
+    'tipEN': '🎵 Stage in Corregimiento Altavista. Free live music — cumbia, vallenato, salsa. Festival night in the neighborhood.'},
+  {'dia': 2, 'mes': 8, 'titulo': 'Tablado Corregimiento San Sebastián de Palmitas', 'tituloEN': 'Stage Corregimiento San Sebastián',
+    'lugar': 'Parque Principal de Palmitas', 'hora': 'Noche · desde 7:00 pm', 'emoji': '🪗', 'tipo': 'tablado', 'gratuito': true,
+    'transporte': '🚌 Bus desde San Javier → 45 min', 'lat': 6.3168, 'lng': -75.6622,
+    'tip': '🎵 Tablado en Corregimiento San Sebastián. Música en vivo gratis — cumbia, vallenato, salsa. Noche de Feria en el barrio.',
+    'tipEN': '🎵 Stage in Corregimiento San Sebastián. Free live music — cumbia, vallenato, salsa. Festival night in the neighborhood.'},
+
+
+  {'dia': 3, 'mes': 8, 'titulo': 'Florecer: Orquídeas, Naturaleza y Tradiciones', 'tituloEN': 'Florecer: Orchids, Nature & Traditions',
+    'lugar': 'Jardín Botánico de Medellín', 'hora': 'Todo el día · 3 al 9 ago', 'emoji': '🌸', 'tipo': 'flores', 'gratuito': true,
+    'transporte': '🚇 Est. Universidad → caminata 5 min', 'lat': 6.2685, 'lng': -75.5671,
+    'tip': '🌸 El Jardín Botánico se viste de flores durante toda la segunda semana de Feria. Orquídeas, plantas nativas y talleres.',
+    'tipEN': '🌸 The Botanical Garden dresses in flowers throughout the second Feria week. Orchids, native plants and workshops.'},
+
+  {'dia': 3, 'mes': 8, 'titulo': 'Fincas Silleteras + Parque Arví', 'tituloEN': 'Silletera Farms + Arví Park',
+    'lugar': 'Santa Elena', 'hora': 'Todo el día', 'emoji': '🌿', 'tipo': 'silletera', 'gratuito': false,
+    'transporte': '🚕 Taxi desde El Centro ~30 min', 'lat': 6.210093, 'lng': -75.498444,
+    'tip': '🌺 Durante la semana de Feria las fincas silleteras de Santa Elena reciben visitantes. Ver el armado de una silleta en tiempo real es uno de los momentos más especiales de la Feria.',
+    'tipEN': '🌺 During Feria week, Santa Elena silletera farms welcome visitors. Watching a silleta being built in real time is one of the most special moments of the Festival.'},
+
+    {'dia': 3, 'mes': 8, 'titulo': 'Tablado C12 La América — Parque La Floresta', 'tituloEN': 'Stage Comuna 12 · La América',
+    'lugar': 'Parque La Floresta, La América', 'hora': 'Noche · desde 7:00 pm', 'emoji': '🪗', 'tipo': 'tablado', 'gratuito': true,
+    'transporte': '🚇 Est. Santa Lucía (L.B) → 10 min', 'lat': 6.255825, 'lng': -75.601519,
+    'tip': '🎵 Tablado en Comuna 12 · La América. Música en vivo gratis — cumbia, vallenato, salsa. Noche de Feria en el barrio.',
+    'tipEN': '🎵 Stage in Comuna 12 · La América. Free live music — cumbia, vallenato, salsa. Festival night in the neighborhood.'},
+  {'dia': 3, 'mes': 8, 'titulo': 'Tablado C1 Popular — cancha Granizal', 'tituloEN': 'Stage Comuna 1 · Popular',
+    'lugar': 'Cancha Granizal, Popular', 'hora': 'Noche · desde 7:00 pm', 'emoji': '🪗', 'tipo': 'tablado', 'gratuito': true,
+    'transporte': '🚇 Est. Acevedo → Metro Cable J → 15 min', 'lat': 6.291166, 'lng': -75.54392,
+    'tip': '🎵 Tablado en Comuna 1 · Popular. Música en vivo gratis — cumbia, vallenato, salsa. Noche de Feria en el barrio.',
+    'tipEN': '🎵 Stage in Comuna 1 · Popular. Free live music — cumbia, vallenato, salsa. Festival night in the neighborhood.'},
+
+
+    {'dia': 4, 'mes': 8, 'titulo': 'Tablado C3 Manrique — cancha El Jardín', 'tituloEN': 'Stage Comuna 3 · Manrique',
+    'lugar': 'Cancha El Jardín, Manrique', 'hora': 'Noche · desde 7:00 pm', 'emoji': '🪗', 'tipo': 'tablado', 'gratuito': true,
+    'transporte': '🚇 Est. Acevedo → 15 min', 'lat': 6.276973, 'lng': -75.5453,
+    'tip': '🎵 Tablado en Comuna 3 · Manrique. Música en vivo gratis — cumbia, vallenato, salsa. Noche de Feria en el barrio.',
+    'tipEN': '🎵 Stage in Comuna 3 · Manrique. Free live music — cumbia, vallenato, salsa. Festival night in the neighborhood.'},
+  {'dia': 4, 'mes': 8, 'titulo': 'Tablado C6 Doce de Octubre — cancha La Tinajita', 'tituloEN': 'Stage Comuna 6 · Doce de Octubre',
+    'lugar': 'Cancha La Tinajita, Doce de Octubre', 'hora': 'Noche · desde 7:00 pm', 'emoji': '🪗', 'tipo': 'tablado', 'gratuito': true,
+    'transporte': '🚇 Est. Tricentenario (L.B) → 15 min', 'lat': 6.305823, 'lng': -75.572004,
+    'tip': '🎵 Tablado en Comuna 6 · Doce de Octubre. Música en vivo gratis — cumbia, vallenato, salsa. Noche de Feria en el barrio.',
+    'tipEN': '🎵 Stage in Comuna 6 · Doce de Octubre. Free live music — cumbia, vallenato, salsa. Festival night in the neighborhood.'},
+
+
+    {'dia': 5, 'mes': 8, 'titulo': 'Tablado C9 Buenos Aires — Parque La Milagrosa', 'tituloEN': 'Stage Comuna 9 · Buenos Aires',
+    'lugar': 'Parque La Milagrosa, Buenos Aires', 'hora': 'Noche · desde 7:00 pm', 'emoji': '🪗', 'tipo': 'tablado', 'gratuito': true,
+    'transporte': '🚌 Bus desde el Centro → 15 min', 'lat': 6.235695, 'lng': -75.554299,
+    'tip': '🎵 Tablado en Comuna 9 · Buenos Aires. Música en vivo gratis — cumbia, vallenato, salsa. Noche de Feria en el barrio.',
+    'tipEN': '🎵 Stage in Comuna 9 · Buenos Aires. Free live music — cumbia, vallenato, salsa. Festival night in the neighborhood.'},
+  {'dia': 5, 'mes': 8, 'titulo': 'Tablado C14 El Poblado — Parque de El Poblado', 'tituloEN': 'Stage Comuna 14 · El Poblado',
+    'lugar': 'Parque de El Poblado', 'hora': 'Noche · desde 7:00 pm', 'emoji': '🪗', 'tipo': 'tablado', 'gratuito': true,
+    'transporte': '🚇 Est. El Poblado (L.A) → 5 min', 'lat': 6.210551, 'lng': -75.570433,
+    'tip': '🎵 Tablado en Comuna 14 · El Poblado. Música en vivo gratis — cumbia, vallenato, salsa. Noche de Feria en el barrio.',
+    'tipEN': '🎵 Stage in Comuna 14 · El Poblado. Free live music — cumbia, vallenato, salsa. Festival night in the neighborhood.'},
+
+
+  {'dia': 6, 'mes': 8, 'titulo': 'Fondas de mi Pueblo', 'tituloEN': 'Fondas de mi Pueblo',
+    'lugar': 'Parqueadero Jumbo la 65 · Cl. 47D con Cra. 65', 'hora': 'Tarde/Noche · 6 al 9 ago', 'emoji': '🌽', 'tipo': 'tablado', 'gratuito': true,
+    'transporte': '🚇 Est. Estadio → caminata 10 min por Cra. 65 hacia el sur hasta Cl. 47D', 'lat': 6.252708, 'lng': -75.584593,
+    'tip': '🌽 Réplica de las fondas antioqueñas con arrieros, gastronomía típica y música de cuerda. El ambiente más auténtico de la Feria. 6 al 9 de agosto.',
+    'tipEN': '🌽 Replica of Antioquian fondas with muleteers, traditional food and string music. The most authentic Festival atmosphere. Aug 6-9.'},
+
+    {'dia': 6, 'mes': 8, 'titulo': 'Tablado C16 Belén — Aeroparque Juan Pablo II', 'tituloEN': 'Stage Comuna 16 · Belén',
+    'lugar': 'Carrera 70, sector Aeroparque Juan Pablo II', 'hora': 'Noche · desde 7:00 pm', 'emoji': '🪗', 'tipo': 'tablado', 'gratuito': true,
+    'transporte': '🚇 Est. Estadio → bus Belén 15 min', 'lat': 6.222287, 'lng': -75.592441,
+    'tip': '🎵 Tablado en Comuna 16 · Belén. Música en vivo gratis — cumbia, vallenato, salsa. Noche de Feria en el barrio.',
+    'tipEN': '🎵 Stage in Comuna 16 · Belén. Free live music — cumbia, vallenato, salsa. Festival night in the neighborhood.'},
+  {'dia': 6, 'mes': 8, 'titulo': 'Tablado C10 La Candelaria — Parque de Boston', 'tituloEN': 'Stage Comuna 10 · La Candelaria',
+    'lugar': 'Parque de Boston, La Candelaria', 'hora': 'Noche · desde 7:00 pm', 'emoji': '🪗', 'tipo': 'tablado', 'gratuito': true,
+    'transporte': '🚇 Est. Prado (L.A) → 12 min', 'lat': 6.24807, 'lng': -75.55762,
+    'tip': '🎵 Tablado en Comuna 10 · La Candelaria. Música en vivo gratis — cumbia, vallenato, salsa. Noche de Feria en el barrio.',
+    'tipEN': '🎵 Stage in Comuna 10 · La Candelaria. Free live music — cumbia, vallenato, salsa. Festival night in the neighborhood.'},
+
+
+  {'dia': 7, 'mes': 8, 'titulo': 'Parque Cultural Nocturno — Noche Tropical', 'tituloEN': 'Cultural Night Park — Tropical Night',
+    'lugar': 'Plaza Gardel', 'hora': '7:00 pm', 'emoji': '🌴', 'tipo': 'concierto', 'gratuito': true,
+    'transporte': '🚇 Est. Exposiciones (L.A) → taxi o bus ~5 min hasta Plaza Gardel (Cra. 65 con Cl. 34)', 'lat': 6.2197, 'lng': -75.5897},
+
+  {'dia': 7, 'mes': 8, 'titulo': 'Pueblito Paisa · Placita de Flores', 'tituloEN': 'Pueblito Paisa · Placita de Flores',
+    'lugar': 'Pueblito Paisa · Cerro Nutibara · Av. 33 cra 63B', 'hora': 'Todo el día · 7 al 9 ago', 'emoji': '🏘️', 'tipo': 'flores', 'gratuito': true,
+    'transporte': '🚇 Est. Exposiciones → caminata 10 min por Av. 33 hacia occidente hasta Cra. 63B\n🚌 Metroplús → Est. Nutibara', 'lat': 6.2362, 'lng': -75.5803,
+    'tip': '🏘️ El Pueblito Paisa se llena de flores durante los últimos 3 días de Feria. La Placita de Flores trae lo mejor de la tradición silletera al Cerro Nutibara.',
+    'tipEN': '🏘️ Pueblito Paisa fills with flowers for the last 3 Feria days. Placita de Flores brings the best silletera tradition to Cerro Nutibara.'},
+
+  {'dia': 7, 'mes': 8, 'titulo': 'Cultura Parque Cristo Rey', 'tituloEN': 'Cristo Rey Park Culture',
+    'lugar': 'Parque Cristo Rey · Guayabal · Av. Guayabal entre Cl 1 Sur y 2 Sur', 'hora': 'Tarde · gratuito', 'emoji': '🎪', 'tipo': 'cultural', 'gratuito': true,
+    'transporte': '🚇 Est. Industriales (L.A) → buseta hacia Guayabal 10 min', 'lat': 6.207456, 'lng': -75.585509,
+    'tip': '🎪 Evento cultural en el parque más emblemático de la Comuna 15 Guayabal. Un reencuentro con la cultura barrial de Medellín.',
+    'tipEN': '🎪 Cultural event at the most iconic park in Guayabal commune. A reconnection with Medellín\'s neighborhood culture.',
+    'curiosidad': '🧠 El Parque Cristo Rey es punto de referencia de la vida comunitaria en Guayabal, cerca del Aeropuerto Olaya Herrera.',
+    'curiosidadEN': '🧠 Cristo Rey Park is a community landmark in Guayabal, near Olaya Herrera Airport.',
+    'reto': '🎯 Preguntale a alguien del barrio cuál es la historia del Parque Cristo Rey.',
+    'retoEN': '🎯 Ask a local about the history of Cristo Rey Park.'},
+
+    {'dia': 7, 'mes': 8, 'titulo': 'Fondas de mi Tierra', 'tituloEN': 'Fondas de mi Tierra',
+    'lugar': 'Mova · Cra. 53 #73-115 (contiguo a Parque Norte)', 'hora': 'Tarde/Noche · 7 y 8 ago', 'emoji': '🪗', 'tipo': 'tablado', 'gratuito': true,
+    'transporte': '🚇 Est. Acevedo → caminata 10 min (junto a Parque Norte)', 'lat': 6.272178, 'lng': -75.56564,
+    'tip': '🌽 Fondas de mi Tierra en Mova — el evento más familiar y auténtico de la segunda semana. 7 y 8 de agosto.',
+    'tipEN': '🌽 Fondas de mi Tierra at Mova — the most family-friendly and authentic event of the second week. Aug 7-8.'},
+
+    {'dia': 7, 'mes': 8, 'titulo': 'Tablado C5 Castilla — Feria de Ganado', 'tituloEN': 'Stage Comuna 5 · Castilla',
+    'lugar': 'Feria de Ganado, Castilla', 'hora': 'Noche · desde 7:00 pm', 'emoji': '🪗', 'tipo': 'tablado', 'gratuito': true,
+    'transporte': '🚇 Est. Tricentenario (L.B) → 15 min', 'lat': 6.301272, 'lng': -75.563889,
+    'tip': '🎵 Tablado en Comuna 5 · Castilla. Música en vivo gratis — cumbia, vallenato, salsa. Noche de Feria en el barrio.',
+    'tipEN': '🎵 Stage in Comuna 5 · Castilla. Free live music — cumbia, vallenato, salsa. Festival night in the neighborhood.'},
+  {'dia': 7, 'mes': 8, 'titulo': 'Tablado C8 Villa Hermosa — Parque de Villa Hermosa', 'tituloEN': 'Stage Comuna 8 · Villa Hermosa',
+    'lugar': 'Parque de Villa Hermosa', 'hora': 'Noche · desde 7:00 pm', 'emoji': '🪗', 'tipo': 'tablado', 'gratuito': true,
+    'transporte': '🚌 Bus desde La Alpujarra → 20 min', 'lat': 6.259027, 'lng': -75.551294,
+    'tip': '🎵 Tablado en Comuna 8 · Villa Hermosa. Música en vivo gratis — cumbia, vallenato, salsa. Noche de Feria en el barrio.',
+    'tipEN': '🎵 Stage in Comuna 8 · Villa Hermosa. Free live music — cumbia, vallenato, salsa. Festival night in the neighborhood.'},
+  {'dia': 7, 'mes': 8, 'titulo': 'Tablado Corregimiento San Cristóbal', 'tituloEN': 'Stage Corregimiento San Cristóbal',
+    'lugar': 'Parque Principal de San Cristóbal', 'hora': 'Noche · desde 7:00 pm', 'emoji': '🪗', 'tipo': 'tablado', 'gratuito': true,
+    'transporte': '🚇 Est. San Javier → bus 20 min', 'lat': 6.277778, 'lng': -75.635208,
+    'tip': '🎵 Tablado en Corregimiento San Cristóbal. Música en vivo gratis — cumbia, vallenato, salsa. Noche de Feria en el barrio.',
+    'tipEN': '🎵 Stage in Corregimiento San Cristóbal. Free live music — cumbia, vallenato, salsa. Festival night in the neighborhood.'},
+
+
+  {'dia': 8, 'mes': 8, 'titulo': 'Concierto Estadio — Súper Concierto', 'tituloEN': 'Stadium Concert — Super Concert',
+    'lugar': 'Estadio Atanasio Girardot', 'hora': '7:00 pm', 'emoji': '🎸', 'tipo': 'concierto', 'gratuito': false, 'esEstrellaFeria': true,
     'transporte': '🚇 Est. Estadio → caminata 5 min', 'lat': 6.2552, 'lng': -75.5880,
-    'tip': 'El evento más esperado de la Feria. Carin León y Silvestre Dangond encabezan una noche épica con salsa, vallenato y música popular. Boletas requeridas — compra con anticipación en taquillas oficiales. 🏟️'},
-  {'dia': 8, 'mes': 8, 'titulo': 'Paraíso de Bicis', 'tituloEN': 'Bicycle Paradise', 'lugar': 'Av. Las Vegas → Laureles', 'hora': '3:00 pm', 'emoji': '🚴', 'tipo': 'especial', 'gratuito': true,
-    'transporte': '🚇 Est. El Poblado → caminata 10 min', 'lat': 6.2100, 'lng': -75.5680},
-  {'dia': 8, 'mes': 8, 'titulo': 'Tablados: San Cristóbal, San Antonio de Prado', 'tituloEN': 'Stages: San Cristóbal, San Antonio de Prado', 'lugar': 'Comunas', 'hora': 'Noche', 'emoji': '🪗', 'tipo': 'tablado', 'gratuito': true,
-    'transporte': '🚇 Metro según zona · consultar mapa', 'lat': 6.2518, 'lng': -75.5636},
-  // FERIA — DÍA 10 (DESFILE SILLETEROS)
-  {'dia': 9, 'mes': 8, 'titulo': '69 Desfile de Silleteros', 'tituloEN': '69th Silleteros Parade', 'lugar': 'Av. Regional → Plaza Mayor', 'hora': '2:00 pm', 'emoji': '🌹', 'tipo': 'desfile', 'gratuito': true, 'esEstrellaFeria': true,
-    'transporte': '🚇 Est. Industriales → caminata 5 min · Llega 2h antes', 'lat': 6.2376, 'lng': -75.5814,
-    'tip': '600 familias silleteras cargando hasta 80 kilos de flores en sus espaldas. El espectáculo más colorido de Colombia. Ver de pie es completamente gratuito en la Avenida del Río — llega 2 horas antes para buen lugar. 🌹'},
-  {'dia': 9, 'mes': 8, 'titulo': 'Silletas exhibidas en Plaza Mayor', 'tituloEN': 'Silletas on display at Plaza Mayor', 'lugar': 'Plaza Mayor', 'hora': 'Hasta 12 ago', 'emoji': '🌸', 'tipo': 'flores', 'gratuito': true,
-    'transporte': '🚇 Est. Industriales → caminata 5 min', 'lat': 6.2410, 'lng': -75.5759},
-  // PLAZAS DE LAS FLORES — toda la feria (31 jul – 9 ago)
-  {'dia': 31, 'mes': 7, 'titulo': 'Plaza de las Flores · Ciudad del Río', 'tituloEN': 'Flowers Square · Ciudad del Río', 'lugar': 'Ciudad del Río', 'hora': 'Todo el día · 10 días', 'emoji': '🌺', 'tipo': 'flores', 'gratuito': true,
-    'transporte': '🚇 Est. Industriales → caminata 8 min', 'lat': 6.2330, 'lng': -75.5730},
-  {'dia': 31, 'mes': 7, 'titulo': 'Plaza de las Flores · Plaza Mayor', 'tituloEN': 'Flowers Square · Plaza Mayor', 'lugar': 'Plaza Mayor', 'hora': 'Todo el día · 10 días', 'emoji': '🌺', 'tipo': 'flores', 'gratuito': true,
-    'transporte': '🚇 Est. Industriales → caminata 5 min', 'lat': 6.2410, 'lng': -75.5759},
-  {'dia': 31, 'mes': 7, 'titulo': 'Plaza de las Flores · Parque Norte', 'tituloEN': 'Flowers Square · Parque Norte', 'lugar': 'Parque Norte', 'hora': 'Todo el día · 10 días', 'emoji': '🌺', 'tipo': 'flores', 'gratuito': true,
-    'transporte': '🚇 Est. Acevedo → caminata 10 min', 'lat': 6.2776, 'lng': -75.5632},
-  // DESFILE CARROZAS AVENIDA PRIMAVERA
-  {'dia': 2, 'mes': 8, 'titulo': 'Desfile Carrozas Av. Primavera', 'tituloEN': 'Floats Parade — Primavera Ave', 'lugar': 'Avenida Primavera', 'hora': '4:00 pm', 'emoji': '🎠', 'tipo': 'desfile', 'gratuito': true,
-    'transporte': '🚇 Est. Exposiciones → caminata 10 min', 'lat': 6.2200, 'lng': -75.5780},
-  // FLORECER — JARDÍN BOTÁNICO
-  {'dia': 1, 'mes': 8, 'titulo': 'Florecer: Orquídeas, Naturaleza y Tradiciones', 'tituloEN': 'Florecer: Orchids, Nature & Traditions', 'lugar': 'Jardín Botánico de Medellín', 'hora': 'Todo el día', 'emoji': '🌸', 'tipo': 'flores', 'gratuito': true,
-    'transporte': '🚇 Est. Universidad → caminata 5 min', 'lat': 6.2685, 'lng': -75.5671},
-  // FESTIVAL DE SANCOCHOS — SANTA ELENA
-  {'dia': 3, 'mes': 8, 'titulo': 'Festival de Sancochos', 'tituloEN': 'Sancocho Festival', 'lugar': 'Parque Principal de Santa Elena', 'hora': '11:00 am', 'emoji': '🍲', 'tipo': 'gastronomia', 'gratuito': true,
-    'transporte': '🚕 Taxi desde El Centro ~30 min', 'lat': 6.2359, 'lng': -75.4986},
-  // FONDAS DE MI TIERRA — Aeroparque Juan Pablo II (31 jul – 2 ago)
-  {'dia': 31, 'mes': 7, 'titulo': 'Fondas de mi Tierra — apertura', 'tituloEN': 'Fondas de mi Tierra — opening', 'lugar': 'Aeroparque Juan Pablo II', 'hora': 'Tarde/Noche', 'emoji': '🪗', 'tipo': 'tablado', 'gratuito': true,
-    'transporte': '🚇 Est. Aguacatala → bus C3-002', 'lat': 6.2218, 'lng': -75.5983,
-    'tip': 'Réplica de las fondas antioqueñas con arrieros, mulas y todo el sabor paisa. El mejor ambiente familiar nocturno de la Feria. 🌽'},
-  {'dia': 1, 'mes': 8, 'titulo': 'Fondas de mi Tierra', 'tituloEN': 'Fondas de mi Tierra', 'lugar': 'Aeroparque Juan Pablo II', 'hora': 'Tarde/Noche', 'emoji': '🪗', 'tipo': 'tablado', 'gratuito': true,
-    'transporte': '🚇 Est. Aguacatala → bus C3-002', 'lat': 6.2218, 'lng': -75.5983},
-  {'dia': 2, 'mes': 8, 'titulo': 'Fondas de mi Tierra — cierre', 'tituloEN': 'Fondas de mi Tierra — closing', 'lugar': 'Aeroparque Juan Pablo II', 'hora': 'Tarde/Noche', 'emoji': '🪗', 'tipo': 'tablado', 'gratuito': true,
-    'transporte': '🚇 Est. Aguacatala → bus C3-002', 'lat': 6.2218, 'lng': -75.5983},
-  // HOMENAJE FERNANDO GONZÁLEZ — 45 años (1 ago, Plaza Mayor)
-  {'dia': 1, 'mes': 8, 'titulo': 'Fernando González — 45 años artísticos', 'tituloEN': 'Fernando González — 45 years on stage', 'lugar': 'Plaza Mayor', 'hora': 'Noche', 'emoji': '🎙️', 'tipo': 'concierto', 'gratuito': false,
-    'transporte': '🚇 Est. Industriales → caminata 5 min', 'lat': 6.2410, 'lng': -75.5759,
-    'tip': 'Homenaje al gran referente de la música tropical colombiana. Una noche especial en el marco de la Feria. 🎶'},
-  // EL DUELO DEL AÑO — La Macarena (1 ago)
-  {'dia': 1, 'mes': 8, 'titulo': 'Reyes de la Feria: Duelo del Año', 'tituloEN': 'Kings of the Festival: The Duel', 'lugar': 'Centro de Espectáculos La Macarena', 'hora': 'Noche', 'emoji': '🎤', 'tipo': 'concierto', 'gratuito': false,
-    'transporte': '🚇 Est. Suramericana → caminata 14 min', 'lat': 6.2572, 'lng': -75.5742,
-    'tip': 'Luis Alberto Posada vs Hebert Vargas — el enfrentamiento más esperado del vallenato en la Feria. 🎵', 'artistas': 'Luis Alberto Posada · Hebert Vargas'},
-  // VALLENATO 5 ESTRELLAS — Centauro Envigado (6 ago)
-  {'dia': 6, 'mes': 8, 'titulo': 'Vallenato 5 Estrellas', 'tituloEN': 'Vallenato 5 Stars', 'lugar': 'Centauro Centro de Eventos · Envigado', 'hora': 'Noche', 'emoji': '🪗', 'tipo': 'concierto', 'gratuito': false,
-    'transporte': '🚇 Est. Industriales → bus hacia Envigado', 'lat': 6.1698, 'lng': -75.5864,
-    'tip': 'Jean Carlos Centeno, Alex Manga, Nelson Velásquez, Daniel Calderón y más en una noche de clásicos vallenatos. 🎵', 'artistas': 'Jean Carlos Centeno · Alex Manga · Nelson Velásquez · Daniel Calderón · Los Gigantes · Miguel Morales'},
-  // SALSENATO — La Macarena (7 ago)
-  {'dia': 7, 'mes': 8, 'titulo': 'Salsenato', 'tituloEN': 'Salsenato', 'lugar': 'Centro de Espectáculos La Macarena', 'hora': 'Noche', 'emoji': '💃', 'tipo': 'concierto', 'gratuito': false,
-    'transporte': '🚇 Est. Suramericana → caminata 14 min', 'lat': 6.2572, 'lng': -75.5742,
-    'tip': 'Salsa y vallenato con Nelson Velásquez, Jean Carlos Centeno, Willie González y más. Una noche para bailar. 💃', 'artistas': 'Nelson Velásquez · Jean Carlos Centeno · Alex Manga · Willie González · Charlie Aponte · Cristian Fernández'},
-  // CONCIERTO ROMÁNTICO — Centauro Envigado (8 ago)
-  {'dia': 8, 'mes': 8, 'titulo': 'Concierto Romántico de Feria', 'tituloEN': 'Romantic Festival Concert', 'lugar': 'Centauro Centro de Eventos · Envigado', 'hora': 'Noche', 'emoji': '❤️', 'tipo': 'concierto', 'gratuito': false,
-    'transporte': '🚇 Est. Industriales → bus hacia Envigado', 'lat': 6.1698, 'lng': -75.5864,
-    'tip': 'Tormenta, Daniel Magal, Los Iracundos, Jerónimo y Silvana Di Lorenzo — íconos de la balada reunidos en una noche para el amor. 🎶', 'artistas': 'Tormenta · Daniel Magal · Los Iracundos · Jerónimo · Silvana Di Lorenzo'},
-  // DESFILE DE CARROZAS MUSICAL — Avenida Primavera (durante la Feria)
-  {'dia': 3, 'mes': 8, 'titulo': 'Desfile de Carrozas Musical', 'tituloEN': 'Musical Float Parade', 'lugar': 'Avenida Primavera', 'hora': 'Tarde', 'emoji': '🎶', 'tipo': 'especial', 'gratuito': true,
-    'transporte': '🚇 Est. Industriales → caminata', 'lat': 6.2480, 'lng': -75.5760,
-    'tip': 'Medellín celebra su reconocimiento como Ciudad de la Música por la UNESCO con un desfile de carrozas que recorre la Avenida Primavera. Música, color y creatividad urbana en un solo recorrido. 🎵🌺'},
+    'artistas': 'John Alex Castaño · Jorge Celedón · El Combo de las Estrellas · Elder Dayán · Ricarena · El Tropicombo · Piso 21 · Francy',
+    'tip': 'El evento más esperado de la Feria. Boletas requeridas — comprá con anticipación en taquillas oficiales. 🏟️',
+    'tipEN': 'The most anticipated Festival event. Tickets required — buy in advance at official box offices. 🏟️'},
 
-  // SILLETERITOS — evento infantil oficial (durante la Feria)
-  {'dia': 3, 'mes': 8, 'titulo': 'Silleteritos — Niños Silleteros', 'tituloEN': 'Silleteritos — Children Silleteros', 'lugar': 'Santa Elena', 'hora': 'Mañana', 'emoji': '🌸', 'tipo': 'especial', 'gratuito': true,
-    'transporte': '🚌 Bus directo a Santa Elena', 'lat': 6.2156, 'lng': -75.5012,
-    'tip': 'Los más pequeños de Santa Elena portan sus silletas por primera vez. Uno de los momentos más emotivos de toda la Feria — la tradición se renueva en cada generación. 🌸👦'},
+  {'dia': 8, 'mes': 8, 'titulo': 'Noche Silletera — Santa Elena', 'tituloEN': 'Silletera Night — Santa Elena',
+    'lugar': 'Santa Elena', 'hora': 'Noche', 'emoji': '🌺', 'tipo': 'silletera', 'gratuito': true,
+    'transporte': '🚕 Taxi desde El Centro ~30 min', 'lat': 6.210093, 'lng': -75.4984440,
+    'tip': '🌺 La noche antes del Desfile — las familias terminan de armar sus silletas bajo las estrellas. Una experiencia única que pocos turistas conocen.',
+    'tipEN': '🌺 The night before the Parade — families finish building their silletas under the stars. A unique experience very few tourists discover.'},
+
+    {'dia': 8, 'mes': 8, 'titulo': 'Tablado C7 Robledo — Calle 73 sector universitario', 'tituloEN': 'Stage Comuna 7 · Robledo',
+    'lugar': 'Calle 73, sector universitario, Robledo', 'hora': 'Noche · desde 7:00 pm', 'emoji': '🪗', 'tipo': 'tablado', 'gratuito': true,
+    'transporte': '🚇 Est. Tricentenario (L.B) → 12 min', 'lat': 6.273092, 'lng': -75.587614,
+    'tip': '🎵 Tablado en Comuna 7 · Robledo. Música en vivo gratis — cumbia, vallenato, salsa. Noche de Feria en el barrio.',
+    'tipEN': '🎵 Stage in Comuna 7 · Robledo. Free live music — cumbia, vallenato, salsa. Festival night in the neighborhood.'},
+  {'dia': 8, 'mes': 8, 'titulo': 'Tablado C2 Santa Cruz — cancha La Frontera', 'tituloEN': 'Stage Comuna 2 · Santa Cruz',
+    'lugar': 'Cancha La Frontera, Santa Cruz', 'hora': 'Noche · desde 7:00 pm', 'emoji': '🪗', 'tipo': 'tablado', 'gratuito': true,
+    'transporte': '🚇 Est. Acevedo (L.A) → 15 min', 'lat': 6.305387, 'lng': -75.554017,
+    'tip': '🎵 Tablado en Comuna 2 · Santa Cruz. Música en vivo gratis — cumbia, vallenato, salsa. Noche de Feria en el barrio.',
+    'tipEN': '🎵 Stage in Comuna 2 · Santa Cruz. Free live music — cumbia, vallenato, salsa. Festival night in the neighborhood.'},
+  {'dia': 8, 'mes': 8, 'titulo': 'Tablado Corregimiento San Antonio de Prado', 'tituloEN': 'Stage Corregimiento San Antonio de Prado',
+    'lugar': 'Parque Principal de San Antonio de Prado', 'hora': 'Noche · desde 7:00 pm', 'emoji': '🪗', 'tipo': 'tablado', 'gratuito': true,
+    'transporte': '🚌 Bus desde Itagüí → 20 min', 'lat': 6.184931, 'lng': -75.656489,
+    'tip': '🎵 Tablado en Corregimiento San Antonio de Prado. Música en vivo gratis — cumbia, vallenato, salsa. Noche de Feria en el barrio.',
+    'tipEN': '🎵 Stage in Corregimiento San Antonio de Prado. Free live music — cumbia, vallenato, salsa. Festival night in the neighborhood.'},
+
+
+  {'dia': 1, 'mes': 8, 'titulo': 'Plaza de las Flores · Parques del Río (apertura)', 'tituloEN': 'Flowers Square · Parques del Río (opening)',
+    'lugar': 'Parques del Río', 'hora': '4:00 pm', 'emoji': '🌹', 'tipo': 'flores', 'gratuito': true,
+    'transporte': '🚇 Est. Industriales → caminata 5 min', 'lat': 6.243748, 'lng': -75.579924,
+    'tip': '🌹 Primera apertura de las Plazas de Flores 2026. El corazón floral de la Feria arranca hoy.',
+    'tipEN': '🌹 First opening of the 2026 Flores Plazas. The floral heart of the Festival starts today.'},
+
+  {'dia': 6, 'mes': 8, 'titulo': 'Placita de Flores MAMM', 'tituloEN': 'Placita de Flores MAMM',
+    'lugar': 'MAMM · Ciudad del Río', 'hora': 'Todo el día · 6 al 9 ago', 'emoji': '🌸', 'tipo': 'flores', 'gratuito': true,
+    'transporte': '🚇 Est. Industriales → caminata 8 min', 'lat': 6.223929, 'lng': -75.573422,
+    'tip': '🌸 La Placita de Flores en el MAMM combina arte contemporáneo con la tradición silletera. 6 al 9 de agosto.',
+    'tipEN': '🌸 Placita de Flores at MAMM combines contemporary art with the silletera tradition. Aug 6-9.'},
+
+  // ══ EVENTOS AGREGADOS — auditoría 24 jul vs PDF oficial Alcaldía ═══════
+
+  // Calle de Artistas día 2 (PDF: 1 y 2 ago)
+  {'dia': 2, 'mes': 8, 'titulo': 'Calle de Artistas · Plaza Botero', 'tituloEN': 'Artists Street · Plaza Botero',
+    'lugar': 'Plaza Botero · Peatonal Carabobo', 'hora': 'Todo el día', 'emoji': '🎨', 'tipo': 'especial', 'gratuito': true,
+    'transporte': '🚇 Est. Alpujarra → caminata 3 min', 'lat': 6.252310, 'lng': -75.567981,
+    'tip': '🎨 Segundo día de la Calle de Artistas. Artistas plásticos, músicos y artesanos en la Peatonal Carabobo.',
+    'tipEN': '🎨 Second day of Artists Street. Painters, musicians and artisans at Peatonal Carabobo.'},
+
+  // Constelaciones (PDF: 1 y 2 ago)
+  {'dia': 1, 'mes': 8, 'titulo': 'Constelaciones', 'tituloEN': 'Constelaciones — Light Show',
+    'lugar': 'Parque de las Luces', 'hora': 'Noche', 'emoji': '✨', 'tipo': 'especial', 'gratuito': true,
+    'transporte': '🚇 Est. Cisneros → caminata 2 min', 'lat': 6.245907, 'lng': -75.572735,
+    'tip': '✨ Espectáculo de luces y arte en el Parque de las Luces. 1 y 2 de agosto.',
+    'tipEN': '✨ Light and art spectacle at Parque de las Luces. August 1 and 2.'},
+  {'dia': 2, 'mes': 8, 'titulo': 'Constelaciones', 'tituloEN': 'Constelaciones — Light Show',
+    'lugar': 'Parque de las Luces', 'hora': 'Noche', 'emoji': '✨', 'tipo': 'especial', 'gratuito': true,
+    'transporte': '🚇 Est. Cisneros → caminata 2 min', 'lat': 6.245907, 'lng': -75.572735,
+    'tip': '✨ Segunda noche de Constelaciones. Arte y luces en el corazón del centro.',
+    'tipEN': '✨ Second night of Constelaciones. Art and lights in the heart of downtown.'},
+
+  // Desfile Avenida Primavera (PDF: dom 2 ago)
+  {'dia': 2, 'mes': 8, 'titulo': 'Desfile Avenida Primavera — 3ª edición', 'tituloEN': 'Avenida Primavera Parade — 3rd Edition',
+    'lugar': 'Avenida Regional', 'hora': 'Tarde', 'emoji': '🌷', 'tipo': 'desfile', 'gratuito': true, 'esEstrellaFeria': true,
+    'transporte': '🚇 Est. Exposiciones (L.A) → caminata 8 min', 'lat': 6.236639, 'lng': -75.575864,
+    'artistas': 'John Alex Castaño · Jorge Celedón · El Combo de las Estrellas',
+    'tip': '🌷 Desfile musical por la Avenida Regional con carrozas y artistas en vivo. ¡La Medellín creativa sale a la calle! 3ª edición.',
+    'tipEN': '🌷 Musical parade along Avenida Regional with floats and live artists. Creative Medellín hits the streets! 3rd edition.'},
+
+  // PCN Noche Colombiana (PDF: lun 3 ago)
+  {'dia': 3, 'mes': 8, 'titulo': 'Parque Cultural Nocturno — Noche Colombiana', 'tituloEN': 'Cultural Night Park — Colombian Night',
+    'lugar': 'Plaza Gardel', 'hora': '7:00 pm', 'emoji': '🇨🇴', 'tipo': 'concierto', 'gratuito': true,
+    'transporte': '🚇 Est. Exposiciones (L.A) → taxi o bus ~5 min hasta Plaza Gardel (Cra. 65 con Cl. 34)', 'lat': 6.2197, 'lng': -75.5897,
+    'tip': '🇨🇴 Noche dedicada a la música colombiana en todas sus expresiones. Plaza Gardel se convierte en el epicentro cultural de la Feria.',
+    'tipEN': '🇨🇴 A night dedicated to Colombian music in all its expressions. Plaza Gardel becomes the cultural epicenter of the Festival.'},
+
+  // PCN Homenaje Grupo Suramérica (PDF: mar 4 ago)
+  {'dia': 4, 'mes': 8, 'titulo': 'Parque Cultural Nocturno — Homenaje Grupo Suramérica', 'tituloEN': 'Cultural Night Park — Suramérica Tribute',
+    'lugar': 'Plaza Gardel', 'hora': '7:00 pm', 'emoji': '🎵', 'tipo': 'concierto', 'gratuito': true,
+    'transporte': '🚇 Est. Exposiciones (L.A) → taxi o bus ~5 min hasta Plaza Gardel (Cra. 65 con Cl. 34)', 'lat': 6.2197, 'lng': -75.5897,
+    'tip': '🎵 Homenaje al Grupo Suramérica — leyenda de la música tropical paisa. Una noche para celebrar el legado de la cumbia y el porro antioqueño.',
+    'tipEN': '🎵 Tribute to Grupo Suramérica — legend of paisa tropical music. A night to celebrate the legacy of cumbia and Antioquian porro.'},
+
+  // PCN Noche Son y Bolero (PDF: mié 5 ago)
+  {'dia': 5, 'mes': 8, 'titulo': 'Parque Cultural Nocturno — Noche de Son y Bolero', 'tituloEN': 'Cultural Night Park — Son & Bolero Night',
+    'lugar': 'Plaza Gardel', 'hora': '7:00 pm', 'emoji': '🎷', 'tipo': 'concierto', 'gratuito': true,
+    'transporte': '🚇 Est. Exposiciones (L.A) → taxi o bus ~5 min hasta Plaza Gardel (Cra. 65 con Cl. 34)', 'lat': 6.2197, 'lng': -75.5897,
+    'tip': '🎷 Son cubano y bolero romántico. La Plaza Gardel honra la tradición de la música de serenata bajo las estrellas.',
+    'tipEN': '🎷 Cuban son and romantic bolero. Plaza Gardel honors the tradition of serenade music under the stars.'},
+
+  // Trova Final (PDF: jue 6 ago, Plaza Gardel)
+  {'dia': 6, 'mes': 8, 'titulo': 'Final Festival de la Trova — Ciudad de Medellín', 'tituloEN': 'Trova Festival Final — City of Medellín',
+    'lugar': 'Plaza Gardel', 'hora': '6:00 pm', 'emoji': '🎤', 'tipo': 'trova', 'gratuito': true, 'esEstrellaFeria': true,
+    'transporte': '🚇 Est. Exposiciones (L.A) → taxi o bus ~5 min hasta Plaza Gardel (Cra. 65 con Cl. 34)', 'lat': 6.2197, 'lng': -75.5897,
+    'tip': '🎤 ¡La gran final de la Trova! Los mejores improvisadores de Colombia se enfrentan en Plaza Gardel. Humor, ingenio y rima en tiempo real.',
+    'tipEN': '🎤 The big Trova Final! Colombia\'s best improvisers face off at Plaza Gardel. Humor, wit and rhyme in real time.'},
+
+  // Desfile Autos Clásicos y Antiguos (PDF: vie 7 ago)
+  {'dia': 7, 'mes': 8, 'titulo': 'Desfile de Autos Clásicos y Antiguos', 'tituloEN': 'Classic & Antique Cars Parade',
+    'lugar': 'UPB Laureles · Cra 70 con Cl 48', 'hora': 'Mañana', 'emoji': '🚗', 'tipo': 'desfile', 'gratuito': true,
+    'transporte': '🚇 Est. Suramericana (L.B) → caminata 10 min por Cra. 70', 'lat': 6.242388, 'lng': -75.590207,
+    'tip': '🚗 Decenas de autos clásicos restaurados recorren las calles de Medellín. Un viaje en el tiempo sobre ruedas.',
+    'tipEN': '🚗 Dozens of restored classic cars cruise through Medellín\'s streets. A journey through time on wheels.'},
+
+  // Héroes de la Patria (PDF: sáb 8 ago)
+  {'dia': 8, 'mes': 8, 'titulo': 'Desfile Héroes de la Patria', 'tituloEN': 'Heroes of the Homeland Parade',
+    'lugar': 'Principales vías de Medellín', 'hora': 'Tarde', 'emoji': '🎖️', 'tipo': 'desfile', 'gratuito': true,
+    'transporte': '🚇 Est. Poblado (L.A) → Av. El Poblado', 'lat': 6.2100, 'lng': -75.5685,
+    'tip': '🎖️ Desfile cívico-militar con las Fuerzas Armadas de Colombia. Un homenaje a los héroes del país durante la Feria.',
+    'tipEN': '🎖️ Civic-military parade with Colombia\'s Armed Forces. A tribute to the country\'s heroes during the Festival.'},
+
+  // ══ DÍA 9 — Domingo 9 agosto · DESFILE DE SILLETEROS ═══════════════════
+
+  {'dia': 9, 'mes': 8, 'titulo': '🌹 69 Desfile de Silleteros', 'tituloEN': '🌹 69th Silleteros Parade',
+    'lugar': 'Av. El Poblado → Plaza Mayor · 530 silleteros', 'hora': '2:00 pm', 'emoji': '🌹', 'tipo': 'desfile', 'gratuito': true, 'esEstrellaFeria': true,
+    'transporte': '🚇 Est. Poblado (L.A) → Av. El Poblado entre Cl 9 y Cl 11 (mejor punto)\n🚇 Metro GRATIS todo el día\n🚌 Metroplús → Est. Industriales → caminata hacia Av. El Poblado', 'lat': 6.236639, 'lng': -75.575864,
+    'tip': '🌹 EL EVENTO DE LA FERIA. 530 silleteros de Santa Elena recorren la Av. El Poblado con sus silletas de flores. Llegá mínimo 2 HORAS antes — el mejor punto es entre Calles 9 y 11. Metro gratis hoy. Edición 69.',
+    'tipEN': '🌹 THE event of the Festival. 530 flower carriers from Santa Elena parade their silletas along Av. El Poblado. Arrive at least 2 HOURS early — best spot is between Calle 9 and Calle 11. Free Metro today. 69th edition.',
+    'curiosidad': '🧠 La tradición silletera viene de los campesinos de Santa Elena que bajaban flores a Medellín en sus espaldas. Hoy son Patrimonio Cultural de la Nación y están en proceso de reconocimiento por la UNESCO.',
+    'curiosidadEN': '🧠 The silletero tradition comes from Santa Elena farmers who carried flowers down to Medellín on their backs. Today it is National Cultural Heritage and under UNESCO recognition process.',
+    'reto': '🎯 Contá cuántas silletas del tipo \"monumental\" pasan. ¡Son las más grandes y pueden pesar hasta 80 kg!',
+    'retoEN': '🎯 Count how many \"monumental\" silletas pass by. They are the largest and can weigh up to 80 kg!'},
+
+  {'dia': 9, 'mes': 8, 'titulo': 'Fondas de mi Pueblo (cierre)', 'tituloEN': 'Fondas de mi Pueblo (closing)',
+    'lugar': 'Parqueadero Jumbo la 65 · Cl. 47D con Cra. 65', 'hora': 'Tarde/Noche', 'emoji': '🌽', 'tipo': 'tablado', 'gratuito': true,
+    'transporte': '🚇 Est. Estadio → caminata 10 min por Cra. 65', 'lat': 6.252708, 'lng': -75.584593,
+    'tip': '🌽 Último día de las Fondas. Ambiente de fonda antioqueña con arrieros, gastronomía y música de cuerda.',
+    'tipEN': '🌽 Last day of the Fondas. Antioquian fonda atmosphere with muleteers, food and string music.'},
+
+  {'dia': 9, 'mes': 8, 'titulo': 'Pueblito Paisa · Placita de Flores (cierre)', 'tituloEN': 'Pueblito Paisa · Placita de Flores (closing)',
+    'lugar': 'Pueblito Paisa · Cerro Nutibara', 'hora': 'Todo el día', 'emoji': '🏘️', 'tipo': 'flores', 'gratuito': true,
+    'transporte': '🚇 Est. Exposiciones → caminata 10 min', 'lat': 6.2362, 'lng': -75.5803,
+    'tip': '🏘️ Último día del Pueblito Paisa con Placita de Flores. Cierre perfecto después del Desfile de Silleteros.',
+    'tipEN': '🏘️ Last day of Pueblito Paisa with Placita de Flores. The perfect close after the Silleteros Parade.'},
+
+  {'dia': 9, 'mes': 8, 'titulo': 'Plaza de las Flores · Parques del Río (cierre)', 'tituloEN': 'Flowers Square · Parques del Río (closing)',
+    'lugar': 'Parques del Río', 'hora': 'Todo el día', 'emoji': '🌹', 'tipo': 'flores', 'gratuito': true,
+    'transporte': '🚇 Est. Industriales → caminata 5 min', 'lat': 6.243748, 'lng': -75.579924,
+    'tip': '🌹 Último día de la Plaza de Flores más grande de la Feria 2026. Silleteros en vivo, flores y gastronomía.',
+    'tipEN': '🌹 Last day of the largest Flores Plaza of Feria 2026. Live silleteros, flowers and gastronomy.'},
+
+  {'dia': 9, 'mes': 8, 'titulo': 'Placita de Flores MAMM (cierre)', 'tituloEN': 'Placita de Flores MAMM (closing)',
+    'lugar': 'MAMM · Ciudad del Río', 'hora': 'Todo el día', 'emoji': '🌸', 'tipo': 'flores', 'gratuito': true,
+    'transporte': '🚇 Est. Industriales → caminata 8 min', 'lat': 6.2388, 'lng': -75.5779,
+    'tip': '🌸 Cierre de la Placita de Flores en el MAMM. Arte y tradición silletera para despedir la Feria.',
+    'tipEN': '🌸 Closing of Placita de Flores at MAMM. Art and silletera tradition to bid the Festival farewell.'},
+
+  {'dia': 9, 'mes': 8, 'titulo': 'Florecer: Orquídeas (cierre)', 'tituloEN': 'Florecer: Orchids (closing)',
+    'lugar': 'Jardín Botánico de Medellín', 'hora': 'Todo el día', 'emoji': '🌸', 'tipo': 'flores', 'gratuito': true,
+    'transporte': '🚇 Est. Universidad → caminata 5 min', 'lat': 6.2685, 'lng': -75.5671,
+    'tip': '🌸 Último día de Florecer en el Jardín Botánico. Orquídeas, plantas nativas y talleres.',
+    'tipEN': '🌸 Last day of Florecer at the Botanical Garden. Orchids, native plants and workshops.'},
+
 ];
-
-/// Tablados agrupados por zona (21 tablados · gratuitos · toda la feria)
+/// Tablados agrupados por zona — 21 tablados oficiales · gratuitos · 31 jul – 9 ago
 const List<Map<String, dynamic>> kFeriaZonasTablero = [
   {
     'zona': 'Zona Norte',
     'emoji': '🏔️',
     'color': Color(0xFF1A4A2A),
-    'tablados': ['Manrique', 'Castilla', 'Santa Cruz', 'Popular'],
     'lat': 6.2900, 'lng': -75.5580,
-    'transporte': '🚇 Est. Acevedo → buseta hacia Manrique o Castilla',
+    'transporte': '🚇 Est. Acevedo / Caribe → buseta hacia la zona',
+    'tablados': [
+      {'nombre': 'Manrique', 'barrio': 'Comuna 3', 'lat': 6.2720, 'lng': -75.5490, 'lugar': 'Parque La Cruz · Cra 45 #72'},
+      {'nombre': 'Popular', 'barrio': 'Comuna 1', 'lat': 6.3020, 'lng': -75.5530, 'lugar': 'Parque Principal de Popular'},
+      {'nombre': 'Santa Cruz', 'barrio': 'Comuna 2', 'lat': 6.2950, 'lng': -75.5470, 'lugar': 'Parque de Santa Cruz'},
+      {'nombre': 'Castilla', 'barrio': 'Comuna 5', 'lat': 6.3010, 'lng': -75.5870, 'lugar': 'Parque La Floresta · Cra 65'},
+      {'nombre': 'Aranjuez', 'barrio': 'Comuna 4', 'lat': 6.2840, 'lng': -75.5560, 'lugar': 'Parque principal Aranjuez'},
+    ],
   },
   {
     'zona': 'Zona Centro',
     'emoji': '🏛️',
     'color': Color(0xFF3A2A1A),
-    'tablados': ['La Candelaria', 'Parque Gardel', 'Parque de los Deseos', 'Calle Artistas'],
     'lat': 6.2518, 'lng': -75.5636,
-    'transporte': '🚇 Est. Alpujarra / Universidad → caminata',
+    'transporte': '🚇 Est. Alpujarra / Universidad / Hospital → caminata',
+    'tablados': [
+      {'nombre': 'La Candelaria', 'barrio': 'Comuna 10', 'lat': 6.2518, 'lng': -75.5650, 'lugar': 'Parque Bolívar · Centro histórico'},
+      {'nombre': 'Calle de los Artistas', 'barrio': 'Plaza Botero', 'lat': 6.2527, 'lng': -75.5647, 'lugar': 'Parque Botero · Peatonal Carabobo'},
+      {'nombre': 'Parque Gardel', 'barrio': 'Guayabal', 'lat': 6.2197, 'lng': -75.5897, 'lugar': 'Plaza Gardel · junto Aeropuerto Olaya'},
+      {'nombre': 'Parque de los Deseos', 'barrio': 'Aranjuez', 'lat': 6.268617, 'lng': -75.565699, 'lugar': 'Parque de los Deseos · junto Jardín Botánico'},
+      {'nombre': 'Buenos Aires', 'barrio': 'Comuna 9', 'lat': 6.2350, 'lng': -75.5540, 'lugar': 'Parque Buenos Aires'},
+      {'nombre': 'Villa Hermosa', 'barrio': 'Comuna 8', 'lat': 6.2250, 'lng': -75.5480, 'lugar': 'Parque principal Villa Hermosa'},
+    ],
   },
   {
     'zona': 'Zona Occidente',
     'emoji': '🌄',
     'color': Color(0xFF2A1A3A),
-    'tablados': ['San Javier', 'Robledo', 'La América', 'San Cristóbal', 'Altavista'],
     'lat': 6.2610, 'lng': -75.6000,
-    'transporte': '🚇 Est. San Javier → caminata o buseta local',
+    'transporte': '🚇 Est. San Javier / Estadio → caminata o buseta',
+    'tablados': [
+      {'nombre': 'San Javier', 'barrio': 'Comuna 13', 'lat': 6.2548, 'lng': -75.5973, 'lugar': 'Parque principal San Javier'},
+      {'nombre': 'Robledo', 'barrio': 'Comuna 7', 'lat': 6.2880, 'lng': -75.5860, 'lugar': 'Parque San Martín de Robledo'},
+      {'nombre': 'La América', 'barrio': 'Comuna 12', 'lat': 6.255825, 'lng': -75.601519, 'lugar': 'Parque La Floresta, La América'},
+      {'nombre': 'Laureles', 'barrio': 'Comuna 11', 'lat': 6.2460, 'lng': -75.5940, 'lugar': 'Segundo Parque de Laureles'},
+      {'nombre': 'San Cristóbal', 'barrio': 'Corregimiento', 'lat': 6.2750, 'lng': -75.6180, 'lugar': 'Parque principal San Cristóbal'},
+      {'nombre': 'Altavista', 'barrio': 'Corregimiento', 'lat': 6.2010, 'lng': -75.6120, 'lugar': 'Parque central Altavista'},
+    ],
   },
   {
     'zona': 'Zona Sur',
     'emoji': '🌇',
     'color': Color(0xFF1A2A3A),
-    'tablados': ['El Poblado', 'San Antonio de Prado', 'Villa Hermosa'],
     'lat': 6.2100, 'lng': -75.5680,
-    'transporte': '🚇 Est. El Poblado → caminata · San Antonio: buseta',
+    'transporte': '🚇 Est. Poblado / Aguacatala → caminata · Sur: buseta',
+    'tablados': [
+      {'nombre': 'El Poblado', 'barrio': 'Comuna 14', 'lat': 6.210551, 'lng': -75.570433, 'lugar': 'Parque de El Poblado · El Poblado'},
+      {'nombre': 'Guayabal', 'barrio': 'Comuna 15', 'lat': 6.1980, 'lng': -75.5900, 'lugar': 'Parque principal Guayabal'},
+      {'nombre': 'San Antonio de Prado', 'barrio': 'Corregimiento', 'lat': 6.1180, 'lng': -75.6460, 'lugar': 'Parque de San Antonio de Prado'},
+    ],
+  },
+  {
+    'zona': 'Zona Rural',
+    'emoji': '🌺',
+    'color': Color(0xFF2A1A0A),
+    'lat': 6.2315, 'lng': -75.4950,
+    'transporte': '🚌 Bus directo desde Terminal Norte o taxi',
+    'tablados': [
+      {'nombre': 'Santa Elena', 'barrio': 'Corregimiento', 'lat': 6.2315, 'lng': -75.4950, 'lugar': 'Parque central Santa Elena · corazón silletero'},
+      {'nombre': 'San Sebastián de Palmitas', 'barrio': 'Corregimiento', 'lat': 6.3250, 'lng': -75.7020, 'lugar': 'Parque principal Palmitas'},
+    ],
   },
 ];
 
@@ -1922,36 +2188,7 @@ const List<Map<String, dynamic>> kFeriaRutas = [
     'color2': Color(0xFF2A1020),
     'acento': Color(0xFFD05538),
   },
-  {
-    'id': 'feria_tablados',
-    'nombre': 'TABLADOS Y RUMBA',
-    'nombreEN': 'STAGES & NIGHTLIFE',
-    'emoji': '🥁',
-    'desc': '4 zonas · Comunas · Gardel · Calle de los Artistas',
-    'descEN': '4 zones · Communes · Gardel · Artist Street',
-    'sitios': 4,
-    'tiempo': 'Cada noche',
-    'insignia': 'Gozador Paisa',
-    'insigniaEmoji': '🥁',
-    'color1': Color(0xFF0A0A1A),
-    'color2': Color(0xFF101020),
-    'acento': Color(0xFF7F77DD),
-  },
-  {
-    'id': 'feria_silletera',
-    'nombre': 'RUTA SILLETERA',
-    'nombreEN': 'SILLETERA ROUTE',
-    'emoji': '🌿',
-    'desc': 'Santa Elena · Fincas · Arví · La experiencia auténtica',
-    'descEN': 'Santa Elena · Farms · Arví · The authentic experience',
-    'sitios': 5,
-    'tiempo': '1 día completo',
-    'insignia': 'Guardián Silletero',
-    'insigniaEmoji': '🌿',
-    'color1': Color(0xFF0A1A0A),
-    'color2': Color(0xFF0F1E0F),
-    'acento': Color(0xFF2D6A2F),
-  },
+  // [eliminado] feria_silletera — reemplazada por GUARDIANES/SENDEROS/FINCA Y FONDA/VEREDAS
 ];
 
 /// Insignia colección completa
@@ -1959,7 +2196,7 @@ const Map<String, dynamic> kFeriaColeccion = {
   'nombre': 'Colección Feria 2026',
   'emoji': '🏆',
   'desc': 'Completa las 3 rutas de la Feria · Edición 69',
-  'rutas': ['feria_clasica', 'feria_tablados', 'feria_silletera'],
+  'rutas': ['feria_clasica'],
 };
 
 const kGoldLight  = Color(0xFFE8C96A);
@@ -2164,7 +2401,6 @@ class AuthService {
     return doc.data()?['sitiosCompletados'] ?? 0;
   }
 }
-
 
 class RuteroApp extends StatefulWidget {
   const RuteroApp({super.key});
@@ -2827,9 +3063,6 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
   }
 }
 
-
-
-
 // ─────────────────────────────────────────
 //  MIS PREMIOS SCREEN
 // ─────────────────────────────────────────
@@ -2896,11 +3129,18 @@ class MisPremiosScreen extends StatelessWidget {
                       Text(tCompletaRutaPremio,
                         style: const TextStyle(color: kTextMuted, fontSize: 13), textAlign: TextAlign.center),
                     ]));
+                  // Deduplicar premios por rutaNombre — evitar QR repetidos
+                  final _seenRutas = <String>{};
+                  final premiosUnicos = premios.where((doc) {
+                    final d = doc.data() as Map<String, dynamic>;
+                    final rn = d['rutaNombre']?.toString() ?? doc.id;
+                    return _seenRutas.add(rn);
+                  }).toList();
                   return ListView.builder(
                     padding: const EdgeInsets.all(16),
-                    itemCount: premios.length,
+                    itemCount: premiosUnicos.length,
                     itemBuilder: (ctx, i) {
-                      final data = premios[i].data() as Map<String, dynamic>;
+                      final data = premiosUnicos[i].data() as Map<String, dynamic>;
                       final canjeado = data['canjeado'] ?? false;
                       return Container(
                         margin: const EdgeInsets.only(bottom: 12),
@@ -3285,9 +3525,9 @@ class _CompraScreenState extends State<CompraScreen> {
                   Row(children: [
                     if (sitios > 0) _InfoPill(icon: '📍', text: '$sitios ${t("sitios","spots")}'),
                     if (sitios > 0 && tiempo.isNotEmpty) const SizedBox(width: 6),
-                    if (tiempo.isNotEmpty) _InfoPill(icon: '⏱', text: tiempo),
+                    if (tiempo.isNotEmpty) _InfoPill(icon: '⏱', text: tiempo?.toString() ?? ''),
                     const SizedBox(width: 6),
-                    _InfoPill(icon: '💪', text: _tDificultad(dificultad)),
+                    _InfoPill(icon: '💪', text: _tDificultad(dificultad?.toString() ?? '')),
                   ]),
                 ],
                 if (premio.isNotEmpty) ...[
@@ -3743,7 +3983,7 @@ Future<bool?> mostrarBottomSheetConversion(BuildContext context) async {
     context: context,
     backgroundColor: Colors.transparent,
     isScrollControlled: true,
-    builder: (_) => Container(
+    builder: (ctx) => Container(
       decoration: const BoxDecoration(
         color: Color(0xFF1A1A1A),
         borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
@@ -3771,7 +4011,7 @@ Future<bool?> mostrarBottomSheetConversion(BuildContext context) async {
         const SizedBox(height: 28),
         // Botón principal — Registrarse
         GestureDetector(
-          onTap: () => Navigator.pop(_, true),
+          onTap: () => Navigator.pop(ctx, true),
           child: Container(
             width: double.infinity,
             padding: const EdgeInsets.symmetric(vertical: 16),
@@ -3786,7 +4026,7 @@ Future<bool?> mostrarBottomSheetConversion(BuildContext context) async {
         const SizedBox(height: 12),
         // Botón secundario — Ya tengo cuenta
         GestureDetector(
-          onTap: () => Navigator.pop(_, false),
+          onTap: () => Navigator.pop(ctx, false),
           child: Container(
             width: double.infinity,
             padding: const EdgeInsets.symmetric(vertical: 14),
@@ -3800,7 +4040,7 @@ Future<bool?> mostrarBottomSheetConversion(BuildContext context) async {
         const SizedBox(height: 12),
         // Escape — continuar sin guardar
         GestureDetector(
-          onTap: () => Navigator.pop(_, null),
+          onTap: () => Navigator.pop(ctx, null),
           child: Text(
             t('Continuar sin guardar →', 'Continue without saving →'),
             style: TextStyle(
@@ -3812,7 +4052,6 @@ Future<bool?> mostrarBottomSheetConversion(BuildContext context) async {
   );
 }
 
-// Widget reutilizable para campos de texto
 class _InputField extends StatelessWidget {
   final TextEditingController ctrl;
   final String hint;
@@ -3998,12 +4237,12 @@ class _OnboardingScreenState extends State<OnboardingScreen>
       'emojisBg': ['🏙️', '🌳', '🚇', '🎨', '📍'],
       'titulo': 'Explora Medellín\ncomo nunca antes',
       'tituloEN': 'Explore Medellín\nlike never before',
-      'desc': 'Más de 32 rutas gamificadas por la ciudad de la eterna primavera. Cada sitio tiene su historia — tú la descubres.',
-      'descEN': 'Over 32 gamified routes through the city of eternal spring. Every spot has its story — you discover it.',
+      'desc': 'Más de 40 rutas gamificadas por la ciudad de la eterna primavera. Cada sitio tiene su historia — tú la descubres.',
+      'descEN': 'Over 40 gamified routes through the city of eternal spring. Every spot has its story — you discover it.',
       'color1': 0xFF5BAD6F,
       'color2': 0xFF1B5E3A,
       'imagen': 'assets/images/onboarding_explora.png',
-      'tag1': '32+ rutas', 'tag1EN': '32+ routes',
+      'tag1': '40+ rutas', 'tag1EN': '40+ routes',
       'tag2': '155+ sitios', 'tag2EN': '155+ spots',
     },
     {
@@ -4088,8 +4327,8 @@ class _OnboardingScreenState extends State<OnboardingScreen>
   @override
   Widget build(BuildContext context) {
     final slide = _slides[_paginaActual];
-    final Color color1 = Color(slide['color1'] as int);
-    final Color color2 = Color(slide['color2'] as int);
+    final Color color1 = Color((slide['color1'] as int?) ?? 0);
+    final Color color2 = Color((slide['color2'] as int?) ?? 0);
 
     return Scaffold(
       body: AnimatedContainer(
@@ -4102,7 +4341,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
             child: AnimatedSwitcher(
               duration: const Duration(milliseconds: 600),
               child: Image.asset(
-                slide['imagen'] as String,
+                slide['imagen']?.toString() ?? '',
                 key: ValueKey(slide['imagen']),
                 fit: BoxFit.cover,
                 errorBuilder: (_, __, ___) =>
@@ -4179,7 +4418,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
               itemCount: _slides.length,
               itemBuilder: (_, i) {
                 final s = _slides[i];
-                final Color c1 = Color(s['color1'] as int);
+                final Color c1 = Color((s['color1'] as int?) ?? 0);
                 return Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 24),
                   child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
@@ -4198,7 +4437,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                             ]),
                             boxShadow: [BoxShadow(color: c1.withOpacity(0.5),
                               blurRadius: 50, spreadRadius: 10)]),
-                          child: Center(child: Text(s['emoji'] as String,
+                          child: Center(child: Text(s['emoji']?.toString() ?? '',
                             style: const TextStyle(fontSize: 84)))))),
                     const SizedBox(height: 36),
 
@@ -4223,7 +4462,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                         child: Column(children: [
                           // Título en PlayfairDisplay
                           Text(
-                            kLang == 'en' ? s['tituloEN'] as String : s['titulo'] as String,
+                            kLang == 'en' ? s['tituloEN']?.toString() ?? '' : s['titulo']?.toString() ?? '',
                             textAlign: TextAlign.center,
                             style: TextStyle(
                               fontFamily: 'PlayfairDisplay',
@@ -4233,7 +4472,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                                 blurRadius: 20)])),
                           const SizedBox(height: 14),
                           Text(
-                            kLang == 'en' ? s['descEN'] as String : s['desc'] as String,
+                            kLang == 'en' ? s['descEN']?.toString() ?? '' : s['desc']?.toString() ?? '',
                             textAlign: TextAlign.center,
                             style: TextStyle(
                               fontFamily: 'Inter',
@@ -4243,10 +4482,10 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                           const SizedBox(height: 18),
                           Row(mainAxisAlignment: MainAxisAlignment.center, children: [
                             _OnbTag(label: kLang == 'en'
-                              ? s['tag1EN'] as String : s['tag1'] as String, color: c1),
+                              ? s['tag1EN']?.toString() ?? '' : s['tag1']?.toString() ?? '', color: c1),
                             const SizedBox(width: 10),
                             _OnbTag(label: kLang == 'en'
-                              ? s['tag2EN'] as String : s['tag2'] as String, color: c1),
+                              ? s['tag2EN']?.toString() ?? '' : s['tag2']?.toString() ?? '', color: c1),
                           ]),
                         ])),
                     ),
@@ -4288,7 +4527,6 @@ class _OnboardingScreenState extends State<OnboardingScreen>
   }
 }
 
-
 class _OnbTag extends StatelessWidget {
   final String label;
   final Color color;
@@ -4306,7 +4544,6 @@ class _OnbTag extends StatelessWidget {
         letterSpacing: 0.5)));
   }
 }
-
 
 // ═══════════════════════════════════════════════════════════════════════════
 //  🌿 WELCOME SCREEN
@@ -4699,11 +4936,22 @@ final List<_ServicioViajero> kServiciosViajero = [
     idiomasEN: '🇫🇷 French · 🇨🇴 Spanish',
     color: Color(0xFF1565C0)),
   _ServicioViajero(
+    nombre: 'Mobiplab', nombreEN: 'Mobiplab',
+    empresa: 'Mobiplab',
+    descripcion: 'Reparación de celulares iPhone en el centro de Medellín. Calle 50 N° 55-50 piso 2.',
+    descripcionEN: 'iPhone repair shop in downtown Medellín. Calle 50 N° 55-50, 2nd floor.',
+    whatsapp: '+573001852758',
+    emoji: '🔧',
+    logoAsset: 'assets/images/servicios/Mobiplab.jpg',
+    idiomas: '🇨🇴 Español',
+    idiomasEN: '🇨🇴 Spanish',
+    color: Color(0xFF0D47A1)),
+  _ServicioViajero(
     nombre: 'Whoosh Colombia', nombreEN: 'Whoosh Colombia',
     empresa: 'Whoosh',
-    descripcion: 'Patinetas eléctricas compartidas en Medellín. Más de 1.000 patinetas en zonas planas y bajas de la ciudad. Perfectas para recorrer rutas de Rutero MDE. Descarga la app y busca el punto P más cercano.',
-    descripcionEN: 'Shared electric scooters in Medellín. Over 1,000 scooters in flat and low-lying areas of the city. Perfect for Rutero MDE routes. Download the app and find the nearest P point.',
-    whatsapp: '+573226875265',
+    descripcion: 'Patinetas eléctricas compartidas en Medellín. Más de 1.000 patinetas en zonas planas y bajas de la ciudad. Perfectas para recorrer rutas de Rutero MDE. Descarga la app en whoosh.bike/es_la y buscá el punto P más cercano.',
+    descripcionEN: 'Shared electric scooters in Medellín. Over 1,000 scooters in flat and low-lying areas of the city. Perfect for Rutero MDE routes. Get the app at whoosh.bike/es_la and find the nearest P point.',
+    whatsapp: '',
     emoji: '🛴',
     logoAsset: 'assets/images/servicios/whoosh_logo_amarillo.png',
     idiomas: '🇨🇴 Español · 🇬🇧 English',
@@ -4731,18 +4979,18 @@ class ServiciosScreen extends StatelessWidget {
 
   // Construye la card de servicio desde Firestore o desde datos hardcodeados
   Widget _buildCard(Map<String, dynamic> data, BuildContext context) {
-    final nombre = data['nombre'] as String? ?? '';
-    final empresa = data['empresa'] as String? ?? '';
+    final nombre = data['nombre']?.toString() ?? '';
+    final empresa = data['empresa']?.toString() ?? '';
     final descripcion = kLang == 'en'
-      ? (data['descripcionEN'] as String? ?? data['descripcion'] as String? ?? '')
-      : (data['descripcion'] as String? ?? '');
-    final whatsapp = data['whatsapp'] as String? ?? '';
+      ? (data['descripcionEN']?.toString() ?? data['descripcion']?.toString() ?? '')
+      : (data['descripcion']?.toString() ?? '');
+    final whatsapp = data['whatsapp']?.toString() ?? '';
     final idiomas = kLang == 'en'
-      ? (data['idiomasEN'] as String? ?? data['idiomas'] as String? ?? '')
-      : (data['idiomas'] as String? ?? '');
-    final emoji = data['emoji'] as String? ?? '🛎️';
-    final logoAsset = data['logoAsset'] as String?;
-    final colorHex = data['color'] as String? ?? '#1B6B3A';
+      ? (data['idiomasEN']?.toString() ?? data['idiomas']?.toString() ?? '')
+      : (data['idiomas']?.toString() ?? '');
+    final emoji = data['emoji']?.toString() ?? '🛎️';
+    final logoAsset = data['logoAsset']?.toString();
+    final colorHex = data['color']?.toString() ?? '#1B6B3A';
     Color color;
     try {
       color = Color(int.parse(colorHex.replaceAll('#', '0xFF')));
@@ -4803,6 +5051,27 @@ class ServiciosScreen extends StatelessWidget {
                 const SizedBox(width: 8),
                 Text(t('Contactar por WhatsApp', 'Contact via WhatsApp'),
                   style: const TextStyle(color: Color(0xFF25D366), fontSize: 13, fontWeight: FontWeight.w800)),
+              ])))
+        else if (empresa == 'Whoosh')
+          GestureDetector(
+            onTap: () async {
+              final uri = Uri.parse('https://whoosh.bike/es_la');
+              if (await canLaunchUrl(uri)) {
+                await launchUrl(uri, mode: LaunchMode.externalApplication);
+              }
+            },
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFD000).withOpacity(0.12),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: const Color(0xFFFFD000).withOpacity(0.5))),
+              child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                const Text('🛴', style: TextStyle(fontSize: 16)),
+                const SizedBox(width: 8),
+                Text(t('Ver app en whoosh.bike', 'Get app at whoosh.bike'),
+                  style: const TextStyle(color: Color(0xFFFFD000), fontSize: 13, fontWeight: FontWeight.w800)),
               ]))),
       ]));
   }
@@ -4869,9 +5138,1231 @@ class ServiciosScreen extends StatelessWidget {
                 }
                 return Column(children: items.map((d) => _buildCard(d, context)).toList());
               }),
+            const SizedBox(height: 24),
+            // ── Banner reclutamiento de servicios ──────────────────────────
+            GestureDetector(
+              onTap: () async {
+                final uri = Uri.parse('mailto:paulflopezp@gmail.com?subject=Quiero%20ofrecer%20un%20servicio%20en%20Rutero%20MDE');
+                if (await canLaunchUrl(uri)) {
+                  await launchUrl(uri, mode: LaunchMode.externalApplication);
+                }
+              },
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(18),
+                decoration: BoxDecoration(
+                  color: kCard,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: kGold.withOpacity(0.35)),
+                  gradient: LinearGradient(
+                    colors: [kGold.withOpacity(0.06), kCard],
+                    begin: Alignment.topLeft, end: Alignment.bottomRight)),
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Row(children: [
+                    const Text('🤝', style: TextStyle(fontSize: 22)),
+                    const SizedBox(width: 10),
+                    Expanded(child: Text(
+                      t('¿Tenés un servicio para viajeros?', 'Do you offer a traveler service?'),
+                      style: const TextStyle(color: kGold, fontSize: 14, fontWeight: FontWeight.w900))),
+                  ]),
+                  const SizedBox(height: 8),
+                  Text(
+                    t('Si ofrecés transporte, guías, hospedaje u otros servicios para turistas en Medellín, contáctanos. Queremos conectarte con viajeros de todo el mundo.',
+                      'If you offer transport, guides, accommodation or other traveler services in Medellín, reach out. We want to connect you with travelers from around the world.'),
+                    style: TextStyle(color: kTextMuted.withOpacity(0.8), fontSize: 12, height: 1.5)),
+                  const SizedBox(height: 12),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(vertical: 11),
+                    decoration: BoxDecoration(
+                      color: kGold.withOpacity(0.12),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: kGold.withOpacity(0.4))),
+                    child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                      const Text('✉️', style: TextStyle(fontSize: 15)),
+                      const SizedBox(width: 8),
+                      Text(t('Contáctanos — paulflopezp@gmail.com', 'Contact us — paulflopezp@gmail.com'),
+                        style: const TextStyle(color: kGold, fontSize: 12, fontWeight: FontWeight.w800)),
+                    ])),
+                ]))),
           ])),
       ]));
   }
+}
+
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  🗓️ RUTERO PLANNER IA
+//  Itinerario personalizado generado por Claude según fechas, intereses y
+//  presupuesto del viajero. Versión gratuita: hasta 2 días.
+// ═══════════════════════════════════════════════════════════════════════════
+
+// ── Modelo de itinerario ─────────────────────────────────────────────────
+class _PlannerBloque {
+  final String periodo;  // 'Mañana', 'Tarde', 'Noche'
+  final String periodoEN;
+  final String emoji;
+  final String rutaNombre;
+  final String descripcion;
+  final String duracion;
+  final String precio;
+  final String transporte;
+  const _PlannerBloque({
+    required this.periodo, required this.periodoEN, required this.emoji,
+    required this.rutaNombre, required this.descripcion,
+    required this.duracion, required this.precio, required this.transporte,
+  });
+}
+
+class _PlannerDia {
+  final int numero;
+  final String fecha;
+  final List<_PlannerBloque> bloques;
+  final bool esFeria;
+  const _PlannerDia({
+    required this.numero, required this.fecha,
+    required this.bloques, this.esFeria = false,
+  });
+}
+
+// ── Pantalla principal del Planner ────────────────────────────────────────
+class PlannerScreen extends StatefulWidget {
+  const PlannerScreen({super.key});
+  @override
+  State<PlannerScreen> createState() => _PlannerScreenState();
+}
+
+class _PlannerScreenState extends State<PlannerScreen> {
+  int _paso = 0;  // 0=duración, 1=fechas+zona, 2=intereses+perfil
+
+  // Datos del formulario
+  int _dias = 1;
+  DateTime _llegada = DateTime.now();
+  DateTime _salida = DateTime.now().add(const Duration(days: 1));
+  String _zonaHotel = 'El Poblado';
+  final Set<String> _intereses = {};
+  String _compania = 'Solo';
+  String _presupuesto = 'Medio';
+  String _horaLlegada = 'Mañana';      // Mañana / Tarde / Noche
+  String _horaSalida  = 'No sé aún';  // hora de salida del último día
+  String _alojamiento = 'Hotel';       // Hotel / Airbnb / Hostal / Casa de familiar
+  bool _primeraVez = true;             // Primera vez en Medellín
+
+  final List<String> _zonasHotel = ['El Poblado', 'Laureles', 'Centro', 'Otro'];
+  final List<Map<String, String>> _interesesOpts = [
+    {'emoji': '🏛️', 'label': 'Cultura', 'labelEN': 'Culture'},
+    {'emoji': '🍽️', 'label': 'Gastronomía', 'labelEN': 'Food'},
+    {'emoji': '🌿', 'label': 'Naturaleza', 'labelEN': 'Nature'},
+    {'emoji': '🎨', 'label': 'Arte', 'labelEN': 'Art'},
+    {'emoji': '🌙', 'label': 'Vida nocturna', 'labelEN': 'Nightlife'},
+    {'emoji': '⚡', 'label': 'Aventura', 'labelEN': 'Adventure'},
+    {'emoji': '📸', 'label': 'Fotografía', 'labelEN': 'Photography'},
+    {'emoji': '🛍️', 'label': 'Compras', 'labelEN': 'Shopping'},
+  ];
+
+  bool get _esFeria {
+    final ahora = _llegada;
+    final inicio = DateTime(kFeriaAno, 7, 31);
+    final fin = DateTime(kFeriaAno, 8, 9, 23, 59);
+    return ahora.isAfter(inicio.subtract(const Duration(days: 1))) &&
+           ahora.isBefore(fin);
+  }
+
+  String _formatFecha(DateTime d) {
+    final meses = kLang == 'en'
+      ? ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
+      : ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+    return '${d.day} ${meses[d.month - 1]}';
+  }
+
+  void _siguientePaso() {
+    if (_paso < 2) {
+      setState(() => _paso++);
+    } else {
+      _generarItinerario();
+    }
+  }
+
+  Future<void> _generarItinerario() async {
+    // Validar intereses
+    if (_intereses.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(t('Elegí al menos un interés', 'Choose at least one interest')),
+        backgroundColor: kAccent));
+      return;
+    }
+
+    // ── Guardar métricas en Firestore (async — no bloquea el flujo) ──
+    Future.microtask(() async {
+      try {
+        final uid = FirebaseAuth.instance.currentUser?.uid ?? 'anonimo';
+        final nombre = FirebaseAuth.instance.currentUser?.displayName ?? 'Viajero';
+        await FirebaseFirestore.instance.collection('planner_metricas').add({
+          'uid': uid,
+          'nombre': nombre,
+          'timestamp': FieldValue.serverTimestamp(),
+          'dias': _dias,
+          'llegada': _formatFecha(_llegada),
+          'salida': _formatFecha(_salida),
+          'horaLlegada': _horaLlegada,
+          'horaSalida': _horaSalida,
+          'zonaHotel': _zonaHotel,
+          'alojamiento': _alojamiento,
+          'intereses': _intereses.toList(),
+          'compania': _compania,
+          'presupuesto': _presupuesto,
+          'primeraVez': _primeraVez,
+          'idioma': kLang,
+          'esFeria': _esFeria,
+        });
+      } catch (_) {
+        // Silencioso
+      }
+    });
+
+    // Armar prompt para Claude
+    final rutasDisponibles = RutasService().rutas
+      .where((r) => r['activa'] != false && r['pausada'] != true)
+      .map((r) => '- ${r['nombre']}: ${r['subtitulo'] ?? ''} (${r['tiempo'] ?? ''}, ${r['zona'] ?? ''})')
+      .take(30)
+      .join('\n');
+
+    final interesesStr = _intereses.join(', ');
+    final feriaStr = _esFeria ? '\n- Las fechas coinciden con la Feria de las Flores 2026 (31 jul – 9 ago). Incluir eventos de Feria relevantes.' : '';
+
+    final prompt = kLang == 'en' ? """
+You are Rutero MDE, a tourism AI for Medellín, Colombia.
+Create a personalized ${_dias}-day itinerary (FREE version: max 2 days) for a traveler with these details:
+- Arrival: ${_formatFecha(_llegada)}, Departure: ${_formatFecha(_salida)}, Arrival time: $_horaLlegada, Departure time (last day): $_horaSalida
+- Accommodation zone: $_zonaHotel, Type: $_alojamiento
+- Interests: $interesesStr
+- Traveling: $_compania
+- Budget: $_presupuesto (${ _presupuesto == 'Bajo' ? 'USD 10-30/day (~\$40,000-120,000 COP)' : _presupuesto == 'Medio' ? 'USD 30-80/day (~\$120,000-320,000 COP)' : 'over USD 80/day (~\$320,000+ COP)'})
+- First time in Medellín: ${_primeraVez ? 'YES — wants to see the city icons' : 'NO — already knows the basics, looking for different experiences'}$feriaStr
+${_horaSalida != 'No sé aún' ? '- Departure time on last day: $_horaSalida. Adjust the last day so all activities finish before that time, leaving enough margin to reach the airport or bus terminal.' : ''}
+${_primeraVez ? "\nIMPORTANT - First time: must include Medellin icons mapped to Rutero MDE routes: Provenza/Parque Lleras=HUELLAS VIVAS DE EL POBLADO, Pueblito Paisa=DEL ORIGEN PAISA A LA MEDELLIN MODERNA, Electric Stairs Comuna 13=RUTA TRANSFORMACION URBANA, Plaza Botero=DEL ORIGEN PAISA A LA MEDELLIN MODERNA. If 2+ days add RUTA GUATAPE. Never invent standalone sites." : ""}
+
+Available routes in Rutero MDE:
+$rutasDisponibles
+
+Respond ONLY with valid JSON (no markdown, no explanation):
+{
+  "saludo": "short personalized greeting in English",
+  "dias": [
+    {
+      "numero": 1,
+      "fecha": "date label",
+      "esFeria": false,
+      "bloques": [
+        {
+          "periodo": "Morning",
+          "periodoEN": "Morning",
+          "emoji": "🌅",
+          "rutaNombre": "EXACT route name from the list above",
+          "descripcion": "why this route fits their interests (1-2 sentences)",
+          "duracion": "2-3 hours",
+          "precio": "Gratis / ~20,000 COP",
+          "transporte": "Metro L.A → Est. Acevedo"
+        }
+      ]
+    }
+  ],
+  "resumen": {
+    "rutas": 3,
+    "horasTotales": "6-8 horas",
+    "costoEstimado": "~40,000 COP",
+    "puntosPosibles": 350,
+    "insignias": ["Explorador Urbano", "Guardián Silletero"]
+  },
+  "tip": "one final practical tip for this specific traveler"
+}
+""" : """
+Sos Rutero MDE, la IA de turismo de Medellín, Colombia.
+Creá un itinerario personalizado de $_dias día(s) (versión GRATUITA: máximo 2 días) para un viajero con estos datos:
+- Llegada: ${_formatFecha(_llegada)}, Salida: ${_formatFecha(_salida)}, Hora de llegada: $_horaLlegada, Hora de salida (último día): $_horaSalida
+- Zona del alojamiento: $_zonaHotel, Tipo: $_alojamiento
+- Intereses: $interesesStr
+- Viaja: $_compania
+- Presupuesto: $_presupuesto (${ _presupuesto == 'Bajo' ? 'USD 10-30/día (~\$40.000-120.000 COP)' : _presupuesto == 'Medio' ? 'USD 30-80/día (~\$120.000-320.000 COP)' : 'más de USD 80/día (~\$320.000+ COP)'})
+- Primera vez en Medellín: ${_primeraVez ? 'SÍ — quiere ver los íconos de la ciudad' : 'NO — ya conoce lo básico, busca experiencias diferentes'}$feriaStr
+${_horaSalida != 'No sé aún' ? '- Hora de salida el último día: $_horaSalida. Ajustá ese día para que todas las actividades terminen antes de esa hora, dejando margen para llegar al aeropuerto o terminal de buses.' : ''}
+${_primeraVez ? "\nIMPORTANTE - Primera vez: incluir iconos de Medellin mapeados a rutas Rutero: Provenza/Parque Lleras=HUELLAS VIVAS DE EL POBLADO, Pueblito Paisa=DEL ORIGEN PAISA A LA MEDELLIN MODERNA, Escaleras Electricas Comuna13=RUTA TRANSFORMACION URBANA, Plaza Botero=DEL ORIGEN PAISA A LA MEDELLIN MODERNA. Si 2+ dias incluir RUTA GUATAPE. No inventar sitios sueltos." : ""}
+
+Rutas disponibles en Rutero MDE:
+$rutasDisponibles
+
+Respondé SOLO con JSON válido (sin markdown, sin explicación):
+{
+  "saludo": "saludo corto y personalizado",
+  "dias": [
+    {
+      "numero": 1,
+      "fecha": "etiqueta de fecha",
+      "esFeria": false,
+      "bloques": [
+        {
+          "periodo": "Mañana",
+          "periodoEN": "Morning",
+          "emoji": "🌅",
+          "rutaNombre": "NOMBRE EXACTO de la ruta de la lista de arriba",
+          "descripcion": "por qué esta ruta encaja con sus intereses (1-2 frases)",
+          "duracion": "2-3 horas",
+          "precio": "Gratis / ~20.000 COP",
+          "transporte": "Metro L.A → Est. Acevedo"
+        }
+      ]
+    }
+  ],
+  "resumen": {
+    "rutas": 3,
+    "horasTotales": "6-8 horas",
+    "costoEstimado": "~40.000 COP",
+    "puntosPosibles": 350,
+    "insignias": ["Explorador Urbano", "Guardián Silletero"]
+  },
+  "tip": "un consejo final práctico para este viajero específico"
+}
+""";
+
+    if (!mounted) return;
+    final result = await Navigator.of(context).push<Map<String, dynamic>?>(
+      MaterialPageRoute(builder: (_) => _PlannerLoadingScreen(prompt: prompt)));
+
+    if (result != null && mounted) {
+      Navigator.of(context).pushReplacement(MaterialPageRoute(
+        builder: (_) => _PlannerResultScreen(data: result, dias: _dias)));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: kDark2,
+      body: Column(children: [
+        // Header
+        Container(
+          decoration: BoxDecoration(
+            color: kDark2,
+            border: Border(bottom: BorderSide(color: kGold.withOpacity(0.1)))),
+          child: SafeArea(bottom: false, child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
+            child: Column(children: [
+              Row(children: [
+                GestureDetector(
+                  onTap: () => _paso > 0 ? setState(() => _paso--) : Navigator.pop(context),
+                  child: Container(width: 36, height: 36,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.06), shape: BoxShape.circle,
+                      border: Border.all(color: kGold.withOpacity(0.2))),
+                    child: const Center(child: Text('←', style: TextStyle(color: kText, fontSize: 16))))),
+                const SizedBox(width: 12),
+                Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text(t('RUTERO PLANNER', 'RUTERO PLANNER'),
+                    style: const TextStyle(fontFamily: 'PlayfairDisplay',
+                      fontSize: 18, fontWeight: FontWeight.w900, color: kGold)),
+                  Text(t('Tu itinerario personalizado con IA', 'Your AI-powered itinerary'),
+                    style: const TextStyle(fontSize: 11, color: kTextMuted)),
+                ])),
+                const Text('🗓️', style: TextStyle(fontSize: 22)),
+              ]),
+              const SizedBox(height: 12),
+              // Barra de progreso de pasos
+              Row(children: List.generate(3, (i) => Expanded(child: Container(
+                height: 3,
+                margin: EdgeInsets.only(right: i < 2 ? 4 : 0),
+                decoration: BoxDecoration(
+                  color: i <= _paso ? kGold : Colors.white.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(2)))))),
+            ])))),
+        // Contenido del paso
+        Expanded(child: SingleChildScrollView(
+          padding: const EdgeInsets.all(24),
+          child: AnimatedSwitcher(
+            duration: const Duration(milliseconds: 250),
+            child: _paso == 0 ? _buildPaso0() :
+                   _paso == 1 ? _buildPaso1() : _buildPaso2(),
+          ))),
+        // Botón siguiente
+        Container(
+          padding: const EdgeInsets.fromLTRB(24, 12, 24, 32),
+          decoration: BoxDecoration(
+            color: kDark2,
+            border: Border(top: BorderSide(color: Colors.white.withOpacity(0.06)))),
+          child: GestureDetector(
+            onTap: _siguientePaso,
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(colors: [kGold, kGold.withOpacity(0.8)]),
+                borderRadius: BorderRadius.circular(14),
+                boxShadow: [BoxShadow(color: kGold.withOpacity(0.3), blurRadius: 16, offset: const Offset(0, 4))]),
+              child: Center(child: Text(
+                _paso < 2
+                  ? t('SIGUIENTE →', 'NEXT →')
+                  : t('GENERAR MI ITINERARIO ✨', 'GENERATE MY ITINERARY ✨'),
+                style: const TextStyle(
+                  color: Colors.black, fontSize: 14,
+                  fontWeight: FontWeight.w900, letterSpacing: 1.5)))))),
+      ]),
+    );
+  }
+
+  Widget _buildPaso0() {
+    return Column(key: const ValueKey(0), crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Text(t('¿Cuántos días tenés en Medellín?', 'How many days do you have in Medellín?'),
+        style: const TextStyle(fontFamily: 'PlayfairDisplay',
+          fontSize: 22, fontWeight: FontWeight.w900, color: kText)),
+      const SizedBox(height: 8),
+      Text(t('Versión gratuita: hasta 2 días', 'Free version: up to 2 days'),
+        style: TextStyle(fontSize: 12, color: kGold.withOpacity(0.8))),
+      const SizedBox(height: 32),
+      ...List.generate(4, (i) {
+        final n = i + 1;
+        final sel = _dias == n;
+        return GestureDetector(
+          onTap: () => setState(() {
+            _dias = n;
+            // Ajustar salida automáticamente
+            _salida = _llegada.add(Duration(days: n));
+          }),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 200),
+            margin: const EdgeInsets.only(bottom: 12),
+            padding: const EdgeInsets.all(18),
+            decoration: BoxDecoration(
+              color: sel ? kGold.withOpacity(0.12) : kCard,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                color: sel ? kGold : Colors.white.withOpacity(0.06),
+                width: sel ? 1.5 : 1)),
+            child: Row(children: [
+              Text(n == 1 ? '☀️' : n == 2 ? '🌅🌅' : n == 3 ? '🌄🌄🌄' : '🗓️',
+                style: const TextStyle(fontSize: 24)),
+              const SizedBox(width: 14),
+              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text(
+                  n == 1 ? t('1 día', '1 day') :
+                  n == 2 ? t('2 días', '2 days') :
+                  n == 3 ? t('3 días', '3 days') :
+                           t('4 días', '4 days'),
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800,
+                    color: sel ? kGold : kText)),
+                Text(
+                  n == 1 ? t('Un día perfecto en Medellín', 'A perfect day in Medellín') :
+                  n == 2 ? t('El clásico fin de semana', 'The classic weekend') :
+                  n == 3 ? t('Explorá lo mejor de la ciudad', 'Explore the city\'s best') :
+                           t('Experiencia completa Medellín', 'Full Medellín experience'),
+                  style: const TextStyle(fontSize: 12, color: kTextMuted)),
+              ])),
+              if (n > 2)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: kOrchid.withOpacity(0.15),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: kOrchid.withOpacity(0.4))),
+                  child: Text(t('Premium', 'Premium'),
+                    style: const TextStyle(color: kOrchid, fontSize: 10, fontWeight: FontWeight.w700))),
+              if (sel) ...[
+                const SizedBox(width: 8),
+                Container(width: 22, height: 22,
+                  decoration: BoxDecoration(color: kGold, shape: BoxShape.circle),
+                  child: const Center(child: Text('✓',
+                    style: TextStyle(color: Colors.black, fontSize: 12, fontWeight: FontWeight.w900)))),
+              ],
+            ])));
+      }),
+    ]);
+  }
+
+  Widget _buildPaso1() {
+    final horasOpts = [
+      {'valor': 'Mañana',  'emoji': '🌅', 'label': 'Mañana',  'labelEN': 'Morning',   'sub': 'Antes del mediodía',     'subEN': 'Before noon'},
+      {'valor': 'Tarde',   'emoji': '☀️', 'label': 'Tarde',   'labelEN': 'Afternoon', 'sub': '12pm – 6pm',             'subEN': '12pm – 6pm'},
+      {'valor': 'Noche',   'emoji': '🌙', 'label': 'Noche',   'labelEN': 'Evening',   'sub': 'Después de las 6pm',     'subEN': 'After 6pm'},
+    ];
+    final alojOpts = [
+      {'valor': 'Hotel',             'emoji': '🏨'},
+      {'valor': 'Airbnb',            'emoji': '🏠'},
+      {'valor': 'Hostal',            'emoji': '🛏️'},
+      {'valor': 'Casa de familiar',  'emoji': '👨‍👩‍👧'},
+    ];
+    return Column(key: const ValueKey(1), crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Text(t('¿Cuándo llegás?', 'When do you arrive?'),
+        style: const TextStyle(fontFamily: 'PlayfairDisplay',
+          fontSize: 22, fontWeight: FontWeight.w900, color: kText)),
+      const SizedBox(height: 28),
+      _DateSelector(
+        label: t('Llegada', 'Arrival'),
+        emoji: '✈️',
+        fecha: _llegada,
+        onChanged: (d) => setState(() {
+          _llegada = d;
+          _salida = d.add(Duration(days: _dias));
+        }),
+      ),
+      const SizedBox(height: 12),
+      _DateSelector(
+        label: t('Salida', 'Departure'),
+        emoji: '🏠',
+        fecha: _salida,
+        onChanged: (d) => setState(() => _salida = d),
+      ),
+      // ── Hora de llegada ──────────────────────────────────────────────
+      const SizedBox(height: 28),
+      Text(t('¿A qué hora llegás a Medellín?', 'What time do you arrive in Medellín?'),
+        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: kText)),
+      const SizedBox(height: 14),
+      Row(children: horasOpts.map((h) {
+        final sel = _horaLlegada == h['valor'];
+        return Expanded(child: GestureDetector(
+          onTap: () => setState(() => _horaLlegada = h['valor']!),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 180),
+            margin: EdgeInsets.only(right: h['valor'] != 'Noche' ? 8 : 0),
+            padding: const EdgeInsets.symmetric(vertical: 14),
+            decoration: BoxDecoration(
+              color: sel ? kGold.withOpacity(0.12) : kCard,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                color: sel ? kGold : Colors.white.withOpacity(0.08),
+                width: sel ? 1.5 : 1)),
+            child: Column(children: [
+              Text(h['emoji']!, style: const TextStyle(fontSize: 22)),
+              const SizedBox(height: 6),
+              Text(t(h['label']!, h['labelEN']!),
+                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700,
+                  color: sel ? kGold : kText)),
+              const SizedBox(height: 2),
+              Text(t(h['sub']!, h['subEN']!),
+                textAlign: TextAlign.center,
+                style: const TextStyle(fontSize: 9, color: kTextMuted)),
+            ]))));
+      }).toList()),
+      // ── Hora de salida ───────────────────────────────────────────────
+      const SizedBox(height: 28),
+      Text(t('¿A qué hora salís de Medellín el último día?', 'What time do you leave Medellín on your last day?'),
+        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: kText)),
+      const SizedBox(height: 6),
+      Text(t('El planner ajusta las actividades para que llegués a tiempo', 'The planner adjusts activities so you make it on time'),
+        style: const TextStyle(fontSize: 11, color: kTextMuted)),
+      const SizedBox(height: 14),
+      Wrap(spacing: 10, runSpacing: 10, children: [
+        {'valor': 'Antes de las 10am', 'emoji': '🌅', 'es': 'Antes 10am',  'en': 'Before 10am'},
+        {'valor': 'Entre 10am y 2pm',  'emoji': '☀️', 'es': '10am – 2pm', 'en': '10am – 2pm'},
+        {'valor': 'Entre 2pm y 6pm',   'emoji': '🌤️', 'es': '2pm – 6pm',  'en': '2pm – 6pm'},
+        {'valor': 'Después de las 6pm','emoji': '🌙', 'es': 'Después 6pm', 'en': 'After 6pm'},
+        {'valor': 'No sé aún',         'emoji': '❓', 'es': 'No sé aún',   'en': 'Not sure yet'},
+      ].map((op) {
+        final sel = _horaSalida == op['valor'];
+        return GestureDetector(
+          onTap: () => setState(() => _horaSalida = op['valor']!),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 180),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            decoration: BoxDecoration(
+              color: sel ? kAccent.withOpacity(0.15) : kCard,
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(
+                color: sel ? kAccent : Colors.white.withOpacity(0.08),
+                width: sel ? 1.5 : 1)),
+            child: Row(mainAxisSize: MainAxisSize.min, children: [
+              Text(op['emoji']!, style: const TextStyle(fontSize: 14)),
+              const SizedBox(width: 6),
+              Text(kLang == 'en' ? op['en']! : op['es']!,
+                style: TextStyle(fontSize: 13,
+                  fontWeight: sel ? FontWeight.w700 : FontWeight.w500,
+                  color: sel ? kAccent : kText)),
+            ])));
+      }).toList()),
+      // ── Zona hotel ───────────────────────────────────────────────────
+      const SizedBox(height: 28),
+      Text(t('¿En qué zona está tu alojamiento?', 'What zone is your accommodation in?'),
+        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: kText)),
+      const SizedBox(height: 14),
+      Wrap(spacing: 10, runSpacing: 10, children: _zonasHotel.map((zona) {
+        final sel = _zonaHotel == zona;
+        return GestureDetector(
+          onTap: () => setState(() => _zonaHotel = zona),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 180),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            decoration: BoxDecoration(
+              color: sel ? kGreen.withOpacity(0.15) : kCard,
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(
+                color: sel ? kGreen : Colors.white.withOpacity(0.08),
+                width: sel ? 1.5 : 1)),
+            child: Row(mainAxisSize: MainAxisSize.min, children: [
+              Text(zona == 'El Poblado' ? '🌴' : zona == 'Laureles' ? '🏟️' :
+                   zona == 'Centro' ? '🏛️' : '📍',
+                style: const TextStyle(fontSize: 14)),
+              const SizedBox(width: 6),
+              Text(zona, style: TextStyle(
+                fontSize: 13, fontWeight: sel ? FontWeight.w700 : FontWeight.w500,
+                color: sel ? kGreen : kText)),
+            ])));
+      }).toList()),
+      // ── Tipo de alojamiento ──────────────────────────────────────────
+      const SizedBox(height: 28),
+      Text(t('¿Qué tipo de alojamiento tenés?', 'What type of accommodation do you have?'),
+        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: kText)),
+      const SizedBox(height: 14),
+      Wrap(spacing: 10, runSpacing: 10, children: alojOpts.map((a) {
+        final sel = _alojamiento == a['valor'];
+        return GestureDetector(
+          onTap: () => setState(() => _alojamiento = a['valor']!),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 180),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            decoration: BoxDecoration(
+              color: sel ? kOrchid.withOpacity(0.12) : kCard,
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(
+                color: sel ? kOrchid : Colors.white.withOpacity(0.08),
+                width: sel ? 1.5 : 1)),
+            child: Row(mainAxisSize: MainAxisSize.min, children: [
+              Text(a['emoji']!, style: const TextStyle(fontSize: 14)),
+              const SizedBox(width: 6),
+              Text(a['valor']!, style: TextStyle(
+                fontSize: 13, fontWeight: sel ? FontWeight.w700 : FontWeight.w500,
+                color: sel ? kOrchid : kText)),
+            ])));
+      }).toList()),
+      // ── Feria banner ─────────────────────────────────────────────────
+      if (_esFeria) ...[
+        const SizedBox(height: 24),
+        Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: kFeriaRojo.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: kFeriaRojo.withOpacity(0.4))),
+          child: Row(children: [
+            const Text('🌹', style: TextStyle(fontSize: 20)),
+            const SizedBox(width: 10),
+            Expanded(child: Text(
+              t('¡Tu visita coincide con la Feria de las Flores! El planner incluirá eventos especiales.',
+                'Your visit coincides with Feria de las Flores! The planner will include special events.'),
+              style: const TextStyle(fontSize: 12, color: kText, height: 1.4))),
+          ])),
+      ],
+    ]);
+  }
+
+  Widget _buildPaso2() {
+    return Column(key: const ValueKey(2), crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Text(t('¿Qué te interesa?', 'What are you into?'),
+        style: const TextStyle(fontFamily: 'PlayfairDisplay',
+          fontSize: 22, fontWeight: FontWeight.w900, color: kText)),
+      Text(t('Elegí todos los que quieras', 'Choose as many as you like'),
+        style: const TextStyle(fontSize: 12, color: kTextMuted)),
+      const SizedBox(height: 20),
+      Wrap(spacing: 10, runSpacing: 10, children: _interesesOpts.map((op) {
+        final label = kLang == 'en' ? op['labelEN']! : op['label']!;
+        final sel = _intereses.contains(op['label']);
+        return GestureDetector(
+          onTap: () => setState(() =>
+            sel ? _intereses.remove(op['label']) : _intereses.add(op['label']!)),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 180),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            decoration: BoxDecoration(
+              color: sel ? kGold.withOpacity(0.15) : kCard,
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(
+                color: sel ? kGold : Colors.white.withOpacity(0.08),
+                width: sel ? 1.5 : 1)),
+            child: Row(mainAxisSize: MainAxisSize.min, children: [
+              Text(op['emoji']!, style: const TextStyle(fontSize: 16)),
+              const SizedBox(width: 6),
+              Text(label, style: TextStyle(
+                fontSize: 13, fontWeight: sel ? FontWeight.w700 : FontWeight.w500,
+                color: sel ? kGold : kText)),
+            ])));
+      }).toList()),
+      const SizedBox(height: 28),
+      Text(t('¿Con quién viajás?', 'Who are you traveling with?'),
+        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: kText)),
+      const SizedBox(height: 12),
+      Row(children: [
+        {'v': 'Solo', 'e': '🧍', 'es': 'Solo/a', 'en': 'Solo'},
+        {'v': 'Pareja', 'e': '👫', 'es': 'Pareja', 'en': 'Couple'},
+        {'v': 'Familia', 'e': '👨‍👩‍👧', 'es': 'Familia', 'en': 'Family'},
+        {'v': 'Grupo', 'e': '👥', 'es': 'Grupo', 'en': 'Group'},
+      ].map((op) {
+        final sel = _compania == op['v'];
+        return Expanded(child: GestureDetector(
+          onTap: () => setState(() => _compania = op['v']!),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 180),
+            margin: const EdgeInsets.only(right: 8),
+            padding: const EdgeInsets.symmetric(vertical: 12),
+            decoration: BoxDecoration(
+              color: sel ? kGreen.withOpacity(0.15) : kCard,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: sel ? kGreen : Colors.white.withOpacity(0.06),
+                width: sel ? 1.5 : 1)),
+            child: Column(children: [
+              Text(op['e']!, style: const TextStyle(fontSize: 20)),
+              const SizedBox(height: 4),
+              Text(kLang == 'en' ? op['en']! : op['es']!,
+                style: TextStyle(fontSize: 10,
+                  color: sel ? kGreen : kTextMuted,
+                  fontWeight: sel ? FontWeight.w700 : FontWeight.w400)),
+            ]))));
+      }).toList()),
+      const SizedBox(height: 24),
+      Text(kLang == 'en' ? 'Daily budget (USD)' : 'Presupuesto diario (COP)',
+        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: kText)),
+      const SizedBox(height: 4),
+      Text(kLang == 'en' ? 'Includes meals, transport and entry fees' : 'Incluye comidas, transporte y entradas',
+        style: const TextStyle(fontSize: 11, color: kTextMuted)),
+      const SizedBox(height: 12),
+      Row(children: [
+        {'v': 'Bajo',  'es': 'Mochilero', 'en': 'Budget',  'subEN': r'$10-30 USD', 'subES': r'$40K-120K', 'c': '🟢'},
+        {'v': 'Medio', 'es': 'Confort',   'en': 'Mid',     'subEN': r'$30-80 USD', 'subES': r'$120K-320K', 'c': '🟡'},
+        {'v': 'Alto',  'es': 'Premium',   'en': 'Premium', 'subEN': r'+$80 USD',   'subES': r'+$320K', 'c': '🟠'},
+      ].map((op) {
+        final sel = _presupuesto == op['v'];
+        return Expanded(child: GestureDetector(
+          onTap: () => setState(() => _presupuesto = op['v']!),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 180),
+            margin: const EdgeInsets.only(right: 8),
+            padding: const EdgeInsets.symmetric(vertical: 12),
+            decoration: BoxDecoration(
+              color: sel ? kGold.withOpacity(0.12) : kCard,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: sel ? kGold : Colors.white.withOpacity(0.06),
+                width: sel ? 1.5 : 1)),
+            child: Column(children: [
+              Text(op['c']!, style: const TextStyle(fontSize: 18)),
+              const SizedBox(height: 4),
+              Text(kLang == 'en' ? op['en']! : op['es']!,
+                style: TextStyle(fontSize: 11,
+                  color: sel ? kGold : kText,
+                  fontWeight: sel ? FontWeight.w700 : FontWeight.w500)),
+              Text(kLang == 'en' ? op['subEN']! : op['subES']!,
+                style: const TextStyle(fontSize: 9, color: kTextMuted)),
+            ]))));
+      }).toList()),
+      // ── Primera vez en Medellín ──────────────────────────────────────
+      const SizedBox(height: 28),
+      Text(t('¿Es tu primera vez en Medellín?', 'Is this your first time in Medellín?'),
+        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: kText)),
+      const SizedBox(height: 12),
+      Row(children: [
+        {'val': true,  'emoji': '🌟', 'es': 'Primera vez',  'en': 'First time',
+         'sub': 'Quiero ver los clásicos', 'subEN': 'I want the classics'},
+        {'val': false, 'emoji': '🔁', 'es': 'Ya la conozco', 'en': 'Been here before',
+         'sub': 'Busco algo diferente',    'subEN': 'Looking for something new'},
+      ].map((op) {
+        final sel = _primeraVez == (op['val'] as bool);
+        return Expanded(child: GestureDetector(
+          onTap: () => setState(() => _primeraVez = op['val'] as bool),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 180),
+            margin: EdgeInsets.only(right: op['val'] == true ? 8 : 0),
+            padding: const EdgeInsets.symmetric(vertical: 14),
+            decoration: BoxDecoration(
+              color: sel ? kGreen.withOpacity(0.12) : kCard,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                color: sel ? kGreen : Colors.white.withOpacity(0.06),
+                width: sel ? 1.5 : 1)),
+            child: Column(children: [
+              Text(op['emoji'] as String, style: const TextStyle(fontSize: 22)),
+              const SizedBox(height: 6),
+              Text(kLang == 'en' ? op['en'] as String : op['es'] as String,
+                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700,
+                  color: sel ? kGreen : kText)),
+              const SizedBox(height: 2),
+              Text(kLang == 'en' ? op['subEN'] as String : op['sub'] as String,
+                textAlign: TextAlign.center,
+                style: const TextStyle(fontSize: 9, color: kTextMuted)),
+            ]))));
+      }).toList()),
+    ]);
+  }
+}
+
+// ── Selector de fecha rápido ──────────────────────────────────────────────
+class _DateSelector extends StatelessWidget {
+  final String label;
+  final String emoji;
+  final DateTime fecha;
+  final ValueChanged<DateTime> onChanged;
+  const _DateSelector({
+    required this.label, required this.emoji,
+    required this.fecha, required this.onChanged,
+  });
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: () async {
+        final picked = await showDatePicker(
+          context: context,
+          initialDate: fecha,
+          firstDate: DateTime.now(),
+          lastDate: DateTime.now().add(const Duration(days: 365)),
+          builder: (ctx, child) => Theme(
+            data: Theme.of(ctx).copyWith(
+              colorScheme: ColorScheme.dark(
+                primary: kGold, onPrimary: Colors.black,
+                surface: kCard, onSurface: kText)),
+            child: child!));
+        if (picked != null) onChanged(picked);
+      },
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: kCard, borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.white.withOpacity(0.08))),
+        child: Row(children: [
+          Text(emoji, style: const TextStyle(fontSize: 22)),
+          const SizedBox(width: 12),
+          Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(label, style: const TextStyle(fontSize: 10, color: kTextMuted, letterSpacing: 1)),
+            Text(
+              '${fecha.day}/${fecha.month}/${fecha.year}',
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: kText)),
+          ]),
+          const Spacer(),
+          Icon(Icons.calendar_today_outlined, color: kGold.withOpacity(0.7), size: 18),
+        ])));
+  }
+}
+
+// ── Pantalla de carga ─────────────────────────────────────────────────────
+class _PlannerLoadingScreen extends StatefulWidget {
+  final String prompt;
+  const _PlannerLoadingScreen({required this.prompt});
+  @override
+  State<_PlannerLoadingScreen> createState() => _PlannerLoadingScreenState();
+}
+
+class _PlannerLoadingScreenState extends State<_PlannerLoadingScreen>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _ctrl;
+  late Animation<double> _anim;
+  int _msgIdx = 0;
+  final List<String> _msgs = [
+    '🗺️  Analizando 45+ rutas de Medellín...',
+    '📍  Calculando distancias desde tu hotel...',
+    '🎯  Combinando tus intereses...',
+    '✨  Armando tu itinerario perfecto...',
+  ];
+  final List<String> _msgsEN = [
+    '🗺️  Analyzing 45+ Medellín routes...',
+    '📍  Calculating distances from your hotel...',
+    '🎯  Matching your interests...',
+    '✨  Building your perfect itinerary...',
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(vsync: this, duration: const Duration(seconds: 2))..repeat();
+    _anim = Tween<double>(begin: 0, end: 1).animate(_ctrl);
+    _cycleMessages();
+    _callClaude();
+  }
+
+  void _cycleMessages() {
+    Future.delayed(const Duration(milliseconds: 1800), () {
+      if (mounted) {
+        setState(() => _msgIdx = (_msgIdx + 1) % _msgs.length);
+        _cycleMessages();
+      }
+    });
+  }
+
+  Future<void> _callClaude() async {
+    try {
+      final response = await http.post(
+        Uri.parse('https://planneriav2-u2yk2c4v7a-uc.a.run.app'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'prompt': widget.prompt}),
+      );
+
+      if (!mounted) return;
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final text = data['result'] as String;
+        final clean = text.replaceAll(RegExp(r'```json|```'), '').trim();
+        final parsed = jsonDecode(clean) as Map<String, dynamic>;
+        if (mounted) Navigator.of(context).pop(parsed);
+      } else {
+        if (mounted) {
+          Navigator.of(context).pop(null);
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text(t('Error generando itinerario. Intentá de nuevo.',
+              'Error generating itinerary. Please try again.')),
+            backgroundColor: Colors.red));
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        Navigator.of(context).pop(null);
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(t('Sin conexión. Verificá tu internet.',
+            'No connection. Check your internet.')),
+          backgroundColor: Colors.red));
+      }
+    }
+  }
+
+  @override
+  void dispose() { _ctrl.dispose(); super.dispose(); }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: kDark2,
+      body: Center(child: Padding(
+        padding: const EdgeInsets.all(40),
+        child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+          // Logo animado
+          AnimatedBuilder(animation: _anim, builder: (_, __) => Transform.rotate(
+            angle: _anim.value * 2 * 3.14159,
+            child: Container(width: 80, height: 80,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(color: kGold, width: 2),
+                boxShadow: [BoxShadow(color: kGold.withOpacity(0.3), blurRadius: 20)]),
+              child: const Center(child: Text('🗓️', style: TextStyle(fontSize: 36)))))),
+          const SizedBox(height: 40),
+          Text(t('ARMANDO TU ITINERARIO', 'BUILDING YOUR ITINERARY'),
+            style: const TextStyle(fontFamily: 'PlayfairDisplay',
+              fontSize: 20, fontWeight: FontWeight.w900, color: kGold,
+              letterSpacing: 1)),
+          const SizedBox(height: 8),
+          Text(t('con inteligencia artificial', 'with artificial intelligence'),
+            style: const TextStyle(fontSize: 12, color: kTextMuted)),
+          const SizedBox(height: 40),
+          AnimatedSwitcher(
+            duration: const Duration(milliseconds: 400),
+            child: Text(
+              kLang == 'en' ? _msgsEN[_msgIdx] : _msgs[_msgIdx],
+              key: ValueKey(_msgIdx),
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontSize: 14, color: kText, height: 1.5))),
+          const SizedBox(height: 32),
+          // Barra de progreso indeterminada
+          ClipRRect(
+            borderRadius: BorderRadius.circular(4),
+            child: const LinearProgressIndicator(
+              backgroundColor: Color(0xFF1A2A1A),
+              valueColor: AlwaysStoppedAnimation<Color>(kGold),
+              minHeight: 3)),
+        ]))));
+  }
+}
+
+// ── Pantalla de resultado ─────────────────────────────────────────────────
+class _PlannerResultScreen extends StatelessWidget {
+  final Map<String, dynamic> data;
+  final int dias;
+  const _PlannerResultScreen({required this.data, required this.dias});
+
+  @override
+  Widget build(BuildContext context) {
+    final saludo = data['saludo']?.toString() ?? '';
+    final diasList = (data['dias'] as List? ?? []).cast<Map<String, dynamic>>();
+    final resumen = data['resumen'] as Map<String, dynamic>? ?? {};
+    final tip = data['tip']?.toString() ?? '';
+
+    return Scaffold(
+      backgroundColor: kDark2,
+      body: Column(children: [
+        // Header resultado
+        Container(
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              colors: [Color(0xFF0A1A08), Color(0xFF0F2010)],
+              begin: Alignment.topLeft, end: Alignment.bottomRight),
+            border: Border(bottom: BorderSide(color: kGold.withOpacity(0.2)))),
+          child: SafeArea(bottom: false, child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Row(children: [
+                GestureDetector(
+                  onTap: () => Navigator.of(context).popUntil((r) => r.isFirst),
+                  child: Container(width: 36, height: 36,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.06), shape: BoxShape.circle,
+                      border: Border.all(color: kGold.withOpacity(0.2))),
+                    child: const Center(child: Text('←',
+                      style: TextStyle(color: kText, fontSize: 16))))),
+                const SizedBox(width: 12),
+                Expanded(child: Text(t('TU ITINERARIO', 'YOUR ITINERARY'),
+                  style: const TextStyle(fontFamily: 'PlayfairDisplay',
+                    fontSize: 18, fontWeight: FontWeight.w900, color: kGold))),
+                GestureDetector(
+                  onTap: () {
+                    final texto = '🗓️ ${t("Mi itinerario en Medellín", "My Medellín itinerary")}\n\n'
+                      + diasList.map((d) {
+                          final bloques = (d['bloques'] as List? ?? []).cast<Map>();
+                          return '📅 ${d['fecha']}\n' + bloques.map((b) =>
+                            '  ${b['emoji']} ${b['rutaNombre']} · ${b['duracion']}').join('\n');
+                        }).join('\n\n')
+                      + '\n\n🌿 Rutero MDE → rutero-mde.web.app';
+                    Share.share(texto);
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                    decoration: BoxDecoration(
+                      color: kGold.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: kGold.withOpacity(0.4))),
+                    child: Row(mainAxisSize: MainAxisSize.min, children: [
+                      const Icon(Icons.share_outlined, color: kGold, size: 14),
+                      const SizedBox(width: 5),
+                      Text(t('Compartir', 'Share'),
+                        style: const TextStyle(color: kGold, fontSize: 12,
+                          fontWeight: FontWeight.w700)),
+                    ]))),
+              ]),
+              if (saludo.isNotEmpty) ...[
+                const SizedBox(height: 12),
+                Text(saludo,
+                  style: const TextStyle(fontSize: 13, color: kText, height: 1.4)),
+              ],
+            ])))),
+        // Lista de días
+        Expanded(child: ListView(
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 40),
+          children: [
+            // Días e itinerario
+            ...diasList.map((dia) {
+              final esFeria = dia['esFeria'] == true;
+              final bloques = (dia['bloques'] as List? ?? []).cast<Map<String, dynamic>>();
+              return Container(
+                margin: const EdgeInsets.only(bottom: 20),
+                decoration: BoxDecoration(
+                  color: kCard,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: esFeria ? kFeriaRojo.withOpacity(0.4) : kGold.withOpacity(0.15))),
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  // Header del día
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: esFeria ? kFeriaRojo.withOpacity(0.1) : kGold.withOpacity(0.08),
+                      borderRadius: const BorderRadius.vertical(top: Radius.circular(16))),
+                    child: Row(children: [
+                      Text(esFeria ? '🌹' : '📅', style: const TextStyle(fontSize: 20)),
+                      const SizedBox(width: 10),
+                      Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                        Text(
+                          '${t("DÍA", "DAY")} ${dia['numero']}',
+                          style: TextStyle(fontSize: 10, color: esFeria ? kFeriaRojo : kGold,
+                            fontWeight: FontWeight.w800, letterSpacing: 1.5)),
+                        Text(dia['fecha']?.toString() ?? '',
+                          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: kText)),
+                      ])),
+                      if (esFeria)
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: kFeriaRojo.withOpacity(0.15),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: kFeriaRojo.withOpacity(0.4))),
+                          child: Text(t('🌹 FERIA', '🌹 FESTIVAL'),
+                            style: const TextStyle(color: kFeriaRojo, fontSize: 10,
+                              fontWeight: FontWeight.w800))),
+                    ])),
+                  // Bloques del día
+                  ...bloques.asMap().entries.map((entry) {
+                    final b = entry.value;
+                    final isLast = entry.key == bloques.length - 1;
+                    final rutaNombre = b['rutaNombre']?.toString() ?? '';
+                    // Buscar la ruta real — búsqueda flexible (exacta o contains)
+                    final todasRutas = RutasService().rutas;
+                    Map<String, dynamic> rutaReal = todasRutas.firstWhere(
+                      (r) => r['nombre']?.toString() == rutaNombre,
+                      orElse: () => <String, dynamic>{});
+                    // Fallback: búsqueda parcial si no hay match exacto
+                    if (rutaReal.isEmpty && rutaNombre.isNotEmpty) {
+                      rutaReal = todasRutas.firstWhere(
+                        (r) => (r['nombre']?.toString() ?? '').toLowerCase()
+                               .contains(rutaNombre.toLowerCase().substring(0,
+                                 rutaNombre.length > 8 ? 8 : rutaNombre.length)),
+                        orElse: () => <String, dynamic>{});
+                    }
+                    return Column(children: [
+                      InkWell(
+                        onTap: rutaReal.isNotEmpty ? () =>
+                          RuteroNav.push(context, RouteDetailScreen(ruta: rutaReal)) : null,
+                        child: Padding(
+                          padding: const EdgeInsets.all(16),
+                          child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                            // Periodo
+                            Container(width: 44,
+                              child: Column(children: [
+                                Text(b['emoji']?.toString() ?? '📍',
+                                  style: const TextStyle(fontSize: 22)),
+                                const SizedBox(height: 4),
+                                Text(
+                                  t(b['periodo']?.toString() ?? '',
+                                    b['periodoEN']?.toString() ?? b['periodo']?.toString() ?? ''),
+                                  textAlign: TextAlign.center,
+                                  style: const TextStyle(fontSize: 8, color: kTextMuted, height: 1.2)),
+                              ])),
+                            const SizedBox(width: 12),
+                            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                              Text(rutaNombre,
+                                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800,
+                                  color: kText)),
+                              const SizedBox(height: 4),
+                              Text(b['descripcion']?.toString() ?? '',
+                                style: const TextStyle(fontSize: 12, color: kTextMuted, height: 1.4)),
+                              const SizedBox(height: 8),
+                              Wrap(
+                                spacing: 6,
+                                runSpacing: 6,
+                                children: [
+                                  _PlannerChip('⏱️ ${b['duracion'] ?? ''}', kGold),
+                                  _PlannerChip('💵 ${b['precio'] ?? ''}', kGreen),
+                                ],
+                              ),
+                              if (b['transporte'] != null) ...[
+                                const SizedBox(height: 6),
+                                Row(children: [
+                                  const Text('🚇 ', style: TextStyle(fontSize: 11)),
+                                  Expanded(child: Text(b['transporte']!,
+                                    style: const TextStyle(fontSize: 11, color: kTextMuted))),
+                                ]),
+                              ],
+                              if (rutaReal.isNotEmpty)
+                                Padding(
+                                  padding: const EdgeInsets.only(top: 8),
+                                  child: Text(t('→ Iniciar ruta', '→ Start route'),
+                                    style: const TextStyle(fontSize: 11, color: kGreen,
+                                      fontWeight: FontWeight.w700))),
+                            ])),
+                          ]))),
+                      if (!isLast)
+                        Padding(
+                          padding: const EdgeInsets.only(left: 36),
+                          child: Container(height: 1,
+                            color: Colors.white.withOpacity(0.05))),
+                    ]);
+                  }),
+                ]));
+            }),
+
+            // Resumen final
+            if (resumen.isNotEmpty)
+              Container(
+                padding: const EdgeInsets.all(16),
+                margin: const EdgeInsets.only(bottom: 16),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [kGold.withOpacity(0.1), kGreen.withOpacity(0.08)]),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: kGold.withOpacity(0.3))),
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text(t('RESUMEN DE TU VIAJE', 'TRIP SUMMARY'),
+                    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w900,
+                      color: kGold, letterSpacing: 1.5)),
+                  const SizedBox(height: 14),
+                  Row(children: [
+                    _ResumenStat('🗺️', '${resumen['rutas'] ?? 0}', t('rutas', 'routes')),
+                    _ResumenStat('⏱️', '${resumen['horasTotales'] ?? ''}', t('tiempo', 'time')),
+                    _ResumenStat('💵', '${resumen['costoEstimado'] ?? ''}', t('costo est.', 'est. cost')),
+                    _ResumenStat('⭐', '${resumen['puntosPosibles'] ?? 0}', t('puntos', 'points')),
+                  ]),
+                  if (resumen['insignias'] != null) ...[
+                    const SizedBox(height: 12),
+                    Wrap(spacing: 8, runSpacing: 8,
+                      children: (resumen['insignias'] as List).map<Widget>((ins) =>
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                          decoration: BoxDecoration(
+                            color: kGold.withOpacity(0.12),
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(color: kGold.withOpacity(0.4))),
+                          child: Text('🏅 $ins',
+                            style: const TextStyle(fontSize: 11, color: kGold,
+                              fontWeight: FontWeight.w700)))).toList()),
+                  ],
+                ])),
+
+            // Tip final
+            if (tip.isNotEmpty)
+              Container(
+                padding: const EdgeInsets.all(16),
+                margin: const EdgeInsets.only(bottom: 16),
+                decoration: BoxDecoration(
+                  color: kCard, borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: kGreen.withOpacity(0.3))),
+                child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  const Text('💡', style: TextStyle(fontSize: 20)),
+                  const SizedBox(width: 10),
+                  Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text(t('Consejo de Rutero', 'Rutero Tip'),
+                      style: const TextStyle(fontSize: 10, color: kGreen,
+                        fontWeight: FontWeight.w800, letterSpacing: 1.2)),
+                    const SizedBox(height: 4),
+                    Text(tip, style: const TextStyle(fontSize: 13, color: kText, height: 1.4)),
+                  ])),
+                ])),
+
+            // CTA nuevo itinerario
+            GestureDetector(
+              onTap: () => Navigator.of(context).pop(),
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                decoration: BoxDecoration(
+                  color: kCard, borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: kGold.withOpacity(0.3))),
+                child: Center(child: Text(
+                  t('✏️ Ajustar itinerario', '✏️ Adjust itinerary'),
+                  style: const TextStyle(color: kGold, fontSize: 13,
+                    fontWeight: FontWeight.w700))))),
+          ])),
+      ]),
+    );
+  }
+}
+
+class _PlannerChip extends StatelessWidget {
+  final String label;
+  final Color color;
+  const _PlannerChip(this.label, this.color);
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+    decoration: BoxDecoration(
+      color: color.withOpacity(0.1),
+      borderRadius: BorderRadius.circular(8),
+      border: Border.all(color: color.withOpacity(0.3))),
+    child: Text(label,
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+      style: TextStyle(fontSize: 11, color: color, fontWeight: FontWeight.w600)));
+}
+
+class _ResumenStat extends StatelessWidget {
+  final String emoji;
+  final String valor;
+  final String label;
+  const _ResumenStat(this.emoji, this.valor, this.label);
+  @override
+  Widget build(BuildContext context) => Expanded(child: Column(children: [
+    Text(emoji, style: const TextStyle(fontSize: 18)),
+    const SizedBox(height: 4),
+    Text(valor, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: kText)),
+    Text(label, style: const TextStyle(fontSize: 9, color: kTextMuted)),
+  ]));
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -4983,17 +6474,17 @@ class ColaboradoresScreen extends StatelessWidget {
                   lista = snap.data!.docs.map((doc) {
                     final d = doc.data() as Map<String, dynamic>;
                     Color color = kGreen;
-                    try { color = Color(int.parse((d['color'] as String? ?? '#2D5A1B').replaceAll('#', '0xFF'))); } catch (_) {}
+                    try { color = Color(int.parse((d['color']?.toString() ?? '#2D5A1B').replaceAll('#', '0xFF'))); } catch (_) {}
                     return _Colaborador(
-                      nombre: d['nombre'] as String? ?? '',
-                      handle: d['handle'] as String? ?? '',
-                      plataforma: d['plataforma'] as String? ?? 'YouTube',
-                      descripcion: d['descripcion'] as String? ?? '',
-                      descripcionEN: d['descripcionEN'] as String? ?? '',
-                      emoji: d['emoji'] as String? ?? '🎬',
-                      urlCanal: d['urlCanal'] as String? ?? '',
-                      rutaVinculada: d['rutaVinculada'] as String? ?? '',
-                      rutaVinculadaEN: d['rutaVinculadaEN'] as String? ?? '',
+                      nombre: d['nombre']?.toString() ?? '',
+                      handle: d['handle']?.toString() ?? '',
+                      plataforma: d['plataforma']?.toString() ?? 'YouTube',
+                      descripcion: d['descripcion']?.toString() ?? '',
+                      descripcionEN: d['descripcionEN']?.toString() ?? '',
+                      emoji: d['emoji']?.toString() ?? '🎬',
+                      urlCanal: d['urlCanal']?.toString() ?? '',
+                      rutaVinculada: d['rutaVinculada']?.toString() ?? '',
+                      rutaVinculadaEN: d['rutaVinculadaEN']?.toString() ?? '',
                       color: color,
                     );
                   }).toList();
@@ -5218,8 +6709,8 @@ class _CapturasDeCampoScreenState extends State<CapturasDeCampoScreen> {
       final sitio = _encontrarSitioCercano(pos.latitude, pos.longitude);
       if (sitio != null) {
         setState(() {
-          _sitioDetectado = sitio['nombre'] as String? ?? '';
-          _rutaDetectada = sitio['ruta'] as String? ?? '';
+          _sitioDetectado = sitio['nombre']?.toString() ?? '';
+          _rutaDetectada = sitio['ruta']?.toString() ?? '';
           _estado = t('📍 Sitio detectado', '📍 Site detected');
         });
       } else {
@@ -5436,15 +6927,15 @@ class _CapturasDeCampoScreenState extends State<CapturasDeCampoScreen> {
               child: Row(children: [
                 ClipRRect(
                   borderRadius: BorderRadius.circular(8),
-                  child: Image.file(File(c['path'] as String),
+                  child: Image.file(File(c['path']?.toString() ?? ''),
                     width: 60, height: 60, fit: BoxFit.cover,
                     errorBuilder: (_, __, ___) => Container(width: 60, height: 60, color: kGreen.withOpacity(0.2),
                       child: const Icon(Icons.image, color: kGreen)))),
                 const SizedBox(width: 12),
                 Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text(c['sitio'] as String, style: const TextStyle(color: kText, fontSize: 13, fontWeight: FontWeight.w700)),
-                  Text(c['ruta'] as String, style: const TextStyle(color: kGreen, fontSize: 10)),
-                  Text((c['fecha'] as String).substring(0, 16).replaceAll('T', ' '),
+                  Text(c['sitio']?.toString() ?? '', style: const TextStyle(color: kText, fontSize: 13, fontWeight: FontWeight.w700)),
+                  Text(c['ruta']?.toString() ?? '', style: const TextStyle(color: kGreen, fontSize: 10)),
+                  Text((c['fecha']?.toString() ?? '').substring(0, 16).replaceAll('T', ' '),
                     style: const TextStyle(color: kTextMuted, fontSize: 10)),
                 ])),
               ]))).toList(),
@@ -6494,9 +7985,9 @@ class _WelcomeScreenState extends State<WelcomeScreen> with SingleTickerProvider
 
                 // Chips de datos
                 Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-                  _WelcomeChip(emoji: '🗺️', label: '${RutasService().rutas.length} ${t("rutas","routes")}'),
+                  _WelcomeChip(emoji: '🗺️', label: '${RutasService().rutas.where((r) => r['activa'] != false && r['pausada'] != true && !(r['esFeria'] == true) && !['FERIA CLÁSICA','FERIA DE LAS FLORES'].contains(r['nombre']?.toString())).length} ${t("rutas","routes")}'),
                   const SizedBox(width: 8),
-                  _WelcomeChip(emoji: '📍', label: '${kSitiosMapa.length} ${t("sitios","spots")}'),
+                  _WelcomeChip(emoji: '📍', label: '${RutasService().rutas.fold<int>(0, (sum, r) { final sd = r['sitiosDetalle']; final gps = r['gpsSitios']; return sum + ((sd is List ? sd.length : 0) + (gps is List ? gps.length : 0) > 0 ? (sd is List ? sd.length : (gps is List ? gps.length : 0)) : 0); })} ${t("sitios","spots")}'),
                   const SizedBox(width: 8),
                   _WelcomeChip(emoji: '🏅', label: t('Premios reales','Real rewards')),
                 ]),
@@ -6537,7 +8028,6 @@ class HomeScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) => const HomeBody();
 }
-
 
 // ─────────────────────────────────────────────────────────────────────────
 //  BANNER SUPERIOR — Imagen panorámica + Banner aliados rotativos
@@ -6735,7 +8225,6 @@ const Map<String, AliadoComercial> kAliadosFinales = {
     activo: false,
   ),
 
-  // ── RUTA LAURELES & TRADICIÓN ──
   'Restaurante local (Aliado)': AliadoComercial(
     id: 'laureles_restaurante',
     nombre: 'Restaurante local',
@@ -6890,7 +8379,6 @@ Future<void> registrarCodigoAliado({
   }
 }
 
-
 /// Convierte un color de ruta que puede venir como Color (hardcode) o String hex (Firestore)
 Color kRutaColor(dynamic val, Color fallback) {
   if (val == null) return fallback;
@@ -6906,29 +8394,140 @@ Color kRutaColor(dynamic val, Color fallback) {
 
 /// Mapeo local: nombre de ruta → datos de temporada
 const Map<String, Map<String, dynamic>> kTemporadaPorRuta = {
-  'SEMANA SANTA PATRIMONIAL': {'temporadaMeses': [3, 4], 'temporadaInicio': [3, 29], 'temporadaFin': [4, 5]},
-  'FESTIVAL INTERNACIONAL DE TANGO': {'temporadaMeses': [6], 'temporadaInicio': [6, 22], 'temporadaFin': [6, 30]},
-  'FESTIVAL DE POESÍA INTERNACIONAL': {'temporadaMeses': [7], 'temporadaInicio': [7, 4], 'temporadaFin': [7, 12]},
-  'COLOMBIAMODA — MODA & DISEÑO': {'temporadaMeses': [7], 'temporadaInicio': [7, 28], 'temporadaFin': [7, 31]},
   'FERIA DE LAS FLORES': {'temporadaMeses': [7, 8], 'temporadaInicio': [7, 31], 'temporadaFin': [8, 9]},
-  'TABLADOS Y RUMBA': {'temporadaMeses': [7, 8], 'temporadaInicio': [7, 31], 'temporadaFin': [8, 9]},
-  'RUTA SILLETERA': {'temporadaMeses': [7, 8], 'temporadaInicio': [7, 19], 'temporadaFin': [8, 9]},
-  'MEDEJAZZ — FESTIVAL DE JAZZ': {'temporadaMeses': [9], 'temporadaInicio': [9, 10], 'temporadaFin': [9, 20]},
-  'FIESTA DEL LIBRO Y LA CULTURA': {'temporadaMeses': [9], 'temporadaInicio': [9, 5], 'temporadaFin': [9, 15]},
-  'FERIA DE LA ANTIOQUEÑIDAD': {'temporadaMeses': [10], 'temporadaInicio': [10, 1], 'temporadaFin': [10, 31]},
-  'ALUMBRADO NAVIDEÑO — RÍO MEDELLÍN': {'temporadaMeses': [12, 1], 'temporadaInicio': [12, 1], 'temporadaFin': [1, 15]},
+  // [eliminado] 'TABLADOS Y RUMBA': {'temporadaMeses': [7, 8], 'temporadaInicio': [7, 31], 'temp
+  // [eliminado] 'RUTA SILLETERA': {'temporadaMeses': [7, 8], 'temporadaInicio': [7, 19], 'tempor
+  'FINCAS SILLETERAS': {'temporadaMeses': [7, 8], 'temporadaInicio': [7, 19], 'temporadaFin': [8, 9]},
 };
 
 /// Rutas pausadas por nombre
 const Set<String> kRutasPausadas = {
-  'ALUMBRADO NAVIDEÑO — RÍO MEDELLÍN',
-  'MEDEJAZZ — FESTIVAL DE JAZZ',
-  'FIESTA DEL LIBRO Y LA CULTURA',
-  'FERIA DE LA ANTIOQUEÑIDAD',
-  'SEMANA SANTA PATRIMONIAL',
-  'COLOMBIAMODA — MODA & DISEÑO',
-  'FESTIVAL DE POESÍA INTERNACIONAL',
-  'FESTIVAL INTERNACIONAL DE TANGO',
+  'NOCHE EN EL POBLADO', // pausada — sin contenido validado
+};
+
+
+// ── Cómo Llegar por ruta — fallback para rutas de Firestore sin este campo ──────────
+const Map<String, String> kComoLlegarPorRuta = {
+  'VIVE MANRIQUE':
+    '🚇 Metro L.A → Est. Acevedo\n🚌 Buseta hacia Calle 45\n🕐 ~20 min desde el centro',
+  'VIVE EL POBLADO':
+    '🚇 Metro L.A → Est. Poblado\n🚶 5 min caminando al Parque El Poblado\n🚕 Taxi desde cualquier punto',
+  'HUELLAS VIVAS DE EL POBLADO':
+    '🚇 Metro L.A → Est. Poblado\n🚶 5 min al Parque El Poblado\n🕐 ~15 min desde el centro',
+  'EL POBLADO VERDE':
+    '🚇 Metro L.A → Est. Poblado\n🚶 8 min al Parque Lineal La Presidenta\n🕐 ~15 min desde el centro',
+  'EL POBLADO CREATIVO':
+    '🚇 Metro L.A → Est. Poblado\n🚶 10 min hacia Provenza y Calle 10\n🕐 ~15 min desde el centro',
+  'SABORES DE EL POBLADO':
+    '🚇 Metro L.A → Est. Poblado\n🚶 5 min al Parque Lleras y zona gastronómica\n🕐 ~15 min desde el centro',
+  'NOCHE EN EL POBLADO':
+    '🚇 Metro L.A → Est. Poblado\n🚶 5 min al Parque Lleras\n🚕 Taxi de regreso — metro cierra a medianoche',
+  'VIVE LAURELES':
+    '🚇 Metro L.A → Est. Estadio\n🚶 10 min al Segundo Parque de Laureles\n🕐 ~12 min desde el centro',
+  // [eliminado] VIVE EL CENTRO
+
+  'TRANVÍA CULTURAL':
+    '🚃 Tranvía de Ayacucho → cualquier estación\n🚇 Metro L.A → Est. Parque Berrío → transbordo Tranvía\n🕐 5 min a pie desde el centro',
+  'DEL ORIGEN PAISA A LA MEDELLÍN MODERNA':
+    '🚇 Metro L.A → Est. Parque Berrío\n🚶 Caminata al Parque Bolívar — ruta recorre varios barrios\n🕐 ~10 min desde El Poblado',
+  'RUTA TRANSFORMACIÓN URBANA':
+    '🚇 Metro L.A → Est. Acevedo\n🚡 Metrocable L.K → Est. La Aurora (España)\n🕐 ~25 min desde el centro',
+  'RUTA MEMORIA Y REFLEXIÓN':
+    '🚇 Metro L.B → Est. Floresta\n🚶 3 min al Museo Beyond Escobar\n🕐 ~15 min desde el centro',
+  'RUTA VERDE DEL NORTE':
+    '🚇 Metro L.A → Est. Universidad\n🚶 5 min al Jardín Botánico y Parque Explora\n🕐 ~15 min desde El Poblado',
+  'RUTA DEL METROCABLE & ARVÍ':
+    '🚇 Metro L.A → Est. Acevedo\n🚡 Metrocable L.K → Santo Domingo → L.L → Parque Arví\n🕐 ~1h trayecto completo desde el centro',
+  'RUTA DE LOS MIRADORES':
+    '🚇 Metro L.A → Est. Acevedo\n🚡 Metrocable L.K → Est. Mirador 13 de Noviembre\n🕐 ~30 min desde el centro',
+
+  'RUTA GUATAPÉ & LA PIEDRA':
+    '🚌 Bus desde Terminal Norte → Guatapé (2h)\n🚕 Taxi desde Medellín (~1h 45min)\n🕐 Salir antes de las 8am',
+  'FINCAS SILLETERAS':
+    '🚇 Metro L.A → Est. Acevedo\n🚡 Metrocable L.L → Parque Arví\n🚕 Taxi colectivo a Santa Elena (~\$8.000 COP)\n🕐 ~1h 20min en total',
+  'FINCAS AGROTURÍSTICAS':
+    '🚕 Taxi hacia la vereda de destino\n🚌 Bus colectivo desde Terminal Norte según finca\n📍 Coordinar ubicación exacta con cada finca',
+  'TURISMO CREATIVO':
+    '🚇 Metro según el espacio creativo elegido\n📍 Mayoría en El Poblado y Laureles\n🕐 Verificar ubicación exacta con cada espacio',
+  'TRANSFORMACIÓN MEMORIA E HISTORIA':
+    '🚇 Metro L.A → Est. Acevedo\n🚡 Metrocable L.K → Santo Domingo o La Aurora\n🕐 ~25 min desde el centro',
+  'DISEÑO MODA Y COMPRAS':
+    '🚇 Metro L.A → Est. Industriales\n🚶 5 min a Plaza Mayor y Calle Provenza\n🕐 ~10 min desde el centro',
+  'RUTA SANTA FE DE ANTIOQUIA':
+    '🚌 Terminal Norte (Metro Est. Caribe) → buses frecuentes toda la mañana\n🚗 Vía Túnel de Occidente: Medellín → 80 km → ~1h 20min\n🕐 Primer bus: 5:30am · Último regreso: 7:00pm\n📍 Llegar al Parque Principal — todo está a pie desde ahí',
+  'JOYA COLONIAL OCULTA — CONCEPCIÓN':
+    '🚌 Terminal Norte (Metro Est. Caribe) → bus directo a Concepción\n🚗 Autopista Medellín-Bogotá → peaje Marinilla → desvío Concepción (~75 km)\n🕐 Primer bus: 6:00am · Último regreso: 5:00pm\n⏱️ Tiempo total: ~2h 30min en bus · ~1h 45min en carro\n📍 Bajarse en el Parque Principal — todo se hace a pie',
+  'FERIA DE LAS FLORES':
+    '🚇 Metro + sistema integrado — cada evento tiene su estación\n📍 Desfile Silleteros: Est. Industriales · Av. El Río\n📍 Santa Elena: Metrocable L.L → Arví → taxi colectivo\n🗺️ Consultá el Tab Feria para cada evento',
+  'CENTRO ALTERNATIVO':
+    '🚇 Metro L.A → Est. Parque Berrío o Cisneros\n🚶 Caminata por el centro histórico\n🕐 ~10 min desde El Poblado',
+  'ENTRE JUEGOS Y PALABRAS':
+    '🚇 Metro L.B → Est. Estadio o Suramericana\n🚶 10 min al Primer Parque de Laureles\n🕐 ~12 min desde el centro',
+  'ENTRE SABORES RISAS Y MIL COLORES':
+    '🚇 Metro L.B → Est. Estadio o Suramericana\n🚶 10 min a la Carrera 70\n🕐 ~12 min desde el centro',
+  'NOCHE EN LAURELES':
+    '🚇 Metro L.B → Est. Estadio\n🚶 10 min a la Carrera 70 y Segundo Parque\n🌙 Taxi de regreso — metro cierra a medianoche',
+  'OTROS CAMINOS LAURELES':
+    '🚇 Metro L.B → Est. Suramericana o Estadio\n🚶 Caminata por el barrio\n🕐 ~12 min desde el centro',
+  'RINCONES ESCONDIDOS DE EL POBLADO':
+    '🚇 Metro L.A → Est. El Poblado\n🚶 10 min hacia Provenza y Manila\n🕐 ~15 min desde el centro',
+  'SABORES DE LA 70':
+    '🚇 Metro L.B → Est. Suramericana\n🚶 8 min a la Carrera 70\n🍽️ El corredor gastronómico más famoso de Medellín',
+  'SABORES DEL CENTRO':
+    '🚇 Metro L.A → Est. Parque Berrío o Alpujarra\n🚶 Caminata por el centro histórico\n🕐 ~10 min desde El Poblado',
+  'FERIA CLÁSICA':
+    '🚇 Cada evento tiene punto de encuentro diferente\n📍 Desfile Silleteros: Est. Industriales · Av. El Río\n🚲 Feria a Ritmo de Bicicleta: sale desde Parque Luces\n🎤 Concierto Inaugural: Obelisco · Av. 33 con El Río',
+
+};
+
+
+// ── Zona por ruta — fallback para rutas de Firestore sin campo 'zona' ────────
+const Map<String, String> kZonaPorRuta = {
+  // Ciudad
+  'VIVE MANRIQUE':                        'Ciudad',
+  'HUELLAS VIVAS DE EL POBLADO':          'Ciudad',
+  'EL POBLADO VERDE':                     'Ciudad',
+  'EL POBLADO CREATIVO':                  'Ciudad',
+  'NOCHE EN EL POBLADO':                  'Ciudad',
+  'VIVE LAURELES':                        'Ciudad',
+  // [eliminado] VIVE EL CENTRO
+  // [eliminado] 'RUTA PATRIMONIAL DEL CENTRO':          'Ciudad',
+  // [eliminado] 'RUTA CENTRO REPUBLICANO':              'Ciudad',
+  'TRANVÍA CULTURAL':                     'Ciudad',
+  'DEL ORIGEN PAISA A LA MEDELLÍN MODERNA': 'Ciudad',
+  'RUTA TRANSFORMACIÓN URBANA':           'Ciudad',
+  'RUTA MEMORIA Y REFLEXIÓN':             'Ciudad',
+  'RUTA VERDE DEL NORTE':                 'Ciudad',
+  'RUTA DEL METROCABLE & ARVÍ':           'Ciudad',
+  'RUTA DE LOS MIRADORES':                'Ciudad',
+  // [eliminado] 'RUTA CULTURAL NOCTURNA':               'Ciudad',
+  'TURISMO CREATIVO':                     'Ciudad',
+  'CENTRO ALTERNATIVO':                   'Ciudad',
+  'ENTRE JUEGOS Y PALABRAS':              'Ciudad',
+  'ENTRE SABORES RISAS Y MIL COLORES':   'Ciudad',
+  'NOCHE EN LAURELES':                    'Ciudad',
+  'OTROS CAMINOS LAURELES':              'Ciudad',
+  'RINCONES ESCONDIDOS DE EL POBLADO':   'Ciudad',
+  'SABORES DE LA 70':                    'Comida Urbana',
+  'SABORES DEL CENTRO':                  'Comida Urbana',
+  'TRANSFORMACIÓN MEMORIA E HISTORIA':    'Ciudad',
+  'BARRIO PRADO — CULTURA Y BOHEMIA':     'Ciudad',
+  'MEMORIA Y DERECHOS HUMANOS':           'Ciudad',
+  'CAFÉS Y CANTINAS HISTÓRICAS DEL CENTRO':'Ciudad',
+  'TEATROS Y ESCENA DEL CENTRO':           'Ciudad',
+  'FINCAS SILLETERAS':                    'Ciudad',
+  'FINCAS AGROTURÍSTICAS':               'Ciudad',
+  'DISEÑO MODA Y COMPRAS':               'Ciudad',
+  // Comida Urbana
+  'SABORES DE EL POBLADO':               'Comida Urbana',
+  // Alrededores
+  'RUTA GUATAPÉ & LA PIEDRA':            'Alrededores',
+  // Temporada
+  'FERIA DE LAS FLORES':                 'Temporada',
+  // [eliminado] 'RUTA SILLETERA':                      'Temporada',
+  // [eliminado] 'TABLADOS Y RUMBA':                    'Temporada',
+  'FERIA CLÁSICA':                       'Temporada',
+  // Eventos
 };
 
 /// Mapeo local: nombre de ruta → path de imagen (APK asset)
@@ -6936,103 +8535,423 @@ const Set<String> kRutasPausadas = {
 const Map<String, String> kImagenPorRuta = {
   'RUTA MEMORIA Y REFLEXIÓN': 'assets/images/rutas/ruta_memoria_reflexion.jpg',
   'RUTA TRANSFORMACIÓN URBANA': 'assets/images/rutas/ruta_01_transformacion.jpg',
-  'RUTA PATRIMONIAL DEL CENTRO': 'assets/images/rutas/ruta_02_patrimonial.jpg',
-  'RUTA CENTRO REPUBLICANO': 'assets/images/rutas/ruta_02b_republicano.jpg',
-  'CORREDOR CULTURAL DE LA 45': 'assets/images/rutas/ruta_corredor_45.jpg',
+  // [eliminado] 'RUTA PATRIMONIAL DEL CENTRO': 'assets/images/rutas/ruta_02_patrimonial.jpg',
+  // [eliminado] 'RUTA CENTRO REPUBLICANO': 'assets/images/rutas/ruta_02b_republicano.jpg',
   'RUTA VERDE DEL NORTE': 'assets/images/rutas/ruta_03_verde_norte.jpg',
   'RUTA DEL METROCABLE & ARVÍ': 'assets/images/rutas/ruta_04_metrocable.jpg',
-  'RUTA LAURELES & TRADICIÓN': 'assets/images/rutas/ruta_06_laureles.jpg',
   'RUTA DE LOS MIRADORES': 'assets/images/rutas/ruta_07_miradores.jpg',
-  'RUTA CULTURAL NOCTURNA': 'assets/images/rutas/ruta_08_nocturna.jpg',
-  'SENDEROS DE AGUA Y NATURALEZA': 'assets/images/rutas/ruta_09_senderos_agua.jpg',
-  'ARTE, CIUDAD Y SABORES': 'assets/images/rutas/ruta_10_arte_ciudad_sabores.jpg',
+  // [eliminado] 'RUTA CULTURAL NOCTURNA': 'assets/images/rutas/ruta_08_nocturna.jpg',
+  'VIVE EL POBLADO': 'assets/images/rutas/ruta_vive_poblado.jpg',
   'DEL ORIGEN PAISA A LA MEDELLÍN MODERNA': 'assets/images/rutas/ruta_11_origen_paisa_moderno.jpg',
   'TRANVÍA CULTURAL': 'assets/images/rutas/ruta_12_tranvia_cultural.jpg',
   'RUTA GUATAPÉ & LA PIEDRA': 'assets/images/rutas/ruta_09_guatape.jpg',
-  'RUTA DEL CAFÉ EN SANTA ELENA': 'assets/images/rutas/ruta_10_santa_elena.jpg',
-  'RUTA SAN CARLOS & CHARCOS': 'assets/images/rutas/ruta_11_san_carlos.jpg',
-  'RUTA JARDÍN COLONIAL': 'assets/images/rutas/ruta_12_jardin.jpg',
-  'RUTA SANTA FE DE ANTIOQUIA': 'assets/images/rutas/ruta_13_santa_fe.jpg',
-  'RUTA ENVIGADO NATURAL': 'assets/images/rutas/ruta_14_envigado.jpg',
-  'SENDEROS DEL ARRIERO Y LA MONTAÑA': 'assets/images/rutas/ruta_arriero_ciudad_bolivar.jpg',
-  'RUTA ESPÍRITU ARRIERO — JERICÓ': 'assets/images/rutas/ruta_jerico.jpg',
-  'RUTA PARAÍSO NATURAL — SAN RAFAEL': 'assets/images/rutas/ruta_san_rafael.jpg',
-  'RUTA MONTAÑA Y ANCESTRALIDAD — TÁMESIS': 'assets/images/rutas/ruta_tamesis.jpg',
-  'RUTA JOYA COLONIAL OCULTA — CONCEPCIÓN': 'assets/images/rutas/ruta_concepcion.jpg',
-  'RUTA CARIBE ANTIOQUEÑO — NECOCLÍ': 'assets/images/rutas/ruta_necocli.jpg',
-  'SABOR DE BARRIO — EL CENTRO': 'assets/images/rutas/ruta_gastronomia_centro.jpg',
-  'SABOR DE CANCHA — LAURELES': 'assets/images/rutas/ruta_gastronomia_laureles.jpg',
-  'SABOR VIAJERO — EL POBLADO': 'assets/images/rutas/ruta_gastronomia_poblado.jpg',
-  'SABOR PAISA PROFUNDO — ENVIGADO': 'assets/images/rutas/ruta_gastronomia_envigado.jpg',
-  'SABOR URBANO — MERCADO DEL RÍO': 'assets/images/rutas/ruta_gastronomia_mercado_rio.jpg',
-  'SEMANA SANTA PATRIMONIAL': 'assets/images/rutas/ruta_16_semana_santa.jpg',
-  'FESTIVAL INTERNACIONAL DE TANGO': 'assets/images/rutas/ruta_18_tango.jpg',
-  'FESTIVAL DE POESÍA INTERNACIONAL': 'assets/images/rutas/ruta_23_poesia.jpg',
-  'COLOMBIAMODA — MODA & DISEÑO': 'assets/images/rutas/ruta_colombiamoda.jpg',
   'FERIA DE LAS FLORES': 'assets/images/rutas/ruta_17_feria_flores.jpg',
-  'TABLADOS Y RUMBA': 'assets/images/rutas/ruta_17_feria_flores.jpg',
-  'RUTA SILLETERA': 'assets/images/rutas/ruta_17_feria_flores.jpg',
-  'MEDEJAZZ — FESTIVAL DE JAZZ': 'assets/images/rutas/ruta_19_jazz.jpg',
-  'FIESTA DEL LIBRO Y LA CULTURA': 'assets/images/rutas/ruta_20_libro.jpg',
-  'FERIA DE LA ANTIOQUEÑIDAD': 'assets/images/rutas/ruta_21_antioqueñidad.jpg',
-  'ALUMBRADO NAVIDEÑO — RÍO MEDELLÍN': 'assets/images/rutas/ruta_15_alumbrado.jpg',
-  'PARQUE JAIME DUQUE — CLÁSICA': 'assets/images/rutas/ruta_jaime_duque_clasica.jpg',
-  'PARQUE JAIME DUQUE — FAMILIA': 'assets/images/rutas/ruta_jaime_duque_familia.jpg',
-  'PARQUE JAIME DUQUE — NATURALEZA': 'assets/images/rutas/ruta_jaime_duque_naturaleza.jpg',
-  'PARQUE JAIME DUQUE — AVENTURA FAMILIAR': 'assets/images/rutas/ruta_jaime_duque_familiar.jpg',
-  // ── Popayán ──
-  'CIRCUITO CENTRO HISTÓRICO — LA CIUDAD BLANCA': 'assets/images/rutas/ruta_ppn_01_centro_historico.jpg',
-  'CATADOR DEL CAUCA — SABORES DE LA CIUDAD BLANCA': 'assets/images/rutas/ruta_ppn_02_catador_cauca.jpg',
-  'CONGRESO GASTRONÓMICO XXIV — SABOR INTERNACIONAL': 'assets/images/rutas/ruta_ppn_03_congreso_gastronomico.jpg',
-  // ── Bogotá ──
-  'RUTA LA CANDELARIA — EL CORAZÓN DE BOGOTÁ': 'assets/images/rutas/ruta_bta_01_candelaria.jpg',
+  // [eliminado] 'TABLADOS Y RUMBA': 'assets/images/rutas/ruta_17_feria_flores.jpg',
+  // ── Rutas nuevas Vive (Firestore) — imágenes propias ──
+  'HUELLAS VIVAS DE EL POBLADO': 'assets/images/rutas/ruta_huellas_vivas_poblado.jpg',
+  'EL POBLADO VERDE': 'assets/images/rutas/ruta_poblado_verde.jpg',
+  'EL POBLADO CREATIVO': 'assets/images/rutas/ruta_poblado_creativo.jpg',
+  'SABORES DE EL POBLADO': 'assets/images/rutas/ruta_gastronomia_poblado.jpg',
+  'NOCHE EN EL POBLADO': 'assets/images/rutas/ruta_noche_poblado.jpg',
+  'VIVE LAURELES': 'assets/images/rutas/ruta_06_laureles.jpg',
+  // ── Feria — imágenes propias ──
+  'FERIA CLÁSICA': 'assets/images/rutas/ruta_feria_clasica.jpg',
+  // [eliminado] 'RUTA SILLETERA': 'assets/images/rutas/ruta_silletera.jpg',
+  'VIVE MANRIQUE': 'assets/images/rutas/ruta_corredor_45.jpg',
+  // ── Rutas Secretaría de Turismo (Firestore) — imágenes reutilizadas ──
+  // [eliminado] VIVE EL CENTRO
+  'FINCAS SILLETERAS':               'assets/images/rutas/ruta_silletera.jpg',
+  'FINCAS AGROTURÍSTICAS':           'assets/images/rutas/ruta_03_verde_norte.jpg',
+  'TURISMO CREATIVO':                'assets/images/rutas/ruta_poblado_creativo.jpg',
+  'TRANSFORMACIÓN MEMORIA E HISTORIA': 'assets/images/rutas/ruta_transformacion_memoria_historia.jpg',
+  // ── Rutas Centro nuevas (29 jul) ──
+  'BARRIO PRADO — CULTURA Y BOHEMIA':       'assets/images/rutas/ruta_barrio_prado.jpg',
+  'MEMORIA Y DERECHOS HUMANOS':             'assets/images/rutas/ruta_memoria_derechos_humanos.jpg',
+  'CAFÉS Y CANTINAS HISTÓRICAS DEL CENTRO': 'assets/images/rutas/ruta_cafes_cantinas_centro.jpg',
+  'TEATROS Y ESCENA DEL CENTRO':             'assets/images/rutas/ruta_teatro_escena_centro.jpg',
+  'DISEÑO MODA Y COMPRAS':           'assets/images/rutas/ruta_corredor_45.jpg',
+  // ── Rutas Fincas Silleteras temáticas (28 jul) — imágenes diferenciadas ──
+  'GUARDIANES DE LA SILLETA':        'assets/images/rutas/ruta_silletera.jpg',
+  'SENDEROS EN FLOR':                'assets/images/rutas/ruta_10_santa_elena.jpg',
+  'FINCA Y FONDA':                   'assets/images/rutas/ruta_13_santa_fe.jpg',
+  'VEREDAS DE SANTA ELENA':          'assets/images/rutas/ruta_07_miradores.jpg',
+  // ── Rutas Laureles nuevas (28 jul) — imágenes diferenciadas ──
+  'ENTRE JUEGOS Y PALABRAS':              'assets/images/rutas/ruta_entre_juegos_palabras.jpg',
+  'ENTRE SABORES RISAS Y MIL COLORES':   'assets/images/rutas/ruta_entre_sabores_risas.jpg',
+  'OTROS CAMINOS LAURELES':              'assets/images/rutas/ruta_noche_laureles.jpg',
+  'NOCHE EN LAURELES':                   'assets/images/rutas/ruta_noche_laureles.jpg',
+  // ── Rutas El Poblado adicionales ──
+  'CENTRO ALTERNATIVO':                  'assets/images/rutas/ruta_centro_alternativo.jpg',
+  'RINCONES ESCONDIDOS DE EL POBLADO':   'assets/images/rutas/ruta_rincones_poblado.jpg',
+  // ── Rutas gastronómicas ──
+  'SABORES DE LA 70':                    'assets/images/rutas/ruta_gastronomia_laureles.jpg',
+  'SABORES DEL CENTRO':                  'assets/images/rutas/ruta_gastronomia_centro.jpg',
 };
 
 const Map<String, String> kInsigniaPorRuta = {
-  'RUTA MEMORIA Y REFLEXIÓN': 'assets/images/insignias/insignia_memoria_viva.png',
-  'RUTA TRANSFORMACIÓN URBANA': 'assets/images/insignias/insignia_01_explorador_13.png',
-  'RUTA PATRIMONIAL DEL CENTRO': 'assets/images/insignias/insignia_02_guardian_patrimonio.png',
-  'RUTA CENTRO REPUBLICANO': 'assets/images/insignias/insignia_02_guardian_patrimonio.png',
-  'CORREDOR CULTURAL DE LA 45': 'assets/images/insignias/insignia_corredor_45.png',
-  'RUTA VERDE DEL NORTE': 'assets/images/insignias/insignia_03_guardabosque.png',
-  'RUTA DEL METROCABLE & ARVÍ': 'assets/images/insignias/insignia_04_viajero_alturas.png',
-  'RUTA LAURELES & TRADICIÓN': 'assets/images/insignias/insignia_06_corazon_paisa.png',
-  'RUTA DE LOS MIRADORES': 'assets/images/insignias/insignia_07_condor_andes.png',
-  'RUTA CULTURAL NOCTURNA': 'assets/images/insignias/insignia_08_noctambulo_cultural.png',
-  'SENDEROS DE AGUA Y NATURALEZA': 'assets/images/insignias/insignia_09_explorador_naturaleza.png',
-  'ARTE, CIUDAD Y SABORES': 'assets/images/insignias/insignia_10_creador_urbano.png',
-  'DEL ORIGEN PAISA A LA MEDELLÍN MODERNA': 'assets/images/insignias/insignia_11_embajador_paisa_moderno.png',
-  'TRANVÍA CULTURAL': 'assets/images/insignias/insignia_12_viajero_tranvia.png',
-  'RUTA GUATAPÉ & LA PIEDRA': 'assets/images/insignias/insignia_09_conquistador_penol.png',
-  'RUTA DEL CAFÉ EN SANTA ELENA': 'assets/images/insignias/insignia_10_silletero_honor.png',
-  'RUTA SAN CARLOS & CHARCOS': 'assets/images/insignias/insignia_11_explorador_aguas.png',
-  'RUTA JARDÍN COLONIAL': 'assets/images/insignias/insignia_12_viajero_suroeste_jar.png',
-  'RUTA SANTA FE DE ANTIOQUIA': 'assets/images/insignias/insignia_13_guardian_colonial.png',
-  'RUTA ENVIGADO NATURAL': 'assets/images/insignias/insignia_12_viajero_suroeste.png',
-  'SENDEROS DEL ARRIERO Y LA MONTAÑA': 'assets/images/insignias/insignia_arriero_conquistador_suroeste.png',
-  'SEMANA SANTA PATRIMONIAL': 'assets/images/insignias/insignia_16_peregrino_paisa.png',
-  'FESTIVAL INTERNACIONAL DE TANGO': 'assets/images/insignias/insignia_18_gardel_medellin.png',
-  'FESTIVAL DE POESÍA INTERNACIONAL': 'assets/images/insignias/insignia_23_poeta_valle.png',
-  'COLOMBIAMODA — MODA & DISEÑO': 'assets/images/insignias/insignia_24_embajador_diseno.png',
-  'FERIA DE LAS FLORES': 'assets/images/insignias/insignia_17_silletero_oro.png',
-  'TABLADOS Y RUMBA': 'assets/images/insignias/insignia_17_silletero_oro.png',
-  'RUTA SILLETERA': 'assets/images/insignias/insignia_17_silletero_oro.png',
-  'MEDEJAZZ — FESTIVAL DE JAZZ': 'assets/images/insignias/insignia_19_jazz_paisa.png',
-  'FIESTA DEL LIBRO Y LA CULTURA': 'assets/images/insignias/insignia_20_lector_primavera.png',
-  'FERIA DE LA ANTIOQUEÑIDAD': 'assets/images/insignias/insignia_21_embajador_paisa.png',
-  'ALUMBRADO NAVIDEÑO — RÍO MEDELLÍN': 'assets/images/insignias/insignia_15_guardian_luz_nav.png',
-  'PARQUE JAIME DUQUE — AVENTURA FAMILIAR': 'assets/images/insignias/insignia_01_explorador_13.png',
-  // ── Nuevas ciudades ──
-  'CIRCUITO CENTRO HISTÓRICO — LA CIUDAD BLANCA': 'assets/images/insignias/insignia_ppn_ciudad_blanca.png',
-  'CATADOR DEL CAUCA — SABORES DE LA CIUDAD BLANCA': 'assets/images/insignias/insignia_ppn_catador_cauca.png',
-  'CONGRESO GASTRONÓMICO XXIV — SABOR INTERNACIONAL': 'assets/images/insignias/insignia_ppn_congreso_xxiv.png',
-  'RUTA LA CANDELARIA — EL CORAZÓN DE BOGOTÁ': 'assets/images/insignias/insignia_bta_candelaria.png',
-  'FERIA CLÁSICA': 'assets/images/insignias/insignia_feria_clasica.png',
+  // ── Rutas Ciudad Medellín (hardcoded) ──
+  'RUTA MEMORIA Y REFLEXIÓN':                    'assets/images/insignias/insignia_memoria_viva.png',
+  'RUTA TRANSFORMACIÓN URBANA':                  'assets/images/insignias/insignia_01_explorador_13.png',
+  // [eliminado] 'RUTA PATRIMONIAL DEL CENTRO':                 'assets/images/insignias/insignia
+  // [eliminado] 'RUTA CENTRO REPUBLICANO':                     'assets/images/insignias/insignia
+  'RUTA VERDE DEL NORTE':                        'assets/images/insignias/insignia_03_guardabosque.png',
+  'RUTA DEL METROCABLE & ARVÍ':                  'assets/images/insignias/insignia_04_viajero_alturas.png',
+  'RUTA DE LOS MIRADORES':                       'assets/images/insignias/insignia_07_condor_andes.png',
+  // [eliminado] 'RUTA CULTURAL NOCTURNA':                      'assets/images/insignias/insignia
+  'VIVE EL POBLADO':                             'assets/images/insignias/insignia_vive_poblado.png',
+  'DEL ORIGEN PAISA A LA MEDELLÍN MODERNA':      'assets/images/insignias/insignia_11_embajador_paisa_moderno.png',
+  'TRANVÍA CULTURAL':                            'assets/images/insignias/insignia_12_viajero_tranvia.png',
+  'RUTA GUATAPÉ & LA PIEDRA':                    'assets/images/insignias/insignia_conquistador_piedra.png',
+  // ── Rutas Firestore (nuevas Vive) ──
+  'HUELLAS VIVAS DE EL POBLADO':                 'assets/images/insignias/insignia_huellas_vivas.png',
+  'EL POBLADO VERDE':                            'assets/images/insignias/insignia_poblado_verde.png',
+  'EL POBLADO CREATIVO':                         'assets/images/insignias/insignia_espiritu_creativo.png',
+  'SABORES DE EL POBLADO':                       'assets/images/insignias/insignia_paladar_paisa.png',
+  'NOCHE EN EL POBLADO':                         'assets/images/insignias/insignia_noctambulo_paisa.png',
+  'VIVE LAURELES':                               'assets/images/insignias/insignia_vecino_laureles.png',
+  // ── Feria de las Flores ──
+  'FERIA DE LAS FLORES':                         'assets/images/insignias/insignia_feria_silletero_oro.png',
+  'FERIA CLÁSICA':                               'assets/images/insignias/insignia_feria_clasica.png',
+  // [eliminado] 'RUTA SILLETERA':                              'assets/images/insignias/insignia
+  // [eliminado] 'TABLADOS Y RUMBA':                            'assets/images/insignias/insignia
+  // ── Temporada ──
+  // ── Otras ciudades ──
+  'VIVE MANRIQUE':                               'assets/images/insignias/insignia_explorador_45.png',
+  // ── Rutas Secretaría de Turismo (Firestore) ──
+  // [eliminado] VIVE EL CENTRO
+  'FINCAS SILLETERAS':                           'assets/images/insignias/insignia_guardian_silletero.png',
+  'FINCAS AGROTURÍSTICAS':                       'assets/images/insignias/insignia_03_guardabosque.png',
+  'TURISMO CREATIVO':                            'assets/images/insignias/insignia_espiritu_creativo.png',
+  'TRANSFORMACIÓN MEMORIA E HISTORIA':           'assets/images/insignias/insignia_memoria_viva.png',
+  'DISEÑO MODA Y COMPRAS':                       'assets/images/insignias/insignia_explorador_45.png',
+  // ── Rutas Centro nuevas (29 jul) ──
+  'BARRIO PRADO — CULTURA Y BOHEMIA':            'assets/images/insignias/insignia_bohemia_centro.png',
+  'MEMORIA Y DERECHOS HUMANOS':                  'assets/images/insignias/insignia_memoria_viva.png',
+  'CAFÉS Y CANTINAS HISTÓRICAS DEL CENTRO':      'assets/images/insignias/insignia_guardian_patrimonio.png',
+  'TEATROS Y ESCENA DEL CENTRO':                 'assets/images/insignias/insignia_guardian_patrimonio.png',
+  // ── Rutas Laureles y Poblado adicionales ──
+  'ENTRE JUEGOS Y PALABRAS':                     'assets/images/insignias/insignia_vecino_laureles.png',
+  'ENTRE SABORES RISAS Y MIL COLORES':           'assets/images/insignias/insignia_paladar_paisa.png',
+  'OTROS CAMINOS LAURELES':                      'assets/images/insignias/insignia_vecino_laureles.png',
+  'NOCHE EN LAURELES':                           'assets/images/insignias/insignia_noctambulo_paisa.png',
+  'CENTRO ALTERNATIVO':                          'assets/images/insignias/insignia_explorador_oculto.png',
+  'RINCONES ESCONDIDOS DE EL POBLADO':           'assets/images/insignias/insignia_explorador_oculto.png',
+  'SABORES DE LA 70':                            'assets/images/insignias/insignia_paladar_70.png',
+  'SABORES DEL CENTRO':                          'assets/images/insignias/insignia_paladar_paisa.png',
 };
+
 
 // ─────────────────────────────────────────────────────────────────────────
 //  RUTAS SERVICE — Carga rutas desde Firestore con fallback a hardcode
 // ─────────────────────────────────────────────────────────────────────────
+
+/// Rutas completas de la Feria — se agregan a kRutasData en tiempo de ejecución
+final List<Map<String, dynamic>> kFeriaRutasCompletas = [
+  // ── FERIA CLÁSICA — todos los eventos icónicos ────────────────────────────
+  {
+    'nombre': 'FERIA CLÁSICA',
+    'nombreEN': 'CLASSIC FERIA',
+    'emoji': '🌹',
+    'zona': 'Temporada',
+    'ciudad': 'Medellín',
+    'pais': 'Colombia',
+    'subtitulo': 'Desfile · Trova · Autos · Silletas · Concierto · Bicis',
+    'subtituloEN': 'Parade · Trova · Cars · Silletas · Concert · Bikes',
+    'tag': '🌹 31 jul – 9 ago',
+    'tiempo': '10 días',
+    'dificultad': 'FÁCIL',
+    'transporte': '🚇 Metro + 🚶 Caminata según evento del día',
+    'mejorHora': 'Depende del evento — ver programación',
+    'tipoExperiencia': 'Festival Cultural',
+    'tipoExperienciaEN': 'Cultural Festival',
+    'temporadaMeses': [7, 8],
+    'temporadaInicio': [7, 31],
+    'temporadaFin': [8, 9],
+    'activa': true,
+    'hook': '"Medellín te quiere y florece para ti" — 10 días, 120+ eventos gratuitos, la fiesta más grande de Colombia',
+    'hookEN': '"Medellín loves you and blooms for you" — 10 days, 120+ free events, Colombia\'s biggest festival',
+    'descripcion': 'La guía oficial de los eventos más icónicos de la Feria de las Flores 2026. Organizá tu itinerario por día: qué ver, a qué hora, cómo llegar y qué esperar en cada evento. Edición 69 del Desfile de Silleteros — primera vez con silleteros neurodiversos (Proceso Silleteando Ando).',
+    'descripcionEN': 'The official guide to the most iconic events of Feria de las Flores 2026. Plan your day-by-day itinerary: what to see, when, how to get there and what to expect. 69th Silleteros Parade edition — first time with neurodiverse silleteros (Silleteando Ando Process).',
+    'momentoClave': 'Desfile de Silleteros — 9 ago, 2pm. Edición 69 con 530 silleteros y participación neurodiversa por primera vez.',
+    'momentoClaveEN': 'Silleteros Parade — Aug 9, 2pm. 69th edition with 530 silleteros and neurodiverse participation for the first time.',
+    'misionEpica': 'Asistí a mínimo 5 eventos diferentes de la Feria y desbloqueá la Insignia Silletero de Oro — la más difícil de obtener.',
+    'misionEpicaEN': 'Attend at least 5 different Feria events and unlock the Golden Silletero Badge — the hardest to earn.',
+    'sitiosDetalle': [
+      {
+        'nombre': 'Concierto Inaugural (Obelisco) — 31 jul',
+        'nombreEN': 'Opening Concert (Obelisco) — Jul 31',
+        'emoji': '🎤',
+        'orden': 1,
+        'lat': 6.257020, 'lng': -75.591759,
+        'horario': 'Martes 31 julio · Noche · Gratuito',
+        'tip': '🎤 Llegá 1 hora antes — el Obelisco se llena rápido. El mejor lugar es frente al escenario sobre la Carrera 70. Llevá agua y ropa abrigada por si refresca en la noche.',
+        'tipEN': '🎤 Arrive 1 hour early — the Obelisco fills fast. Best spot is in front of the stage on Carrera 70. Bring water and a light jacket in case it gets cool.',
+        'curiosidad': '🧠 El Concierto Inaugural marca el arranque oficial de la Feria desde los años 90. El Obelisco fue construido en 1947 como símbolo de modernización de Medellín. El lema oficial 2026 es "Medellín te quiere y florece para ti".',
+        'curiosidadEN': '🧠 The Opening Concert has officially kicked off the Feria since the 1990s. The Obelisco was built in 1947 as a symbol of Medellín\'s modernization. The 2026 official motto is "Medellín loves you and blooms for you".',
+        'reto': '🎯 Tomá una foto del escenario encendido con el Obelisco de fondo. ¿Cuántas personas estimás que hay en el concierto?',
+        'retoEN': '🎯 Take a photo of the lit stage with the Obelisco behind it. How many people do you estimate are at the concert?',
+        'puntosReto': 100,
+      },
+      {
+        'nombre': 'Feria a Ritmo de Bicicleta — 1 ago · 10am',
+        'nombreEN': 'Festival by Bicycle — Aug 1 · 10am',
+        'emoji': '🚴',
+        'orden': 2,
+        'lat': 6.2458, 'lng': -75.5722,
+        'horario': 'Sábado 1 agosto · 10:00 am · Gratuito',
+        'tip': '🚴 El recorrido es de 12 km desde el Edificio Inteligente de EPM hasta el Parque de Belén. Decorá tu bicicleta con flores — hay premios para la más creativa. El tramo por Parques del Río es el más fotogénico.',
+        'tipEN': '🚴 The route is 12 km from the EPM Intelligent Building to Belén Park. Decorate your bike with flowers — prizes for the most creative. The Parques del Río section is the most photogenic.',
+        'curiosidad': '🧠 La Feria a Ritmo de Bicicleta es una de las actividades más nuevas de la Feria (nació en 2012) y promueve la movilidad sostenible. Cada año convoca a más de 5.000 ciclistas de toda la ciudad.',
+        'curiosidadEN': '🧠 The Festival by Bicycle is one of the Feria\'s newest activities (born 2012) promoting sustainable mobility. Each year it draws over 5,000 cyclists from across the city.',
+        'reto': '🎯 Completá el recorrido de 12 km con tu bicicleta decorada. Tomá foto con la bici en el punto de llegada en el Parque de Belén.',
+        'retoEN': '🎯 Complete the 12 km route with your decorated bicycle. Take a photo with your bike at the finish point at Belén Park.',
+        'puntosReto': 150,
+      },
+      {
+        'nombre': 'Desfile Chivas y Flores — 1 ago',
+        'nombreEN': 'Chivas & Flowers Parade — Aug 1',
+        'emoji': '🚌',
+        'orden': 3,
+        'lat': 6.2448, 'lng': -75.5719, 'radioM': 400,
+        'horario': 'Sábado 1 agosto · 2:00 pm · Gratuito',
+        'tip': '🚌 El mejor punto para ver el desfile es en la Avenida del Ferrocarril cerca a la Alpujarra. Llevá cámara — las chivas decoradas con flores son increíblemente fotogénicas. Llegá 30 min antes para coger sitio.',
+        'tipEN': '🚌 Best viewing spot is on Avenida del Ferrocarril near Alpujarra. Bring a camera — chivas decorated with flowers are incredibly photogenic. Arrive 30 min early for a good spot.',
+        'curiosidad': '🧠 Las "chivas" o "buses escalera" son el transporte rural más icónico de Colombia. Pintadas de colores vivos y con barandas de madera, fueron el medio de transporte de los campesinos antioqueños por décadas. Durante la Feria, las decoran con flores de Santa Elena.',
+        'curiosidadEN': '🧠 "Chivas" or "escalera buses" are Colombia\'s most iconic rural transport. Painted in vivid colors with wooden railings, they were the main transport for Antioquian farmers for decades. During the Feria, they\'re decorated with Santa Elena flowers.',
+        'reto': '🎯 Fotografiá la chiva más colorida del desfile. ¿Podés contar cuántas flores lleva decorándola?',
+        'retoEN': '🎯 Photograph the most colorful chiva in the parade. Can you count how many flowers are decorating it?',
+        'puntosReto': 100,
+      },
+      {
+        'nombre': 'Desfile Avenida Primavera — 2 ago · 2pm',
+        'nombreEN': 'Primavera Avenue Parade — Aug 2 · 2pm',
+        'emoji': '🌸',
+        'orden': 4,
+        'lat': 6.2195, 'lng': -75.5750, 'radioM': 400,
+        'horario': 'Domingo 2 agosto · 2:00 pm · Gratuito',
+        'tip': '🌸 Tercera edición del desfile. El mejor punto de vista es la esquina de Carrera 43 con Av. El Poblado. Vestite con algo floral — hay ambiente muy festivo. El desfile dura aproximadamente 2 horas.',
+        'tipEN': '🌸 Third edition of the parade. Best viewing at the corner of Carrera 43 and Av. El Poblado. Dress in something floral — very festive atmosphere. The parade lasts approximately 2 hours.',
+        'curiosidad': '🧠 La Avenida Primavera es una de las vías de diseño y moda más importantes de Medellín. Este desfile surgió como una extensión de la Feria hacia El Poblado, mostrando la fusión de moda, flores y cultura paisa contemporánea.',
+        'curiosidadEN': '🧠 Primavera Avenue is one of Medellín\'s most important fashion and design streets. This parade emerged as a Feria extension into El Poblado, showcasing the fusion of fashion, flowers and contemporary paisa culture.',
+        'reto': '🎯 Vestite con algo floral y tomá foto en el desfile. Contá cuántos diseñadores locales participan en el evento.',
+        'retoEN': '🎯 Dress in something floral and take a photo at the parade. Count how many local designers participate in the event.',
+        'puntosReto': 100,
+      },
+      {
+        'nombre': 'Caminata Canina — 2 ago · 10am · Estadio',
+        'nombreEN': 'Dog Walk — Aug 3 · 10am · Stadium',
+        'emoji': '🐾',
+        'orden': 5,
+        'lat': 6.2552, 'lng': -75.5880,
+        'horario': 'Lunes 3 agosto · 10:00 am · Gratuito',
+        'tip': '🐾 Llevá tu mascota decorada con flores — hay premios para los disfraces más creativos. El recorrido es de 2 km, desde el Estadio Atanasio hasta Tierragro. Llevá agua para tu mascota y bolsas para recoger.',
+        'tipEN': '🐾 Bring your pet decorated with flowers — prizes for the most creative costumes. The walk is 2 km from Atanasio Stadium to Tierragro. Bring water for your pet and bags for cleanup.',
+        'curiosidad': '🧠 La Caminata Canina es uno de los eventos más queridos de la Feria y convoca a miles de mascotas. Medellín es considerada una de las ciudades más pet-friendly de Colombia — Laureles concentra la mayor cantidad de veterinarias y tiendas para mascotas del país.',
+        'curiosidadEN': '🧠 The Dog Walk is one of the Feria\'s most beloved events, drawing thousands of pets. Medellín is considered one of Colombia\'s most pet-friendly cities — Laureles has the country\'s highest concentration of vets and pet shops.',
+        'reto': '🎯 Decorá tu mascota con flores y participá en el concurso de disfraces. Si no tenés mascota, tomá foto de la más creativa que encuentres.',
+        'retoEN': '🎯 Decorate your pet with flowers and join the costume contest. If you don\'t have a pet, photograph the most creative one you find.',
+        'puntosReto': 100,
+      },
+      {
+        'nombre': 'Plaza de las Flores (Parque de los Deseos) — 31 jul al 4 ago',
+        'nombreEN': 'Flowers Plaza (Parque de los Deseos) — all Feria',
+        'emoji': '🌟',
+        'orden': 6,
+        'lat': 6.268617, 'lng': -75.565699,
+        'horario': '31 jul – 9 ago · Todo el día · Gratuito',
+        'tip': '🌟 NUEVA SEDE 2026 — primera vez que las Plazas de Flores llegan al Parque de los Deseos. El parque tiene la fuente interactiva más famosa de Medellín. Mejor hora: tarde cuando las flores están iluminadas.',
+        'tipEN': '🌹 Open throughout the Festival. Flower exhibitions, live silleteros, music and gastronomy every day. The best spot to see the flowers up close.',
+        'tipEN': '🌟 NEW 2026 VENUE — first time Flores Plazas come to Parque de los Deseos. The park has Medellín\'s most famous interactive fountain. Best time: evening when flowers are illuminated.',
+        'curiosidad': '🧠 El Parque de los Deseos fue inaugurado en 2003 como símbolo de la transformación urbana de Medellín. Este año las Plazas de Flores tienen 3 sedes por primera vez: Parques del Río, Ciudad del Río (MAMM) y Parque de los Deseos.',
+        'curiosidadEN': '🧠 Parque de los Deseos was inaugurated in 2003 as a symbol of Medellín\'s urban transformation. This year the Flores Plazas have 3 venues for the first time: Parques del Río, Ciudad del Río (MAMM) and Parque de los Deseos.',
+        'reto': '🎯 Tomá la foto clásica del Parque de los Deseos con flores de la Feria. Comparála con una foto normal del parque — ¿qué diferencia ves?',
+        'retoEN': '🎯 Take the classic Parque de los Deseos photo with Feria flowers. Compare it with a normal park photo — what differences do you see?',
+        'puntosReto': 75,
+      },
+      {
+        'nombre': 'Plaza de las Flores (Parques del Río) — toda la feria',
+        'nombreEN': 'Flowers Plaza (Parques del Río) — all Feria',
+        'emoji': '🌹',
+        'orden': 7,
+        'lat': 6.243748, 'lng': -75.579924,
+        'horario': '31 jul – 9 ago · Todo el día · Gratuito',
+        'tip': '🌹 Esta es la Plaza de Flores más grande — cubre varios módulos de Parques del Río con exhibición de silletas ganadoras, venta de flores de Santa Elena y shows de silleteros en vivo. Ideal para ver el trabajo de los silleteros de cerca.',
+        'tipEN': '🌺 The largest Flowers Square of the Festival at Parques del Río. Traditional food, silletero exhibitions, artisans and live music. All 10 days, free.',
+        'tipEN': '🌹 This is the largest Flores Plaza — covers several Parques del Río modules with winning silleta exhibition, Santa Elena flower market and live silletero shows. Ideal for seeing silletero craftsmanship up close.',
+        'curiosidad': '🧠 Los silleteros de Santa Elena cargan entre 60 y 80 kilos de flores en sus espaldas durante el desfile. Las silletas monumentales pueden tener más de 600 flores diferentes. Cada familia silletera tiene su propio diseño heredado de generación en generación.',
+        'curiosidadEN': '🧠 Santa Elena silleteros carry between 60 and 80 kilos of flowers on their backs during the parade. Monumental silletas can have over 600 different flowers. Each silletera family has their own design inherited through generations.',
+        'reto': '🎯 Comprá una flor a un silletero en la Plaza y preguntale de qué finca viene. Tomá foto con la flor y el silletero (con permiso).',
+        'retoEN': '🎯 Buy a flower from a silletero at the Plaza and ask which farm it comes from. Take a photo with the flower and the silletero (with permission).',
+        'puntosReto': 125,
+      },
+      {
+        'nombre': 'Parque Cultural Nocturno (Plaza Gardel) — 2 al 7 ago',
+        'nombreEN': 'Nocturnal Cultural Park (Plaza Gardel) — Aug 2-7',
+        'emoji': '🎭',
+        'orden': 8,
+        'lat': 6.2197, 'lng': -75.5897,
+        'horario': '2-7 agosto · 7:00 pm · Gratuito',
+        'tip': '🎭 6 noches temáticas consecutivas en Plaza Gardel: Afro (2 ago), Música Colombiana (3), Homenaje Grupo Suramérica (4), Son (5), Bolero (6), Tropical (7). Llegá temprano — la plaza se llena. Transporte: Metro Aguacatala + 15 min a pie.',
+        'tipEN': '🎭 6 consecutive themed nights at Plaza Gardel: Afro (Aug 2), Colombian Music (3), Grupo Suramérica Tribute (4), Son & Bolero (5), Tropical Night (7). Each show is a world-class spectacle.',
+        'tipEN': '🎭 6 consecutive themed nights at Plaza Gardel: Afro (Aug 2), Colombian Music (3), Grupo Suramérica tribute (4), Son (5), Bolero (6), Tropical (7). Arrive early — the plaza fills up. Transport: Metro Aguacatala + 15 min walk.',
+        'curiosidad': '🧠 Plaza Gardel lleva el nombre de Carlos Gardel, el rey del tango argentino que murió en un accidente de aviación en el Aeropuerto Olaya Herrera (al lado) en 1935. Los paisas lo adoptaron como propio y lo convirtieron en símbolo de Medellín.',
+        'curiosidadEN': '🧠 Plaza Gardel is named after Carlos Gardel, the Argentine tango king who died in a plane crash at Olaya Herrera Airport (next door) in 1935. Paisas adopted him as their own and made him a Medellín symbol.',
+        'reto': '🎯 Asistí a mínimo 2 noches temáticas diferentes. Tomá video de 15 segundos en cada una. ¿Cuál noche te gustó más?',
+        'retoEN': '🎯 Attend at least 2 different themed nights. Take a 15-second video at each. Which night did you prefer?',
+        'puntosReto': 200,
+      },
+      {
+        'nombre': 'Festival Nacional de la Trova — Final 6 ago · 6pm',
+        'nombreEN': 'National Trova Festival — Final Aug 6 · 6pm',
+        'emoji': '🎤',
+        'orden': 9,
+        'lat': 6.2197, 'lng': -75.5897,
+        'horario': 'Jueves 6 agosto · 6:00 pm · Gratuito · Plaza Gardel',
+        'tip': '🎤 La trova paisa es improvisación de versos musicales en tiempo real — los trovadores compiten en ingenio y humor. La final es el 6 de agosto pero hay semifinales el 31 jul y 1 ago en el Parque de los Deseos. Retá a un trovador — si acepta improvisar con tu nombre, ganás puntos.',
+        'tipEN': '🎤 The most anticipated trova night. The best juglares in the country compete for the title at Plaza Gardel. Arrive early to get a spot — it fills completely.',
+        'tipEN': '🎤 Paisa trova is real-time musical verse improvisation — trovadores compete in wit and humor. The final is Aug 6 but there are semifinals Jul 31 and Aug 1 at Parque de los Deseos. Challenge a trovador — if they improvise with your name, you earn bonus points.',
+        'curiosidad': '🧠 El Festival Nacional de la Trova Ciudad de Medellín lleva más de 60 años eligiendo al Rey o Reina de la Trova. La trova paisa es una tradición oral única en el mundo, declarada Patrimonio Cultural de Antioquia. Los grandes maestros son Salvo Ruiz y el "Ñito" Restrepo.',
+        'curiosidadEN': '🧠 The National Trova Festival of Medellín has been choosing the King or Queen of Trova for over 60 years. Paisa trova is a unique oral tradition in the world, declared Cultural Heritage of Antioquia. The great masters are Salvo Ruiz and "Ñito" Restrepo.',
+        'reto': '🎯 Retá a un trovador a inventar una copla con tu nombre. Si lo logra, tomá video. Bonus: aprendé una copla y recitala en voz alta.',
+        'retoEN': '🎯 Challenge a trovador to invent a verse with your name. If they do it, take a video. Bonus: learn a verse and recite it out loud.',
+        'puntosReto': 175,
+      },
+      {
+        'nombre': 'Desfile Autos Clásicos y Antiguos — 7 ago · 10am · UPB',
+        'nombreEN': 'Classic & Vintage Cars Parade — Aug 7 · 10am · UPB',
+        'emoji': '🚗',
+        'orden': 10,
+        'lat': 6.2572, 'lng': -75.5742, 'radioM': 400,
+        'horario': 'Viernes 7 agosto · 10:00 am · Gratuito · UPB → Estadio',
+        'tip': '🚗 El mejor punto para ver el desfile es en la Carrera 70 con Circular — ahí el recorrido es más lento y podés apreciar mejor los autos. Algunos modelos son de los años 30s en perfecto estado. Llegá a las 9:30am para coger lugar.',
+        'tipEN': '🚗 The most beautiful classic cars of Antioquia parade through Laureles. Some are over 80 years old and in perfect condition. Best viewing spot: Carrera 70 with Circular.',
+        'tipEN': '🚗 Best viewing at Carrera 70 with Circular — the route is slower there and you can better appreciate the cars. Some models are from the 1930s in perfect condition. Arrive at 9:30am for a good spot.',
+        'curiosidad': '🧠 El Desfile de Autos Clásicos y Antiguos lleva más de 30 años en la Feria. Los propietarios de estos autos los mantienen con recursos propios y los restauran durante todo el año. Algunos han ganado premios internacionales en ferias de autos de Estados Unidos y Europa.',
+        'curiosidadEN': '🧠 The Classic and Vintage Cars Parade has been part of the Feria for over 30 years. Owners maintain these cars with their own resources and restore them all year. Some have won international prizes at car shows in the US and Europe.',
+        'reto': '🎯 Encontrá el auto más antiguo del desfile y averiguá el año de fabricación. Tomá foto y conversá con el propietario.',
+        'retoEN': '🎯 Find the oldest car in the parade and find out the year it was manufactured. Take a photo and chat with the owner.',
+        'puntosReto': 125,
+      },
+      {
+        'nombre': 'Héroes de la Patria — 8 ago · 2pm',
+        'nombreEN': 'Heroes of the Homeland — Aug 8 · 2pm · Av. El Poblado',
+        'emoji': '🎖️',
+        'orden': 11,
+        'lat': 6.2150, 'lng': -75.5720, 'radioM': 400,
+        'horario': 'Sábado 8 agosto · 2:00 pm · Gratuito · Av. El Poblado',
+        'tip': '🎖️ Desfile con fuerzas militares y de policía de Antioquia. Poco conocido por turistas pero muy emotivo. El recorrido va por Avenida El Poblado. Es el único desfile de la Feria con participación activa de las fuerzas del Estado.',
+        'tipEN': '🎖️ Parade with the military and police forces of Antioquia. An emotional and little-known event for tourists, very meaningful for Medellín locals.',
+        'tipEN': '🎖️ Parade with Antioquia\'s military and police forces. Little-known by tourists but very moving. The route goes along Avenida El Poblado. It\'s the only Feria parade with active State forces participation.',
+        'curiosidad': '🧠 El desfile Héroes de la Patria se incorporó a la programación de la Feria como homenaje a los miembros de las fuerzas armadas y de policía de Antioquia. Es uno de los eventos más recientes del calendario oficial.',
+        'curiosidadEN': '🧠 The Héroes de la Patria parade was incorporated into the Feria program as a tribute to Antioquia\'s armed and police forces. It\'s one of the most recent additions to the official calendar.',
+        'reto': '🎯 Tomá foto del desfile y agradecele a un uniformado por su servicio. Compartí la foto en redes con #FeriaDeLasFlores2026.',
+        'retoEN': '🎯 Photograph the parade and thank a uniformed officer for their service. Share the photo on social media with #FeriaDeLasFlores2026.',
+        'puntosReto': 75,
+      },
+      {
+        'nombre': 'Súper Concierto (Estadio Atanasio) — 8 ago · 7pm',
+        'nombreEN': 'Super Concert (Atanasio Stadium) — Aug 8 · 7pm',
+        'emoji': '🎸',
+        'orden': 12,
+        'lat': 6.2554, 'lng': -75.5890,
+        'horario': 'Sábado 8 agosto · 7:00 pm · REQUIERE BOLETA',
+        'tip': '🎸 REQUIERE BOLETA — comprá con anticipación en taquillas oficiales. Artistas confirmados: Carin León, Grupo Niche, Silvestre Dangond, Felipe Peláez y más. El estadio tiene capacidad para 45.000 personas. Llegá 2 horas antes para la apertura de puertas.',
+        'tipEN': '🎸 The most anticipated event of the Festival. Official artists: John Alex Castaño, Jorge Celedón, El Combo de las Estrellas and more. Tickets required — buy in advance at official box offices.',
+        'tipEN': '🎸 TICKET REQUIRED — buy in advance at official ticket offices. Confirmed artists: Carin León, Grupo Niche, Silvestre Dangond, Felipe Peláez and more. The stadium holds 45,000 people. Arrive 2 hours early for door opening.',
+        'curiosidad': '🧠 El Estadio Atanasio Girardot fue sede de los Juegos Suramericanos 2010 y tiene capacidad para 45.943 personas. El Súper Concierto es el evento con boleta más esperado de la Feria y mezcla vallenato, salsa, música popular y regional en una sola noche.',
+        'curiosidadEN': '🧠 Atanasio Girardot Stadium hosted the 2010 South American Games with capacity for 45,943 people. The Super Concert is the Feria\'s most anticipated ticketed event, mixing vallenato, salsa, popular and regional music in one night.',
+        'reto': '🎯 Tomá foto del estadio lleno con el escenario encendido. ¿Cuántos artistas alcanzás a ver en la noche? Guardá la boleta como recuerdo.',
+        'retoEN': '🎯 Take a photo of the packed stadium with the lit stage. How many artists can you see in one night? Keep your ticket as a souvenir.',
+        'puntosReto': 200,
+      },
+      {
+        'nombre': 'Desfile de Silleteros — 9 ago · 2pm · Av. Regional',
+        'nombreEN': 'Silleteros Parade — Aug 9 · 2pm · Av. El Poblado',
+        'emoji': '🌹',
+        'orden': 13,
+        'lat': 6.2090, 'lng': -75.5734, 'radioM': 400,
+        'horario': 'Domingo 9 agosto · 2:00 pm · Gratuito · Av. El Poblado → Plaza Mayor',
+        'tip': '🌹 El evento más importante de la Feria — el cierre perfecto. Llegá 2 HORAS antes para conseguir sitio. El mejor punto de vista: Av. El Poblado entre Calles 9 y 11 (inicio del recorrido). Llevá sombrero y protector solar. El recorrido dura aprox. 3 horas.',
+        'tipEN': '🌹 530 silleteros carrying up to 80 kilos of flowers on their backs. The most colorful spectacle in Colombia. Standing viewing is completely free along Avenida del Río — arrive 2 hours early for a good spot.',
+        'tipEN': '🌹 The Feria\'s most important event — the perfect close. Arrive 2 HOURS early for a spot. Best viewing: Av. El Poblado between Calles 9 and 11 (route start). Bring a hat and sunscreen. The parade lasts approx. 3 hours.',
+        'curiosidad': '🧠 Edición 69. Este año por primera vez participan 10 silleteros neurodiversos del Proceso Silleteando Ando de la Corporación de Silleteros de Santa Elena (COSSE). Hay 5 categorías: Monumental (80+ kg), Emblemática, Clásica, Tradicional y Silleteritos. El ganador de 2025 fue Juan Pablo Sánchez en su participación 18.',
+        'curiosidadEN': '🧠 69th edition. This year for the first time, 10 neurodiverse silleteros from the Silleteando Ando Process of Santa Elena Silleteros Corporation (COSSE) participate. There are 5 categories: Monumental (80+ kg), Emblematic, Classic, Traditional and Silleteritos. The 2025 winner was Juan Pablo Sánchez in his 18th participation.',
+        'reto': '🎯 Encontrá a los 10 silleteros neurodiversos en el desfile y aplaudílos especialmente. Tomá foto de la silleta Monumental más grande que encuentres. ¿Cuántas flores estimás que tiene?',
+        'retoEN': '🎯 Find the 10 neurodiverse silleteros in the parade and give them a special cheer. Photograph the largest Monumental silleta you find. How many flowers do you estimate it has?',
+        'puntosReto': 250,
+      },
+    ],
+    'sitiosList': [
+      'Concierto Inaugural (Obelisco) — 31 jul',
+      'Feria a Ritmo de Bicicleta — 1 ago · 10am',
+      'Desfile Chivas y Flores — 1 ago',
+      'Desfile Avenida Primavera — 2 ago · 2pm',
+      'Caminata Canina — 2 ago · 10am · Estadio',
+      'Plaza de las Flores (Parque de los Deseos) — 31 jul al 4 ago',
+      'Plaza de las Flores (Parques del Río) — toda la feria',
+      'Parque Cultural Nocturno (Plaza Gardel) — 2 al 7 ago',
+      'Festival Nacional de la Trova — Final 6 ago · 6pm',
+      'Desfile Autos Clásicos y Antiguos — 7 ago · 10am · UPB',
+      'Desfile Chivas y Flores — 1 ago',
+      'Héroes de la Patria — 8 ago · 2pm',
+      'Súper Concierto (Estadio Atanasio) — 8 ago · 7pm',
+      'Desfile de Silleteros — 9 ago · 2pm · Av. Regional',
+    ],
+    'sitios': 14,
+    'consejos': [
+      '📅 PROGRAMACIÓN COMPLETA en feriadelasfloresmedellin.gov.co',
+      '🚇 Usá el Metro — el día del Desfile de Silleteros el metro es gratis',
+      '🌹 Llegá 2 horas antes al Desfile — las mejores sillas se agotan',
+      '💵 La mayoría de eventos son GRATUITOS — revisá cuáles requieren boleta',
+      '📸 Batería cargada siempre — cada evento es fotogénico',
+      '🌂 Llevá paraguas — agosto tiene lluvias en la tarde',
+      '👟 Zapatos cómodos — vas a caminar mucho',
+      '🎟️ Súper Concierto (8 ago) requiere boleta — comprá con anticipación',
+      '🏆 Sillas para rifar: 530 silleteros compiten por las categorías Monumental, Emblemática, Clásica, Tradicional y Silleteritos',
+    ],
+    'consejosEN': [
+      '📅 FULL PROGRAM at feriadelasfloresmedellin.gov.co',
+      '🚇 Use the Metro — on Silleteros Parade day the metro is FREE',
+      '🌹 Arrive 2 hours early to the Parade — best spots fill up fast',
+      '💵 Most events are FREE — check which require tickets',
+      '📸 Keep your battery charged — every event is photogenic',
+      '🌂 Bring an umbrella — August has afternoon rain',
+      '👟 Comfortable shoes — you will walk a lot',
+      '🎟️ Super Concert (Aug 8) requires ticket — buy in advance',
+      '🏆 Silletero competition: 530 silleteros compete in Monumental, Emblematic, Classic, Traditional and Silleteritos categories',
+    ],
+    'gpsSitios': [
+      {'nombre': 'Concierto Inaugural (Obelisco) — 31 jul', 'lat': 6.257020, 'lng': -75.591759},
+      {'nombre': 'Feria a Ritmo de Bicicleta — 1 ago · 10am', 'lat': 6.2458, 'lng': -75.5722},
+      {'nombre': 'Desfile Chivas y Flores — 1 ago', 'lat': 6.236639, 'lng': -75.575864, 'radioM': 400},
+      {'nombre': 'Desfile Avenida Primavera — 2 ago · 2pm', 'lat': 6.236639, 'lng': -75.575864, 'radioM': 400},
+      {'nombre': 'Caminata Canina — 2 ago · 10am · Estadio', 'lat': 6.2552, 'lng': -75.5880},
+      {'nombre': 'Plaza de las Flores (Parque de los Deseos) — 31 jul al 4 ago', 'lat': 6.268617, 'lng': -75.565699},
+      {'nombre': 'Plaza de las Flores (Parques del Río) — toda la feria', 'lat': 6.243748, 'lng': -75.579924},
+      {'nombre': 'Parque Cultural Nocturno (Plaza Gardel) — 2 al 7 ago', 'lat': 6.2197, 'lng': -75.5897},
+      {'nombre': 'Festival Nacional de la Trova — Final 6 ago · 6pm', 'lat': 6.2197, 'lng': -75.5897},
+      {'nombre': 'Desfile Autos Clásicos y Antiguos — 7 ago · 10am · UPB', 'lat': 6.2572, 'lng': -75.5742, 'radioM': 400},
+      {'nombre': 'Héroes de la Patria — 8 ago · 2pm', 'lat': 6.2150, 'lng': -75.5720, 'radioM': 400},
+      {'nombre': 'Súper Concierto (Estadio Atanasio) — 8 ago · 7pm', 'lat': 6.2554, 'lng': -75.5890},
+      {'nombre': 'Desfile de Silleteros — 9 ago · 2pm · Av. Regional', 'lat': 6.236639, 'lng': -75.575864, 'radioM': 400},
+    ],
+    'color1': const Color(0xFF1A0A10),
+    'color2': const Color(0xFF2A1020),
+    'acento': const Color(0xFFD05538),
+    'imagen': 'assets/images/rutas/ruta_feria_clasica.jpg',
+    'insignia': 'Silletero de Oro',
+    'insigniaImg': 'assets/images/insignias/insignia_feria_silletero_oro.png',
+    'personaje': '🌹',
+    'premio': 'Insignia Silletero de Oro',
+    'comoLlegar': '🚇 Cada evento tiene su punto de encuentro — ver agenda\n🎤 Concierto Inaugural: Sector Obelisco · Est. Suramericana (L.B) → 8 min\n🚴 Feria a Ritmo de Bici: Plaza Pies Descalzos · Est. Alpujarra (L.A) → 8 min\n🌹 Desfile Silleteros: Puente Guayaquil · Est. Exposiciones (L.A) → 10 min',
+    'antesDeSalir': '📅 Descargá la agenda completa en Tab Feria · 🚇 Metro y tarjeta Cívica · 💧 Agua y protector solar · 📱 Celular con Rutero MDE abierto para validar cada evento · 🎒 Solo lo esencial — habrá multitudes',
+  },
+  // [eliminado] RUTA SILLETERA — reemplazada por rutas Fincas Silleteras en Firestore
+  // [eliminado] TABLADOS Y RUMBA
+];
+
+// ─────────────────────────────────────────
+
 class RutasService {
   static final RutasService _instance = RutasService._internal();
   factory RutasService() => _instance;
@@ -7040,15 +8959,76 @@ class RutasService {
 
   List<Map<String, dynamic>> _rutas = [];
   bool _cargado = false;
+  bool get cargado => _cargado;
 
   /// Rutas actuales — Firestore + rutas locales que no estén en Firestore
+  /// Las rutas que están en Firestore (aunque se borren) NO se reinyectan desde local.
   List<Map<String, dynamic>> get rutas {
-    if (!_cargado || _rutas.isEmpty) return kRutasData;
+    if (!_cargado || _rutas.isEmpty) return [...kFeriaRutasCompletas]; // fallback mientras carga Firestore
     // Merge: rutas de Firestore + rutas locales que Firestore no tiene
+    // EXCLUIR rutas locales que ya fueron migradas a Firestore (para evitar zombis)
     final nombresFirestore = _rutas.map((r) => r['nombre']?.toString() ?? '').toSet();
-    final soloLocales = kRutasData.where((r) =>
-      !nombresFirestore.contains(r['nombre']?.toString() ?? '')).toList();
-    return [..._rutas, ...soloLocales];
+    const migradasAFirestore = {
+      // ── Rutas Ciudad originales ──────────────────────────────────────
+      'VIVE EL POBLADO',
+      'DISEÑO MODA Y COMPRAS',
+      'HUELLAS VIVAS DE EL POBLADO',
+      'EL POBLADO VERDE',
+      'EL POBLADO CREATIVO',
+      'SABORES DE EL POBLADO',
+      'NOCHE EN EL POBLADO',
+      'VIVE LAURELES',
+      'CENTRO PATRIMONIAL',
+      'RUTA GUATAPÉ & LA PIEDRA',
+      'VIVE MANRIQUE',
+      'CENTRO ALTERNATIVO',
+      'RINCONES ESCONDIDOS DE EL POBLADO',
+      // ── Rutas en Firestore Y en kRutasData → usar versión Firestore ──
+      'RUTA MEMORIA Y REFLEXIÓN',
+      'RUTA TRANSFORMACIÓN URBANA',
+      'RUTA VERDE DEL NORTE',
+      'RUTA DEL METROCABLE & ARVÍ',
+      'RUTA DE LOS MIRADORES',
+      'DEL ORIGEN PAISA A LA MEDELLÍN MODERNA',
+      'TRANVÍA CULTURAL',
+      'TRANSFORMACIÓN MEMORIA E HISTORIA',
+      // ── Comida Urbana ────────────────────────────────────────────────
+      'SABORES DE LA 70',
+      'SABORES DEL CENTRO',
+      'SABOR PAISA PROFUNDO — ENVIGADO',
+      'SABOR URBANO — MERCADO DEL RÍO',
+      // ── Temporada ────────────────────────────────────────────────────
+      'FERIA DE LAS FLORES',
+      'COLOMBIAMODA — MODA & DISEÑO',
+      'FESTIVAL INTERNACIONAL DE TANGO',
+      'FERIA DE LA ANTIOQUEÑIDAD',
+      'MEDEÍJAZZ — FESTIVAL DE JAZZ',
+      'SEMANA SANTA PATRIMONIAL',
+      'FIESTA DEL LIBRO Y LA CULTURA',
+      'NOCHE EN LAURELES',
+      'BARRIO PRADO — CULTURA Y BOHEMIA',
+      'MEMORIA Y DERECHOS HUMANOS',
+      'CAFÉS Y CANTINAS HISTÓRICAS DEL CENTRO',
+      'TEATROS Y ESCENA DEL CENTRO',
+      'ENTRE JUEGOS Y PALABRAS',
+      'ENTRE SABORES RISAS Y MIL COLORES',
+      'OTROS CAMINOS LAURELES',
+      'FINCAS SILLETERAS',
+      'FINCAS AGROTURÍSTICAS',
+      // ── Alrededores ──────────────────────────────────────────────────
+      'RUTA SANTA FE DE ANTIOQUIA',
+      'JOYA COLONIAL OCULTA — CONCEPCIÓN',
+    };
+    final soloLocales = kRutasData.where((r) {
+      final nombre = r['nombre']?.toString() ?? '';
+      if (nombresFirestore.contains(nombre)) return false;
+      if (migradasAFirestore.contains(nombre)) return false;
+      return true;
+    }).toList();
+    // Agregar rutas completas de Feria que no estén ya en Firestore o locales
+    final nombresTodos = {...nombresFirestore, ...soloLocales.map((r) => r['nombre']?.toString() ?? '')};
+    final feriaExtras = kFeriaRutasCompletas.where((r) => !nombresTodos.contains(r['nombre']?.toString() ?? '')).toList();
+    return [..._rutas, ...soloLocales, ...feriaExtras];
   }
 
   /// Lanza carga en background sin bloquear el arranque de la app.
@@ -7059,6 +9039,72 @@ class RutasService {
   void removeListener(VoidCallback cb) => _listeners.remove(cb);
   void _notificar() { for (final cb in List.of(_listeners)) { cb(); } }
 
+  /// Busca un sitio en sitiosDetalle de Firestore por nombre.
+  /// Retorna el Map del sitio o null si no existe.
+  Map<String, dynamic>? buscarSitioDetalle(String sitioNombre) {
+    for (final ruta in _rutas) {
+      final detalle = parseSitiosDetalle(ruta['sitiosDetalle']);
+      for (final sitio in detalle) {
+        if (sitio is Map && sitio['nombre']?.toString() == sitioNombre) {
+          final m = Map<String, dynamic>.from(sitio);
+          // Limpiar precios individuales de descripciones — política general
+          if (m['descripcion'] is String) m['descripcion'] = _limpiarPrecioSitio(m['descripcion']?.toString() ?? '');
+          if (m['descripcionEN'] is String) m['descripcionEN'] = _limpiarPrecioSitio(m['descripcionEN']?.toString() ?? '');
+          if (m['tip'] is String) m['tip'] = _limpiarPrecioSitio(m['tip']?.toString() ?? '');
+          if (m['tipEN'] is String) m['tipEN'] = _limpiarPrecioSitio(m['tipEN']?.toString() ?? '');
+          return m;
+        }
+      }
+    }
+    return null;
+  }
+
+  /// Retorna curiosidad de sitiosDetalle como Map {'es': ..., 'en': ...}
+  Map<String, String>? getCuriosidad(String sitioNombre) {
+    final s = buscarSitioDetalle(sitioNombre);
+    if (s == null || (s['curiosidad'] == null && s['curiosidadEN'] == null)) return null;
+    return {'es': s['curiosidad'] ?? '', 'en': s['curiosidadEN'] ?? ''};
+  }
+
+  /// Retorna reto de sitiosDetalle como Map compatible con kRetosPorSitio
+  Map<String, dynamic>? getReto(String sitioNombre) {
+    final s = buscarSitioDetalle(sitioNombre);
+    if (s == null || (s['reto'] == null && s['retoEN'] == null)) return null;
+    return {
+      'emoji': s['emoji'] ?? '🎯',
+      'reto_es': s['reto'] ?? '',
+      'reto_en': s['retoEN'] ?? '',
+      'puntos': s['puntosReto'] ?? 10,
+    };
+  }
+
+  /// Retorna tip de sitiosDetalle como Map {'es': ..., 'en': ..., 'emoji': ...}
+  Map<String, String>? getTip(String sitioNombre) {
+    final s = buscarSitioDetalle(sitioNombre);
+    if (s == null || (s['tip'] == null && s['tipEN'] == null)) return null;
+    return {'es': s['tip'] ?? '', 'en': s['tipEN'] ?? '', 'emoji': s['emoji'] ?? '✨'};
+  }
+
+  /// Retorna misionEpica de la ruta de Firestore
+  Map<String, dynamic>? getMisionEpica(String rutaNombre) {
+    for (final ruta in _rutas) {
+      if (ruta['nombre']?.toString() == rutaNombre && ruta['misionEpica'] != null) {
+        return {
+          'nombre_es': ruta['nombre'] ?? '',
+          'nombre_en': ruta['nombreEN'] ?? '',
+          'descripcion_es': ruta['misionEpica'] ?? '',
+          'descripcion_en': ruta['misionEpicaEN'] ?? '',
+          'recompensa_es': ruta['premio'] ?? 'Insignia',
+          'recompensa_en': ruta['premio'] ?? 'Badge',
+          'objetivo': ruta['sitios'] ?? 5,
+          'puntos': 500,
+          'emoji': ruta['personaje'] ?? '🏆',
+        };
+      }
+    }
+    return null;
+  }
+
   void cargarEnBackground() {
     Future.microtask(() async {
       QuerySnapshot<Map<String, dynamic>> snap;
@@ -7067,7 +9113,7 @@ class RutasService {
         // borrados que aún estén en la caché local persistente del SDK.
         snap = await FirebaseFirestore.instance
             .collection('rutas')
-            .get(const GetOptions(source: fs.Source.server))
+            .get(const GetOptions(source: fs.Source.serverAndCache))
             .timeout(const Duration(seconds: 15));
       } catch (e) {
         debugPrint('⚠️ RutasService: server falló, intentando caché. ' + e.toString());
@@ -7088,8 +9134,16 @@ class RutasService {
             final ruta = <String, dynamic>{'id': d.id, ...data};
             final nombre = ruta['nombre']?.toString() ?? '';
             // Enriquecer con imagen/insignia local si Firestore no las trae
-            ruta['imagen'] ??= kImagenPorRuta[nombre];
+            // Enriquecer con imagen local (override Firestore paths que no existen)
+            final imagenLocal = kImagenPorRuta[nombre];
+            if (imagenLocal != null) ruta['imagen'] = imagenLocal;
+
             ruta['insigniaImg'] ??= kInsigniaPorRuta[nombre];
+            // Enriquecer zona si Firestore no la trae
+            if (!ruta.containsKey('zona') || ruta['zona'] == null) {
+              final zonaLocal = kZonaPorRuta[nombre];
+              if (zonaLocal != null) ruta['zona'] = zonaLocal;
+            }
             // Enriquecer con campos locales que Firestore normalmente no almacena
             // (consejos, momentoClave, descripciones, hooks, colores, etc.)
             final localData = kRutasData.firstWhere(
@@ -7129,6 +9183,14 @@ class RutasService {
             }
             return ruta;
           }).toList();
+          // Deduplicar por nombre — si hay docs duplicados en Firestore, tomar el primero
+          final seenNombres = <String>{};
+          _rutas = _rutas.where((r) {
+            final n = r['nombre']?.toString() ?? '';
+            if (n.isEmpty || seenNombres.contains(n)) return false;
+            seenNombres.add(n);
+            return true;
+          }).toList();
           _cargado = true;
           _notificar(); // Avisar a la UI que hay datos nuevos
         }
@@ -7141,7 +9203,6 @@ class RutasService {
   /// Recarga forzada
   void recargar() { _cargado = false; cargarEnBackground(); }
 }
-
 
 // ─────────────────────────────────────────────────────────────────────────
 //  ALIADOS SERVICE — Carga aliados desde Firestore
@@ -7227,1979 +9288,11 @@ class AliadosService {
 // Lista global de rutas — accesible desde MapScreen y RouteDetailScreen
 // ignore: non_constant_identifier_names
 final List<Map<String, dynamic>> kRutasData = [
-    // ── CIUDAD ──
-
-    // ── RUTA — Corredor Cultural de la 45 (Manrique) ──
-    {
-      'nombre': 'CORREDOR CULTURAL DE LA 45', 'nombreEN': 'THE 45TH AVENUE CULTURAL CORRIDOR',
-      'insigniaImg': 'assets/images/insignias/insignia_corredor_45.png',
-      'imagen': 'assets/images/rutas/ruta_corredor_45.jpg',
-      'subtitulo': 'Arte urbano · Tango · Memoria · Gastronomía', 'subtituloEN': 'Street Art · Tango · Memory · Gastronomy',
-      'emoji': '🎨',
-      'sitios': 8, 'tiempo': '3h – 4h', 'transporte': '🚇 Metro + caminata · 🛴 Whoosh (tramo plano)',
-      'precio': r'$0', 'dificultad': 'MODERADA',
-      'color1': const Color(0xFF1A0F20), 'color2': const Color(0xFF2D1A3A),
-      'acento': const Color(0xFFB07ABF),
-      'tag': '🎭 Turismo comunitario',
-      'zona': 'Ciudad',
-      'ciudad': 'Medellín', 'pais': 'Colombia',
-      'insignia': 'Espíritu del 45',
-      'personaje': '🎨',
-      'premio': 'Insignia Espíritu del 45',
-      'hook': 'Manrique es el barrio más musical de Medellín. En sus calles empinadas conviven el tango, la salsa, los murales más grandes de la ciudad y una comunidad que transformó el dolor en arte.',
-      'hookEN': 'Manrique is the most musical neighborhood in Medellín. On its steep streets, tango, salsa, the city largest murals, and a community that transformed pain into art all coexist.',
-      'descripcion': 'Un recorrido por el corazón cultural del nororiente de Medellín: la Carrera 45 y sus alrededores. Esta ruta une la gastronomía de barrio, el legado de Carlos Gardel, el macromural más grande de Colombia y miradores con vistas únicas de la ciudad. Un turismo comunitario real, diseñado desde y para la gente de Manrique.',
-      'descripcionEN': 'A journey through the cultural heart of northeast Medellín: Carrera 45 and its surroundings. This route connects neighborhood gastronomy, the legacy of Carlos Gardel, the largest mural in Colombia, and viewpoints with unique city views. Real community tourism, designed by and for the people of Manrique.',
-      'mejorHora': '9:00 am – 5:00 pm (fines de semana hay más ambiente)',
-      'tipoExperiencia': 'Arte & Cultura Comunitaria',
-      'tipoExperienciaEN': 'Art & Community Culture',
-      'momentoClave': 'Macromural Constelaciones — 14.819 m² de arte colectivo sobre las fachadas de San José de La Cima II. El mural más grande de Colombia, creado por la comunidad para contar su propia historia.',
-      'momentoClaveEN': 'Constelaciones Mural — 14,819 m² of collective art on the facades of San José de La Cima II. The largest mural in Colombia, created by the community to tell their own story.',
-      'consejos': [
-        '🚇 Llega en Metro hasta Estación Gardel — el nombre es tu primera pista',
-        '🎵 Visita entre semana si quieres tranquilidad; los fines de semana hay presentaciones de tango en vivo',
-        '📷 Pide permiso antes de fotografiar a los residentes de Constelaciones',
-        '👟 Usa zapatos cómodos — la ruta incluye calles empinadas hacia los barrios altos',
-        '🍽️ No salgas sin probar algo en la 45 — la gastronomía de barrio es parte de la experiencia',
-        '☀️ Haz la parte alta (Constelaciones) antes del mediodía para evitar el calor',
-        '🛴 El tramo plano de La 45 Gastronómica es apto para Whoosh — solo el inicio, no las subidas hacia Constelaciones · Consulta tarifas en la app Whoosh'
-      ],
-      'consejosEN': [
-        '🚇 Arrive by Metro at Gardel Station — the name is your first clue',
-        '🎵 Visit on weekdays for a quieter experience; weekends feature live tango performances',
-        '📷 Ask permission before photographing Constelaciones residents',
-        '👟 Wear comfortable shoes — the route includes steep streets toward the upper neighborhoods',
-        '🍽️ Don\'t leave without trying something on La 45 — neighborhood gastronomy is part of the experience',
-        '☀️ Do the upper section (Constelaciones) before noon to avoid the heat',
-        '🛴 The flat stretch of La 45 Gastronómica is Whoosh-friendly — only the flat section, not the uphill toward Constelaciones · Check rates in the Whoosh app'
-      ],
-      'sitiosList': [
-        'Estación Gardel — Puerta de Manrique',
-        'Casa Gardeliana',
-        'Casa de la Cultura Manrique',
-        'La 45 Gastronómica',
-        'Hangar M45 Azotea',
-        'UVA La Armonía — Punto de Inicio Constelaciones',
-        'Macromural Constelaciones',
-        'Mirador El Ojo de Dios',
-      ],
-    },
-
-    // ── RUTA — Memoria y Reflexión ──
-    {
-      'nombre': 'RUTA MEMORIA Y REFLEXIÓN', 'nombreEN': 'MEMORY & REFLECTION ROUTE',
-      'insigniaImg': 'assets/images/insignias/insignia_memoria_viva.png',
-      'imagen': 'assets/images/rutas/ruta_memoria_reflexion.jpg',
-      'subtitulo': 'Historia · Contexto · Transformación', 'subtituloEN': 'History · Context · Transformation',
-      'emoji': '🕊️',
-      'sitios': 5, 'tiempo': '3h – 4h', 'transporte': '🚇 Metro + 🚕 Taxi',
-      'precio': '\$35.000', 'dificultad': 'FÁCIL',
-      'color1': const Color(0xFF0F1520), 'color2': const Color(0xFF1A2538),
-      'acento': const Color(0xFF7A95B0),
-      'tag': '🎧 Cultural profunda',
-      'zona': 'Ciudad',
-      'ciudad': 'Medellín', 'pais': 'Colombia',
-      'insignia': 'Memoria Viva',
-      'personaje': '🕊️',
-      'premio': "Insignia Memoria Viva",
-      'hook': 'Hay una historia que Medellín vivió en carne propia y que el mundo conoce de lejos. Esta ruta te la cuenta desde adentro — con quienes la vivieron.',
-      'hookEN': 'There is a story Medellín lived firsthand that the world knows only from the outside. This route tells it from within — from those who lived it.',
-      'descripcion': 'Un recorrido que comienza donde se cuenta la historia — en el museo de San Javier — y continúa por los lugares que marcaron uno de los periodos más complejos de la ciudad. Cinco paradas, un contexto real, y una Medellín que decidió transformarse.',
-      'descripcionEN': 'A journey that begins where the story is told — at the museum in San Javier — and continues through the places that defined one of the most complex periods in the city. Five stops, real context, and a Medellín that chose to transform itself.',
-      'mejorHora': '9:00 am – 3:00 pm (solo de día)',
-      'tipoExperiencia': 'Memoria & Reflexión',
-      'tipoExperienciaEN': 'Memory & Reflection',
-      'momentoClave': 'El techo del Barrio Los Olivos — hoy una calle tranquila, normal, con vecinos y niños jugando. El contraste entre lo que pasó aquí y lo que es hoy dice más que cualquier documental.',
-      'momentoClaveEN': 'The rooftop in Barrio Los Olivos — today a quiet, ordinary street with neighbors and kids playing. The contrast between what happened here and what it is today says more than any documentary.',
-      'consejos': [
-        '🏛️ Comienza en el Museo de San Javier — el contexto histórico que te dan allí hace que el resto de la ruta tenga mucho más sentido',
-        '🤲 Mantén siempre una actitud respetuosa — son lugares de memoria activa para muchas familias',
-        '☀️ Realiza esta ruta únicamente durante el día por tu propia seguridad',
-        '🚫 No ingreses a propiedades privadas — algunos sitios son residencias activas',
-        '📷 Pregúntate siempre el tono antes de fotografiar — hay espacios que merecen silencio',
-        '⚠️ Esta ruta pasa por zonas con historia reciente de conflicto — viaja con autocuidado y sigue las recomendaciones locales',
-        '💭 Ven con el ánimo correcto — es memoria y reflexión, no entretenimiento',
-      ],
-      'consejosEN': [
-        '🏛️ Start at the Museum in San Javier — the historical context they give you makes the rest of the route much more meaningful',
-        '🤲 Always keep a respectful attitude — these are places of living memory for many families',
-        '☀️ Take this route only during daytime for your own safety',
-        '🚫 Do not enter private properties — some sites are active residences',
-        '📷 Always consider the tone before taking photos — some spaces deserve silence',
-        '⚠️ This route passes through areas with a recent history of conflict — travel with care and follow local guidance',
-        '💭 Come with the right mindset — this is memory and reflection, not entertainment',
-      ],
-      'sitiosList': [
-        'Museo Beyond Escobar',
-        'Barrio Los Olivos — El Techo',
-        'Cementerio Jardines Montesacro',
-        'Parque Memorial Inflexión',
-      ],
-      'antesDeSalir': '🏛️ Agenda tu visita al Museo Beyond Escobar (Cl. 39 # 107-72, Barrio 20 de Julio) · 🚇 Metro Línea B → Est. Floresta (3 min caminando) · 🚕 Taxi hacia Los Olivos y Montesacro · 💵 Lleva \$35.000 COP + entrada museo \$120.000 · ☀️ Solo de día · ⚠️ Autocuidado en todo el recorrido',
-    },
-    {
-      'nombre': 'RUTA TRANSFORMACIÓN URBANA', 'nombreEN': 'URBAN TRANSFORMATION ROUTE',
-      'insigniaImg': 'assets/images/insignias/insignia_01_explorador_13.png',
-      'imagen': 'assets/images/rutas/ruta_01_transformacion.jpg',
-      'subtitulo': 'Comuna 13 · San Javier · Arte urbano', 'subtituloEN': 'Comuna 13 · San Javier · Urban Art',
-      'emoji': '🎨',
-      'sitios': 7, 'tiempo': '3h', 'transporte': '🚇 Metro + caminata',
-      'precio': '\$24.900', 'dificultad': 'FÁCIL',
-      'color1': const Color(0xFF0D1F0D), 'color2': const Color(0xFF1A3A1A),
-      'acento': kGreen,
-      'tag': '🏆 Más popular',
-      'zona': 'Ciudad',
-      'ciudad': 'Medellín', 'pais': 'Colombia',
-      // 'turismoResponsable': true,  // 🚫 Pausado 30 mayo 2026
-      'premio': 'Insignia Explorador de la 13',
-            'misionEpica': 'Encuentra los 5 murales que cuentan la historia de la transformación de la Comuna 13. Fotografía cada uno y descifra su mensaje — el que completa los 5 gana la insignia.',
-      "misionEpicaEN": "Find the 5 murals that tell the story of Comuna 13's transformation. Photograph each one and decode its message — whoever completes all 5 earns the badge.",
-      'sitiosList': ['Estación San Javier (Metro)', 'Biblioteca de San Javier', 'Ciudadela de la 4° Revolución', 'Museo Beyond Escobar', 'Parque de la paz', 'Murales Hip Hop', 'Escaleras eléctricas'],
-      'hook': 'Del barrio más peligroso del mundo a símbolo global de transformación social.',
-      'hookEN': 'From the world\'s most dangerous neighborhood to a global symbol of social transformation.',
-      'descripcion': 'Explora la Comuna 13 a través de su arte urbano, música hip-hop y escaleras eléctricas únicas en el mundo. Una historia de resiliencia que te va a mover.',
-      'descripcionEN': 'Explore Comuna 13 through its urban art, hip-hop music and world-unique outdoor escalators. A story of resilience that will move you.',
-      'mejorHora': '9:00 am – 12:00 pm',
-      'tipoExperiencia': 'Cultural & Urbana',
-      'tipoExperienciaEN': 'Cultural & Urban',
-      'momentoClave': 'Sube los 6 tramos de escaleras eléctricas — reemplazan lo que antes eran 350 escalones de cemento. La vista del barrio desde el último tramo te dejará sin palabras.',
-      'momentoClaveEN': 'Climb all 6 sections of the outdoor escalators — they replaced what used to be 350 concrete steps. The view of the neighborhood from the top section will leave you speechless.',
-      'consejos': ['🎒 Mochila pequeña al frente en el metro y durante el recorrido', '📱 Guarda el celular en el bolsillo al caminar por zonas concurridas', '💧 Lleva agua — hay bastante caminata y el sol pega fuerte', '👟 Zapatos cómodos con buen agarre, hay escaleras y terreno irregular', '📷 En los murales puedes fotografiar tranquilo, es zona turística consolidada', '🕐 Sal temprano para mejor luz y evitar el calor del mediodía'],
-      'consejosEN': ['🎒 Small backpack worn in front on the metro and throughout the route', '📱 Keep your phone in your pocket while walking through busy areas', '💧 Bring water — lots of walking and strong sun from midday', '👟 Comfortable shoes with good grip — stairs and uneven terrain', '📷 Photograph freely at the murals — it\'s a well-established tourist area', '🕐 Go early for best light and to avoid midday heat'],
-    },
-    {
-      'nombre': 'RUTA PATRIMONIAL DEL CENTRO', 'nombreEN': 'DOWNTOWN HERITAGE ROUTE',
-      'insigniaImg': 'assets/images/insignias/insignia_02_guardian_patrimonio.png',
-      'imagen': 'assets/images/rutas/ruta_02_patrimonial.jpg',
-      'subtitulo': 'Centro · La Candelaria · Historia', 'subtituloEN': 'Downtown · La Candelaria · History',
-      'emoji': '🏛️',
-      'sitios': 10, 'tiempo': '2h', 'transporte': '🚇 Metro + caminata · 🛴 Whoosh disponible',
-      'precio': '\$24.900', 'dificultad': 'FÁCIL',
-      'color1': const Color(0xFF120F1A), 'color2': const Color(0xFF231A35),
-      'acento': kOrchid,
-      'tag': '📚 Cultural',
-      'zona': 'Ciudad',
-      'ciudad': 'Medellín', 'pais': 'Colombia',
-      // 'turismoResponsable': true,  // 🚫 Pausado 30 mayo 2026
-      'premio': 'Insignia Guardián del Patrimonio',
-      'hook': 'El corazón colonial de Medellín — Plaza Botero, Coltejer y la catedral más grande de ladrillo del mundo.',
-      'hookEN': 'The colonial heart of Medellin — Plaza Botero, Coltejer and the largest brick cathedral in the world.',
-      'descripcion': 'Recorre el corazón histórico de Medellín desde el Parque Berrío hasta la Plaza Botero. Iglesias coloniales, edificios art déco, museos y vida urbana auténtica.',
-      'descripcionEN': 'Walk through the historic heart of Medellin from Parque Berrio to Plaza Botero. Colonial churches, art deco buildings, museums and authentic urban life.',
-      'mejorHora': '8:00 am – 11:00 am',
-      'tipoExperiencia': 'Histórica & Cultural',
-      'tipoExperienciaEN': 'Historic & Cultural',
-      'momentoClave': 'Detente frente al Edificio Coltejer y mira hacia arriba — su forma de aguja de coser es el símbolo industrial de Medellín.',
-      'momentoClaveEN': 'Stop in front of Edificio Coltejer and look up — its needle shape is the industrial symbol of Medellin.',
-      'consejos': ['🎒 El centro puede estar concurrido — mochila al frente y documentos guardados', '📱 Evita usar el celular mientras caminas por calles principales', '💧 Lleva agua, hay bastante caminata', '👟 Zapatos cómodos — varios kilómetros a pie', '☀️ Protector solar para las zonas al aire libre', '🕐 Las iglesias y museos abren desde las 8am — aprovecha temprano', '🛴 Esta ruta es apta para patineta eléctrica Whoosh — descarga la app y busca el punto P más cercano al Parque Berrío · Consulta tarifas en la app Whoosh'],
-      'consejosEN': ['🎒 Downtown can be busy — backpack in front and keep documents secure', '📱 Avoid using your phone while walking on main streets', '💧 Bring water, lots of walking', '👟 Comfortable shoes — several kilometers on foot', '☀️ Sunscreen for outdoor sections', '🕐 Churches and museums open from 8am — go early', '🛴 This route is e-scooter friendly — download the Whoosh app and find the nearest P point at Parque Berrío · Check rates in the Whoosh app'],
-            'misionEpica': 'Encuentra la fecha de fundación de Medellín grabada en la Catedral Metropolitana. Ese número es tu código de insignia.',
-      'misionEpicaEN': 'Find the founding date of Medellín engraved in the Metropolitan Cathedral. That number is your badge code.',
-      'sitiosList': ['Parque Berrío', 'Iglesia de La Candelaria', 'Edificio Coltejer', 'Pasaje Junín', 'Parque Bolívar', 'Catedral Basílica Metropolitana', 'Hotel Nutibara', 'Plaza Botero', 'Museo de Antioquia', 'Palacio de la Cultura Rafael Uribe Uribe'],
-    },
-    {
-      'nombre': 'RUTA CENTRO REPUBLICANO', 'nombreEN': 'REPUBLICAN CENTER ROUTE',
-      'insigniaImg': 'assets/images/insignias/insignia_02_guardian_patrimonio.png',
-      'imagen': 'assets/images/rutas/ruta_02b_republicano.jpg',
-      'subtitulo': 'Centro · Arquitectura · Historia republicana', 'subtituloEN': 'Downtown · Architecture · Republican History',
-      'emoji': '🏛️',
-      'sitios': 11, 'tiempo': '2.5h', 'transporte': '🚇 Metro + caminata · 🛴 Whoosh disponible',
-      'precio': '\$24.900', 'dificultad': 'FÁCIL',
-      'color1': const Color(0xFF120F1A), 'color2': const Color(0xFF231A35),
-      'acento': kOrchid,
-      'tag': '🏛️ Arquitectura',
-      'zona': 'Ciudad',
-      'ciudad': 'Medellín', 'pais': 'Colombia',
-      'premio': 'Insignia Cronista Republicano',
-      'hook': 'La Medellín republicana e institucional — edificios que narran cien años de historia en cada fachada.',
-      'hookEN': 'Republican and institutional Medellin — buildings that tell a hundred years of history on every facade.',
-      'descripcion': 'La segunda parte del centro histórico: arquitectura republicana, el Parque de las Luces, La Alpujarra y el Teatro Pablo Tobón Uribe. El Medellín institucional y cultural.',
-      'descripcionEN': 'The second part of the historic center: republican architecture, Parque de las Luces, La Alpujarra and Teatro Pablo Tobon Uribe. Institutional and cultural Medellin.',
-      'mejorHora': '9:00 am – 12:00 pm',
-      'tipoExperiencia': 'Histórica & Arquitectónica',
-      'tipoExperienciaEN': 'Historic & Architectural',
-      'momentoClave': 'El Parque de las Luces al mediodía — cuando el sol ilumina las 300 columnas de luz y el reflejo en el agua crea una imagen que pocas ciudades del mundo tienen.',
-      'momentoClaveEN': 'Parque de las Luces at midday — when the sun illuminates the 300 light columns and the water reflection creates an image few cities in the world can match.',
-      'consejos': ['🎒 El centro puede estar concurrido — mochila al frente y documentos guardados', '📱 Evita usar el celular mientras caminas por calles principales', '💧 Lleva agua, hay bastante caminata', '👟 Zapatos cómodos — varios kilómetros a pie', '☀️ Protector solar para las zonas al aire libre', '🕐 El Teatro Pablo Tobón tiene visitas guiadas — consulta horarios antes'],
-      'consejosEN': ['🎒 Downtown can be busy — backpack in front and keep documents secure', '📱 Avoid using your phone while walking on main streets', '💧 Bring water, lots of walking', '👟 Comfortable shoes — several kilometers on foot', '☀️ Sunscreen for outdoor sections', '🕐 Teatro Pablo Tobon offers guided tours — check times beforehand'],
-      'sitiosList': ['Iglesia de La Veracruz', 'Palacio Nacional', 'Edificio Vásquez', 'Edificio Carré', 'Parque de las Luces', 'Centro Administrativo La Alpujarra', 'Estación Ferrocarril de Antioquia', 'Parque San Antonio', 'Iglesia de San Ignacio', 'Teatro Pablo Tobón Uribe (Centro)', 'Museo Casa de la Memoria'],
-    },
-    {
-      'nombre': 'RUTA VERDE DEL NORTE', 'nombreEN': 'GREEN NORTH ROUTE',
-      'insigniaImg': 'assets/images/insignias/insignia_03_guardabosque.png',
-      'imagen': 'assets/images/rutas/ruta_03_verde_norte.jpg',
-      'subtitulo': 'Aranjuez · Chagualo · Naturaleza', 'subtituloEN': 'Aranjuez · Chagualo · Nature',
-      'emoji': '🌿',
-      'sitios': 9, 'tiempo': '3h', 'transporte': '🚇 Metro + caminata',
-      'precio': '\$24.900', 'dificultad': 'FÁCIL',
-      'color1': const Color(0xFF0A1A0A), 'color2': const Color(0xFF163016),
-      'acento': kGreen,
-      'tag': '🌱 Naturaleza',
-      'zona': 'Ciudad',
-      'ciudad': 'Medellín', 'pais': 'Colombia',
-      'premio': 'Insignia Guardabosque Urbano',
-      'hook': 'El pulmón verde de Medellín: orquídeas, astronomía y ciencia en el corazón de la ciudad.',
-      'hookEN': 'The green lung of Medellín: orchids, astronomy and science in the heart of the city.',
-      'descripcion': 'Un recorrido por la zona universitaria más vibrante de Medellín: jardines, orquídeas, ciencia interactiva y planetario. Ideal para familias y curiosos.',
-      'descripcionEN': 'A journey through Medellin\'s most vibrant university zone: gardens, orchids, interactive science and planetarium. Perfect for families and curious minds.',
-      'mejorHora': '9:00 am – 12:00 pm',
-      'tipoExperiencia': 'Naturaleza & Educativa',
-      'tipoExperienciaEN': 'Nature & Educational',
-      'momentoClave': 'El Orquideorama al amanecer — la estructura de madera con orquídeas iluminadas por el sol es una de las fotos más hermosas de Medellín.',
-      'momentoClaveEN': 'The Orquideorama at dawn — the wooden structure with orchids lit by the sun is one of the most beautiful photos in Medellin.',
-      'consejos': ['☀️ Lleva protector solar — gran parte del recorrido es al aire libre', '💧 Hidratación constante, especialmente con niños', '📷 Las orquídeas del Orquideorama son perfectas para fotos — sé respetuoso con las plantas', '🌿 No toques ni arranques flores en el Jardín Botánico', '👟 Zapatos cómodos, hay senderos de tierra y zonas de grama', '🕐 El Planetario tiene funciones programadas — revisa horarios antes de ir'],
-      'consejosEN': ['☀️ Bring sunscreen — much of the route is outdoors', '💧 Stay hydrated, especially with children', '📷 The Orquideorama orchids are perfect for photos — be respectful of the plants', '🌿 Do not touch or pick flowers in the Botanical Garden', '👟 Comfortable shoes — dirt paths and grass areas', '🕐 The Planetarium has scheduled shows — check times before going'],
-            'misionEpica': 'Identifica 5 especies de plantas nativas en el Jardín Botánico. Fotografía cada una con su nombre en el letrero — el botánico más completo gana.',
-      'misionEpicaEN': 'Identify 5 native plant species in the Botanical Garden. Photograph each one with its name sign — the most complete botanist wins.',
-      'sitiosList': ['Estación Universidad (Metro)', 'Jardín Botánico Joaquín Antonio Uribe', 'Orquideorama', 'Parque Norte', 'Parque Explora', 'Planetario de Medellín', 'Universidad de Antioquia (fachada)', 'Parque de los Deseos'],
-    },
-    {
-      'nombre': 'RUTA DEL METROCABLE & ARVÍ', 'nombreEN': 'METROCABLE & ARVÍ ROUTE',
-      'insigniaImg': 'assets/images/insignias/insignia_04_viajero_alturas.png',
-      'imagen': 'assets/images/rutas/ruta_04_metrocable.jpg',
-      'subtitulo': 'Santo Domingo · Arví · Innovación', 'subtituloEN': 'Santo Domingo · Arví · Innovation',
-      'emoji': '🚡',
-      'sitios': 7, 'tiempo': '4h', 'transporte': '🚇 Metro + Metrocable',
-      'precio': '\$29.900', 'dificultad': 'MEDIO',
-      'color1': const Color(0xFF0A0F1A), 'color2': const Color(0xFF141F35),
-      'acento': kOrchid,
-      'tag': '🚡 Innovación',
-      'zona': 'Ciudad',
-      'ciudad': 'Medellín', 'pais': 'Colombia',
-      // 'turismoResponsable': true,  // 🚫 Pausado 30 mayo 2026
-      'premio': 'Insignia Viajero de las Alturas',
-      'hook': 'Sube en cable desde el metro hasta el bosque — la transformación urbana más increíble de América Latina.',
-      'hookEN': 'Ride a cable car from the metro to the forest — the most incredible urban transformation in Latin America.',
-      'descripcion': 'Desde Acevedo hasta el Parque Arví en cable aéreo. Comunas, Biblioteca España, mercado campesino y naturaleza a 2.400 metros de altura.',
-      'descripcionEN': 'From Acevedo to Parque Arvi by cable car. Comunas, Espana Library, farmers market and nature at 2,400 meters above sea level.',
-      'mejorHora': '8:00 am – 11:00 am',
-      'tipoExperiencia': 'Urbana & Naturaleza',
-      'tipoExperienciaEN': 'Urban & Nature',
-      'momentoClave': 'Al llegar al Parque Arví, respira profundo — el cambio de temperatura y paisaje desde la ciudad es algo que no olvidarás.',
-      'momentoClaveEN': 'When you arrive at Parque Arvi, take a deep breath — the change in temperature and landscape from the city is something you will not forget.',
-      'consejos': ['🧥 Lleva una chaqueta liviana — Arví está a 2.400m y refresca bastante', '💧 Lleva agua y merienda para el parque', '📱 Guarda el celular en el metrocable — va lleno de turistas', '🕐 Evita fines de semana si puedes — entre semana hay mucho menos gente', '👟 Zapatos cerrados y cómodos para los senderos del parque', '🎟 La tarjeta metro debe tener saldo para el cable — recárgala antes'],
-      'consejosEN': ['🧥 Bring a light jacket — Arvi is at 2,400m and gets cool', '💧 Bring water and snacks for the park', '📱 Keep your phone secure on the cable car — it gets crowded with tourists', '🕐 Avoid weekends if possible — much less crowded on weekdays', '👟 Closed comfortable shoes for the park trails', '🎟 Your metro card needs credit for the cable — top it up beforehand'],
-            'misionEpica': 'Desde el Metrocable cuenta cuántos barrios puedes identificar mirando hacia el oriente. El número más cercano al real gana 20 puntos extra.',
-      'misionEpicaEN': 'From the Metrocable count how many neighborhoods you can identify looking east. The number closest to the real one wins 20 bonus points.',
-            'antesDeSalir': '🚇 Metro + Metrocable \$5.600 total · 🧥 Chaqueta — Arví es frío · 💵 \$40.000 COP · 📶 Sin señal en el parque · ⏰ Mejor 8-10am',
-      'sitiosList': ['Estación Acevedo (Metro)', 'Metrocable Línea K', 'Biblioteca España (Santo Domingo)', 'Mirador Santo Domingo', 'Metrocable Línea L', 'Parque Arví (entrada)'],
-    },
-    {
-      'nombre': 'RUTA LAURELES & TRADICIÓN', 'nombreEN': 'LAURELES & TRADITION ROUTE',
-      'insigniaImg': 'assets/images/insignias/insignia_06_corazon_paisa.png',
-      'imagen': 'assets/images/rutas/ruta_06_laureles.jpg',
-      'subtitulo': 'Laureles · Estadio · Cultura local · Gastronomía', 'subtituloEN': 'Laureles · Stadium · Local Culture · Food',
-      'emoji': '🌺',
-      'sitios': 6, 'tiempo': '2.5h', 'transporte': '🚇 Metro + caminata · 🛴 Whoosh disponible',
-      'precio': '\$24.900', 'dificultad': 'FÁCIL',
-      'color1': const Color(0xFF1A0A0A), 'color2': const Color(0xFF2E1515),
-      'acento': kAccent,
-      'tag': '🏡 Barrios',
-      'zona': 'Ciudad',
-      'ciudad': 'Medellín', 'pais': 'Colombia',
-      // 'turismoResponsable': true,  // 🚫 Pausado 30 mayo 2026
-      'premio': 'Insignia Corazón Paisa',
-      'hook': 'El Medellín de barrio: fútbol, arepa y conversación paisa a la vuelta de la esquina.',
-      'hookEN': 'Neighborhood Medellin: football, arepa and paisa conversation around the corner.',
-      'descripcion': 'Recorre el barrio más querido de Medellín: el Estadio Atanasio, la icónica Carrera 70, la U.P.B. y los dos parques de Laureles donde la vida paisa se vive sin apuros.',
-      'descripcionEN': 'Walk through Medellin most beloved neighborhood: the Atanasio stadium, the iconic 70th avenue, U.P.B. university and Laureles two parks where paisa life happens at its own pace.',
-      'mejorHora': '3:00 pm – 7:00 pm',
-      'tipoExperiencia': 'Barrial & Gastronómica',
-      'tipoExperienciaEN': 'Neighborhood & Gastronomic',
-      'momentoClave': 'Llega al Segundo Parque de Laureles al atardecer — los locales salen a caminar y el ambiente es el Medellín más auténtico que vas a encontrar.',
-      'momentoClaveEN': 'Arrive at Segundo Parque de Laureles at sunset — locals come out to walk and the atmosphere is the most authentic Medellin you will find.',
-      'consejos': ['👟 Ruta de caminata tranquila y plana — zapatos cómodos son suficientes', '💧 Lleva agua o compra en alguna tienda del parque', '🕐 Tarde es el mejor momento — el barrio cobra vida después de las 3pm', '📷 Los parques de Laureles son muy fotogénicos al atardecer', '🍽️ La Carrera 70 y los parques tienen muchos restaurantes — ideal para cerrar con comida', '🏟️ Si hay partido del DIM o Nacional, evita pasar por el Estadio — hay mucha multitud', '🛴 Ruta perfecta en patineta eléctrica Whoosh — zona plana, ideal para micromovilidad · Descarga la app y busca el punto P cerca al Estadio · Consulta tarifas en la app Whoosh'],
-      'consejosEN': ['👟 Easy flat walking route — comfortable shoes are enough', '💧 Bring water or buy at a local shop', '🕐 Afternoon is best — the neighborhood comes alive after 3pm', '📷 Laureles parks are very photogenic at sunset', '🍽️ Carrera 70 and the parks have many restaurants — great for closing with food', '🏟️ If there is a DIM or Nacional match, avoid passing by the Stadium — big crowds', '🛴 Perfect e-scooter route — flat area, ideal for Whoosh micromobility · Download the app and find the P point near the Stadium · Check rates in the Whoosh app'],
-            'misionEpica': 'Aprende 3 palabras paisas durante el recorrido y úsalas en una frase antes de terminar la ruta. El parce que más palabras use gana.',
-      'misionEpicaEN': 'Learn 3 paisa words during the route and use them in a sentence before finishing. The parce who uses the most words wins.',
-      'sitiosList': ['Estadio Atanasio Girardot', 'Avenida Carrera la 70 (Laureles)', 'U.P.B Porteria', 'Primer Parque de Laureles', 'Segundo Parque de Laureles'],
-    },
-    {
-      'nombre': 'RUTA DE LOS MIRADORES', 'nombreEN': 'VIEWPOINTS ROUTE',
-      'insigniaImg': 'assets/images/insignias/insignia_07_condor_andes.png',
-      'imagen': 'assets/images/rutas/ruta_07_miradores.jpg',
-      'subtitulo': 'Cerros tutelares · Vistas 360°', 'subtituloEN': 'Hilltop Parks · 360° Views',
-      'emoji': '⛰️',
-      'sitios': 5, 'tiempo': '5h', 'transporte': '🚕 Taxi + caminata',
-      'precio': '\$29.900', 'dificultad': 'MEDIO',
-      'color1': const Color(0xFF0F1208), 'color2': const Color(0xFF1E2410),
-      'acento': kGold,
-      'tag': '🦅 Aventura',
-      'zona': 'Ciudad',
-      'ciudad': 'Medellín', 'pais': 'Colombia',
-      // 'turismoResponsable': true,  // 🚫 Pausado 30 mayo 2026
-      'premio': 'Insignia Cóndor de los Andes',
-      'hook': 'Medellín desde las alturas — cinco miradores, una ciudad que te va a enamorar.',
-      'hookEN': 'Medellin from above — five viewpoints, a city that will make you fall in love.',
-      'descripcion': 'Los mejores miradores de Medellín en una sola ruta. Desde el Cerro Nutibara hasta Belén, pasando por Las Palmas, El Picacho y las Tres Cruces. Vistas 360° garantizadas.',
-      'descripcionEN': 'Medellin best viewpoints in one route. From Cerro Nutibara to Belen, through Las Palmas, El Picacho and Tres Cruces. 360 degree views guaranteed.',
-      'mejorHora': '2:00 pm – 7:00 pm',
-      'tipoExperiencia': 'Aventura & Naturaleza',
-      'tipoExperienciaEN': 'Adventure & Nature',
-      'momentoClave': 'El mirador del Cerro de las Tres Cruces al atardecer — cuando el sol baja detrás del valle, Medellín brilla como pocas ciudades en el mundo.',
-      'momentoClaveEN': 'Cerro de las Tres Cruces viewpoint at sunset — when the sun drops behind the valley, Medellin shines like few cities in the world.',
-      'consejos': ['🚕 Esta ruta requiere taxi o app de transporte — planea los trayectos', '🌦️ Verifica el clima antes de salir — los cerros se nublan rápido', '💧 Lleva agua suficiente para todo el día', '👟 Zapatos con buen agarre — el Cerro de las Tres Cruces tiene subida empinada', '🔦 Si llegas al atardecer, lleva linterna para el regreso', '📷 Batería extra o power bank — vas a tomar muchas fotos'],
-      'consejosEN': ['🚕 This route requires taxi or rideshare — plan your trips', '🌦 Check the weather before leaving — hills cloud over quickly', '💧 Bring enough water for the full day', '👟 Grippy shoes — Cerro de las Tres Cruces has a steep climb', '🔦 If arriving at sunset, bring a flashlight for the way back', '📷 Extra battery or power bank — you will take a lot of photos'],
-            'misionEpica': 'En cada mirador identifica un barrio icónico de Medellín y un hito de su historia. Al final tienes el mapa mental más completo de la ciudad.',
-      'misionEpicaEN': 'At each viewpoint identify an iconic Medellín neighborhood and a milestone of its history. At the end you have the most complete mental map of the city.',
-      'sitiosList': ['Cerro Nutibara', 'Mirador Avenida Las Palmas', 'Cerro El Picacho (fachada)', 'Cerro de las Tres Cruces', 'Mirador de Belén'],
-    },
-    {
-      'nombre': 'RUTA CULTURAL NOCTURNA', 'nombreEN': 'NIGHT CULTURE ROUTE',
-      'insigniaImg': 'assets/images/insignias/insignia_08_noctambulo_cultural.png',
-      'imagen': 'assets/images/rutas/ruta_08_nocturna.jpg',
-      'subtitulo': 'Centro · El Poblado · Arte nocturno', 'subtituloEN': 'Downtown · El Poblado · Night Art',
-      'emoji': '🎭',
-      'sitios': 5, 'tiempo': '3h', 'transporte': '🚕 Taxi / app · 🛴 Whoosh disponible',
-      'precio': '\$29.900', 'dificultad': 'FÁCIL',
-      'color1': const Color(0xFF0A080F), 'color2': const Color(0xFF16101E),
-      'acento': kOrchid,
-      'tag': '🌙 Nocturna',
-      'zona': 'Ciudad',
-      'ciudad': 'Medellín', 'pais': 'Colombia',
-      // 'turismoResponsable': true,  // 🚫 Pausado 30 mayo 2026
-      'premio': 'Insignia Noctámbulo Cultural',
-      'hook': 'Medellín de noche: teatro, galerías y música en vivo — la cultura no duerme.',
-      'hookEN': 'Medellin at night: theatre, galleries and live music — culture never sleeps.',
-      'descripcion': 'La ruta nocturna de Medellín conecta teatro, arte contemporáneo y vida nocturna cultural. Desde el Pablo Tobón hasta el Parque Lleras, sin perder la elegancia.',
-      'descripcionEN': 'Medellin night route connects theatre, contemporary art and cultural nightlife. From Pablo Tobon to the live music bar, without losing elegance.',
-      'mejorHora': '7:00 pm – 11:00 pm',
-      'tipoExperiencia': 'Cultural & Nocturna',
-      'tipoExperienciaEN': 'Cultural & Nightlife',
-      'momentoClave': 'El Parque Lleras de noche al cierre — la energía de Medellín nocturno en su punto más auténtico. Deja que la ciudad te muestre su mejor cara.',
-      'momentoClaveEN': 'The live music bar at the end — order a local drink, listen to the jazz or salsa, and let Medellin at night show you its best side.',
-      'consejos': ['🚕 Usa siempre taxi o app de transporte por la noche — no camines solos en zonas desconocidas', '👜 Lleva solo lo necesario — billetera pequeña, celular y documentos', '🔋 Carga el celular antes de salir — la noche es larga', '💳 Lleva efectivo para los establecimientos que no aceptan tarjeta', '👗 Algunos bares tienen restricción de vestimenta — consulta antes', '🤝 Ve en grupo si es tu primera vez en la vida nocturna de Medellín'],
-      'consejosEN': ['🚕 Always use taxi or rideshare at night — do not walk alone in unfamiliar areas', '👜 Bring only essentials — small wallet, phone and ID', '🔋 Charge your phone before leaving — it is a long night', '💳 Bring cash for places that do not accept cards', '👗 Some bars have dress codes — check beforehand', '🤝 Go in a group if it is your first time in Medellin nightlife'],
-            'misionEpica': 'Encuentra el teatro más antiguo del centro histórico de Medellín. La fecha de su fundación es tu código de insignia nocturna.',
-      "misionEpicaEN": "Find the oldest theater in Medellín's historic center. Its founding date is your night badge code.",
-      'sitiosList': ['Teatro Pablo Tobón Uribe', 'Zona Rosa El Poblado', 'Galería de arte (Provenza)', 'Parque Lleras (noche)'],
-    },
-    // ── RUTA 09 — Senderos de Agua y Naturaleza ──
-    {
-      'nombre': 'SENDEROS DE AGUA Y NATURALEZA', 'nombreEN': 'WATER & NATURE TRAILS',
-      'imagen': 'assets/images/rutas/ruta_09_senderos_agua.jpg',
-      'insigniaImg': 'assets/images/insignias/insignia_09_explorador_naturaleza.png',
-      'subtitulo': 'El Poblado · Quebradas · El Castillo', 'subtituloEN': 'El Poblado · Streams · El Castillo',
-      'descripcion': 'Descubre la Medellín oculta que respira a través de sus quebradas y zonas verdes. Desde el Parque El Poblado ascenderás por senderos naturales urbanos siguiendo el curso de la Quebrada La Presidenta, hasta culminar en el Castillo Museo y Jardines, símbolo de historia y arquitectura rodeado de naturaleza.',
-      'emoji': '🌿',
-      'sitios': 6, 'tiempo': '3.5h – 4.5h', 'transporte': '🚶 Caminata (trekking urbano)',
-      'precio': '\$29.900', 'dificultad': 'MEDIO',
-      'color1': const Color(0xFF061A08), 'color2': const Color(0xFF0D2E10),
-      'acento': kGreen,
-      'tag': '🌿 Naturaleza urbana',
-      'zona': 'Ciudad',
-      'ciudad': 'Medellín', 'pais': 'Colombia',
-      'insignia': 'Explorador de Quebradas',
-      'personaje': '🌊',
-      'premio': "Insignia Explorador de Quebradas",
-      'sitiosList': [
-        'Parque El Poblado (inicio)',
-        'Parque Lineal La Presidenta',
-        'Quebrada La Presidenta (sendero)',
-        'Sector El Poblado Alto (zona verde)',
-        'Vías arborizadas hacia El Castillo',
-        'El Castillo Museo y Jardines',
-      ],
-      'consejos': ['👟 Calzado con agarre — los senderos cerca de la quebrada pueden estar húmedos y resbaladizos', '💧 Lleva agua suficiente — el ascenso tiene subidas exigentes', '🌿 Repelente de insectos para las zonas de quebrada', '📱 Guarda el celular en el bolsillo — los senderos son estrechos y hay ramas', '🎟 Lleva efectivo para la entrada al Castillo Museo', '🕐 Sal antes de las 9am para evitar el calor en los tramos de subida'],
-      'consejosEN': ['👟 Grippy shoes — trails near the stream can be wet and slippery', '💧 Bring enough water — the climb has demanding uphill sections', '🌿 Insect repellent for stream areas', '📱 Keep your phone in your pocket — trails are narrow with branches', '🎟 Bring cash for the Castillo Museo entrance', '🕐 Leave before 9am to avoid heat on the uphill sections'],
-      'distancia': '4 – 6 km',
-    },
-    // ── RUTA 10 — Arte, Ciudad y Sabores ──
-    {
-      'nombre': 'ARTE, CIUDAD Y SABORES', 'nombreEN': 'ART, CITY & FLAVORS',
-      'imagen': 'assets/images/rutas/ruta_10_arte_ciudad_sabores.jpg',
-      'insigniaImg': 'assets/images/insignias/insignia_10_creador_urbano.png',
-      'subtitulo': 'El Poblado · Ciudad del Río · MAMM · Mercado del Río', 'subtituloEN': 'El Poblado · Ciudad del Río · MAMM · River Market',
-      'descripcion': 'Una ruta que conecta el origen histórico de Medellín con su transformación cultural y artística. Desde el Parque El Poblado recorrerás el corredor que pasó de industrial a creativo: el MAMM, el Mercado del Río y el Parque de la Conservación.',
-      'emoji': '🎨',
-      'sitios': 6, 'tiempo': '3h – 4h', 'transporte': '🚶 Caminata + 🚇 Metro',
-      'precio': '\$24.900', 'dificultad': 'FÁCIL',
-      'color1': const Color(0xFF1A0A14), 'color2': const Color(0xFF2A1020),
-      'acento': kOrchid,
-      'tag': '🎨 Arte & Cultura',
-      'zona': 'Ciudad',
-      'ciudad': 'Medellín', 'pais': 'Colombia',
-      // 'turismoResponsable': true,  // 🚫 Pausado 30 mayo 2026
-      'insignia': 'Creador Urbano',
-      'personaje': '🖼️',
-      'premio': "Insignia Creador Urbano",
-      'sitiosList': [
-        'Parque El Poblado (inicio)',
-        'Parque de Telemedellín',
-        'Museo de Arte Moderno de Medellín (MAMM)',
-        'Mercado del Río',
-        'Estación Industriales (Metro)',
-        'Parque de la Conservación',
-      ],
-      'consejos': ['🚶 Ruta de caminata tranquila — zapatos cómodos son suficientes', '💧 Lleva agua o compra en el Mercado del Río', '💳 El Mercado del Río y el MAMM aceptan tarjeta — ten algo de efectivo para vendedores', '📷 El MAMM tiene exposiciones temporales increíbles — revisa cartelera antes', '🎟 Lleva efectivo para la entrada al MAMM si no van al tour gratuito', '🕐 El Mercado del Río es mejor a la hora del almuerzo — va lleno de opciones'],
-      'consejosEN': ['🚶 Easy walking route — comfortable shoes are enough', '💧 Bring water or buy at Mercado del Rio', '💳 Mercado del Rio and MAMM accept cards — have some cash for vendors', '📷 The MAMM has incredible temporary exhibitions — check the program beforehand', '🎟 Bring cash for MAMM entrance if not joining the free tour', '🕐 Mercado del Rio is best at lunchtime — full of great options'],
-      'distancia': '3 – 5 km',
-    },
-    // ── RUTA 11 — Del Origen Paisa a la Medellín Moderna ──
-    {
-      'nombre': 'DEL ORIGEN PAISA A LA MEDELLÍN MODERNA', 'nombreEN': 'FROM PAISA ROOTS TO MODERN MEDELLÍN',
-      'imagen': 'assets/images/rutas/ruta_11_origen_paisa_moderno.jpg',
-      'insigniaImg': 'assets/images/insignias/insignia_11_embajador_paisa_moderno.png',
-      'subtitulo': 'Cerro Nutibara · Parques del Río · Plaza Mayor · Centro', 'subtituloEN': 'Cerro Nutibara · River Parks · Plaza Mayor · Downtown',
-      'descripcion': 'Desde el Cerro Nutibara descenderás por los pulmones verdes de la ciudad hacia la Medellín moderna. El Pueblito Paisa, Parques del Río, el Parque de los Pies Descalzos, el Museo del Agua EPM, Plaza Mayor y la Gobernación de Antioquia forman una línea narrativa completa: de las raíces tradicionales al corazón institucional de la ciudad.',
-      'emoji': '🏘️',
-      'sitios': 6, 'tiempo': '2.5h – 3h', 'transporte': '🚶 Caminata (descenso continuo)',
-      'precio': '\$24.900', 'dificultad': 'FÁCIL',
-      'color1': const Color(0xFF1A0E05), 'color2': const Color(0xFF2E1A08),
-      'acento': kCafe,
-      'tag': '🏘️ Cultural & Urbana',
-      'zona': 'Ciudad',
-      'ciudad': 'Medellín', 'pais': 'Colombia',
-      'insignia': 'Embajador Paisa Moderno',
-      'personaje': '🗺️',
-      'premio': "Insignia Embajador Paisa Moderno",
-      'sitiosList': [
-        'Pueblito Paisa (inicio ruta)',
-        'Parques del Río Medellín',
-        'Parque de los Pies Descalzos',
-        'Museo del Agua EPM',
-        'Plaza Mayor Medellín',
-        'Gobernación de Antioquia',
-      ],
-      'consejos': ['👟 Ruta en descenso continuo — zapatos cómodos y con agarre para las bajadas del cerro', '💧 Lleva agua — el cerro tiene tramos sin sombra al inicio', '🚕 Para subir al Cerro Nutibara toma taxi — no hay transporte público directo', '📷 El Pueblito Paisa al amanecer tiene una luz preciosa — vale la pena madrugar', '💳 La mayoría de puntos son gratuitos o de bajo costo — ten efectivo para detalles', '☀️ Protector solar para los tramos al aire libre en los Parques del Río'],
-      'consejosEN': ['👟 Continuous downhill route — comfortable grippy shoes for the hill descent', '💧 Bring water — the hill has sections without shade at the start', '🚕 Take a taxi to reach Cerro Nutibara — no direct public transport', '📷 Pueblito Paisa at dawn has beautiful light — worth waking up early', '💳 Most spots are free or low cost — have some cash for extras', '☀️ Sunscreen for the open-air sections along the Parques del Rio'],
-      'distancia': '2 – 3 km',
-    },
-    // ── RUTA 12 — Tranvía Cultural ──
-    {
-      'nombre': 'TRANVÍA CULTURAL', 'nombreEN': 'CULTURAL TRAM ROUTE',
-      'imagen': 'assets/images/rutas/ruta_12_tranvia_cultural.jpg',
-      'insigniaImg': 'assets/images/insignias/insignia_12_viajero_tranvia.png',
-      'subtitulo': 'Tranvía · Buenos Aires · Placita de Flórez', 'subtituloEN': 'Tram · Buenos Aires · Flórez Market',
-      'descripcion': 'Una ruta que conecta el centro de Medellín con sus barrios más auténticos usando el tranvía de Ayacucho. Recorrerás Buenos Aires, caminarás la histórica calle Ayacucho y cerrarás en la Placita de Flórez, el mercado más representativo de la tradición alimentaria paisa.',
-      'emoji': '🚃',
-      'sitios': 5, 'tiempo': '2h – 3h', 'transporte': '🚃 Tranvía de Ayacucho + 🚶 Caminata',
-      'precio': '\$24.900', 'dificultad': 'FÁCIL',
-      'color1': const Color(0xFF0A1220), 'color2': const Color(0xFF102030),
-      'acento': const Color(0xFF4A90D9),
-      'tag': '🚃 Urbana & Cotidiana',
-      'zona': 'Ciudad',
-      'ciudad': 'Medellín', 'pais': 'Colombia',
-      // 'turismoResponsable': true,  // 🚫 Pausado 30 mayo 2026
-      'insignia': 'Viajero del Tranvía',
-      'personaje': '🎭',
-      'premio': "Insignia Viajero del Tranvía",
-      'sitiosList': [
-        'Tranvía de Ayacucho (recorrido)',
-        'Estación Bicentenario',
-        'Barrio Buenos Aires',
-        'Calle 49 Ayacucho (comercio)',
-        'Placita de Flórez',
-      ],
-      'consejos': ['🎟 Recarga la tarjeta metro antes — el tranvía usa la misma tarjeta y puede agotarse en horas pico', '💧 Lleva agua o compra en la Placita de Flórez al final', '💵 Lleva efectivo para la Placita de Flórez — los puestos del mercado no tienen datáfono', '👟 Calzado cómodo para caminar por Buenos Aires y la calle Ayacucho', '📷 El tranvía de Ayacucho es icónico — no pierdas la foto en el recorrido', '🕐 El tranvía puede estar lleno en horas pico — intenta ir entre semana'],
-      'consejosEN': ['🎟 Top up your metro card before — the tram uses the same card and can run out during peak hours', '💧 Bring water or buy at Placita de Florez at the end', '💵 Bring cash for Placita de Florez — market stalls do not have card readers', '👟 Comfortable shoes for walking around Buenos Aires and Ayacucho street', '📷 The Ayacucho tram is iconic — don\'t miss the photo during the ride', '🕐 The tram can be packed during peak hours — try to go on a weekday'],
-      'distancia': '2 – 3 km',
-    },
-    // ── ALREDEDORES ──
-    {
-      'nombre': 'RUTA GUATAPÉ & LA PIEDRA', 'nombreEN': 'GUATAPÉ & THE ROCK ROUTE',
-      'imagen': 'assets/images/rutas/ruta_09_guatape.jpg',
-      'insigniaImg': 'assets/images/insignias/insignia_09_conquistador_penol.png',
-      'subtitulo': 'Guatapé · El Peñol · Excursión día completo', 'subtituloEN': 'Guatapé · El Peñol · Full Day Trip',
-      'emoji': '🏔️',
-      'sitios': 9, 'tiempo': 'Día completo (8h)', 'transporte': '🚌 Bus Terminal Norte (2h) + caminata',
-      'precio': '\$44.900', 'dificultad': 'MEDIO',
-      'color1': const Color(0xFF0A1220), 'color2': const Color(0xFF102040),
-      'acento': const Color(0xFF4A90D9),
-      'tag': '🏔️ Excursión',
-      'zona': 'Alrededores',
-      'ciudad': 'Medellín', 'pais': 'Colombia',
-      'radioGps': 30,
-      'premio': 'Insignia Conquistador del Peñol',
-      'hook': 'Sube 740 escalones, llega a la cima y entiende por qué Guatapé es el lugar más visitado de Antioquia.',
-      'hookEN': 'Climb 740 steps, reach the top and understand why Guatape is the most visited place in Antioquia.',
-      'descripcion': 'Una excursión de día completo a Guatapé y El Peñol: sales del Terminal del Norte, pasas por Marinilla y El Alto del Chocho (donde arranca tu ruta). Visitas el pueblo de El Peñol, la réplica del viejo Peñol, La Casa al Revés, subes los 740 escalones de La Piedra y cierras en el pueblo más colorido de Colombia: Guatapé. Desde la cima verás el embalse de 2.200 hectáreas — y si miras con atención, la cruz que marca dónde quedaba el pueblo original, hoy sumergido bajo el agua.',
-      'descripcionEN': "A full-day trip to Guatapé and El Peñol: departing from Terminal del Norte, passing Marinilla and El Alto del Chocho (where your route starts). Visit El Peñol town, the Old Peñol replica, the Upside-Down House, climb the 740 steps of La Piedra, and close in Colombia's most colorful town: Guatapé. From the top you'll see the 2,200-hectare reservoir — and if you look closely, the cross marking where the original town once stood, now submerged underwater.",
-      'mejorHora': '6:00 am (salida) – Regreso 5:00 pm',
-      'tipoExperiencia': 'Aventura & Excursión',
-      'tipoExperienciaEN': 'Adventure & Day Trip',
-      'momentoClave': 'Los últimos 50 escalones de La Piedra son los más duros — pero la vista desde la cima es la recompensa más grande de toda la ruta.',
-      'momentoClaveEN': 'The last 50 steps of La Piedra are the hardest — but the view from the top is the greatest reward of the entire route.',
-      'consejos': ['🚌 Sal antes de las 7am desde Terminal del Norte — los buses se llenan rápido los fines de semana', '💧 Lleva abundante agua para los 740 escalones — no hay puestos en el ascenso', '🌞 Protector solar y gorra son obligatorios — la roca no tiene sombra', '👟 Zapatos cerrados con agarre — las escaleras son de metal y pueden estar húmedas', '💵 Lleva efectivo — muchos puestos en Guatapé no tienen datáfono', '📷 Baja la carga del celular — el paisaje desde arriba exige muchas fotos'],
-      'consejosEN': ['🚌 Leave before 7am from Terminal del Norte — buses fill up fast on weekends', '💧 Bring plenty of water for the 740 steps — no vendors on the climb', '🌞 Sunscreen and hat are essential — the rock has no shade', '👟 Closed shoes with grip — metal stairs can be wet', '💵 Bring cash — many Guatape vendors do not have card readers', '📷 Free up phone storage — the view from the top demands many photos'],
-            'misionEpica': 'Cuenta exactamente los escalones de la Piedra del Peñol mientras subes. Quien llegue arriba con el número correcto — 740 — gana la insignia máxima.',
-      'misionEpicaEN': 'Count exactly the steps of La Piedra del Peñol as you climb. Whoever reaches the top with the correct number — 740 — earns the top badge.',
-            'antesDeSalir': '🚌 Bus Terminal Norte \$15.000 ida · ⏰ Sale 7am · ☀️ Protector solar · 👟 Tenis para 740 escalones · 💵 \$80.000 COP mínimo',
-      'sitiosList': ['Mirador El Alto del Chocho', 'Peñol (pueblo)', 'Réplica Viejo Peñol', 'La Casa al Revés', 'Piedra del Peñol (740 escalones)', 'Plazoleta de los Zócalos', 'Calle del Recuerdo', 'Parque Principal de Guatapé', 'Malecón de Guatapé'],
-    },
-    {
-      'nombre': 'RUTA DEL CAFÉ EN SANTA ELENA',
-      'nombreEN': 'COFFEE ROUTE IN SANTA ELENA',
-      'imagen': 'assets/images/rutas/ruta_10_santa_elena.jpg',
-      'insigniaImg': 'assets/images/insignias/insignia_10_silletero_honor.png',
-      'subtitulo': 'Santa Elena · Café · Tradición silletera', 'subtituloEN': 'Santa Elena · Coffee · Flower Tradition',
-      'emoji': '☕',
-      'sitios': 5, 'tiempo': '5h', 'transporte': '🚕 Taxi / bus veredal',
-      'precio': '\$34.900', 'dificultad': 'FÁCIL',
-      'color1': const Color(0xFF1A0E05), 'color2': const Color(0xFF2E1A08),
-      'acento': kCafe,
-      'tag': '☕ Café & Flores',
-      'zona': 'Alrededores',
-      'ciudad': 'Medellín', 'pais': 'Colombia',
-      'premio': 'Insignia Silletero de Honor',
-      'hook': 'El café más aromático del mundo nace aquí, entre flores de silleteros y bruma de montaña.',
-      'hookEN': 'The world most aromatic coffee is born here, among flower arrangements and mountain mist.',
-      'descripcion': 'Sube a Santa Elena para conocer a los silleteros, aprender el proceso del café de semilla a taza y caminar entre bosques a 2.600 metros de altura.',
-      'descripcionEN': 'Head up to Santa Elena to meet the silleteros, learn the coffee process from seed to cup and walk through forests at 2,600 meters above sea level.',
-      'mejorHora': '8:00 am – 1:00 pm',
-      'tipoExperiencia': 'Cultural & Naturaleza',
-      'tipoExperienciaEN': 'Cultural & Nature',
-      'momentoClave': 'La degustación de café de origen en la finca — cuando el barista te explica de dónde viene cada nota de sabor, nunca más vas a tomar café igual.',
-      'momentoClaveEN': 'The coffee tasting at the farm — when the barista explains where each flavor note comes from, you will never drink coffee the same way again.',
-      'consejos': ['🧥 Santa Elena está a 2.600m — lleva chaqueta aunque en Medellín haga calor', '💧 Lleva agua para los senderos del bosque', '👟 Zapatos cómodos con agarre para los caminos de tierra de la finca', '🚕 Coordina el transporte de regreso — los buses veredales son escasos en la tarde', '📷 La finca y los jardines de silleteros son muy fotogénicos — lleva batería cargada', '🌿 Respeta los cultivos de café — no toques las plantas sin permiso del guía'],
-      'consejosEN': ['🧥 Santa Elena is at 2,600m — bring a jacket even if Medellin is warm', '💧 Bring water for the forest trails', '👟 Comfortable shoes with grip for the farm dirt paths', '🚕 Arrange return transport — rural buses are scarce in the afternoon', '📷 The farm and flower gardens are very photogenic — bring a charged battery', '🌿 Respect the coffee crops — do not touch plants without the guide permission'],
-            'misionEpica': 'Aprende a identificar una planta de café en estado de floración, verde y maduro. Fotografía las tres etapas — ese es tu diploma de caficultor.',
-      'misionEpicaEN': 'Learn to identify a coffee plant in flowering, green and ripe state. Photograph the three stages — that is your coffee grower diploma.',
-      'sitiosList': ['Parque de Santa Elena', 'Mirador de Santa Elena', 'Finca Silletera', 'Proceso del café: semilla a taza', 'Parque Ecológico Piedras Blancas', 'Bosque El Romeral'],
-    },
-    {
-      'nombre': 'RUTA SAN CARLOS & CHARCOS',
-      'nombreEN': 'SAN CARLOS & NATURAL POOLS ROUTE',
-      'imagen': 'assets/images/rutas/ruta_11_san_carlos.jpg',
-      'insigniaImg': 'assets/images/insignias/insignia_11_explorador_aguas.png',
-      'subtitulo': 'San Carlos · Antioquia · Aventura', 'subtituloEN': 'San Carlos · Antioquia · Adventure',
-      'emoji': '🌊',
-      'sitios': 6, 'tiempo': 'Día completo (9h)', 'transporte': '🚌 Bus Terminal Norte',
-      'precio': '\$44.900', 'dificultad': 'DIFÍCIL',
-      'color1': const Color(0xFF051520), 'color2': const Color(0xFF0A2535),
-      'acento': const Color(0xFF2AB8D0),
-      'tag': '🌊 Aventura extrema',
-      'zona': 'Alrededores',
-      'ciudad': 'Medellín', 'pais': 'Colombia',
-      'premio': 'Insignia Explorador de Aguas',
-            'antesDeSalir': '🚇 Metro San Javier · línea B · 💵 Lleva \$30.000 COP · 📸 Carga el celular · 👟 Zapatos cómodos para subir · ⏰ Mejor 9-11am antes del calor · ⚠️ Recorre la ruta con autocuidado: cuida tus pertenencias, evita mostrar objetos de valor y sigue las recomendaciones de seguridad locales en todo el trayecto · 🏛️ Museo Beyond Escobar disponible con cita previa por WhatsApp',
-      'sitioOpcional': true, 'hook': 'San Carlos tiene más de 50 fuentes de agua — el destino de aventura más refrescante de Antioquia.',
-      'hookEN': 'San Carlos has more than 50 water sources — Antioquia most refreshing adventure destination.',
-      'descripcion': 'Un día completo de aventura en el oriente antioqueño: charcos naturales, rappel, ríos de aguas cristalinas y naturaleza pura a 3 horas de Medellín.',
-      'descripcionEN': 'A full day of adventure in eastern Antioquia: natural pools, rappelling, crystal-clear rivers and pure nature 3 hours from Medellin.',
-      'mejorHora': '6:00 am (salida) – Regreso 6:00 pm',
-      'tipoExperiencia': 'Aventura Extrema',
-      'tipoExperienciaEN': 'Extreme Adventure',
-      'momentoClave': 'El salto en El Chispero — cuando tocas el agua después del rappel, la adrenalina y el frescor se mezclan en una sensación que no tiene precio.',
-      'momentoClaveEN': 'The jump at El Chispero — when you hit the water after the rappel, the adrenaline and coolness mix into a priceless feeling.',
-      'consejos': ['🩱 Lleva ropa de baño debajo de la ropa — los charcos son la estrella de la ruta', '🌿 Repelente de insectos obligatorio para los senderos', '☀️ Bloqueador solar resistente al agua — vas a estar mojado la mayor parte del día', '👟 Zapatos que puedan mojarse — sandalias de río o tenis viejos', '💵 Lleva efectivo — pocos establecimientos tienen datáfono en San Carlos', '🎒 Bolsa impermeable o funda para el celular — el agua salpica mucho'],
-      'consejosEN': ['🩱 Wear swimwear under your clothes — the natural pools are the highlight', '🌿 Insect repellent is essential for the trails', '☀️ Water-resistant sunscreen — you will be wet most of the day', '👟 Shoes that can get wet — river sandals or old sneakers', '💵 Bring cash — few places have card readers in San Carlos', '🎒 Waterproof bag or phone case — lots of splashing'],
-            'misionEpica': 'Llega al charco más profundo de la ruta y mide el tiempo que puedes aguantar el agua fría. El récord actual es 4 minutos. ¿Lo superas?',
-      'misionEpicaEN': 'Reach the deepest pool in the route and time how long you can withstand the cold water. The current record is 4 minutes. Can you beat it?',
-      'sitiosList': ['Parque Principal de San Carlos', 'Cascada San Antonio', 'Charco El Remolino', 'Sendero Cascada La Chorrera', 'Río Samaná Norte', 'Mirador El Cerro'],
-    },
-    {
-      'nombre': 'RUTA JARDÍN COLONIAL',
-      'nombreEN': 'COLONIAL JARDÍN ROUTE',
-      'imagen': 'assets/images/rutas/ruta_12_jardin.jpg',
-      'insigniaImg': 'assets/images/insignias/insignia_12_viajero_suroeste_jar.png',
-      'subtitulo': 'Jardín · Suroeste Antioqueño · Café', 'subtituloEN': 'Jardín · Southwest Antioquia · Coffee',
-      'emoji': '🏡',
-      'sitios': 6, 'tiempo': 'Día completo (7h)', 'transporte': '🚌 Bus Terminal Sur',
-      'precio': '\$44.900', 'dificultad': 'FÁCIL',
-      'color1': const Color(0xFF0A1A08), 'color2': const Color(0xFF142E10),
-      'acento': kGreen,
-      'tag': '🌸 Pueblo más lindo',
-      'zona': 'Alrededores',
-      'ciudad': 'Medellín', 'pais': 'Colombia',
-      'premio': 'Insignia Viajero del Suroeste',
-      'hook': 'El pueblo más lindo de Colombia te espera — 7 horas que se sienten como viajar en el tiempo.',
-      'hookEN': 'Colombia most beautiful town awaits you — 7 hours that feel like traveling back in time.',
-      'descripcion': 'Una excursión al suroeste antioqueño para visitar Jardín: teleférico, basílica colonial, finca cafetera y el cañón del Cauca desde las alturas.',
-      'descripcionEN': 'A trip to southwest Antioquia to visit Jardin: cable car, colonial basilica, coffee farm and the Cauca canyon from above.',
-      'mejorHora': '6:00 am (salida) – Regreso 6:00 pm',
-      'tipoExperiencia': 'Cultural & Cafetera',
-      'tipoExperienciaEN': 'Cultural & Coffee',
-      'momentoClave': 'El teleférico de Jardín al amanecer — la neblina entre las montañas y el pueblo colonial abajo es una imagen que no vas a olvidar.',
-      'momentoClaveEN': 'Jardin cable car at dawn — the mist between the mountains and the colonial town below is an image you will not forget.',
-      'consejos': ['🚌 El bus sale muy temprano — reserva o llega con tiempo a Terminal Sur', '🧥 Jardín está a 1.750m — lleva chaqueta liviana', '💧 Lleva agua para la finca y los senderos', '👟 Zapatos cómodos para caminos de tierra en la finca cafetera', '💵 Lleva efectivo — Jardín es un pueblo pequeño', '📷 El parque principal y la basílica son irresistibles para fotos — batería cargada'],
-      'consejosEN': ['🚌 Bus leaves very early — book ahead or arrive at Terminal Sur with time', '🧥 Jardin is at 1,750m — bring a light jacket', '💧 Bring water for the farm and trails', '👟 Comfortable shoes for dirt paths at the coffee farm', '💵 Bring cash — Jardin is a small town', '📷 The main square and basilica are irresistible for photos — charged battery'],
-            'antesDeSalir': '🚌 Bus Terminal Sur 3-4h · ⏰ Sale 6am · 🌧️ Lleva impermeable — Jardín llueve · 💵 \$150.000 COP para 2 días · 📵 Señal limitada en el pueblo',
-      'sitioOpcional': true,       'misionEpica': 'Encuentra la iglesia más antigua de Jardín y el nombre del santo patrono del municipio. Esa combinación desbloquea tu insignia colonial.',
-      "misionEpicaEN": "Find the oldest church in Jardín and the name of the municipality's patron saint. That combination unlocks your colonial badge.",
-      'sitiosList': ['Plaza Principal de Jardín', 'Basílica Menor Nuestra Señora del Carmen', 'Vivorigen — Café de Especialidad', 'La Garrucha (teleférico artesanal)', 'Mirador El Bosque', 'Cueva del Esplendor (agencia)'],
-    },
-    {
-      'nombre': 'RUTA SANTA FE DE ANTIOQUIA', 'nombreEN': 'SANTA FE DE ANTIOQUIA ROUTE',
-      'imagen': 'assets/images/rutas/ruta_13_santa_fe.jpg',
-      'insigniaImg': 'assets/images/insignias/insignia_13_guardian_colonial.png',
-      'subtitulo': 'Santa Fe · Pueblo Patrimonio · Historia', 'subtituloEN': 'Santa Fe · Heritage Town · History',
-      'emoji': '⛪',
-      'sitios': 7, 'tiempo': 'Día completo (6h)', 'transporte': '🚌 Bus Terminal Norte',
-      'precio': '\$34.900', 'dificultad': 'FÁCIL',
-      'color1': const Color(0xFF1A1005), 'color2': const Color(0xFF2E1E0A),
-      'acento': kGold,
-      'tag': '🏛️ Patrimonio',
-      'zona': 'Alrededores',
-      'ciudad': 'Medellín', 'pais': 'Colombia',
-      'premio': 'Insignia Guardián Colonial',
-      'hook': 'La primera capital de Antioquia fundada en 1541 — donde cada calle cuenta cinco siglos de historia.',
-      'hookEN': 'The oldest city in Antioquia, founded in 1541 — where colonial time stood still.',
-      'descripcion': 'Santa Fe de Antioquia en versión ruta: calles empedradas, el Puente de Occidente y la gastronomía más auténtica del norte antioqueño.',
-      'descripcionEN': 'Santa Fe de Antioquia route version: cobblestone streets, the Bridge of the West and the most authentic northern Antioquian gastronomy.',
-      'mejorHora': '8:00 am – 3:00 pm',
-      'tipoExperiencia': 'Histórica & Patrimonial',
-      'tipoExperienciaEN': 'Historic & Heritage',
-      'momentoClave': 'Camina el Puente de Occidente — construido sin soldadura en 1895, es ingeniería colonial pura que cruza el río Cauca.',
-      'momentoClaveEN': 'Walk the Puente de Occidente — built without welding in 1895, pure colonial engineering crossing the Cauca river.',
-      'consejos': ['☀️ Santa Fe es mucho más caliente que Medellín — protector solar y gorra son esenciales', '💧 Lleva agua — el calor seco deshidrata rápido', '👟 Calzado cómodo para las calles empedradas coloniales', '💵 Lleva efectivo para los puestos de dulces y artesanías', '🕐 Sal temprano — el calor es intenso después del mediodía', '📷 Las calles y fachadas coloniales tienen mejor luz en la mañana'],
-      'consejosEN': ['☀️ Santa Fe is much hotter than Medellin — sunscreen and hat essential', '💧 Bring water — dry heat dehydrates fast', '👟 Comfortable shoes for cobblestone streets', '💵 Bring cash for sweets and craft vendors', '🕐 Leave early — heat is intense after midday', '📷 Colonial streets and facades have best light in the morning'],
-            'misionEpica': 'Identifica 3 edificios coloniales con más de 200 años de antigüedad. Fotografía la placa histórica de cada uno — esa es la evidencia de tu insignia colonial.',
-      'misionEpicaEN': 'Identify 3 colonial buildings over 200 years old. Photograph the historical plaque of each one — that is the evidence for your colonial badge.',
-      'sitiosList': ['Plaza Mayor Santa Fe de Antioquia', 'Catedral de la Inmaculada Concepción', 'Museo Juan del Corral', 'Iglesia de Chiquinquirá', 'Parroquia Santa Bárbara', 'Calle Real (colonial)', 'Puente de Occidente (1887)'],
-    },
-    {
-      'nombre': 'RUTA ENVIGADO NATURAL',
-      'nombreEN': 'NATURAL ENVIGADO ROUTE',
-      'imagen': 'assets/images/rutas/ruta_14_envigado.jpg',
-      'insigniaImg': 'assets/images/insignias/insignia_12_viajero_suroeste.png',
-      'subtitulo': 'Envigado · Área Metropolitana · Aves', 'subtituloEN': 'Envigado · Metro Area · Birds',
-      'emoji': '🦋',
-      'sitios': 5, 'tiempo': '3h', 'transporte': '🚇 Metro + bus',
-      'precio': '\$34.900', 'dificultad': 'FÁCIL',
-      'color1': const Color(0xFF0A1A0A), 'color2': const Color(0xFF122212),
-      'acento': kGreen,
-      'tag': '🦋 Naturaleza cercana',
-      'zona': 'Alrededores',
-      'ciudad': 'Medellín', 'pais': 'Colombia',
-      'premio': 'Insignia Explorador del Sur',
-      'hook': 'Naturaleza y arte a 20 minutos de Medellín — el secreto verde del sur del Valle.',
-      'hookEN': 'Nature and art 20 minutes from Medellin — the green secret of the southern valley.',
-      'descripcion': 'Envigado esconde senderos de aves, quebradas cristalinas y una escena artística local que pocos turistas conocen. La escapada natural más cercana a Medellín.',
-      'descripcionEN': 'Envigado hides bird trails, crystal streams and a local art scene that few tourists know. The closest natural escape from Medellin.',
-      'mejorHora': '8:00 am – 12:00 pm',
-      'tipoExperiencia': 'Naturaleza & Arte',
-      'tipoExperienciaEN': 'Nature & Art',
-      'momentoClave': 'El sendero de las aves al amanecer — el canto y los colores de las aves del oriente antioqueño son una experiencia que los pajareros del mundo buscan.',
-      'momentoClaveEN': 'The bird trail at dawn — the song and colors of eastern Antioquia birds is an experience that birdwatchers from around the world seek out.',
-      'consejos': ['🌿 Repelente de insectos para los senderos cerca de la quebrada', '💧 Lleva agua — el sendero tiene algo de subida', '🔇 Habla en voz baja en el sendero de las aves para no espantarlas', '📷 Binoculares si tienes — el avistamiento de aves es increíble', '👟 Zapatos con agarre para los caminos húmedos cerca al agua', '🕐 El amanecer es el mejor momento para las aves — sal antes de las 7am'],
-      'consejosEN': ['🌿 Insect repellent for the trails near the stream', '💧 Bring water — the trail has some uphill sections', '🔇 Speak quietly on the bird trail so you do not scare them away', '📷 Binoculars if you have them — the birdwatching is incredible', '👟 Grippy shoes for wet paths near the water', '🕐 Dawn is the best time for birds — leave before 7am'],
-      'sitiosList': ['Parque Principal Envigado', 'Casa Museo Débora Arango', 'Mercado del Tranvía Envigado', 'Quebrada La Ayurá', 'Parque El Salado', 'Sendero Ecológico El Salado', 'Charco El Salado'],
-    },
-    // ── RUTA SENDEROS DEL ARRIERO ──
-    {
-      'nombre': 'SENDEROS DEL ARRIERO Y LA MONTAÑA',
-      'nombreEN': 'MULETEER MOUNTAIN TRAILS',
-      'imagen': 'assets/images/rutas/ruta_arriero_ciudad_bolivar.jpg',
-      'insigniaImg': 'assets/images/insignias/insignia_arriero_conquistador_suroeste.png',
-      'subtitulo': 'Ciudad Bolívar · Suroeste Antioqueño · Cultura arriera', 'subtituloEN': 'Ciudad Bolívar · Southwest Antioquia · Muleteer Culture',
-      'descripcion': 'Una travesía por la cultura arriera, los paisajes cafeteros y la biodiversidad del suroeste antioqueño. Desde el Parque Principal de Ciudad Bolívar recorrerás la Casa de la Cultura, la Avenida Las Palmas, el Mirador Alto de La Mesa, los Farallones del Citará, la Cascada Cola de Caballo, una finca cafetera y el Parque del Arriero. Cada parada revela una historia viva entre tradición y naturaleza.',
-      'emoji': '🐎',
-      'sitios': 8, 'tiempo': 'Día completo (7h)', 'transporte': '🚌 Bus Terminal Sur',
-      'precio': '\$44.900', 'dificultad': 'MEDIO',
-      'color1': const Color(0xFF1A0E05), 'color2': const Color(0xFF2E1A08),
-      'acento': kCafe,
-      'tag': '🐎 Cultura arriera',
-      'zona': 'Alrededores',
-      'ciudad': 'Medellín', 'pais': 'Colombia',
-      'insignia': 'Conquistador del Suroeste Antioqueño',
-      'personaje': '⛰️',
-      'premio': "Insignia Conquistador del Suroeste",
-      'sitiosList': [
-        'Parque Principal + Iglesia La Inmaculada (Ciudad Bolívar)',
-        'Casa de la Cultura Ernesto María González',
-        'Avenida Las Palmas (corredor natural)',
-        'Mirador Alto de La Mesa',
-        'Farallones del Citará',
-        'Cascada Cola de Caballo',
-        'Finca cafetera local (proceso del café)',
-        'Parque del Arriero (cierre)',
-      ],
-      'consejos': ['🚌 El bus desde Terminal Sur sale temprano — verifica horarios y reserva con anticipación', '🧥 Ciudad Bolívar está a 1.600m — lleva chaqueta para los senderos de montaña', '💧 Agua abundante para los 6-9 km de recorrido con desnivel', '👟 Zapatos de senderismo o tenis con agarre — los senderos tienen barro en época de lluvia', '🌿 Repelente de insectos para la Cascada Cola de Caballo y la finca', '💵 Lleva efectivo suficiente para el día — Ciudad Bolívar tiene pocos datáfonos'],
-      'consejosEN': ['🚌 The bus from Terminal Sur leaves early — check times and book in advance', '🧥 Ciudad Bolivar is at 1,600m — bring a jacket for the mountain trails', '💧 Plenty of water for the 6-9 km route with elevation changes', '👟 Hiking shoes or grippy sneakers — trails can be muddy in rainy season', '🌿 Insect repellent for Cascada Cola de Caballo and the farm', '💵 Bring enough cash for the day — Ciudad Bolivar has few card readers'],
-      'distancia': '6 – 9 km',
-    },
-
-    // ── RUTAS NUEVAS — PUEBLOS ANTIOQUEÑOS ──
-    {
-      'nombre': 'RUTA ESPÍRITU ARRIERO — JERICÓ',
-      'nombreEN': 'MULETEER SPIRIT — JERICÓ',
-      'imagen': 'assets/images/rutas/ruta_jerico.jpg',
-      'subtitulo': 'Jericó · Tradición · Fe · Montaña',
-      'subtituloEN': 'Jericó · Tradition · Faith · Mountain',
-      'emoji': '🐎',
-      'sitios': 6, 'tiempo': 'Día completo (7h)', 'transporte': '🚌 Bus Terminal Sur',
-      'dificultad': 'MEDIO',
-      'color1': const Color(0xFF1A0E05), 'color2': const Color(0xFF2E1A08),
-      'acento': kCafe,
-      'tag': '🐎 Suroeste antioqueño',
-      'zona': 'Alrededores',
-      'ciudad': 'Medellín', 'pais': 'Colombia',
-      'insignia': 'Heredero de Tradición',
-      'personaje': '🎒',
-      'premio': 'Insignia Heredero de Tradición',
-      'hook': 'La tierra del carriel más famoso del mundo — Jericó te espera.',
-      'hookEN': 'The land of Colombia first saint and the world most famous leather bag — Jerico awaits.',
-      'descripcion': 'Jericó combina fe, artesanía y café de especialidad en un pueblo que respira identidad arriera. Cuna de Santa Laura Montoya, la primera colombiana canonizada.',
-      'descripcionEN': 'Jerico combines faith, craftsmanship and specialty coffee in a town that breathes muleteer identity. Birthplace of Santa Laura Montoya, the first Colombian canonized.',
-      'mejorHora': '7:00 am – 4:00 pm',
-      'tipoExperiencia': 'Cultural & Cafetera',
-      'tipoExperienciaEN': 'Cultural & Coffee',
-      'momentoClave': 'El mirador de Jericó al atardecer — el valle del Cauca y las montañas del suroeste bañadas de luz dorada son una postal perfecta.',
-      'momentoClaveEN': 'Jerico viewpoint at sunset — the Cauca valley and southwest mountains bathed in golden light make the perfect postcard.',
-      'consejos': ['🚌 El viaje desde Medellín toma ~3h — sal bien temprano de Terminal Sur', '🧥 Jericó está a 1.750m — lleva ropa fresca pero con chaqueta por si llueve', '💧 Hidratación constante durante el recorrido', '👟 Zapatos cómodos para las calles empedradas del pueblo', '💵 Lleva efectivo — la mayoría de artesanos y cafés son en efectivo', '📷 El parque principal y la basílica tienen colores increíbles — no pierdas la luz de la tarde'],
-      'consejosEN': ['🚌 Journey from Medellin takes 3h — leave very early from Terminal Sur', '🧥 Jerico is at 1,750m — light clothing but jacket in case of rain', '💧 Stay hydrated throughout the route', '👟 Comfortable shoes for the town cobblestone streets', '💵 Bring cash — most artisans and cafes are cash only', '📷 The main square and basilica have incredible colors — do not miss the afternoon light'],
-      'sitioOpcional': true,
-      'sitiosList': [
-        'Parque Principal de Jericó',
-        'Casa Natal de Santa Laura Montoya',
-        'Museo MAJA — Antropología y Artes',
-        'El Taller del Carriel',
-        'Mirador de las Olas',
-        'Morro El Salvador',
-      ],
-    },
-    {
-      'nombre': 'RUTA PARAÍSO NATURAL — SAN RAFAEL',
-      'imagen': 'assets/images/rutas/ruta_san_rafael.jpg',
-      'nombreEN': 'NATURAL PARADISE — SAN RAFAEL',
-      'subtitulo': 'San Rafael · Ríos · Cascadas · Oriente',
-      'subtituloEN': 'San Rafael · Rivers · Waterfalls · East',
-      'emoji': '🌿',
-      'sitios': 6, 'tiempo': 'Día completo (8h)', 'transporte': '🚌 Bus Terminal Norte + caminata',
-      'dificultad': 'MEDIO',
-      'color1': const Color(0xFF0A1A0A), 'color2': const Color(0xFF0F2510),
-      'acento': kGreen,
-      'tag': '🌿 Oriente antioqueño',
-      'zona': 'Alrededores',
-      'ciudad': 'Medellín', 'pais': 'Colombia',
-      'insignia': 'Espíritu del Agua',
-      'personaje': '💧',
-      'premio': 'Insignia Espíritu del Agua',
-      'hook': 'San Rafael tiene más de 50 fuentes de agua — el paraíso natural más secreto del oriente antioqueño.',
-      'hookEN': 'San Rafael has more than 50 water sources — the most secret natural paradise of eastern Antioquia.',
-      'descripcion': 'Un destino de ecoturismo de nivel mundial escondido a 3 horas de Medellín. Ríos, cascadas y charcos de aguas cristalinas en un entorno de biodiversidad extraordinaria.',
-      'descripcionEN': 'A world-class ecotourism destination hidden 3 hours from Medellin. Rivers, waterfalls and crystal pools in an extraordinary biodiversity setting.',
-      'mejorHora': '6:00 am (salida) – Regreso 6:00 pm',
-      'tipoExperiencia': 'Ecoturismo & Aventura',
-      'tipoExperienciaEN': 'Ecotourism & Adventure',
-      'momentoClave': 'La Cascada Los Patios — el sonido del agua cayendo en medio de la selva y la frescura del ambiente crean una sensación de aislamiento total del mundo urbano.',
-      'momentoClaveEN': 'Cascada Los Patios — the sound of falling water amid the jungle and the cool air create a feeling of total isolation from the urban world.',
-      'consejos': ['🩱 Lleva ropa de baño — los charcos son el corazón de la ruta', '🌿 Repelente de insectos obligatorio para los senderos', '☀️ Bloqueador solar resistente al agua', '👟 Zapatos que puedan mojarse — sandalias de río o tenis viejos', '💵 Lleva efectivo suficiente para todo el día', '🎒 Bolsa impermeable o funda para el celular'],
-      'consejosEN': ['🩱 Bring swimwear — the natural pools are the heart of the route', '🌿 Insect repellent essential for trails', '☀️ Water-resistant sunscreen', '👟 Shoes that can get wet — river sandals or old sneakers', '💵 Bring enough cash for the whole day', '🎒 Waterproof bag or phone case'],
-      'sitioOpcional': true,
-      'sitiosList': [
-        'Parque Principal de San Rafael',
-        'Playa del Río Arenal',
-        'Charco El Trocadero',
-        'Cascada Los Simios',
-        'Reserva Natural Piedra Montada',
-        'Sendero Ecológico La Planta',
-      ],
-    },
-    {
-      'nombre': 'RUTA MONTAÑA Y ANCESTRALIDAD — TÁMESIS',
-      'imagen': 'assets/images/rutas/ruta_tamesis.jpg',
-      'nombreEN': 'MOUNTAIN & ANCESTRY — TÁMESIS',
-      'subtitulo': 'Támesis · Petroglifos · Café · Suroeste',
-      'subtituloEN': 'Támesis · Petroglyphs · Coffee · Southwest',
-      'emoji': '☕',
-      'sitios': 6, 'tiempo': 'Día completo (7h)', 'transporte': '🚌 Bus Terminal Sur',
-      'dificultad': 'MEDIO',
-      'color1': const Color(0xFF1A0E05), 'color2': const Color(0xFF2A1800),
-      'acento': kCafeLight,
-      'tag': '☕ Suroeste antioqueño',
-      'zona': 'Alrededores',
-      'ciudad': 'Medellín', 'pais': 'Colombia',
-      'insignia': 'Guardián Ancestral',
-      'personaje': '🗿',
-      'premio': 'Insignia Guardián Ancestral',
-      'hook': 'Petroglifos precolombinos, café de especialidad y montañas del suroeste — un viaje al origen de todo.',
-      'hookEN': 'Pre-Columbian petroglyphs, specialty coffee and southwest mountains — a journey to the origin of everything.',
-      'descripcion': 'Támesis guarda uno de los yacimientos de petroglifos más importantes de Antioquia. Una ruta que mezcla arqueología, naturaleza y tradición cafetera en un solo día.',
-      'descripcionEN': 'Tamesis holds one of Antioquia most important petroglyph sites. A route that blends archaeology, nature and coffee tradition in a single day.',
-      'mejorHora': '6:00 am (salida) – Regreso 6:00 pm',
-      'tipoExperiencia': 'Arqueológica & Cafetera',
-      'tipoExperienciaEN': 'Archaeological & Coffee',
-      'momentoClave': 'Frente a los petroglifos de Támesis — grabados de más de 1.000 años que conectan con algo que va mucho más allá del turismo.',
-      'momentoClaveEN': 'In front of Tamesis petroglyphs — engravings over 1,000 years old that connect you with something far beyond tourism.',
-      'consejos': ['🚌 Viaje largo desde Medellín — sal muy temprano de Terminal Sur', '🧥 Las montañas del suroeste cambian rápido de temperatura — lleva capas', '💧 Agua suficiente para los senderos arqueológicos y la finca', '👟 Zapatos de senderismo o con buen agarre para los caminos a los petroglifos', '🌿 Repelente de insectos para los senderos naturales', '🤲 No toques los petroglifos — son patrimonio arqueológico frágil e irreemplazable'],
-      'consejosEN': ['🚌 Long journey from Medellin — leave very early from Terminal Sur', '🧥 Southwest mountains change temperature fast — wear layers', '💧 Enough water for the archaeological trails and the farm', '👟 Hiking shoes or good grip for the paths to the petroglyphs', '🌿 Insect repellent for the natural trails', '🤲 Do not touch the petroglyphs — they are fragile and irreplaceable archaeological heritage'],
-      'sitioOpcional': true,
-      'sitiosList': [
-        'Parque Principal de Támesis',
-        'Petroglifos — Jardín Botánico',
-        'Cerro Cristo Rey',
-        'La Oculta Lodge',
-        'Mirador Jericó–Támesis',
-        'Finca cafetera local (Támesis)',
-      ],
-    },
-    {
-      'nombre': 'RUTA JOYA COLONIAL OCULTA — CONCEPCIÓN',
-      'imagen': 'assets/images/rutas/ruta_concepcion.jpg',
-      'nombreEN': 'HIDDEN COLONIAL GEM — CONCEPCIÓN',
-      'subtitulo': 'Concepción · Calles de piedra · Tradición',
-      'subtituloEN': 'Concepción · Stone Streets · Tradition',
-      'emoji': '🏛️',
-      'sitios': 6, 'tiempo': 'Día completo (6h)', 'transporte': '🚌 Bus Terminal Norte + caminata',
-      'dificultad': 'FÁCIL',
-      'color1': const Color(0xFF12100A), 'color2': const Color(0xFF1E1A0F),
-      'acento': kGold,
-      'tag': '🏛️ Oriente antioqueño',
-      'zona': 'Alrededores',
-      'ciudad': 'Medellín', 'pais': 'Colombia',
-      'insignia': 'Descubridor Oculto',
-      'personaje': '🏺',
-      'premio': 'Insignia Descubridor Oculto',
-      'hook': 'El pueblo del oriente antioqueño que el turismo masivo aún no ha encontrado.',
-      'hookEN': 'The eastern Antioquian town that mass tourism has not found yet — Concepcion awaits you in secret.',
-      'descripcion': 'Concepción es un municipio de calles empedradas y arquitectura colonial intacta que casi nadie conoce. Visitar aquí es descubrir antes que todos.',
-      'descripcionEN': 'Concepcion is a municipality of cobblestone streets and intact colonial architecture that almost no one knows about. Visiting here means discovering before everyone else.',
-      'mejorHora': '8:00 am – 3:00 pm',
-      'tipoExperiencia': 'Histórica & Descubrimiento',
-      'tipoExperienciaEN': 'Historic & Discovery',
-      'momentoClave': 'El mirador Alto de la Virgen — el oriente antioqueño se despliega en 360° y el silencio del lugar contrasta con todo el ruido de la ciudad.',
-      'momentoClaveEN': 'Alto de la Virgen viewpoint — eastern Antioquia unfolds in 360 degrees and the silence of the place contrasts with all the city noise you left behind.',
-      'consejos': ['🚌 Verifica los horarios de los buses — Concepción tiene pocos servicios directos', '💧 Lleva agua suficiente — es un pueblo pequeño con pocos establecimientos', '👟 Zapatos cómodos para las calles de piedra', '💵 Lleva efectivo — es un pueblo pequeño sin datáfonos frecuentes', '📷 Las calles empedradas al amanecer tienen una luz mágica — sal temprano', '🤫 Habla con los locales — tienen historias que no encontrarás en ninguna guía'],
-      'consejosEN': ['🚌 Check bus schedules — Concepcion has few direct services', '💧 Bring enough water — small town with few establishments', '👟 Comfortable shoes for stone streets', '💵 Bring cash — small town with few card readers', '📷 The cobblestone streets at dawn have magical light — go early', '🤫 Talk to locals — they have stories you will not find in any guide'],
-      'sitioOpcional': true,
-      'sitiosList': [
-        'Parque Principal de Concepción',
-        'Iglesia Nuestra Señora de la Inmaculada Concepción',
-        'Calles empedradas de Concepción',
-        'Casa Museo José María Córdoba',
-        'Charco El Aguacate',
-        'Mirador Alto de la Virgen',
-      ],
-    },
-    {
-      'nombre': 'RUTA CARIBE ANTIOQUEÑO — NECOCLÍ',
-      'imagen': 'assets/images/rutas/ruta_necocli.jpg',
-      'nombreEN': 'ANTIOQUIAN CARIBBEAN — NECOCLÍ',
-      'subtitulo': 'Necoclí · Mar Caribe · Golfo de Urabá',
-      'subtituloEN': 'Necoclí · Caribbean Sea · Gulf of Urabá',
-      'emoji': '🏝️',
-      'sitios': 6, 'tiempo': '2 días', 'transporte': '🚌 Bus Terminal Norte (8-10h)',
-      'dificultad': 'FÁCIL',
-      'color1': const Color(0xFF001A2E), 'color2': const Color(0xFF002E4A),
-      'acento': const Color(0xFF00B4D8),
-      'tag': '🏝️ Caribe antioqueño',
-      'zona': 'Alrededores',
-      'ciudad': 'Medellín', 'pais': 'Colombia',
-      'insignia': 'Navegante del Caribe',
-      'personaje': '🌊',
-      'premio': 'Insignia Navegante del Caribe',
-      'hook': 'Antioquia tiene Caribe — y Necoclí es la puerta al mar que pocos paisas conocen.',
-      'hookEN': 'Antioquia has Caribbean coast — and Necocli is the sea gate that few paisas know.',
-      'descripcion': 'Necoclí es la única salida de Antioquia al mar Caribe. Playa, muelle, mercado local y atardeceres sobre el Golfo de Urabá que no tienen comparación.',
-      'descripcionEN': 'Necocli is Antioquia only outlet to the Caribbean Sea. Beach, dock, local market and sunsets over the Gulf of Uraba that have no comparison.',
-      'mejorHora': '7:00 am – 6:00 pm (2 días)',
-      'tipoExperiencia': 'Playa & Cultural',
-      'tipoExperienciaEN': 'Beach & Cultural',
-      'momentoClave': 'El atardecer desde la Playa Oeste — el sol cayendo sobre el Golfo de Urabá pinta el cielo de naranja y el agua de oro.',
-      'momentoClaveEN': 'Sunset from Playa Oeste — the sun dropping over the Gulf of Uraba paints the sky orange and the water gold. The perfect closing for this route.',
-      'consejos': ['🚌 El viaje en bus desde Medellín toma 8-10h — viaja de noche para aprovechar el día', '☀️ Protector solar de alta protección — el sol caribeño es intenso', '🩱 Lleva ropa de playa y ropa cómoda para el pueblo', '💧 Hidratación constante — el calor y la humedad son altos', '💵 Lleva efectivo suficiente para 2 días — Necoclí es zona con pocos datáfonos', '🌿 Lleva repelente — los zancudos al atardecer en la costa son intensos'],
-      'consejosEN': ['🚌 Bus from Medellin takes 8-10h — travel overnight to make the most of the day', '☀️ High-protection sunscreen — Caribbean sun is intense', '🩱 Bring beach clothes and comfortable town clothes', '💧 Stay hydrated — heat and humidity are high', '💵 Bring enough cash for 2 days — Necocli has few card readers', '🌿 Bring repellent — mosquitoes at sunset on the coast are intense'],
-      'sitioOpcional': true,
-      'sitiosList': [
-        'Parque Principal de Necoclí',
-        'Playa Principal de Necoclí',
-        'Muelle Turístico de Necoclí',
-        'Restaurante Galápagos',
-        'Plataforma Avistamiento Tortugas Marinas',
-        'Playa Oeste — Zona de Atardecer',
-      ],
-    },
-
-    // ── POPAYÁN — Ruta 1: Centro Histórico ──────────────────────────────────
-    {
-      'nombre': 'CIRCUITO CENTRO HISTÓRICO — LA CIUDAD BLANCA',
-      'nombreEN': 'HISTORIC DOWNTOWN CIRCUIT — THE WHITE CITY',
-      'imagen': 'assets/images/rutas/ruta_ppn_01_centro_historico.jpg',
-      'subtitulo': 'Catedral · Morro de Tulcán · Panteón de los Próceres',
-      'subtituloEN': 'Cathedral · Morro de Tulcán · Pantheon of Heroes',
-      'emoji': '🏛️',
-      'tiempo': '3-4h', 'transporte': '🚶 Caminata · Centro compacto',
-      'dificultad': 'FÁCIL',
-      'color1': const Color(0xFF0F0F0A), 'color2': const Color(0xFF1A1A10),
-      'acento': const Color(0xFFD4AF7A),
-      'tag': '🏛️ Patrimonio colonial',
-      'zona': 'Ciudad',
-      'ciudad': 'Popayán', 'pais': 'Colombia',
-      'insignia': 'Guardián de la Ciudad Blanca',
-      'personaje': '🏛️',
-      'premio': 'Insignia Guardián de la Ciudad Blanca',
-      'hook': 'La ciudad más blanca de Colombia guarda 500 años de historia en cada esquina.',
-      'hookEN': 'Colombia\'s whitest city holds 500 years of history on every corner.',
-      'descripcion': 'Popayán es Patrimonio Histórico de Colombia. Sus edificios blancos, calles coloniales y templos del siglo XVIII forman uno de los centros históricos mejor conservados de América. Este circuito conecta los 8 hitos arquitectónicos e históricos más emblemáticos a pie.',
-      'descripcionEN': 'Popayán is a Colombian Heritage site. Its white buildings, colonial streets and 18th-century churches form one of the best-preserved historic centers in the Americas. This circuit connects the 8 most iconic architectural and historical landmarks on foot.',
-      'mejorHora': '8:00 am – 12:00 pm',
-      'tipoExperiencia': 'Patrimonio & Historia',
-      'tipoExperienciaEN': 'Heritage & History',
-      'momentoClave': 'El Morro de Tulcán — la pirámide precolombina con vista panorámica de toda la ciudad blanca.',
-      'momentoClaveEN': 'Morro de Tulcán — the pre-Columbian pyramid with panoramic views of the entire white city.',
-      'consejos': [
-        '🏛️ Muchas iglesias cierran al mediodía — visítalas en la mañana',
-        '🌧️ Popayán tiene clima frío y lluvioso — lleva paraguas o ruana',
-        '📸 El Puente del Humilladero es mejor foto en la mañana temprano',
-        '🎨 El Museo Negret vale la visita — arte moderno en casa colonial',
-        '⛰️ El Morro de Tulcán requiere subir escaleras — usa zapatos cómodos',
-        '🚶 Todo el circuito es a pie — distancia total aprox. 2 km',
-      ],
-      'consejosEN': [
-        '🏛️ Many churches close at noon — visit them in the morning',
-        '🌧️ Popayán has cold rainy weather — bring an umbrella or poncho',
-        '📸 The Humilladero Bridge is best photographed early morning',
-        '🎨 Museo Negret is worth the visit — modern art in a colonial house',
-        '⛰️ Morro de Tulcán requires climbing stairs — wear comfortable shoes',
-        '🚶 The whole circuit is on foot — total distance approx. 2 km',
-      ],
-      'sitios': 8,
-      'sitiosList': [
-        'Parque Caldas',
-        'Catedral Basílica de Popayán',
-        'Torre del Reloj',
-        'Iglesia de San Francisco',
-        'La Ermita',
-        'Puente del Humilladero',
-        'Panteón de los Próceres',
-        'Morro de Tulcán',
-      ],
-      'misionEpica': 'Fotografía las 4 iglesias más antiguas del centro histórico y encuentra la placa que marca el año de fundación de Popayán.',
-      'misionEpicaEN': 'Photograph the 4 oldest churches in the historic center and find the plaque marking the year Popayán was founded.',
-    },
-
-    // ── POPAYÁN — Ruta 2: Catador del Cauca ─────────────────────────────────
-    {
-      'nombre': 'CATADOR DEL CAUCA — SABORES DE LA CIUDAD BLANCA',
-      'nombreEN': 'CAUCA TASTER — FLAVORS OF THE WHITE CITY',
-      'imagen': 'assets/images/rutas/ruta_ppn_02_catador_cauca.jpg',
-      'subtitulo': 'Pipián · Champús · Salpicón · UNESCO Gastronomía',
-      'subtituloEN': 'Pipián · Champús · Salpicón · UNESCO Gastronomy',
-      'emoji': '🌶️',
-      'tiempo': '3-4h', 'transporte': '🚶 Caminata · Centro gastronómico',
-      'dificultad': 'FÁCIL',
-      'color1': const Color(0xFF1A0A00), 'color2': const Color(0xFF2A1000),
-      'acento': const Color(0xFFE8873A),
-      'tag': '🌶️ Ciudad UNESCO Gastronomía',
-      'zona': 'Comida Urbana',
-      'ciudad': 'Popayán', 'pais': 'Colombia',
-      'insignia': 'Catador del Cauca',
-      'personaje': '🌶️',
-      'premio': 'Insignia Catador del Cauca',
-      'hook': 'Popayán fue la primera ciudad del mundo declarada Ciudad Creativa de la Gastronomía por la UNESCO. Pruébalo.',
-      'hookEN': 'Popayán was the first city in the world declared a UNESCO Creative City of Gastronomy. Taste it.',
-      'descripcion': 'Un recorrido por los sabores que le dieron a Popayán la declaratoria UNESCO en 2005. Desde el mercado popular hasta los restaurantes emblemáticos de la cocina payanesa: pipián, champús, salpicón de Baudilia, carantanta y colaciones.',
-      'descripcionEN': 'A journey through the flavors that earned Popayán the UNESCO designation in 2005. From the popular market to iconic Payanese restaurants: pipián, champús, Baudilia\'s salpicón, carantanta and colaciones.',
-      'mejorHora': '9:00 am – 2:00 pm',
-      'tipoExperiencia': 'Gastronomía & Cultura',
-      'tipoExperienciaEN': 'Gastronomy & Culture',
-      'momentoClave': 'Mora Castilla — el salpicón payanés con receta de la época de la Independencia.',
-      'momentoClaveEN': 'Mora Castilla — the Payanese salpicón with a recipe from the Independence era.',
-      'consejos': [
-        '🌶️ El pipián tiene ají — pregunta por el nivel de picante antes',
-        '🧃 El champús es una bebida fría de maíz y frutas — perfecta para el frío payanés',
-        '🕘 El Mercado Bolívar abre desde las 6am — llega temprano',
-        '💵 Lleva efectivo — muchos puestos del mercado no tienen datáfono',
-        '📸 Pide permiso antes de fotografiar a las cocineras tradicionales',
-        '🍽️ Esta ruta es para comer — no llegues con el estómago lleno',
-      ],
-      'consejosEN': [
-        '🌶️ Pipián has chili — ask about the spice level beforehand',
-        '🧃 Champús is a cold drink of corn and fruit — perfect for Popayán\'s cool weather',
-        '🕘 Mercado Bolívar opens from 6am — arrive early',
-        '💵 Bring cash — many market stalls don\'t have card readers',
-        '📸 Ask permission before photographing traditional cooks',
-        '🍽️ This route is for eating — don\'t arrive on a full stomach',
-      ],
-      'sitios': 6,
-      'sitiosList': [
-        'Galería La Esmeralda',
-        'Hotel Dann Monasterio',
-        'Cocina Tradicional de Pipián',
-        'Mora Castilla',
-        'Mercado Bolívar',
-        'Parque Caldas',
-      ],
-      'misionEpica': 'Prueba los 5 sabores emblema de Popayán: pipián, champús, salpicón payanés, carantanta y colaciones. Fotografía cada uno.',
-      'misionEpicaEN': 'Taste the 5 emblematic flavors of Popayán: pipián, champús, Payanese salpicón, carantanta and colaciones. Photograph each one.',
-    },
-
-    // ── POPAYÁN — Ruta 3: Congreso Gastronómico XXIV (temporal sep 2026) ────
-    {
-      'nombre': 'CONGRESO GASTRONÓMICO XXIV — SABOR INTERNACIONAL',
-      'nombreEN': 'XXIV GASTRONOMIC CONGRESS — INTERNATIONAL FLAVOR',
-      'imagen': 'assets/images/rutas/ruta_ppn_03_congreso_gastronomico.jpg',
-      'subtitulo': 'Tarima del Sabor · Foro Académico · Arequipa · El Tambo',
-      'subtituloEN': 'Flavor Stage · Academic Forum · Arequipa · El Tambo',
-      'emoji': '🍽️',
-      'tiempo': '4-5h', 'transporte': '🚶 Caminata · Parque Caldas y entornos',
-      'dificultad': 'FÁCIL',
-      'color1': const Color(0xFF0A0F05), 'color2': const Color(0xFF111A08),
-      'acento': const Color(0xFFB8C94A),
-      'tag': '🎪 Evento · 3–6 sep 2026',
-      'zona': 'Temporada',
-      'ciudad': 'Popayán', 'pais': 'Colombia',
-      'insignia': 'Congresista Gourmet XXIV',
-      'personaje': '🍽️',
-      'premio': 'Insignia Congresista Gourmet XXIV',
-      'hook': '45.000 personas, 60 cocineras tradicionales y los mejores chefs del mundo. Todo en el Parque Caldas durante 4 días.',
-      'hookEN': '45,000 people, 60 traditional cooks and the world\'s best chefs. All in Parque Caldas for 4 days.',
-      'descripcion': 'El Congreso Gastronómico de Popayán es el evento culinario más importante de Colombia, celebrado desde 2002. La edición XXIV tiene como invitados de honor a Arequipa (Perú), Manizales (Caldas) y El Tambo (Cauca).',
-      'descripcionEN': 'The Popayán Gastronomic Congress is Colombia\'s most important culinary event, held since 2002. The XXIV edition honors Arequipa (Peru), Manizales (Caldas) and El Tambo (Cauca).',
-      'mejorHora': '10:00 am – 3:00 pm',
-      'tipoExperiencia': 'Gastronomía & Evento Internacional',
-      'tipoExperienciaEN': 'Gastronomy & International Event',
-      'momentoClave': 'La Tarima del Sabor — 7.000 degustaciones gratuitas de cocinas tradicionales de toda Colombia.',
-      'momentoClaveEN': 'The Flavor Stage — 7,000 free tastings from traditional kitchens across Colombia.',
-      'consejos': [
-        '🎪 El evento es gratuito y abierto al público — no necesitas boleta',
-        '🕘 Llega antes de las 10am para los mejores puestos',
-        '🌧️ Lleva paraguas — Popayán es lluviosa en septiembre',
-        '📸 Los stands internacionales son perfectos para fotos',
-        '🍽️ Prueba el arroz — es el producto invitado de esta edición',
-        '🗣️ El Foro Académico es gratuito — entra aunque no seas experto',
-      ],
-      'consejosEN': [
-        '🎪 The event is free and open to the public — no ticket needed',
-        '🕘 Arrive before 10am for the best spots',
-        '🌧️ Bring an umbrella — Popayán is rainy in September',
-        '📸 International stands are perfect for photos',
-        '🍽️ Try rice — it\'s this edition\'s featured product',
-        '🗣️ The Academic Forum is free — go in even if you\'re not an expert',
-      ],
-      'sitios': 6,
-      'sitiosList': [
-        'Teatro Guillermo Valencia',
-        'Tarima del Sabor — Parque Caldas',
-        'Stand Arequipa (Perú)',
-        'Stand El Tambo (Cauca)',
-        'Stand Manizales (Caldas)',
-        'Mercado Campesino — El Arroz',
-      ],
-      'misionEpica': 'Habla con una cocinera tradicional y pregúntale cuál es su receta más antigua. Fotografía el plato que más te impresione.',
-      'misionEpicaEN': 'Talk to a traditional cook and ask them their oldest recipe. Photograph the dish that impresses you the most.',
-      'fechaEvento': {'diaInicio': 3, 'diaFin': 6, 'mes': 9, 'anio': 2026},
-      'temporadaInicio': [9, 3],
-      'temporadaFin': [9, 6],
-      'tagPausada': '🎪 Activa 3–6 sep 2026',
-    },
-
-    // ── BOGOTÁ — La Candelaria ───────────────────────────────────────────────
-    {
-      'nombre': 'RUTA LA CANDELARIA — EL CORAZÓN DE BOGOTÁ',
-      'nombreEN': 'LA CANDELARIA ROUTE — THE HEART OF BOGOTÁ',
-      'imagen': 'assets/images/rutas/ruta_bta_01_candelaria.jpg',
-      'subtitulo': 'Plaza de Bolívar · Museo del Oro · Monserrate',
-      'subtituloEN': 'Plaza de Bolívar · Gold Museum · Monserrate',
-      'emoji': '🏔️',
-      'sitios': 8, 'tiempo': '4-5h', 'transporte': '🚇 TransMilenio + teleférico',
-      'dificultad': 'MODERADA',
-      'color1': const Color(0xFF0A0F1A), 'color2': const Color(0xFF101828),
-      'acento': const Color(0xFFC9A84C),
-      'tag': '🏔️ Capital cultural',
-      'zona': 'Ciudad',
-      'ciudad': 'Bogotá', 'pais': 'Colombia',
-      'insignia': 'Explorador de La Candelaria',
-      'personaje': '🏔️',
-      'premio': 'Insignia Explorador de La Candelaria',
-      'hook': 'La historia de Colombia en 8 paradas — desde la fundación hasta el arte que cambió todo.',
-      'hookEN': 'Colombia\'s history in 8 stops — from the founding to the art that changed everything.',
-      'descripcion': 'La Candelaria es el corazón histórico de Bogotá. Museos de clase mundial, plazas fundacionales y el cerro de Monserrate como telón de fondo. Esta ruta conecta lo mejor del centro histórico en una jornada completa.',
-      'descripcionEN': 'La Candelaria is the historic heart of Bogotá. World-class museums, founding plazas and Monserrate hill as a backdrop. This route connects the best of the historic center in a full day.',
-      'mejorHora': '8:00 am – 4:00 pm',
-      'tipoExperiencia': 'Cultural & Histórica',
-      'tipoExperienciaEN': 'Cultural & Historical',
-      'momentoClave': 'El Cerro de Monserrate — Bogotá entera a tus pies desde 3.152 metros sobre el nivel del mar.',
-      'momentoClaveEN': 'Cerro de Monserrate — all of Bogotá at your feet from 3,152 meters above sea level.',
-      'consejos': [
-        '🌡️ Bogotá es fría — lleva chaqueta aunque salga el sol',
-        '🚡 Monserrate: sube en teleférico de mañana para evitar nubes',
-        '🎨 El Museo Botero es gratis — no te lo pierdas',
-        '🔒 La Candelaria tiene zonas de alta circulación — cuida tus pertenencias',
-        '🥔 La ajiaco santafereño es el plato obligatorio en el centro',
-        '📱 El Museo del Oro no permite fotos con flash — respeta la regla',
-      ],
-      'consejosEN': [
-        '🌡️ Bogotá is cold — bring a jacket even when sunny',
-        '🚡 Monserrate: take the cable car in the morning to avoid clouds',
-        '🎨 Museo Botero is free — don\'t miss it',
-        '🔒 La Candelaria has high-traffic areas — keep your belongings safe',
-        '🥔 Ajiaco santafereño is the must-eat dish in the center',
-        '📱 Gold Museum does not allow flash photography — respect the rule',
-      ],
-      'sitiosList': [
-        'Plaza de Bolívar',
-        'Catedral Primada de Colombia',
-        'Palacio Liévano',
-        'Casa de Nariño (exterior)',
-        'Museo Botero',
-        'Museo del Oro',
-        'Chorro de Quevedo',
-        'Cerro de Monserrate',
-      ],
-      'misionEpica': 'Encuentra el símbolo precolombino más famoso del Museo del Oro y descifra su significado. Fotografía la Plaza de Bolívar con las 4 esquinas en una sola toma.',
-      'misionEpicaEN': 'Find the most famous pre-Columbian symbol in the Gold Museum and decode its meaning. Photograph Plaza de Bolívar with all 4 corners in a single shot.',
-    },
-
-    // ── EVENTOS — próximamente ──
-    // ── TEMPORADA ──
-    // ── RUTAS GASTRONÓMICAS — Sabores de Medellín ──────────────
-    {
-      'nombre': 'SABOR DE BARRIO — EL CENTRO',
-      'nombreEN': 'NEIGHBORHOOD FLAVOR — DOWNTOWN',
-      'imagen': 'assets/images/rutas/ruta_gastronomia_centro.jpg',
-      'subtitulo': 'Centro · Empanadas · Bandeja · Chicharrón',
-      'subtituloEN': 'Downtown · Empanadas · Bandeja · Chicharrón',
-      'emoji': '🫔',
-      'sitios': 5, 'tiempo': '3-4h', 'transporte': '🚇 Metro Parque Berrío',
-      'dificultad': 'FÁCIL',
-      'color1': const Color(0xFF1A0A00), 'color2': const Color(0xFF2A1000),
-      'acento': kCafeLight,
-      'tag': '🫔 Gastronomía · Centro de Medellín',
-      'zona': 'Comida Urbana',
-      'ciudad': 'Medellín', 'pais': 'Colombia',
-      // 'turismoResponsable': true,  // 🚫 Pausado 30 mayo 2026
-      'precio': r'$19.900',
-      'insignia': 'Maestro Empanada',
-      'personaje': '🫔',
-      'premio': 'Insignia Maestro Empanada',
-      'hook': '5 paradas · 5 sabores que el centro guarda desde hace décadas.',
-      'hookEN': '5 stops · 5 flavors that downtown has kept for decades.',
-      'descripcion': 'El centro de Medellín tiene la gastronomía más auténtica y asequible de la ciudad. Empanadas desde las 5am, la mejor bandeja paisa de la Calle Junín y el chicharrón que los paisas llevan comiendo toda la vida.',
-      'descripcionEN': 'Downtown Medellín has the most authentic and affordable gastronomy in the city. Empanadas from 5am, the best bandeja paisa on Calle Junín and the chicharrón that paisas have been eating their whole lives.',
-      'mejorHora': '9:00 am – 2:00 pm',
-      'tipoExperiencia': 'Gastronómica & Cultural',
-      'tipoExperienciaEN': 'Gastronomic & Cultural',
-      'momentoClave': 'La Bandeja Paisa del Restaurante Hacienda Junín — frente a ti los 8 ingredientes de la identidad culinaria antioqueña. Identifícalos todos y gana la insignia.',
-      'momentoClaveEN': 'The Bandeja Paisa at Restaurante Hacienda Junín — in front of you the 8 ingredients of Antioquian culinary identity. Identify them all and earn the badge.',
-      'consejos': [
-        '🕔 La Empanarrica abre desde las 5am — llega temprano para la empanada más fresca',
-        '💵 Lleva efectivo — la mayoría de locales del centro no tienen datáfono',
-        '🚇 Metro Parque Berrío es la parada ideal para comenzar',
-        '🌮 La misión épica: identifica los 8 ingredientes de la bandeja paisa',
-        '📸 La foto obligatoria: bandeja paisa completa desde arriba',
-        '⏰ Evita llegar después de las 2pm — varios locales cierran temprano',
-      ],
-      'consejosEN': [
-        '🕔 Empanarrica opens from 5am — arrive early for the freshest empanada',
-        '💵 Bring cash — most downtown spots don\'t have card readers',
-        '🚇 Metro Parque Berrío is the ideal starting stop',
-        '🌮 Epic mission: identify the 8 ingredients of the bandeja paisa',
-        '📸 Mandatory photo: full bandeja paisa from above',
-        '⏰ Avoid arriving after 2pm — several spots close early',
-      ],
-      'misionEpica': 'Identifica los 8 ingredientes de la bandeja paisa y aprende cada nombre en español. El primero en completarla gana 20 puntos extra.',
-      'misionEpicaEN': 'Identify the 8 ingredients of the bandeja paisa and learn each name in Spanish. First to complete wins 20 bonus points.',
-            'antesDeSalir': '🚇 Metro Parque Berrío · 💵 Lleva efectivo \$60.000 COP · ⏰ Mejor 9-12pm · 🍽️ No desayunes antes — vas a comer en cada parada · 📷 Batería cargada',
-      'sitioOpcional': false,
-      'sitiosList': [
-        'Empanarrica · Empanada paisa desde las 5am',
-        'La Jugosa Centro · Salpicón con helado y queso',
-        'Restaurante Hacienda Junín · Bandeja paisa',
-        '¡AHH QUÉ RICURA! · Chicharrón · Plaza de mercado',
-        'El Llanerito Centro · Chorizo + guarapo · vista al Centro',
-      ],
-    },
-    {
-      'nombre': 'SABOR DE CANCHA — LAURELES',
-      'nombreEN': 'STADIUM FLAVOR — LAURELES',
-      'imagen': 'assets/images/rutas/ruta_gastronomia_laureles.jpg',
-      'subtitulo': 'Laureles · Estadio · Arepa · Mondongo',
-      'subtituloEN': 'Laureles · Stadium · Arepa · Mondongo',
-      'emoji': '⚽',
-      'sitios': 5, 'tiempo': '3-4h', 'transporte': '🚇 Metro Estadio',
-      'dificultad': 'FÁCIL',
-      'color1': const Color(0xFF0A1A00), 'color2': const Color(0xFF0F2500),
-      'acento': kGreen,
-      'tag': '⚽ Gastronomía · Laureles · Estadio',
-      'zona': 'Comida Urbana',
-      'ciudad': 'Medellín', 'pais': 'Colombia',
-      // 'turismoResponsable': true,  // 🚫 Pausado 30 mayo 2026
-      'precio': r'$19.900',
-      'insignia': 'Hincha Gourmet',
-      'personaje': '⚽',
-      'premio': 'Insignia Hincha Gourmet',
-      'hook': 'El barrio más querido de Medellín · donde la tradición se sienta a comer.',
-      'hookEN': 'The most beloved neighborhood in Medellín · where tradition sits down to eat.',
-      'descripcion': 'Laureles es el barrio donde los paisas de toda la vida se quedaron. Fondas típicas, la arepa más famosa de la Calle 70 y el mondongo con 5 estrellas que los turistas nunca encuentran solos.',
-      'descripcionEN': 'Laureles is the neighborhood where real paisas stayed. Traditional fondas, the most famous arepa on Calle 70 and the 5-star mondongo tourists never find alone.',
-      'mejorHora': '9:00 am – 4:00 pm',
-      'tipoExperiencia': 'Gastronómica & Barrial',
-      'tipoExperienciaEN': 'Gastronomic & Neighborhood',
-      'momentoClave': 'AREPAPAS en la Calle 70 — la arepa rellena a la brasa que los paisas consideran la evolución perfecta del desayuno. Elige tu relleno y bautízala con un nombre paisa.',
-      'momentoClaveEN': 'AREPAPAS on Calle 70 — the grilled stuffed arepa that paisas consider the perfect evolution of breakfast. Choose your filling and name it in paisa slang.',
-      'consejos': [
-        '🕔 Fonda Típicos abre a las 7:30am — el desayuno paisa más completo del barrio',
-        '⚽ Si hay partido del Nacional o DIM · la atmósfera en La 70 es incomparable',
-        '🌮 La misión: elige tu relleno de arepa y bautízala con un nombre paisa',
-        '🍺 La Tienda de la 70 tiene 4.685 reseñas — es un clásico que no falla',
-        '🕒 Fonda de Laureles abre desde las 6:30am · el mondongo perfecto para arrancar',
-        '💵 La Calle 70 es efectivo — lleva mínimo \$60.000 COP para las 5 paradas',
-      ],
-      'consejosEN': [
-        '🕔 Fonda Típicos opens at 7:30am — most complete paisa breakfast in the neighborhood',
-        '⚽ If there\'s a Nacional or DIM match · the atmosphere on La 70 is priceless',
-        '🌮 Mission: choose your arepa filling and name it in paisa slang',
-        '🍺 La Tienda de la 70 has 4,685 reviews — a classic that never fails',
-        '🕒 Fonda de Laureles opens from 6:30am · perfect mondongo to start the day',
-        '💵 Calle 70 is cash-only — bring at least \$60,000 COP for 5 stops',
-      ],
-      'misionEpica': 'Elige tu relleno de arepa en AREPAPAS y bautízala con un nombre en jerga paisa. La más creativa gana.',
-      'misionEpicaEN': 'Choose your arepa filling at AREPAPAS and name it in paisa slang. The most creative name wins.',
-      'sitioOpcional': false,
-      'sitiosList': [
-        'Fonda Típicos · Desayuno paisa · limonada natural',
-        'Antioquena Capital · Bandeja paisa · abuela en cocina',
-        'AREPAPAS · Arepa rellena a la brasa',
-        'La Tienda de la 70 · Empanadas + guarapo · 4685 reseñas',
-        'Fonda de Laureles · Mondongo · 5.0 estrellas',
-      ],
-    },
-    {
-      'nombre': 'SABOR VIAJERO — EL POBLADO',
-      'nombreEN': 'TRAVELER\'S FLAVOR — EL POBLADO',
-      'imagen': 'assets/images/rutas/ruta_gastronomia_poblado.jpg',
-      'subtitulo': 'Poblado · Jugos exóticos · Bandeja · Mondongo',
-      'subtituloEN': 'Poblado · Exotic juices · Bandeja · Mondongo',
-      'emoji': '🧃',
-      'sitios': 5, 'tiempo': '3-4h', 'transporte': '🚇 Metro El Poblado',
-      'dificultad': 'FÁCIL',
-      'color1': const Color(0xFF1A1000), 'color2': const Color(0xFF2A1800),
-      'acento': kGold,
-      'tag': '🧃 Gastronomía · El Poblado',
-      'zona': 'Comida Urbana',
-      'ciudad': 'Medellín', 'pais': 'Colombia',
-      // 'turismoResponsable': true,  // 🚫 Pausado 30 mayo 2026
-      'precio': r'$19.900',
-      'insignia': 'Explorador del Sabor',
-      'personaje': '🧃',
-      'premio': 'Insignia Explorador del Sabor',
-      'hook': 'El Poblado tiene sabores que los turistas buscan · pero pocos encuentran solos.',
-      'hookEN': 'El Poblado has flavors tourists seek · but few find on their own.',
-      'descripcion': 'El barrio más internacional de Medellín esconde fondas tradicionales a pasos de los bares de moda. Jugos de frutas exóticas, la bandeja más reseñada de la zona y el mondongo que los expats descubren y ya no pueden dejar.',
-      'descripcionEN': 'The most international neighborhood in Medellín hides traditional fondas steps from the trendiest bars. Exotic fruit juices, the most-reviewed bandeja in the area and the mondongo expats discover and can\'t leave behind.',
-      'mejorHora': '10:00 am – 3:00 pm',
-      'tipoExperiencia': 'Gastronómica & Internacional',
-      'tipoExperienciaEN': 'Gastronomic & International',
-      'momentoClave': 'Medellín Es Sabor-Champi — 4.453 reseñas y la bandeja paisa más fotografiada de El Poblado. Misión: identifica los 8 ingredientes y conviértete en Maestro Paisa.',
-      'momentoClaveEN': 'Medellín Es Sabor-Champi — 4,453 reviews and the most photographed bandeja paisa in El Poblado. Mission: identify the 8 ingredients and become a Paisa Master.',
-      'consejos': [
-        '🍓 Finas Frutas N°1 abre en la mañana · llega temprano para los jugos más frescos',
-        '🌮 La misión épica: identifica los 8 ingredientes de la bandeja y conviértete en Maestro Paisa',
-        '💳 El Poblado sí acepta tarjeta en la mayoría de locales',
-        '📍 Q\'empanada de la 10 es 24 horas — perfecta para cerrar la ruta de noche',
-        '🧃 Pide el jugo de lulo con leche condensada — la combinación favorita de los paisas',
-        '📸 Foto obligatoria: el jugo de fruta exótica de Finas Frutas contra la luz',
-      ],
-      'consejosEN': [
-        '🍓 Finas Frutas N°1 opens in the morning · arrive early for the freshest juices',
-        '🌮 Epic mission: identify the 8 bandeja ingredients and become a Paisa Master',
-        '💳 El Poblado accepts cards at most spots',
-        '📍 Q\'empanada de la 10 is 24 hours — perfect for closing the route at night',
-        '🧃 Order the lulo juice with condensed milk — the paisas\' favorite combination',
-        '📸 Mandatory photo: the exotic fruit juice from Finas Frutas against the light',
-      ],
-      'misionEpica': 'Identifica los 8 ingredientes de la bandeja paisa en Medellín Es Sabor-Champi y conviértete en Maestro Paisa. Foto de la bandeja completa como evidencia.',
-      'misionEpicaEN': 'Identify the 8 bandeja paisa ingredients at Medellín Es Sabor-Champi and become a Paisa Master. Photo of the full bandeja as evidence.',
-      'sitioOpcional': false,
-      'sitiosList': [
-        'Finas Frutas N°1 · Jugo de fruta exótica',
-        'Q\'empanada de la 10 · Empanada paisa · 24 horas',
-        'Medellín Es Sabor-Champi · Bandeja paisa · 4453 reseñas',
-        'Ajiacos y Mondongos · Mondongo emblema de Medellín',
-        'Típicos Parce · Premio + código Rutero',
-      ],
-    },
-    {
-      'nombre': 'SABOR PAISA PROFUNDO — ENVIGADO',
-      'nombreEN': 'DEEP PAISA FLAVOR — ENVIGADO',
-      'imagen': 'assets/images/rutas/ruta_gastronomia_envigado.jpg',
-      'subtitulo': 'Envigado · Chicharrón · Cazuela · Sancocho',
-      'subtituloEN': 'Envigado · Chicharrón · Cazuela · Sancocho',
-      'emoji': '🏘️',
-      'sitios': 5, 'tiempo': '4-5h', 'transporte': '🚇 Metro Ayurá + bus',
-      'dificultad': 'FÁCIL',
-      'color1': const Color(0xFF1A0800), 'color2': const Color(0xFF2A1000),
-      'acento': kAccent,
-      'tag': '🏘️ Gastronomía · Envigado',
-      'zona': 'Comida Urbana',
-      'ciudad': 'Medellín', 'pais': 'Colombia',
-      'precio': r'$19.900',
-      'insignia': 'Hijo del Barrio',
-      'personaje': '🏘️',
-      'premio': 'Insignia Hijo del Barrio',
-      'hook': 'El municipio más sabroso del sur del Valle de Aburrá.',
-      'hookEN': 'The most flavorful municipality in the south of the Aburrá Valley.',
-      'descripcion': 'Envigado tiene la gastronomía paisa más auténtica del Área Metropolitana. La Gloria de Gloria lleva décadas sirviendo el mejor chicharrón de la región y el Trifásico de Envigado es el plato más emblemático del municipio.',
-      'descripcionEN': 'Envigado has the most authentic paisa gastronomy in the Metropolitan Area. La Gloria de Gloria has been serving the best chicharrón in the region for decades and the Trifásico de Envigado is the most emblematic dish of the municipality.',
-      'mejorHora': '10:00 am – 3:00 pm · Miércoles a Domingo',
-      'tipoExperiencia': 'Gastronómica & Local',
-      'tipoExperienciaEN': 'Gastronomic & Local',
-      'momentoClave': 'La Gloria de Gloria — 1 kg de chicharrón con 4.262 reseñas. La pregunta épica: ¿qué tiene la cazuela de barrio que no tiene la bandeja paisa?',
-      'momentoClaveEN': 'La Gloria de Gloria — 1 kg of chicharrón with 4,262 reviews. The epic question: what does the cazuela de barrio have that the bandeja paisa doesn\'t?',
-      'consejos': [
-        '⚠️ La Gloria de Gloria cierra lunes y martes — ruta válida miércoles a domingo',
-        '🕔 Llega antes del mediodía — el chicharrón se acaba antes de las 2pm',
-        '🚇 Metro Ayurá + bus hacia el centro de Envigado · 20 min desde Medellín',
-        '💵 Lleva efectivo — Envigado tradicional es efectivo',
-        '🎵 La Calle Jardín tiene música en vivo los fines de semana desde las 5pm',
-        '🍲 La misión: pregunta al mesero de Darisa qué tiene el sancocho que no tiene la bandeja',
-      ],
-      'consejosEN': [
-        '⚠️ La Gloria de Gloria closes Monday and Tuesday — route valid Wed to Sun',
-        '🕔 Arrive before noon — chicharrón sells out before 2pm',
-        '🚇 Metro Ayurá + bus to Envigado center · 20 min from Medellín',
-        '💵 Bring cash — traditional Envigado is cash-only',
-        '🎵 Calle Jardín has live music on weekends from 5pm',
-        '🍲 Mission: ask the waiter at Darisa what the sancocho has that the bandeja doesn\'t',
-      ],
-      'misionEpica': 'Pide la cazuela en Restaurante Bar Donde Gloria y pregunta al mesero qué tiene que no tiene la bandeja paisa. Su respuesta es tu insignia.',
-      'misionEpicaEN': 'Order the cazuela at Restaurante Bar Donde Gloria and ask the waiter what it has that the bandeja paisa doesn\'t. Their answer is your badge.',
-            'antesDeSalir': '⚠️ Solo Miércoles a Domingo · 🚇 Metro Ayurá + bus · ⏰ Llega antes del mediodía · 💵 Efectivo \$80.000 COP · 🍖 La Gloria de Gloria se acaba antes de las 2pm',
-      'sitioOpcional': false,
-      'sitiosList': [
-        'La Gloria de Gloria · 1kg chicharrón · 4262 reseñas · Mié-Dom',
-        'El Trifásico · Plato trifásico emblema Envigado',
-        'Restaurante Bar Donde Gloria · Cazuela de barrio',
-        'Calle Jardín · Ambiente local · música en vivo fines de semana',
-        'Darisa · Sancocho y mondongo auténtico',
-      ],
-    },
-    {
-      'nombre': 'SABOR URBANO — MERCADO DEL RÍO',
-      'nombreEN': 'URBAN FLAVOR — MERCADO DEL RÍO',
-      'imagen': 'assets/images/rutas/ruta_gastronomia_mercado_rio.jpg',
-      'subtitulo': 'Industriales · Mercado del Río · Fusión · Moderno',
-      'subtituloEN': 'Industriales · Mercado del Río · Fusion · Modern',
-      'emoji': '🌆',
-      'sitios': 5, 'tiempo': '3-4h', 'transporte': '🚇 Metro Industriales',
-      'dificultad': 'FÁCIL',
-      'color1': const Color(0xFF0A0A1A), 'color2': const Color(0xFF10101E),
-      'acento': kOrchid,
-      'tag': '🌆 Gastronomía · Industriales · Moderno',
-      'zona': 'Comida Urbana',
-      'ciudad': 'Medellín', 'pais': 'Colombia',
-      // 'turismoResponsable': true,  // 🚫 Pausado 30 mayo 2026
-      'precio': r'$19.900',
-      'insignia': 'Urbanita Gourmet',
-      'personaje': '🌆',
-      'premio': 'Insignia Urbanita Gourmet',
-      'hook': 'La Medellín moderna · donde los clásicos paisas se reinventan.',
-      'hookEN': 'Modern Medellín · where paisa classics reinvent themselves.',
-      'descripcion': 'El corredor Industriales-Mercado del Río es la zona gastronómica más dinámica de Medellín. Food halls urbanos, la bandeja paisa versión moderna y Cerdología — la reinvención del chicharrón que se volvió viral.',
-      'descripcionEN': 'The Industriales-Mercado del Río corridor is the most dynamic gastronomic zone in Medellín. Urban food halls, modern bandeja paisa version and Cerdología — the chicharrón reinvention that went viral.',
-      'mejorHora': '12:00 pm – 10:00 pm',
-      'tipoExperiencia': 'Gastronómica & Moderna',
-      'tipoExperienciaEN': 'Gastronomic & Modern',
-      'momentoClave': 'Mercado del Río — 24.000+ reseñas · la versión moderna de todo lo que Medellín come. Misión épica: prueba una versión moderna de un clásico paisa y decide · ¿mejor que el original?',
-      'momentoClaveEN': 'Mercado del Río — 24,000+ reviews · the modern version of everything Medellín eats. Epic mission: try a modern version of a paisa classic and decide · better than the original?',
-      'consejos': [
-        '🕛 Esta ruta funciona mejor desde el mediodía — los locales abren tarde',
-        '💳 Zona moderna · todos aceptan tarjeta',
-        '🛒 Mercado de La Playa está en el Centro — empieza allá y termina en Mercado del Río',
-        '🍽️ Mercado del Río tiene más de 30 opciones — llega con hambre moderada',
-        '🐷 Cerdología está dentro de Mercado del Río · busca el local en el primer piso',
-        '📸 Foto épica: el atrium de Mercado del Río desde el segundo piso',
-      ],
-      'consejosEN': [
-        '🕛 This route works best from noon — spots open late',
-        '💳 Modern zone · everyone accepts cards',
-        '🛒 Mercado de La Playa is downtown — start there and end at Mercado del Río',
-        '🍽️ Mercado del Río has 30+ options — arrive with moderate hunger',
-        '🐷 Cerdología is inside Mercado del Río · find the spot on the first floor',
-        '📸 Epic photo: the Mercado del Río atrium from the second floor',
-      ],
-      'misionEpica': 'Prueba una versión moderna de un clásico paisa en Mercado del Río y decide: ¿es mejor que el original? Tu veredicto lo comparte la comunidad Rutero.',
-      'misionEpicaEN': 'Try a modern version of a paisa classic at Mercado del Río and decide: is it better than the original? Your verdict gets shared with the Rutero community.',
-      'sitioOpcional': false,
-      'sitiosList': [
-        'Mercado de La Playa · Food hall urbano Centro',
-        'Antioquena Capital · Bandeja paisa · abuela en cocina',
-        'La Jugosa Laureles · Helado con frutas y queso',
-        'Mercado del Río · Versión moderna clásico paisa · 24.000+ reseñas',
-        'Cerdología · Crispetas de chicharrón · dentro Mercado del Río',
-      ],
-    },
-    {
-      'nombre': 'SEMANA SANTA PATRIMONIAL', 'nombreEN': 'HERITAGE HOLY WEEK',
-      'imagen': 'assets/images/rutas/ruta_16_semana_santa.jpg',
-      'insigniaImg': 'assets/images/insignias/insignia_16_peregrino_paisa.png',
-      'subtitulo': 'Centro Histórico · Fe & Cultura', 'subtituloEN': 'Historic Downtown · Faith & Culture',
-      'emoji': '✝️', 'sitios': 6, 'tiempo': '3h',
-      'transporte': '🚇 Metro + caminata', 'dificultad': 'FÁCIL', 'precio': '\$29.900',
-      'zona': 'Temporada', 'tag': '✝️ 29 mar – 5 abr', 'temporadaMeses': [3, 4], 'temporadaInicio': [3, 29], 'temporadaFin': [4, 5],
-      'ciudad': 'Medellín', 'pais': 'Colombia',
-      'color1': const Color(0xFF1A0A0A), 'color2': const Color(0xFF2A1010),
-      'acento': const Color(0xFFB85CAE),
-      'premio': "Insignia Peregrino Paisa",
-      'insignia': 'Peregrino Paisa', 'personaje': '🕊️',
-      'consejos': ['🕐 Las procesiones nocturnas empiezan tarde — lleva ropa abrigada para las noches del centro', '👟 Vas a caminar mucho siguiendo las procesiones — zapatos muy cómodos', '📱 Guarda el celular en el bolsillo en medio de las multitudes', '🚕 Usa taxi o metro para desplazarte entre iglesias — el centro se llena de gente', '💧 Lleva agua — las procesiones pueden durar 2-3 horas de pie', '📷 El flash molesta en los actos religiosos — fotografía en modo silencioso'],
-      'consejosEN': ['🕐 Night processions start late — bring warm clothes for downtown evenings', '👟 You will walk a lot following the processions — very comfortable shoes', '📱 Keep your phone in your pocket in the middle of crowds', '🚕 Use taxi or metro between churches — downtown gets very crowded', '💧 Bring water — processions can last 2-3 hours standing', '📷 Flash disturbs religious ceremonies — photograph in silent mode'],
-      'sitiosList': ['Catedral Metropolitana (Parque Bolívar)', 'Basílica de la Candelaria', 'Iglesia de San José', 'Recorrido de procesiones nocturnas', 'Exposición de arte sacro', 'Plaza Botero (instalación especial)'],
-    },
-    {
-      'nombre': 'FESTIVAL INTERNACIONAL DE TANGO', 'nombreEN': 'INTERNATIONAL TANGO FESTIVAL',
-      'imagen': 'assets/images/rutas/ruta_18_tango.jpg',
-      'insigniaImg': 'assets/images/insignias/insignia_18_gardel_medellin.png',
-      'subtitulo': 'Centro · Plaza Gardel · Música & Cultura', 'subtituloEN': 'Downtown · Plaza Gardel · Music & Culture',
-      'emoji': '🎷', 'sitios': 6, 'tiempo': '3h nocturnas',
-      'transporte': '🚇 Metro + taxi', 'dificultad': 'FÁCIL', 'precio': '\$29.900',
-      'zona': 'Temporada', 'tag': '🎷 22 – 30 jun', 'temporadaMeses': [6], 'temporadaInicio': [6, 22], 'temporadaFin': [6, 30],
-      'ciudad': 'Medellín', 'pais': 'Colombia',
-      'color1': const Color(0xFF0A0A1A), 'color2': const Color(0xFF10102A),
-      'acento': const Color(0xFF5BAD6F),
-      'premio': "Insignia Gardel de Medellín",
-      'insignia': 'Gardel de Medellín', 'personaje': '🎩',
-      'consejos': ['🎷 Llega temprano a los escenarios al aire libre — se llenan rápido durante el festival', '🚕 Usa siempre taxi o metro por la noche — no camines solo en zonas desconocidas', '👗 Los bares tangueros suelen tener ambiente elegante — considera vestirte con estilo', '💵 Lleva efectivo para los bares y milongas populares', '💧 Mantente hidratado — el ambiente de festival en noches cálidas deshidrata', '📷 Batería cargada — querrás capturar las milongas y el ambiente'],
-      'consejosEN': ['🎷 Arrive early to open-air stages — they fill up fast during the festival', '🚕 Always use taxi or metro at night — do not walk alone in unfamiliar areas', '👗 Tango bars tend to have an elegant atmosphere — consider dressing with style', '💵 Bring cash for bars and popular milongas', '💧 Stay hydrated — festival atmosphere on warm nights dehydrates you', '📷 Charged battery — you will want to capture the milongas and the atmosphere'],
-      'sitiosList': ['Casa Gardeliana (museo)', 'Plaza Gardel (epicentro)', 'Parque de los Deseos', 'Parque Pies Descalzos', 'Plaza Manrique (milonga popular)', 'Bar tanguero aliado (clase incluida)'],
-    },
-    {
-      'nombre': 'FESTIVAL DE POESÍA INTERNACIONAL', 'nombreEN': 'INTERNATIONAL POETRY FESTIVAL',
-      'imagen': 'assets/images/rutas/ruta_23_poesia.jpg',
-      'descripcion': 'Medellín se convierte cada julio en la capital mundial de la poesía. Este festival lleva versos y palabras a parques, jardines y bibliotecas de la ciudad. Poetas de todo el mundo se reúnen para compartir sus obras en espacios abiertos rodeados de la naturaleza de la eterna primavera.',
-      'insigniaImg': 'assets/images/insignias/insignia_23_poeta_valle.png',
-      'subtitulo': 'Parques · Bibliotecas · Literatura & Arte', 'subtituloEN': 'Parks · Libraries · Literature & Art',
-      'emoji': '🌷', 'sitios': 5, 'tiempo': '3h',
-      'transporte': '🚇 Metro + caminata', 'dificultad': 'FÁCIL', 'precio': '\$29.900',
-      'zona': 'Temporada', 'tag': '🌷 4 – 12 jul', 'temporadaMeses': [7], 'temporadaInicio': [7, 4], 'temporadaFin': [7, 12],
-      'ordenTemporada': 99,
-      'ciudad': 'Medellín', 'pais': 'Colombia',
-      'color1': const Color(0xFF0A0A1A), 'color2': const Color(0xFF14102A),
-      'acento': const Color(0xFFB85CAE),
-      'premio': "Insignia Poeta del Valle",
-      'insignia': 'Poeta del Valle', 'personaje': '🦋',
-      'consejos': ['🌿 El Jardín Botánico es la sede principal — llega temprano para conseguir buen lugar bajo los árboles', '💧 Lleva agua — las lecturas al aire libre pueden durar horas', '☀️ Protector solar para los eventos diurnos en espacios abiertos', '📓 Lleva un cuaderno — el ambiente inspira a escribir', '👟 Zapatos cómodos para caminar entre sedes del festival', '💵 La mayoría de eventos son gratuitos — ten efectivo solo para la librería aliada'],
-      'consejosEN': ['🌿 The Botanical Garden is the main venue — arrive early for a good spot under the trees', '💧 Bring water — open-air readings can last for hours', '☀️ Sunscreen for daytime events in open spaces', '📓 Bring a notebook — the atmosphere inspires writing', '👟 Comfortable shoes for walking between festival venues', '💵 Most events are free — only have cash for the allied bookstore'],
-      'sitiosList': ['Jardín Botánico (lectura principal)', 'Parque de los Deseos (poesía)', 'Biblioteca EPM (taller escritura)', 'Universidad de Antioquia (lecturas)', 'Librería aliada (firma + café poesía)'],
-    },
-    {
-      'nombre': 'COLOMBIAMODA — MODA & DISEÑO', 'nombreEN': 'COLOMBIAMODA — FASHION & DESIGN',
-      'imagen': 'assets/images/rutas/ruta_colombiamoda.jpg',
-      'descripcion': 'Descubre por qué Medellín es la capital de la moda en Colombia. Colombiamoda reúne a los mejores diseñadores del país en showrooms exclusivos de Plaza Mayor y las boutiques de Provenza. Una ruta para los amantes del diseño, la moda sostenible y el estilo colombiano.',
-      'insigniaImg': 'assets/images/insignias/insignia_24_embajador_diseno.png',
-      'subtitulo': 'Plaza Mayor · Provenza · Moda & Diseño', 'subtituloEN': 'Plaza Mayor · Provenza · Fashion & Design',
-      'emoji': '👗', 'sitios': 5, 'tiempo': '3h',
-      'transporte': '🚇 Metro + taxi', 'dificultad': 'FÁCIL', 'precio': '\$29.900',
-      'zona': 'Temporada', 'tag': '👗 28 – 31 jul', 'temporadaMeses': [7], 'temporadaInicio': [7, 28], 'temporadaFin': [7, 31],
-      'ciudad': 'Medellín', 'pais': 'Colombia',
-      'color1': const Color(0xFF1A0A14), 'color2': const Color(0xFF2A1020),
-      'acento': const Color(0xFFD4956A),
-      'premio': "Insignia Embajador del Diseño",
-      'insignia': 'Embajador del Diseño', 'personaje': '✨',
-      'consejos': ['👗 Colombiamoda es un evento de moda — viste bien para entrar a los showrooms privados', '💳 Los showrooms y boutiques aceptan tarjeta — lleva algo de efectivo para mercados', '🎟 Algunos eventos requieren registro previo — revisa la agenda oficial antes de ir', '📷 Pide permiso antes de fotografiar diseños en los showrooms', '🕐 La Calle Provenza es mejor en la tarde — los diseñadores están más disponibles', '🚕 Taxi o metro para moverse entre Plaza Mayor y Provenza — está un poco lejos'],
-      'consejosEN': ['👗 Colombiamoda is a fashion event — dress well to enter private showrooms', '💳 Showrooms and boutiques accept cards — have some cash for markets', '🎟 Some events require prior registration — check the official agenda beforehand', '📷 Ask permission before photographing designs in showrooms', '🕐 Calle Provenza is best in the afternoon — designers are more available', '🚕 Taxi or metro between Plaza Mayor and Provenza — they are a bit far'],
-      'sitiosList': ['Plaza Mayor (showrooms externos)', 'Calle Provenza (tiendas diseñador)', 'Mercado del Poblado (diseñadores)', 'Galería de arte aliada', 'Showroom marca aliada (dcto exclusivo)'],
-    },
-    {
-      'nombre': 'FERIA DE LAS FLORES', 'nombreEN': 'FLOWER FESTIVAL',
-      'ordenTemporada': 0, 'mostrarContador': false,
-      'imagen': 'assets/images/rutas/ruta_17_feria_flores.jpg',
-      'insigniaImg': 'assets/images/insignias/insignia_17_silletero_oro.png',
-      'subtitulo': 'Medellín · Festival & Tradición silletera · Edición 69',
-      'subtituloEN': 'Medellín · Festival & Flower Parade Tradition · 69th Edition',
-      'emoji': '🌹', 'sitios': 12, 'tiempo': '10 días',
-      'transporte': '🚇 Metro + caminata', 'dificultad': 'FÁCIL',
-      'precio': r'$0',
-      'gratuita': true,
-      'precioTexto': 'GRATIS · Solo durante la Feria',
-      'precioTextoEN': 'FREE · Only during the Festival',
-      'zona': 'Temporada', 'tag': '🌹 31 jul – 9 ago',
-      'temporadaMeses': [7, 8], 'temporadaInicio': [7, 31], 'temporadaFin': [8, 9],
-      'ciudad': 'Medellín', 'pais': 'Colombia',
-      'color1': const Color(0xFF1A0A10), 'color2': const Color(0xFF2A1020),
-      'acento': const Color(0xFFE85D26),
-      'premio': 'Insignia Silletero de Oro',
-      'insignia': 'Silletero de Oro', 'personaje': '💐',
-      'hook': 'La feria más colorida de Colombia · 10 días donde Medellín se viste de flores. GRATIS.',
-      'hookEN': 'The most colorful festival in Colombia · 10 days where Medellín dresses in flowers. FREE.',
-      'descripcion': '"Medellín te quiere" · Edición 69 del Desfile de Silleteros · 31 julio al 9 agosto. +500 actividades, 70% gratuitas. El Desfile de Silleteros es Patrimonio Cultural de la Humanidad.',
-      'descripcionEN': 'Feria de las Flores 2026 · 69th Silleteros Parade Edition · July 31 to August 9. Organizer: Medellín City Hall. Free events. The Silleteros Parade is UNESCO Intangible Cultural Heritage.',
-      'mejorHora': '8:00 am · Domingo 9 de agosto para el Desfile de Silleteros',
-      'tipoExperiencia': 'Festival & Tradición Cultural',
-      'tipoExperienciaEN': 'Festival & Cultural Tradition',
-      'momentoClave': 'El Desfile de Silleteros del domingo 9 de agosto — 600 familias silleteras cargando hasta 80 kilos de flores en sus espaldas. El espectáculo más colorido de Colombia.',
-      'momentoClaveEN': 'The Silleteros Parade on Sunday August 9 — 600 flower-bearing families carrying up to 80 kilos of flowers on their backs. The most colorful spectacle in Colombia.',
-      'misionEpica': 'Reta a un trovador del Parque de los Deseos a inventar una copla con tu nombre. Si lo logras — 30 puntos extra y la insignia Silletero de Oro desbloqueada.',
-      'misionEpicaEN': 'Challenge a trovador at Parque de los Deseos to improvise a verse with your name. If you succeed — 30 bonus points and the Silletero de Oro badge unlocked.',
-      'consejos': [
-        '🌹 La Feria es la semana más concurrida del año — reserva hospedaje con meses de anticipación',
-        '🏨 Hospedaje desde \$20.000 (hostales mochileros) hasta \$150.000+ por noche en temporada alta',
-        '🚇 Usa el metro y la tarjeta Cívica — el tráfico es caótico durante la feria',
-        '💧 Lleva agua — vas a estar mucho tiempo al aire libre en agosto',
-        '☀️ Protector solar obligatorio — los eventos son mayormente al aire libre',
-        '📱 Guarda el celular en el bolsillo en las multitudes del Desfile',
-        '🕐 El Desfile del domingo empieza a las 2pm — llega 2 horas antes para buen puesto',
-        r'🚕 Santa Elena está a ~30 min en taxi desde el centro ($15.000 COP)',
-      ],
-      'consejosEN': [
-        '🌹 Feria week is the most crowded of the year — book accommodation months ahead',
-        '🏨 Lodging from \$5 USD (hostels) to \$40+ per night during peak season',
-        '🚇 Use the metro and Cívica card — traffic is chaotic during the fair',
-        '💧 Bring water — you will be outdoors a lot in August',
-        '☀️ Sunscreen is essential — events are mostly outdoors',
-        '📱 Keep your phone in your pocket in Silleteros Parade crowds',
-        '🕐 The Sunday parade starts at 2pm — arrive 2 hours ahead to get a spot',
-        r'🚕 Santa Elena is ~30 min by taxi from downtown ($4 USD)',
-      ],
-      'sitioOpcional': false,
-      // 📅 VALIDACIÓN POR FECHA — arquitectura futura
-      // Cada sitio tiene una fecha específica dentro de la Feria (31 jul - 9 ago)
-      // Implementar: verificar que la fecha actual coincide con la del sitio
-      // antes de permitir la validación GPS. Algunos eventos son únicos por día.
-      // Campo a agregar: 'fechaEvento': {'dia': 5, 'mes': 8} en _SitioMapa
-      'sitiosList': [
-        'Concierto inaugural (Obelisco)',
-        'Parque de los Deseos (trova)',
-        'Orquideorama — Exposición flores',
-        'Finca Silletera Santa Elena',
-        'Plaza Mayor (exhibición silletas)',
-        'Placita de Flórez — Plaza de Flores',
-        'Parque Gardel (tablados y música)',
-        'Avenida Guayabal (Desfile Silleteros)',
-        'Parques del Río (tablado musical)',
-        'Atanasio Girardot (Super Concierto)',
-        'UPB (Desfile Autos Clásicos)',
-        'Parque Guayaquil (Desfile Chivas)',
-      ],
-      // 📅 Fechas de validación por sitio — se verifican antes de permitir GPS
-      'fechasEvento': {
-        'Concierto inaugural (Obelisco)':         [7, 31],  // 31 jul · 5pm
-        'Parque de los Deseos (trova)':           [8, 7],   // 7 ago · Final Trova
-        'Orquideorama — Exposición flores':       null,     // toda la feria
-        'Finca Silletera Santa Elena':            null,     // toda la feria
-        'Plaza Mayor (exhibición silletas)':      [8, 9],   // 9 ago · Desfile
-        'Placita de Flórez — Plaza de Flores':    null,     // toda la feria
-        'Parque Gardel (tablados y música)':      null,     // toda la feria
-        'Avenida Guayabal (Desfile Silleteros)':  [8, 9],   // 9 ago · 2pm
-        'Parques del Río (tablado musical)':      null,     // toda la feria
-        'Atanasio Girardot (Super Concierto)':    [8, 8],   // 8 ago · 7pm
-        'UPB (Desfile Autos Clásicos)':           [8, 6],   // 6 ago · 10am
-        'Parque Guayaquil (Desfile Chivas)':      [8, 7],   // 7 ago · 2pm
-      },
-    },
-
-  // ── TABLADOS Y RUMBA — Feria 2026 ────────────────────────────
-  {
-    'nombre': 'TABLADOS Y RUMBA',
-    'nombreEN': 'STAGES & NIGHTLIFE',
-    'imagen': 'assets/images/rutas/ruta_17_feria_flores.jpg',
-    'insigniaImg': 'assets/images/insignias/insignia_17_silletero_oro.png',
-    'subtitulo': 'Medellín · 4 zonas · 21 tablados gratuitos · Toda la feria',
-    'subtituloEN': 'Medellín · 4 zones · 21 free stages · Throughout the festival',
-    'emoji': '🥁', 'sitios': 4, 'tiempo': 'Cada noche',
-    'transporte': '🚇 Metro', 'dificultad': 'FÁCIL',
-    'precio': r'$0', 'gratuita': true,
-    'precioTexto': 'GRATIS · Toda la feria',
-    'precioTextoEN': 'FREE · Throughout the festival',
-    'zona': 'Temporada', 'tag': '🥁 31 jul – 9 ago',
-    'temporadaMeses': [7, 8], 'temporadaInicio': [7, 31], 'temporadaFin': [8, 9],
-    'ciudad': 'Medellín', 'pais': 'Colombia',
-    'color1': const Color(0xFF0A0A1A), 'color2': const Color(0xFF101020),
-    'acento': const Color(0xFF7F77DD),
-    'premio': 'Insignia Gozador Paisa',
-    'insignia': 'Gozador Paisa', 'personaje': '🥁',
-    'hook': '21 tablados gratuitos en toda la ciudad · Cada noche de la feria Medellín suena.',
-    'hookEN': '21 free music stages across the city · Every night of the festival Medellín grooves.',
-    'descripcion': 'La feria desde las comunas — 21 tablados gratuitos patrocinados por Aguardiente Antioqueño y Pilsen. Valida en las 4 zonas de la ciudad y gana la insignia Gozador Paisa.',
-    'descripcionEN': 'The festival from the communes — 21 free stages sponsored by Aguardiente Antioqueño and Pilsen. Validate in the 4 city zones and earn the Gozador Paisa badge.',
-    'mejorHora': 'Desde las 8 pm · Toda la feria',
-    'tipoExperiencia': 'Música & Cultura Popular',
-    'tipoExperienciaEN': 'Music & Popular Culture',
-    'momentoClave': 'La noche del Parque Gardel — donde se concentra la mejor música tropical de la feria.',
-    'momentoClaveEN': 'The night at Parque Gardel — where the best tropical music of the festival converges.',
-    'misionEpica': 'Baila en las 4 zonas de la ciudad en una sola noche de feria. Un true Gozador Paisa.',
-    'misionEpicaEN': 'Dance in all 4 city zones in a single festival night. A true Gozador Paisa.',
-    'consejos': [
-      '🥁 Los tablados son GRATIS — no necesitas boleta',
-      '🚇 Usa el metro para moverte entre zonas',
-      '🎶 El Parque Gardel es el epicentro — empieza ahí',
-      '🌙 La mejor hora es después de las 9 pm',
-      '👟 Zapatos cómodos — vas a bailar mucho',
-    ],
-    'consejosEN': [
-      '🥁 Stages are FREE — no ticket needed',
-      '🚇 Use the metro to move between zones',
-      '🎶 Parque Gardel is the epicenter — start there',
-      '🌙 Best time is after 9 pm',
-      '👟 Comfortable shoes — you will dance a lot',
-    ],
-    'sitiosList': [
-      'Tablados Zona Norte (Manrique · Castilla)',
-      'Tablados Zona Centro (Gardel · Deseos · Artistas)',
-      'Tablados Zona Occidente (San Javier · Robledo)',
-      'Tablados Zona Sur (El Poblado · San Antonio)',
-    ],
-  },
-
-  // ── RUTA SILLETERA — Santa Elena y Arví ──────────────────────
-  {
-    'nombre': 'RUTA SILLETERA',
-    'nombreEN': 'SILLETERA ROUTE',
-    'imagen': 'assets/images/rutas/ruta_17_feria_flores.jpg',
-    'insigniaImg': 'assets/images/insignias/insignia_17_silletero_oro.png',
-    'subtitulo': 'Santa Elena · Fincas · Arví · La experiencia auténtica',
-    'subtituloEN': 'Santa Elena · Farms · Arví · The authentic experience',
-    'emoji': '🌿', 'sitios': 5, 'tiempo': '1 día completo',
-    'transporte': '🚕 Taxi desde El Centro (~30 min)', 'dificultad': 'MODERADA',
-    'precio': r'$0', 'gratuita': true,
-    'precioTexto': 'GRATIS · 19 jul – 9 ago',
-    'precioTextoEN': 'FREE · Jul 19 – Aug 9',
-    'zona': 'Temporada', 'tag': '🌿 19 jul – 9 ago',
-    'temporadaMeses': [7, 8], 'temporadaInicio': [7, 19], 'temporadaFin': [8, 9],
-    'ciudad': 'Medellín', 'pais': 'Colombia',
-    'color1': const Color(0xFF0A1A0A), 'color2': const Color(0xFF0F1E0F),
-    'acento': const Color(0xFF2D6A2F),
-    'premio': 'Insignia Guardián Silletero',
-    'insignia': 'Guardián Silletero', 'personaje': '🌿',
-    'hook': 'La experiencia silletera que ninguna otra app tiene. Fincas reales en Santa Elena.',
-    'hookEN': 'The silletera experience no other app has. Real farms in Santa Elena.',
-    'descripcion': 'Visita las fincas silleteras de Santa Elena — donde nacen las flores del Desfile. COSSE, El Pensamiento y El Cartucho abren sus puertas desde el 19 de julio. Combínalo con la ciclada silletera en Parque Arví.',
-    'descripcionEN': 'Visit the silletera farms of Santa Elena — where the Parade flowers are born. COSSE, El Pensamiento and El Cartucho open their doors from July 19. Combine it with the silletera cycling tour at Parque Arví.',
-    'mejorHora': '8:00 am · Llega temprano para ver el proceso',
-    'tipoExperiencia': 'Cultura & Naturaleza',
-    'tipoExperienciaEN': 'Culture & Nature',
-    'momentoClave': 'Ver a los silleteros construir su silleta — hasta 80 kilos de flores frescas trabajadas a mano.',
-    'momentoClaveEN': 'Watch the silleteros build their flower arrangement — up to 80 kilos of fresh flowers crafted by hand.',
-    'misionEpica': 'Aprende a armar una silleta con flores de la finca y tómate la foto. Guardián Silletero desbloqueado.',
-    'misionEpicaEN': 'Learn to assemble a silleta with farm flowers and take the photo. Guardián Silletero unlocked.',
-    'consejos': [
-      r'🚕 Taxi o buseta desde El Centro ~ $15.000 COP · 30 minutos',
-      '🌸 Llega temprano — los silleteros trabajan desde el amanecer',
-      '📷 Cámara cargada — las fotos son increíbles',
-      '💧 Lleva agua y snacks — estás en zona rural',
-      '🌿 Respeta las flores y los cultivos',
-      '🚴 Después de las fincas ve al Parque Arví en Metro Cable',
-    ],
-    'consejosEN': [
-      r'🚕 Taxi or bus from downtown ~ $15,000 COP · 30 minutes',
-      '🌸 Arrive early — silleteros work from dawn',
-      '📷 Charged camera — the photos are incredible',
-      '💧 Bring water and snacks — you are in a rural area',
-      '🌿 Respect the flowers and crops',
-      '🚴 After the farms head to Parque Arví via Metro Cable',
-    ],
-    'sitiosList': [
-      'Finca Silletera COSSE',
-      'Finca El Pensamiento',
-      'Finca El Cartucho',
-      'Parque Arví — Ciclada silletera',
-      'Mirador Santa Elena',
-    ],
-  },
-
-    {
-      'nombre': 'MEDEJAZZ — FESTIVAL DE JAZZ', 'nombreEN': 'MEDEJAZZ — JAZZ FESTIVAL',
-      'imagen': 'assets/images/rutas/ruta_19_jazz.jpg',
-      'insigniaImg': 'assets/images/insignias/insignia_19_jazz_paisa.png',
-      'subtitulo': 'Plaza Mayor · El Tesoro · Música & Cultura', 'subtituloEN': 'Plaza Mayor · El Tesoro · Music & Culture',
-      'emoji': '🎵', 'sitios': 5, 'tiempo': '3h',
-      'transporte': '🚇 Metro + taxi', 'dificultad': 'FÁCIL', 'precio': '\$29.900',
-      'zona': 'Temporada', 'tag': '🎵 10 – 20 sep', 'temporadaMeses': [9], 'temporadaInicio': [9, 10], 'temporadaFin': [9, 20],
-      'ciudad': 'Medellín', 'pais': 'Colombia',
-      'color1': const Color(0xFF0A0A1A), 'color2': const Color(0xFF0A1420),
-      'acento': const Color(0xFF4A90D9),
-      'premio': "Insignia Jazz Paisa",
-      'insignia': 'Jazz Paisa', 'personaje': '🎺',
-      'consejos': ['🎵 Revisa la programación del festival antes — los horarios de cada escenario varían cada día', '🚕 Usa taxi o metro en la noche — no camines solo entre escenarios', '💵 Los bares de jazz cobran cover — lleva efectivo suficiente para la noche', '👗 El jazz tiene ambiente elegante — considera vestirte con un poco de estilo', '🔋 Carga el celular antes de salir — las noches de festival son largas', '💧 Mantente hidratado entre show y show'],
-      'consejosEN': ['🎵 Check the festival program beforehand — each stage has different times each day', '🚕 Use taxi or metro at night — do not walk alone between stages', '💵 Jazz bars charge a cover — bring enough cash for the evening', '👗 Jazz has an elegant atmosphere — consider dressing with some style', '🔋 Charge your phone before going out — festival nights are long', '💧 Stay hydrated between shows'],
-      'sitiosList': ['Plaza Mayor (escenario principal)', 'Jardín Botánico (concierto)', 'Centro Comercial El Tesoro', 'Parque de los Deseos (jam session)', 'Bar de jazz aliado (show nocturno)'],
-    },
-    {
-      'nombre': 'FIESTA DEL LIBRO Y LA CULTURA', 'nombreEN': 'BOOK & CULTURE FESTIVAL',
-      'imagen': 'assets/images/rutas/ruta_20_libro.jpg',
-      'insigniaImg': 'assets/images/insignias/insignia_20_lector_primavera.png',
-      'subtitulo': 'Jardín Botánico · Bibliotecas · Literatura', 'subtituloEN': 'Botanical Garden · Libraries · Literature',
-      'emoji': '📚', 'sitios': 6, 'tiempo': '3h',
-      'transporte': '🚇 Metro + caminata', 'dificultad': 'FÁCIL', 'precio': '\$29.900',
-      'zona': 'Temporada', 'tag': '📚 5 – 15 sep', 'temporadaMeses': [9], 'temporadaInicio': [9, 5], 'temporadaFin': [9, 15],
-      'ciudad': 'Medellín', 'pais': 'Colombia',
-      'color1': const Color(0xFF0A100A), 'color2': const Color(0xFF101A10),
-      'acento': const Color(0xFFC9A84C),
-      'premio': "Insignia Lector de la Eterna Primavera",
-      'insignia': 'Lector de la Eterna Primavera', 'personaje': '📖',
-      'consejos': ['📚 La Fiesta del Libro es gratuita — no necesitas comprar nada para disfrutar todos los eventos', '💧 Lleva agua — el Jardín Botánico tiene eventos al aire libre largas horas', '☀️ Protector solar para los espacios al aire libre del Botánico y Parque Explora', '👟 Zapatos cómodos — vas a caminar bastante entre las distintas sedes', '📓 Lleva bolsa si planeas comprar libros — la librería aliada tiene muy buenas ofertas', '🕐 Los talleres de escritura tienen cupo limitado — regístrate con anticipación'],
-      'consejosEN': ['📚 Fiesta del Libro is free — you do not need to buy anything to enjoy all events', '💧 Bring water — Botanical Garden has outdoor events for long hours', '☀️ Sunscreen for open-air spaces at the Garden and Parque Explora', '👟 Comfortable shoes — you will walk a lot between different venues', '📓 Bring a bag if you plan to buy books — the allied bookstore has great deals', '🕐 Writing workshops have limited spots — register in advance'],
-      'sitiosList': ['Jardín Botánico (sede principal)', 'Orquideorama (presentaciones)', 'Parque Explora (talleres)', 'Biblioteca Pública Piloto', 'Parque de los Deseos (lecturas)', 'Librería aliada'],
-    },
-    {
-      'nombre': 'FERIA DE LA ANTIOQUEÑIDAD', 'nombreEN': 'ANTIOQUIAN IDENTITY FAIR',
-      'imagen': 'assets/images/rutas/ruta_21_antioqueñidad.jpg',
-      'descripcion': 'Celebra lo mejor de la cultura paisa en la Feria de la Antioqueñidad. Visita el Pueblito Paisa, disfruta música de cuerda, artesanías típicas y gastronomía tradicional antioqueña. Una inmersión total en las tradiciones que hacen única a esta región de Colombia.',
-      'insigniaImg': 'assets/images/insignias/insignia_21_embajador_paisa.png',
-      'subtitulo': 'Medellín · Cultura & Tradición paisa', 'subtituloEN': 'Medellín · Culture & Paisa Tradition',
-      'emoji': '🎭', 'sitios': 6, 'tiempo': '4h',
-      'transporte': '🚇 Metro + caminata', 'dificultad': 'FÁCIL', 'precio': '\$29.900',
-      'zona': 'Temporada', 'tag': '🎭 1 – 31 oct', 'temporadaMeses': [10], 'temporadaInicio': [10, 1], 'temporadaFin': [10, 31],
-      'ciudad': 'Medellín', 'pais': 'Colombia',
-      'color1': const Color(0xFF1A0A00), 'color2': const Color(0xFF2A1400),
-      'acento': const Color(0xFF8B5E3C),
-      'premio': "Insignia Embajador Paisa",
-      'insignia': 'Embajador Paisa', 'personaje': '🎪',
-      'consejos': ['🎭 La Antioqueñidad es familiar y muy popular — llega temprano a los eventos del Pueblito Paisa', '🚕 Para subir al Cerro Nutibara toma taxi — no hay transporte público directo', '💵 Lleva efectivo para las artesanías y la gastronomía típica del festival', '👟 Zapatos cómodos para subir y bajar el cerro y caminar entre sedes', '🎶 Los espectáculos de música de cuerda y danza son gratuitos — consulta horarios', '📷 Las artesanías y los trajes típicos son muy fotogénicos — batería cargada'],
-      'consejosEN': ['🎭 Antioqueñidad is family-friendly and very popular — arrive early to Pueblito Paisa events', '🚕 Take a taxi to Cerro Nutibara — no direct public transport', '💵 Bring cash for crafts and traditional gastronomy at the festival', '👟 Comfortable shoes for climbing and descending the hill and walking between venues', '🎶 String music and dance shows are free — check schedules', '📷 Crafts and traditional costumes are very photogenic — charged battery'],
-      'sitiosList': ['Pueblito Paisa (Cerro Nutibara)', 'Parque de las Luces (escenario)', 'Plaza Gardel (música de cuerda)', 'Feria de artesanías antioqueñas', 'Degustación gastronomía típica', 'Espectáculo de danzas folclóricas'],
-    },
-    {
-      'nombre': 'ALUMBRADO NAVIDEÑO — RÍO MEDELLÍN', 'nombreEN': 'CHRISTMAS LIGHTS — RÍO MEDELLÍN',
-      'imagen': 'assets/images/rutas/ruta_15_alumbrado.jpg',
-      'insigniaImg': 'assets/images/insignias/insignia_15_guardian_luz_nav.png',
-      'descripcion': 'Vive la magia del alumbrado navideño más espectacular de Colombia a orillas del Río Medellín. El Desfile de Mitos y Leyendas abre la temporada con criaturas míticas iluminadas, seguido de millones de luces que transforman la ciudad en un sueño navideño. Una experiencia única en Latinoamérica.',
-      'insigniaImg': 'assets/images/insignias/insignia_22_guardian_luz_rio.png',
-      'subtitulo': 'Río Medellín · Centro · Navidad & Luces', 'subtituloEN': 'Río Medellín · Downtown · Christmas & Lights',
-      'emoji': '🎇', 'sitios': 7, 'tiempo': '3h nocturnas',
-      'transporte': '🚇 Metro + caminata', 'dificultad': 'FÁCIL', 'precio': '\$29.900',
-      'zona': 'Temporada', 'tag': '🎇 1 dic – 15 ene', 'temporadaMeses': [12, 1], 'temporadaInicio': [12, 1], 'temporadaFin': [1, 15],
-      'ciudad': 'Medellín', 'pais': 'Colombia',
-      'color1': const Color(0xFF1A1000), 'color2': const Color(0xFF2A1A00),
-      'acento': const Color(0xFFFFD700),
-      'premio': "Insignia Guardián de la Luz",
-      'insignia': 'Guardián de la Luz', 'personaje': '⭐',
-      'consejos': ['🌙 El alumbrado es nocturno — la mejor hora es entre 7pm y 10pm cuando todas las luces están encendidas', '🧥 Las noches de diciembre en el centro pueden ser frescas — lleva una chaqueta liviana', '📱 Guarda el celular en el bolsillo en las multitudes del Paseo del Río', '🚇 Usa exclusivamente el metro — el tráfico en diciembre es caótico en toda la ciudad', '📷 Batería extra o power bank — vas a tomar cientos de fotos', '👥 Ve en grupo — el ambiente es familiar pero las multitudes son muy grandes'],
-      'consejosEN': ['🌙 The lights are at night — best time is between 7pm and 10pm when all lights are on', '🧥 December nights downtown can be cool — bring a light jacket', '📱 Keep your phone in your pocket in the Paseo del Rio crowds', '🚇 Use the metro exclusively — December traffic is chaotic all over the city', '📷 Extra battery or power bank — you will take hundreds of photos', '👥 Go in a group — the atmosphere is family-friendly but crowds are very large'],
-      'sitiosList': ['Desfile de Mitos y Leyendas (7 dic)', 'Paseo Fluvial del Río Medellín', 'Parque Norte (instalación EPM)', 'Parque de los Deseos (animaciones)', 'Puente de Guayaquil iluminado', 'Plaza Cisneros (nocturna)', 'Punto fotográfico oficial Rutero MDE'],
-    },
-
-    // ══════════════════════════════════════════════════════════
-    //  PARQUE JAIME DUQUE — Tocancipá, Cundinamarca
-    //  Modelo B2B · Primer convenio corporativo Rutero MDE
-    //  Mapa oficial: Febrero 2025 · 47 atracciones
-    // ══════════════════════════════════════════════════════════
-
-    // ── RUTA 1: CLÁSICA — Monumentos & Maravillas ────────────
-    {
-      'nombre': 'PARQUE JAIME DUQUE — CLÁSICA',
-      'nombreEN': 'JAIME DUQUE PARK — CLASSIC ROUTE',
-      'imagen': 'assets/images/rutas/ruta_jaime_duque_clasica.jpg',
-      'subtitulo': 'Tocancipá · Cultura · Historia · Naturaleza',
-      'subtituloEN': 'Tocancipá · Culture · History · Nature',
-      'emoji': '🏛️',
-      'sitios': 8,
-      'tiempo': '5-6h',
-      'transporte': '🚶 Caminata dentro del parque',
-      'dificultad': 'FÁCIL',
-      'color1': const Color(0xFF0A1A0F),
-      'color2': const Color(0xFF0F2A15),
-      'acento': kGreen,
-      'tag': '🏛️ Parques temáticos · Cundinamarca',
-      'zona': 'Alrededores',
-      'ciudad': 'Bogotá', 'pais': 'Colombia',
-      'precio': r'$29.900',
-      'insignia': 'Explorador Jaime Duque',
-      'personaje': '🤲',
-      'premio': 'Insignia Explorador Jaime Duque',
-      'hook': 'Más de 100 hectáreas de historia, naturaleza y cultura — el parque más completo de Colombia a 34 km de Bogotá.',
-      'hookEN': 'Over 100 hectares of history, nature and culture — Colombia\'s most complete park just 34km from Bogotá.',
-      'descripcion': 'El Parque Jaime Duque es un centro cultural y recreativo considerado uno de los mejores de Latinoamérica por Discovery Travel & Living. Con réplicas arquitectónicas mundiales, zoológico, museo aeroespacial y reserva natural — todo en un solo lugar.',
-      'descripcionEN': 'Jaime Duque Park is a cultural and recreational center considered one of the best in Latin America by Discovery Travel & Living. World architectural replicas, zoo, aerospace museum and nature reserve — all in one place.',
-      'mejorHora': '9:00 am – 4:00 pm (Mié-Dom)',
-      'tipoExperiencia': 'Cultural & Educativa',
-      'tipoExperienciaEN': 'Cultural & Educational',
-      'momentoClave': 'La cima del Mirador Panorámico — el parque completo se despliega ante tus ojos: el Taj Mahal, los lagos, el zoológico y la sabana cundinamarquesa en 360°.',
-      'momentoClaveEN': 'The Panoramic Viewpoint summit — the entire park unfolds before your eyes: the Taj Mahal, lakes, zoo and the Cundinamarca savanna in 360°.',
-      'consejos': [
-        '🕘 Llega a las 9am — el parque es enorme y 5h mínimo para verlo completo',
-        '👟 Zapatos cómodos — caminarás más de 5 km dentro del parque',
-        '🌤️ Lleva bloqueador solar — mucho recorrido al aire libre',
-        '💵 Lleva efectivo para el restaurante y atracciones especiales',
-        '📸 La réplica del Taj Mahal al amanecer es la mejor foto del parque',
-        '🚶 Todas las atracciones están dentro del parque — usa el mapa del parque en la entrada',
-      ],
-      'consejosEN': [
-        '🕘 Arrive at 9am — the park is huge and you need minimum 5h to see it all',
-        '👟 Comfortable shoes — you will walk more than 5km inside the park',
-        '🌤️ Bring sunscreen — lots of outdoor walking',
-        '💵 Bring cash for the restaurant and special attractions',
-        '📸 The Taj Mahal replica at dawn is the best photo in the park',
-        '🚶 All attractions are inside the park — use the park map at the entrance',
-      ],
-      'sitioOpcional': false,
-      'sitiosList': [
-        'Monumento a Dios',
-        'Taj Mahal Réplica',
-        'Gran Mapa de Colombia & Aviario',
-        'Fontana Mitológica',
-        'Las Siete Maravillas del Mundo Antiguo',
-        'Mar Caribe & Barco Pirata',
-        'Zoológico Bioparque Wakatá',
-        'Museo Aeroespacial FAC',
-      ],
-    },
-
-    // ── RUTA 2: FAMILIA & AVENTURA ───────────────────────────
-    {
-      'nombre': 'PARQUE JAIME DUQUE — FAMILIA',
-      'nombreEN': 'JAIME DUQUE PARK — FAMILY ADVENTURE',
-      'imagen': 'assets/images/rutas/ruta_jaime_duque_familia.jpg',
-      'subtitulo': 'Tocancipá · Niños · Atracciones · Dinosaurios',
-      'subtituloEN': 'Tocancipá · Kids · Rides · Dinosaurs',
-      'emoji': '🦕',
-      'sitios': 7,
-      'tiempo': '4-5h',
-      'transporte': '🚶 Caminata dentro del parque',
-      'dificultad': 'FÁCIL',
-      'color1': const Color(0xFF0A1A0F),
-      'color2': const Color(0xFF0F2A15),
-      'acento': kGreen,
-      'tag': '🦕 Familia · Parques Cundinamarca',
-      'zona': 'Alrededores',
-      'ciudad': 'Bogotá', 'pais': 'Colombia',
-      'precio': r'$29.900',
-      'insignia': 'Explorador Familia Jaime Duque',
-      'personaje': '🦕',
-      'premio': 'Insignia Familia Aventurera',
-      'hook': 'El parque más completo de Colombia para vivir en familia — dinosaurios, atracciones y animales en un solo día.',
-      'hookEN': "Colombia's most complete family park — dinosaurs, rides and animals all in one day.",
-      'descripcion': 'Una ruta diseñada para familias con niños — desde el parque infantil Chiquimundo hasta los dinosaurios, las atracciones mecánicas y el Bioparque Wakatá con hipopótamos, tigres y el cóndor de los Andes.',
-      'descripcionEN': 'A route designed for families with children — from Chiquimundo playground to dinosaurs, mechanical rides and Bioparque Wakatá with hippos, tigers and the Andean condor.',
-      'mejorHora': '10:00 am – 4:00 pm (Sáb-Dom)',
-      'tipoExperiencia': 'Familiar & Recreativa',
-      'tipoExperienciaEN': 'Family & Recreational',
-      'momentoClave': 'El Bioparque Wakatá — ver un hipopótamo, un tigre y el Cóndor de los Andes en su hábitat naturalista dentro del mismo parque es una experiencia que los niños nunca olvidan.',
-      'momentoClaveEN': 'Bioparque Wakatá — seeing a hippo, tiger and Andean condor in their naturalistic habitat within the same park is an experience children never forget.',
-      'consejos': [
-        '🕘 Llega a las 10am — las atracciones para niños tienen cupos',
-        '📏 Verifica estaturas mínimas antes de hacer fila',
-        '🧒 Chiquimundo es gratis con el brazalete de entrada',
-        '🦛 El Bioparque es lo más impresionante — déjalo para el final',
-        '🍔 Restaurante Bocatípicos en el Paseo de la Cultura',
-        '💵 Lleva efectivo para atracciones especiales (tren, kayaks)',
-      ],
-      'consejosEN': [
-        "🕘 Arrive at 10am — children's rides have limited capacity",
-        '📏 Check minimum height requirements before queuing',
-        '🧒 Chiquimundo is included with the entrance bracelet',
-        '🦛 The Bioparque is the most impressive — save it for last',
-        '🍔 Restaurante Bocatípicos at Paseo de la Cultura',
-        '💵 Bring cash for special attractions (train, kayaks)',
-      ],
-      'sitioOpcional': false,
-      'sitiosList': [
-        'Parque Infantil Chiquimundo',
-        'Jardín de los Dinosaurios',
-        'Castillo Medieval',
-        'Atracciones Mecánicas Plaza Cundinamarca',
-        'Kayaks del Caribe',
-        'Zoológico Bioparque Wakatá',
-        'Comarca del Cóndor & Oso Andino',
-      ],
-    },
-
-    // ── RUTA 3: NATURALEZA & CONSERVACIÓN ───────────────────
-    {
-      'nombre': 'PARQUE JAIME DUQUE — NATURALEZA',
-      'nombreEN': 'JAIME DUQUE PARK — NATURE & CONSERVATION',
-      'imagen': 'assets/images/rutas/ruta_jaime_duque_naturaleza.jpg',
-      'subtitulo': 'Tocancipá · Ecoparque · Muisca · Cóndor',
-      'subtituloEN': 'Tocancipá · Ecopark · Muisca · Condor',
-      'emoji': '🌿',
-      'sitios': 6,
-      'tiempo': '4-5h',
-      'transporte': '🚶 Caminata dentro del parque',
-      'dificultad': 'MEDIO',
-      'color1': const Color(0xFF0A1A0F),
-      'color2': const Color(0xFF0F2A15),
-      'acento': kGreen,
-      'tag': '🌿 Ecoturismo · Conservación Colombia',
-      'zona': 'Alrededores',
-      'ciudad': 'Bogotá', 'pais': 'Colombia',
-      'precio': r'$29.900',
-      'insignia': 'Guardián de la Sabana',
-      'personaje': '🦅',
-      'premio': 'Insignia Guardián de la Sabana',
-      'hook': '70 hectáreas de bosque andino restaurado — donde el Cóndor de los Andes vuela libre y la cultura Muisca cobra vida.',
-      'hookEN': '70 hectares of restored Andean forest — where the Andean Condor flies free and Muisca culture comes to life.',
-      'descripcion': 'La Reserva Natural Ecoparque Sabana es un ecosistema vivo de 70 hectáreas con sendero de 5km, cultura Muisca y programas de conservación del Cóndor y el Oso de Anteojos. Una experiencia de ecoturismo de clase mundial a 34km de Bogotá.',
-      'descripcionEN': 'The Ecoparque Sabana Nature Reserve is a living 70-hectare ecosystem with a 5km trail, Muisca culture and conservation programs for the Condor and Spectacled Bear. World-class ecotourism 34km from Bogotá.',
-      'mejorHora': '9:00 am – 1:00 pm (último ingreso Ecoparque)',
-      'tipoExperiencia': 'Ecoturismo & Conservación',
-      'tipoExperienciaEN': 'Ecotourism & Conservation',
-      'momentoClave': 'El Sendero de la Memoria Muisca — 5km rodeado de bosque andino restaurado, esculturas Muiscas y el sonido del viento entre los árboles nativos que el parque ha sembrado por décadas.',
-      'momentoClaveEN': 'The Sendero de la Memoria Muisca — 5km surrounded by restored Andean forest, Muisca sculptures and the sound of wind through native trees the park has planted for decades.',
-      'consejos': [
-        '🕘 El Ecoparque cierra a la 1pm — comienza por aquí',
-        '🚲 Alquila una bicicleta para el sendero de 5km',
-        '🦅 El Cóndor de los Andes es la estrella — reserva tiempo',
-        '🌿 Lleva repelente — zona de bosque húmedo',
-        '📷 El aviario del Gran Mapa es impresionante — no te lo pierdas',
-        '🌱 Cada recorrido en bicicleta financia la siembra de un árbol',
-      ],
-      'consejosEN': [
-        '🕘 Ecoparque closes at 1pm — start here first',
-        '🚲 Rent a bicycle for the 5km trail',
-        '🦅 The Andean Condor is the star — reserve extra time',
-        '🌿 Bring insect repellent — humid forest zone',
-        "📷 The Gran Mapa aviary is impressive — don't miss it",
-        '🌱 Each bicycle ride funds the planting of one tree',
-      ],
-      'sitioOpcional': false,
-      'sitiosList': [
-        'Reserva Natural Ecoparque Sabana',
-        'Sendero de la Memoria Muisca (5km)',
-        'Casa de la Tingua & Avistamiento de Aves',
-        'Gran Mapa de Colombia & Aviario',
-        'Comarca del Cóndor & Oso Andino',
-        'Bioparque Wakatá — Ruta de la Biodiversidad',
-      ],
-    },
-
-    // ── RUTA 4: AVENTURA EN FAMILIA — 12 Estaciones ─────────
-    {
-      'nombre': 'PARQUE JAIME DUQUE — AVENTURA FAMILIAR',
-      'nombreEN': 'JAIME DUQUE PARK — FAMILY ADVENTURE CIRCUIT',
-      'imagen': 'assets/images/rutas/ruta_jaime_duque_familiar.jpg',
-      'subtitulo': 'Tocancipá · 12 Estaciones · Retos en Familia',
-      'subtituloEN': 'Tocancipá · 12 Stations · Family Challenges',
-      'emoji': '👨‍👩‍👧‍👦',
-      'sitios': 12,
-      'tiempo': '4-5h',
-      'transporte': '🚶 Caminata dentro del parque',
-      'dificultad': 'FÁCIL',
-      'color1': const Color(0xFF0A1A0F),
-      'color2': const Color(0xFF0F2A15),
-      'acento': kGreen,
-      'tag': '👨‍👩‍👧‍👦 Familia · Retos · Parque Jaime Duque',
-      'zona': 'Alrededores',
-      'ciudad': 'Bogotá', 'pais': 'Colombia',
-      'precio': r'$29.900',
-      'insignia': 'Familia Aventurera Jaime Duque',
-      'personaje': '👨‍👩‍👧‍👦',
-      'premio': 'Insignia Familia Aventurera',
-      'hook': '12 estaciones · 12 retos · 1 familia más unida. La aventura gamificada más completa de Colombia.',
-      'hookEN': '12 stations · 12 challenges · 1 closer family. The most complete gamified adventure in Colombia.',
-      'descripcion': 'Una ruta diseñada para fortalecer los lazos familiares mientras exploran el parque. En cada estación encontrarán un reto diferente — preguntas, fotos creativas, actos de amor y momentos de reflexión que convierten un paseo en un recuerdo imborrable.',
-      'descripcionEN': 'A route designed to strengthen family bonds while exploring the park. At each station you will find a different challenge — questions, creative photos, acts of love and moments of reflection that turn a day trip into an unforgettable memory.',
-      'mejorHora': '10:00 am – 3:00 pm (Sáb-Dom)',
-      'tipoExperiencia': 'Familiar & Emocional',
-      'tipoExperienciaEN': 'Family & Emotional',
-      'momentoClave': 'Estación 12 — Mirador Panorámico: la familia completa reunida en el punto más alto del parque, con la sabana cundinamarquesa de fondo. El momento perfecto para la foto familiar del año.',
-      'momentoClaveEN': 'Station 12 — Panoramic Viewpoint: the whole family together at the highest point of the park, with the Cundinamarca savanna as background. The perfect moment for the family photo of the year.',
-      'consejos': [
-        '📱 Cada miembro de la familia puede tener la app — comparten los puntos',
-        '⏱ No corras — el valor está en los retos, no en la velocidad',
-        '📷 Guarda todas las fotos — al final tienen el álbum del día',
-        '🍽 La estación 6 termina cerca del restaurante — perfecto para almorzar',
-        '💧 Lleva agua — caminarás más de 4km entre estaciones',
-        '🏆 Al completar las 12 estaciones reciben su insignia especial',
-      ],
-      'consejosEN': [
-        '📱 Each family member can have the app — you share points',
-        "⏱ Don't rush — the value is in the challenges, not the speed",
-        '📷 Save all photos — at the end you have the album of the day',
-        '🍽 Station 6 ends near the restaurant — perfect for lunch',
-        '💧 Bring water — you will walk more than 4km between stations',
-        '🏆 Completing all 12 stations earns your special family badge',
-      ],
-      'sitioOpcional': false,
-      'sitiosList': [
-        'Estación 1 — Monumento a Dios · ¿Por qué están agradecidos?',
-        'Estación 2 — Jardines del Amor · Carta de amor familiar',
-        'Estación 3 — Taj Mahal · Sueño familiar compartido',
-        'Estación 4 — Fontana Mitológica · El poder de la imaginación',
-        'Estación 5 — Gran Mapa de Colombia · Nuestro lugar favorito',
-        'Estación 6 — Siete Maravillas · La maravilla de nuestra familia',
-        'Estación 7 — Mar Caribe · La aventura que queremos vivir juntos',
-        'Estación 8 — Kayaks del Caribe · Trabajo en equipo',
-        'Estación 9 — Bioparque Wakatá · Cuidar lo que amamos',
-        'Estación 10 — Comarca del Cóndor · Volar alto juntos',
-        'Estación 11 — Ecoparque Sabana · Sembrar para el futuro',
-        'Estación 12 — Mirador Panorámico · La foto familiar del año',
-      ],
-    },
+  // ── Todas las rutas migradas a Firestore (22 jul 2026) ──────────────────
+  // Las 15 rutas que estaban aquí fueron migradas y están bloqueadas
+  // en migradasAFirestore. Se mantiene la lista vacía para compatibilidad.
+  // Para agregar rutas nuevas usar admin.html → Método B o Método E.
   ];
-
 class _HomeBodyState extends State<HomeBody> {
   String _filtroActivo = 'Ciudad';
   String _busqueda = '';
@@ -9287,7 +9380,7 @@ class _HomeBodyState extends State<HomeBody> {
 
     // Fallback al sistema viejo por meses
     final List<int> meses = List<int>.from(ruta['temporadaMeses'] ?? []);
-    if (meses.isEmpty) return true;
+    if (meses.isEmpty) return false; // Sin fechas de temporada → mostrar como próximamente
     return meses.contains(ahora.month);
   }
 
@@ -9325,10 +9418,20 @@ class _HomeBodyState extends State<HomeBody> {
     return min;
   }
 
+  // ── Orden fijo para rutas Ciudad (actualizado 25 jul 2026) ──────────────
+  static const List<String> _ordenCiudad = [
+    'RUTA TRANSFORMACIÓN URBANA',
+    'RUTA VERDE DEL NORTE',
+    'RUTA DEL METROCABLE & ARVÍ',
+    'CENTRO ALTERNATIVO',
+    'DEL ORIGEN PAISA A LA MEDELLÍN MODERNA',
+    // Las demás se ordenan después en el orden que lleguen de Firestore
+  ];
+
   List<Map<String, dynamic>> get _rutasFiltradas {
     // Si hay búsqueda activa → buscar en TODAS las rutas (sin filtro de ciudad)
     final base = _busqueda.isNotEmpty ? RutasService().rutas : _rutas;
-    return base.where((r) {
+    final filtered = base.where((r) {
       if (_busqueda.isNotEmpty) {
         final q = _busqueda.toLowerCase();
         final nombre = r['nombre'].toString().toLowerCase();
@@ -9345,11 +9448,22 @@ class _HomeBodyState extends State<HomeBody> {
       if (_filtroActivo == 'Eventos' && r['zona'] != 'Eventos') return false;
       return true;
     }).toList();
+
+    // Aplicar orden fijo para rutas Ciudad
+    if (_filtroActivo == 'Ciudad' && _busqueda.isEmpty) {
+      filtered.sort((a, b) {
+        final ia = _ordenCiudad.indexOf(a['nombre']?.toString() ?? '');
+        final ib = _ordenCiudad.indexOf(b['nombre']?.toString() ?? '');
+        if (ia == -1 && ib == -1) return 0;
+        if (ia == -1) return 1;
+        if (ib == -1) return -1;
+        return ia.compareTo(ib);
+      });
+    }
+    return filtered;
   }
 
   int get _rutasActivas => _rutas.where((r) => _rutaActiva(r) || r['zona'] == 'Comida Urbana' || r['zona'] == 'Eventos').length;
-
-
 
   @override
   Widget build(BuildContext context) {
@@ -9364,9 +9478,7 @@ class _HomeBodyState extends State<HomeBody> {
           child: Stack(children: [
             // Imagen panorámica como fondo del header — dinámica por ciudad
             Positioned.fill(child: ClipRect(child: Image.asset(
-              _ciudadDetectada?.codigo == 'BTA'
-                ? 'assets/images/ruta_jaime_duque_clasica.jpg'
-                : 'assets/images/splash_bg.png',
+              'assets/images/splash_bg.png',
               fit: BoxFit.cover,
               alignment: Alignment.topCenter,
               errorBuilder: (_, __, ___) => const SizedBox()))),
@@ -9456,12 +9568,51 @@ class _HomeBodyState extends State<HomeBody> {
         // El turista puede cambiar manualmente tocando el nombre
         // de la ciudad en el header de la pantalla.
 
-
-
         // Lista rutas
         Expanded(child: SingleChildScrollView(
           padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            // ── Banner Rutero Planner ─────────────────────────────────
+            GestureDetector(
+              onTap: () => RuteroNav.push(context, const PlannerScreen()),
+              child: Container(
+                margin: const EdgeInsets.only(bottom: 20),
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFF0D2010), Color(0xFF142A18)],
+                    begin: Alignment.topLeft, end: Alignment.bottomRight),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: kGold.withOpacity(0.35))),
+                child: Row(children: [
+                  Container(width: 48, height: 48,
+                    decoration: BoxDecoration(
+                      color: kGold.withOpacity(0.15),
+                      shape: BoxShape.circle,
+                      border: Border.all(color: kGold.withOpacity(0.4))),
+                    child: const Center(child: Text('🗓️', style: TextStyle(fontSize: 22)))),
+                  const SizedBox(width: 14),
+                  Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text(t('RUTERO PLANNER IA', 'RUTERO PLANNER AI'),
+                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w900,
+                        color: kGold, letterSpacing: 1)),
+                    const SizedBox(height: 2),
+                    Text(
+                      t('Decinos cuándo llegás — nosotros te decimos qué hacer',
+                        'Tell us when you arrive — we tell you what to do'),
+                      style: TextStyle(fontSize: 11, color: kTextMuted.withOpacity(0.85), height: 1.3)),
+                  ])),
+                  const SizedBox(width: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: kGold,
+                      borderRadius: BorderRadius.circular(20)),
+                    child: Text(t('Probar', 'Try it'),
+                      style: const TextStyle(color: Colors.black, fontSize: 11,
+                        fontWeight: FontWeight.w900))),
+                ]))),
+            // ─────────────────────────────────────────────────────────
             Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
               Text(tRutasDisponibles,
                 style: TextStyle(fontSize: 13, fontWeight: FontWeight.w900,
@@ -9540,15 +9691,65 @@ class _HomeBodyState extends State<HomeBody> {
                 titulo: t('🏙️ EN ${(_ciudadDetectada?.ciudad ?? "MEDELLÍN").toUpperCase()}','🏙️ IN ${(_ciudadDetectada?.ciudad ?? "MEDELLÍN").toUpperCase()}'),
                 subtitulo: '${_rutas.where((r) => r["zona"] == "Ciudad").length} ${t("rutas disponibles","routes available")}'),
               const SizedBox(height: 10),
-              ..._rutas.where((r) {
-                if (r['zona'] != 'Ciudad') return false;
-                if (_ciudadDetectada == null) return true;
-                final rutaCiudad = r['ciudad']?.toString() ?? 'Medellín';
-                return rutaCiudad == _ciudadDetectada!.ciudad;
-              }).map((r) { final pausada = r['pausada'] == true; return _RouteCard(
-                ruta: r, activa: !pausada,
-                proximaActivacion: pausada ? (r['tagPausada'] ?? '🚧 Próximamente') : '',
-                onTap: pausada ? null : () => RuteroNav.push(context, RouteDetailScreen(ruta: r))); }),
+              // ── Agrupar por sectores de Medellín ──
+              ...(() {
+                final rutasCiudad = _rutas.where((r) {
+                  if (r['zona'] != 'Ciudad') return false;
+                  if (_ciudadDetectada == null) return true;
+                  final rutaCiudad = r['ciudad']?.toString() ?? 'Medellín';
+                  return rutaCiudad == _ciudadDetectada!.ciudad;
+                }).toList();
+
+                // Detectar sector por nombre de ruta
+                String _sector(Map<String, dynamic> r) {
+                  final n = r['nombre']?.toString() ?? '';
+                  if (n.contains('POBLADO') || n.contains('HUELLAS VIVAS')) return '📍 El Poblado';
+                  if (n.contains('LAURELES') || n.contains('LA 70')) return '🌿 Laureles';
+                  if (n.contains('CENTRO') || n.contains('PATRIMONIAL') || n.contains('REPUBLICANO') || n.contains('TRANVÍA') || n.contains('ORIGEN PAISA')) return '🏛️ Centro';
+                  if (n.contains('MANRIQUE') || n.contains('TRANSFORMACIÓN')) return '🎨 Manrique & Norte';
+                  return '🗺️ Medellín';
+                }
+
+                // Orden fijo de sectores: primero las rutas urbanas históricas, Poblado y Laureles al final
+                const ordenSectores = [
+                  '🗺️ Medellín',
+                  '🎨 Manrique & Norte',
+                  '🏛️ Centro',
+                  '📍 El Poblado',
+                  '🌿 Laureles',
+                ];
+
+                final sectores = <String>[];
+                final porSector = <String, List<Map<String, dynamic>>>{};
+                for (final r in rutasCiudad) {
+                  final s = _sector(r);
+                  if (!sectores.contains(s)) sectores.add(s);
+                  porSector.putIfAbsent(s, () => []).add(r);
+                }
+                // Aplicar orden fijo — Poblado y Laureles siempre al final
+                final sectoresOrdenados = ordenSectores.where((s) => porSector.containsKey(s)).toList();
+                // Agregar cualquier sector no contemplado en el orden
+                for (final s in sectores) {
+                  if (!sectoresOrdenados.contains(s)) sectoresOrdenados.add(s);
+                }
+
+                final widgets = <Widget>[];
+                for (final sector in sectoresOrdenados) {
+                  widgets.add(Padding(
+                    padding: const EdgeInsets.only(top: 12, bottom: 6, left: 4),
+                    child: Text(sector,
+                      style: const TextStyle(color: kGold, fontSize: 13,
+                        fontWeight: FontWeight.w800, letterSpacing: 1.2))));
+                  for (final r in porSector[sector]!) {
+                    final pausada = r['pausada'] == true;
+                    widgets.add(_RouteCard(
+                      ruta: r, activa: !pausada,
+                      proximaActivacion: pausada ? (r['tagPausada'] ?? '🚧 Próximamente') : '',
+                      onTap: pausada ? null : () => RuteroNav.push(context, RouteDetailScreen(ruta: r))));
+                  }
+                }
+                return widgets;
+              })(),
             ] else if (_filtroActivo == 'Alrededores') ...[
               _SectionHeader(
                 titulo: t('🗻 ALREDEDORES','🗻 SURROUNDINGS'),
@@ -9570,8 +9771,7 @@ class _HomeBodyState extends State<HomeBody> {
                   && !(feriaModuloActivo && r['nombre'] == 'FERIA DE LAS FLORES')
                   // Quitar duplicados — solo mostrar FERIA DE LAS FLORES 2026, no las versiones genéricas
                   && r['nombre'] != 'FERIA DE LAS FLORES'
-                  && r['nombre'] != 'TABLADOS Y RUMBA'
-                  && r['nombre'] != 'RUTA SILLETERA').toList();
+                  ).toList();
                 // Ordenar: 1) vigentes hoy, 2) próximas futuras (más cercanas primero), 3) ya pasadas al final
                 // FIX: eventos con >180 días se calculan para el año siguiente
                 final ahora = DateTime.now();
@@ -9625,54 +9825,6 @@ class _HomeBodyState extends State<HomeBody> {
               })(),
               const SizedBox(height: 20),
 
-              // ── CREADORES — entre Temporada y Urbana ──
-              _SectionHeader(
-                titulo: t('🎬 CREADORES','🎬 CREATORS'),
-                subtitulo: t('Exploradores que muestran Colombia en terreno real','Explorers who show Colombia in the field')),
-              const SizedBox(height: 10),
-              SizedBox(
-                height: 130,
-                child: ListView.separated(
-                  scrollDirection: Axis.horizontal,
-                  itemCount: kColaboradores.length,
-                  separatorBuilder: (_, __) => const SizedBox(width: 10),
-                  itemBuilder: (ctx, i) {
-                    final c = kColaboradores[i];
-                    return GestureDetector(
-                      onTap: () => Navigator.of(context, rootNavigator: false).push(
-                        MaterialPageRoute(builder: (_) => const ColaboradoresScreen())),
-                      child: Container(
-                        width: 110,
-                        padding: const EdgeInsets.all(10),
-                        decoration: BoxDecoration(
-                          color: kCard, borderRadius: BorderRadius.circular(14),
-                          border: Border.all(color: c.color.withOpacity(0.3))),
-                        child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-                          Container(
-                            width: 52, height: 52,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle, color: Colors.white,
-                              border: Border.all(color: c.color.withOpacity(0.4), width: 2)),
-                            child: ClipOval(child: c.logoAsset != null
-                              ? Image.asset(c.logoAsset!, fit: BoxFit.cover)
-                              : Center(child: Text(c.emoji, style: const TextStyle(fontSize: 24))))),
-                          const SizedBox(height: 8),
-                          Text(c.nombre.split(' ').first,
-                            style: const TextStyle(color: kText, fontSize: 11, fontWeight: FontWeight.w800)),
-                          const SizedBox(height: 2),
-                          Text(c.handle,
-                            style: TextStyle(color: c.color, fontSize: 9, fontWeight: FontWeight.w600),
-                            overflow: TextOverflow.ellipsis),
-                        ])));
-                  })),
-              GestureDetector(
-                onTap: () => Navigator.of(context, rootNavigator: false).push(
-                  MaterialPageRoute(builder: (_) => const ColaboradoresScreen())),
-                child: Padding(
-                  padding: const EdgeInsets.only(top: 8),
-                  child: Text(t('Ver todos los creadores →', 'See all creators →'),
-                    style: const TextStyle(fontSize: 11, color: kGreen, fontWeight: FontWeight.w700)))),
-              const SizedBox(height: 20),
             ] else if (_filtroActivo == 'Comida Urbana') ...[
               _SectionHeader(
                 titulo: t('🍟 COMIDA URBANA','🍟 STREET FOOD'),
@@ -9704,17 +9856,17 @@ class _HomeBodyState extends State<HomeBody> {
                     ? snap.data!.docs.map((d) {
                         final data = d.data() as Map<String, dynamic>;
                         Color color = kGreen;
-                        try { color = Color(int.parse((data['color'] as String? ?? '#2D5A1B').replaceAll('#', '0xFF'))); } catch (_) {}
+                        try { color = Color(int.parse((data['color']?.toString() ?? '#2D5A1B').replaceAll('#', '0xFF'))); } catch (_) {}
                         return _Colaborador(
-                          nombre: data['nombre'] as String? ?? '',
-                          handle: data['handle'] as String? ?? '',
-                          plataforma: data['plataforma'] as String? ?? 'YouTube',
-                          descripcion: data['descripcion'] as String? ?? '',
-                          descripcionEN: data['descripcionEN'] as String? ?? '',
-                          emoji: data['emoji'] as String? ?? '🎬',
-                          urlCanal: data['urlCanal'] as String? ?? '',
-                          rutaVinculada: data['rutaVinculada'] as String? ?? '',
-                          rutaVinculadaEN: data['rutaVinculadaEN'] as String? ?? '',
+                          nombre: data['nombre']?.toString() ?? '',
+                          handle: data['handle']?.toString() ?? '',
+                          plataforma: data['plataforma']?.toString() ?? 'YouTube',
+                          descripcion: data['descripcion']?.toString() ?? '',
+                          descripcionEN: data['descripcionEN']?.toString() ?? '',
+                          emoji: data['emoji']?.toString() ?? '🎬',
+                          urlCanal: data['urlCanal']?.toString() ?? '',
+                          rutaVinculada: data['rutaVinculada']?.toString() ?? '',
+                          rutaVinculadaEN: data['rutaVinculadaEN']?.toString() ?? '',
                           color: color,
                         );
                       }).toList()
@@ -9803,19 +9955,229 @@ class RouteDetailScreen extends StatefulWidget {
 class _RouteDetailScreenState extends State<RouteDetailScreen> {
   late int _completados;
   bool _rutaComprada = false;   // true si el turista ya pagó esta ruta
-  bool _verificandoCompra = true; // muestra spinner mientras consulta Firebase
+  bool _verificandoCompra = false; // false por defecto — se actualiza async
   bool _mostrarTipAvatar = true;
-  double? _distanciaAlSitioActivo; // distancia GPS al sitio activo en metros
+  double? _distanciaAlSitioActivo;
+  final Set<int> _sitiosFeriaCompletados = {};
   String _tipActual = '';
   String _poseActual = 'señalando';
-  // Variables avatar secundario (sitios individuales)
   bool _avatarVisible = false;
   String _avatarMensaje = '';
   String _avatarPose = 'normal';
 
+  @override
+  void initState() {
+    super.initState();
+    _completados = widget.progresoInicial;
+    final nombre = widget.ruta['nombre'] ?? '';
+    final tipRuta = (kLang == 'en' ? kTipsPorRutaEN[nombre] : null) ?? kTipsPorRuta[nombre] ??
+      t('¡Bienvenido a esta ruta! Explorá cada sitio y ganá puntos. 🗺️',
+        'Welcome to this route! Explore each spot and earn points. 🗺️');
+    _tipActual = tipRuta;
+    _poseActual = 'señalando';
+    // Guardar ruta activa localmente
+    if (nombre.toString().isNotEmpty) {
+      SesionManager().setRutaActiva(nombre);
+    }
+    // Firebase en background — no bloquean el render
+    Future.microtask(() async {
+      await _verificarCompra();
+      await _calcularDistanciaAlSitioActivo();
+      await _cargarProgresoFirebase();
+      // Si la ruta no tiene sitios cargados, buscar directo en Firestore
+      final sitiosActuales = parseSitiosList(widget.ruta);
+      if (sitiosActuales.isEmpty && nombre.isNotEmpty) {
+        await _cargarSitiosDesdeFirestore(nombre.toString());
+      }
+    });
+    // Tip especial Feria
+    if (['FERIA CLÁSICA'].contains(nombre)) {
+      Future.delayed(const Duration(milliseconds: 800), () {
+        if (mounted) setState(() {
+          _mostrarTipAvatar = true;
+          _tipActual = t(
+            '🌺 ¡Bienvenido a la Feria de las Flores! Podés hacer los sitios en cualquier orden. Tocá cualquiera, validá con GPS y tomá tu foto. Al completar todos ganás tu insignia. ¡A explorar!',
+            '🌺 Welcome to the Flower Festival! You can visit the sites in any order. Tap any one, validate with GPS and take your photo. Complete them all to earn your badge. Let\'s explore!');
+          _poseActual = 'señalando';
+        });
+      });
+    }
+  }
+
+  /// Carga sitiosDetalle directo de Firestore cuando la ruta llegó sin ellos
+  Future<void> _cargarSitiosDesdeFirestore(String nombre) async {
+    try {
+      // Buscar por nombre en la colección rutas
+      final snap = await FirebaseFirestore.instance
+          .collection('rutas')
+          .where('nombre', isEqualTo: nombre)
+          .limit(1)
+          .get();
+      if (snap.docs.isEmpty) return;
+      final data = snap.docs.first.data();
+      final sitiosDetalle = data['sitiosDetalle'];
+      if (sitiosDetalle == null) return;
+      // Actualizar widget.ruta con los sitios encontrados
+      widget.ruta['sitiosDetalle'] = sitiosDetalle;
+      if (mounted) setState(() {});
+    } catch (e) {
+      debugPrint('RouteDetail: error cargando sitios — $e');
+    }
+  }
+
+  Future<void> _irAValidarSitio() async {
+    final sitiosList = parseSitiosList(widget.ruta);
+    final completados = _completados;
+    final totalSitios = sitiosList.length;
+    if (completados >= totalSitios) return;
+    final sitioActivo = sitiosList[completados];
+    final rutaNombre = widget.ruta['nombre']?.toString() ?? '';
+    var _sm = kSitiosMapa.where((s) => s.nombre == sitioActivo && s.ruta == rutaNombre).firstOrNull;
+    _sm ??= kSitiosMapa.where((s) => s.nombre == sitioActivo).firstOrNull;
+    if (_sm == null) {
+      final clave = sitioActivo.toLowerCase().split('(')[0].trim();
+      _sm = kSitiosMapa.where((s) =>
+        s.ruta == rutaNombre &&
+        (s.nombre.toLowerCase().contains(clave) ||
+         clave.contains(s.nombre.toLowerCase().split('(')[0].trim()))
+      ).firstOrNull;
+    }
+    double latSitio = _sm?.posicion.latitude ?? 0;
+    double lngSitio = _sm?.posicion.longitude ?? 0;
+    if (latSitio == 0) {
+      final detalles = parseSitiosDetalle(widget.ruta['sitiosDetalle']);
+      for (final d in detalles) {
+        if (d is! Map) continue;  // saltar strings sueltos
+        final dm = Map<String, dynamic>.from(d as Map);
+        final nombre = dm['nombre']?.toString() ?? '';
+        if (nombre == sitioActivo ||
+            nombre.toLowerCase().contains(sitioActivo.toLowerCase().split('(')[0].trim()) ||
+            sitioActivo.toLowerCase().contains(nombre.toLowerCase().split('(')[0].trim())) {
+          latSitio = (dm['lat'] as num?)?.toDouble() ?? 0;
+          lngSitio = (dm['lng'] as num?)?.toDouble() ?? 0;
+          break;
+        }
+      }
+    }
+    if (latSitio == 0) {
+      final gpsList = widget.ruta['gpsSitios'];
+      final gpsListParsed = gpsList is List ? gpsList : <dynamic>[];
+      for (final g in gpsListParsed) {
+        if (g is! Map) continue;
+        final gm = Map<String, dynamic>.from(g as Map);
+        if ((gm['nombre']?.toString() ?? '') == sitioActivo) {
+          latSitio = (gm['lat'] as num?)?.toDouble() ?? 0;
+          lngSitio = (gm['lng'] as num?)?.toDouble() ?? 0;
+          break;
+        }
+      }
+    }
+    final validado = await Navigator.of(context).push<bool>(MaterialPageRoute(
+      builder: (_) => SitioInfoScreen(
+        sitioNombre: sitioActivo,
+        sitioEmoji: _emojiParaSitio(sitioActivo),
+        sitioNumero: completados + 1,
+        totalSitios: totalSitios,
+        ruta: widget.ruta,
+        latitud: latSitio,
+        longitud: lngSitio,
+      )));
+    if (validado == true && mounted) {
+      setState(() {
+        _completados++;
+        final sitios = parseSitiosList(widget.ruta);
+        SesionManager().setUltimoSitio(_completados);
+        if (_completados >= sitios.length) {
+          SesionManager().limpiarRutaActiva();
+        }
+        if (_completados < sitios.length) {
+          final proximoSitio = sitios[_completados];
+          final tipProximo = tipsService.getTip(proximoSitio);
+          _mostrarTipAvatar = true;
+          _poseActual = 'señalando';
+          _tipActual = tipProximo.isNotEmpty
+            ? '📍 ${t("Próximo","Next")}: $proximoSitio\n\n$tipProximo'
+            : t('¡Perfecto! Siguiente parada: $proximoSitio 👉', 'Perfect! Next stop: $proximoSitio 👉');
+        } else {
+          _mostrarTipAvatar = true;
+          _tipActual = t('🎉 ¡INCREÍBLE! Completaste todos los sitios. ¡Eres un verdadero Rutero MDE! 🏆',
+            '🎉 AMAZING! You completed all spots. You are a true Rutero MDE! 🏆');
+          _poseActual = 'celebracion';
+        }
+      });
+      AuthService.guardarProgreso(widget.ruta['nombre'], _completados + 1, totalSitios);
+    }
+  }
+
+  Future<void> _irAValidarSitioFeria(int indice) async {
+    final sitiosList = parseSitiosList(widget.ruta);
+    if (indice >= sitiosList.length) return;
+    final sitioActivo = sitiosList[indice];
+    final rutaNombre = widget.ruta['nombre']?.toString() ?? '';
+    var sm = kSitiosMapa.where((s) => s.nombre == sitioActivo && s.ruta == rutaNombre).firstOrNull;
+    sm ??= kSitiosMapa.where((s) => s.nombre == sitioActivo).firstOrNull;
+    if (sm == null) {
+      final clave = sitioActivo.toLowerCase().split('(')[0].trim();
+      sm = kSitiosMapa.where((s) =>
+        s.ruta == rutaNombre &&
+        (s.nombre.toLowerCase().contains(clave) ||
+         clave.contains(s.nombre.toLowerCase().split('(')[0].trim()))
+      ).firstOrNull;
+    }
+    double latSitio = sm?.posicion.latitude ?? 0;
+    double lngSitio = sm?.posicion.longitude ?? 0;
+    if (latSitio == 0) {
+      final detalles = parseSitiosDetalle(widget.ruta['sitiosDetalle']);
+      for (final d in detalles) {
+        if (d is! Map) continue;
+        final dm = Map<String, dynamic>.from(d as Map);
+        final nombre = dm['nombre']?.toString() ?? '';
+        if (nombre == sitioActivo ||
+            nombre.toLowerCase().contains(sitioActivo.toLowerCase().split('(')[0].trim()) ||
+            sitioActivo.toLowerCase().contains(nombre.toLowerCase().split('(')[0].trim())) {
+          latSitio = (dm['lat'] as num?)?.toDouble() ?? 0;
+          lngSitio = (dm['lng'] as num?)?.toDouble() ?? 0;
+          break;
+        }
+      }
+    }
+    final validado = await Navigator.of(context).push<bool>(MaterialPageRoute(
+      builder: (_) => SitioInfoScreen(
+        sitioNombre: sitioActivo,
+        sitioEmoji: _emojiParaSitio(sitioActivo),
+        sitioNumero: indice + 1,
+        totalSitios: sitiosList.length,
+        ruta: widget.ruta,
+        latitud: latSitio,
+        longitud: lngSitio,
+      )));
+    if (validado == true && mounted) {
+      setState(() {
+        _sitiosFeriaCompletados.add(indice);
+        _completados = _sitiosFeriaCompletados.length;
+        SesionManager().setUltimoSitio(_completados);
+        if (_sitiosFeriaCompletados.length >= sitiosList.length) {
+          SesionManager().limpiarRutaActiva();
+          _mostrarTipAvatar = true;
+          _tipActual = t(
+            '🎉 ¡INCREÍBLE! Completaste todos los sitios de la Feria. ¡Eres un verdadero Rutero MDE! 🏆',
+            '🎉 AMAZING! You completed all Festival spots. You are a true Rutero MDE! 🏆');
+          _poseActual = 'celebracion';
+        } else {
+          _mostrarTipAvatar = true;
+          _tipActual = t(
+            '¡Excelente! Completaste este sitio de la Feria. Seguí explorando en cualquier orden. 🌹',
+            'Excellent! You completed this Festival spot. Keep exploring in any order. 🌹');
+          _poseActual = 'señalando';
+        }
+      });
+      AuthService.guardarProgreso(widget.ruta['nombre'], _sitiosFeriaCompletados.length, sitiosList.length);
+    }
+  }
+
   String _obtenerTip(String sitio) {
-    if (kLang == 'en' && kTipsPorSitioEN.containsKey(sitio)) return kTipsPorSitioEN[sitio]!;
-    if (kTipsPorSitio.containsKey(sitio)) return kTipsPorSitio[sitio]!;
+    final tip = tipsService.getTip(sitio);
+    if (tip.isNotEmpty) return tip;
     return t('¡Estás explorando Medellín como un verdadero Rutero! Cada sitio tiene su historia. 🌟',
       "You're exploring Medellín like a true Rutero! Every spot has its story. 🌟");
   }
@@ -9823,7 +10185,7 @@ class _RouteDetailScreenState extends State<RouteDetailScreen> {
   /// 📍 Calcula la distancia GPS al sitio activo para mostrarla en la card
   Future<void> _calcularDistanciaAlSitioActivo() async {
     try {
-      final sitiosList = List<String>.from(widget.ruta['sitiosList'] ?? []);
+      final sitiosList = parseSitiosList(widget.ruta);
       if (_completados >= sitiosList.length) return;
       final sitioActivo = sitiosList[_completados];
       // FIX (junio 2026): filtrar por nombre + ruta para evitar colisión de nombres
@@ -9866,13 +10228,6 @@ class _RouteDetailScreenState extends State<RouteDetailScreen> {
       return;
     }
 
-    // Rutas del Parque Jaime Duque → acceso directo (demo B2B)
-    final nombreRuta = widget.ruta['nombre']?.toString() ?? '';
-    if (nombreRuta.contains('JAIME DUQUE')) {
-      if (mounted) setState(() { _rutaComprada = true; _verificandoCompra = false; });
-      return;
-    }
-
     // Verificar en Firebase
     try {
       final uid = AuthService.currentUser?.uid;
@@ -9885,7 +10240,8 @@ class _RouteDetailScreenState extends State<RouteDetailScreen> {
           .doc(uid)
           .collection('rutasCompradas')
           .doc(widget.ruta['nombre']?.toString() ?? '')
-          .get();
+          .get()
+          .timeout(const Duration(seconds: 5));
       if (mounted) {
         setState(() {
           _rutaComprada = doc.exists;
@@ -9904,11 +10260,18 @@ class _RouteDetailScreenState extends State<RouteDetailScreen> {
     final nombreRuta = widget.ruta['nombre']?.toString() ?? '';
     if (nombreRuta.isEmpty) return;
     try {
-      final progresoGuardado = await AuthService.obtenerProgreso(nombreRuta);
+      final progresoGuardado = await AuthService.obtenerProgreso(nombreRuta)
+          .timeout(const Duration(seconds: 5));
       if (progresoGuardado > _completados && mounted) {
         setState(() {
           _completados = progresoGuardado;
-          final sitios = List<String>.from(widget.ruta['sitiosList'] ?? []);
+          final esFeria = ['FERIA CLÁSICA']
+            .contains(widget.ruta['nombre']?.toString() ?? '');
+          if (esFeria && progresoGuardado > 0) {
+            _sitiosFeriaCompletados.addAll(
+              List.generate(progresoGuardado, (i) => i));
+          }
+          final sitios = parseSitiosList(widget.ruta);
           if (_completados < sitios.length) {
             final proximoSitio = sitios[_completados];
             final tipProximo = _obtenerTip(proximoSitio);
@@ -9920,134 +10283,9 @@ class _RouteDetailScreenState extends State<RouteDetailScreen> {
       }
     } catch (e) {
       debugPrint('⚠️ Error cargando progreso: $e');
+      if (mounted) setState(() { _verificandoCompra = false; });
     }
   }
-
-  /// 📷 Abre la pantalla SitioInfoScreen para validar el sitio activo.
-  /// FIX UX (16/05/2026): Esta lógica ANTES estaba en el botón gigante
-  /// "GO TO" al final de la pantalla. Ahora se invoca desde el botón
-  /// "VALIDAR SITIO" en la card del sitio activo (_SiteItem).
-  /// - Busca las coordenadas del sitio (3 intentos: nombre+ruta, nombre, contains)
-  /// - Abre SitioInfoScreen con info + retos + cámara
-  /// - Si la validación es exitosa (vuelve con true):
-  ///   • Incrementa _completados
-  ///   • Persiste en SesionManager y Firebase
-  ///   • Actualiza tip del avatar para señalar próximo sitio
-  ///   • Si fue el último sitio: celebración
-  Future<void> _irAValidarSitio() async {
-    final sitiosList = List<String>.from(widget.ruta['sitiosList'] ?? []);
-    final completados = _completados;
-    final totalSitios = sitiosList.length;
-    if (completados >= totalSitios) return;
-    final sitioActivo = sitiosList[completados];
-    final rutaNombre = widget.ruta['nombre']?.toString() ?? '';
-    // 1° Intento: match EXACTO por nombre Y ruta (lo más seguro)
-    var _sm = kSitiosMapa.where((s) =>
-      s.nombre == sitioActivo && s.ruta == rutaNombre
-    ).firstOrNull;
-    // 2° Intento: match exacto solo por nombre (si la ruta no coincide exacto)
-    _sm ??= kSitiosMapa.where((s) => s.nombre == sitioActivo).firstOrNull;
-    // 3° Intento (fallback): contains pero DENTRO de la misma ruta
-    if (_sm == null) {
-      final clave = sitioActivo.toLowerCase().split('(')[0].trim();
-      _sm = kSitiosMapa.where((s) =>
-        s.ruta == rutaNombre &&
-        (s.nombre.toLowerCase().contains(clave) ||
-         clave.contains(s.nombre.toLowerCase().split('(')[0].trim()))
-      ).firstOrNull;
-    }
-    final validado = await Navigator.of(context).push<bool>(MaterialPageRoute(
-      builder: (_) => SitioInfoScreen(
-        sitioNombre: sitioActivo,
-        sitioEmoji: _emojiParaSitio(sitioActivo),
-        sitioNumero: completados + 1,
-        totalSitios: totalSitios,
-        ruta: widget.ruta,
-        latitud: _sm?.posicion.latitude ?? 0,
-        longitud: _sm?.posicion.longitude ?? 0,
-      )));
-    // Solo sumar si volvió con true
-    if (validado == true && mounted) {
-      setState(() {
-        _completados++;
-        final sitios = List<String>.from(widget.ruta['sitiosList'] ?? []);
-        // 💾 Persistir el progreso localmente para sobrevivir cierre de app
-        SesionManager().setUltimoSitio(_completados);
-        // Si terminó la ruta, limpiar la sesión activa
-        if (_completados >= sitios.length) {
-          SesionManager().limpiarRutaActiva();
-        }
-        if (_completados < sitios.length) {
-          // Avatar habla del PRÓXIMO sitio con su narración específica
-          final proximoSitio = sitios[_completados];
-          final tipProximo = kTipsPorSitio[proximoSitio];
-          _mostrarTipAvatar = true;
-          _poseActual = 'señalando';
-          if (tipProximo != null) {
-            // Mostrar narración del próximo sitio
-            _tipActual = '📍 ${t("Próximo","Next")}: $proximoSitio\n\n${kLang == "en" ? (kTipsPorSitioEN[proximoSitio] ?? tipProximo) : tipProximo}';
-          } else {
-            _tipActual = t('¡Perfecto! Siguiente parada: $proximoSitio 👉 Dirígete allá y valida tu visita.', 'Perfect! Next stop: $proximoSitio 👉 Head there and validate your visit.');
-          }
-        } else {
-          // Completó todos — celebración
-          _mostrarTipAvatar = true;
-          _tipActual = t('🎉 ¡INCREÍBLE! Completaste todos los sitios de esta ruta. ¡Eres un verdadero Rutero MDE! Reclama tu premio ahora. 🏆', '🎉 AMAZING! You completed all spots on this route. You are a true Rutero MDE! Claim your reward now. 🏆');
-          _poseActual = 'celebracion';
-        }
-      });
-      // Guardar progreso en Firebase
-      AuthService.guardarProgreso(
-        widget.ruta['nombre'], _completados + 1, totalSitios);
-    }
-  }
-
-  @override
-  void initState() {
-    super.initState();
-    _completados = widget.progresoInicial;
-    // 🔐 Verificar si la ruta fue comprada antes de mostrar acceso completo
-    _verificarCompra();
-    // 📍 Calcular distancia al sitio activo para mostrar en la card
-    _calcularDistanciaAlSitioActivo();
-    // 🔐 Cargar progreso persistente desde Firebase
-    _cargarProgresoFirebase();
-    final nombre = widget.ruta['nombre'] ?? '';
-    // 💾 Guardar esta ruta como la activa del usuario (SharedPreferences local).
-    // Si el usuario cierra la app por seguridad, al reabrirla se restaura
-    // automáticamente esta ruta con su progreso.
-    if (nombre.toString().isNotEmpty) {
-      SesionManager().setRutaActiva(nombre);
-      if (_completados > 0) {
-        SesionManager().setUltimoSitio(_completados);
-      }
-    }
-    final sitios = List<String>.from(widget.ruta['sitiosList'] ?? []);
-    // Mostrar tip del sitio ACTUAL (al que debe ir el usuario)
-    final sitioActual = _completados < sitios.length ? sitios[_completados] : '';
-    final tipActual = sitioActual.isNotEmpty
-      ? (kLang == 'en' ? (kTipsPorSitioEN[sitioActual] ?? kTipsPorSitio[sitioActual]) : kTipsPorSitio[sitioActual])
-      : null;
-    if (tipActual != null) {
-      _tipActual = '📍 ${t("Dirígete a","Head to")}: $sitioActual\n\n$tipActual';
-    } else if (_completados == 0) {
-      final tipRuta = (kLang == 'en' ? kTipsPorRutaEN[nombre] : null) ?? kTipsPorRuta[nombre] ??
-        t('¡Bienvenido a esta ruta! Explora cada sitio y gana puntos. 🗺️',
-          'Welcome to this route! Explore each spot and earn points. 🗺️');
-      final List<String> consejos = List<String>.from(
-        (kLang == 'en' ? widget.ruta['consejosEN'] : widget.ruta['consejos']) ?? []);
-      final String primerConsejo = consejos.isNotEmpty ? consejos.first : '';
-      _tipActual = primerConsejo.isNotEmpty
-        ? '$tipRuta\n\n💡 ${t("Tip:","Tip:")} $primerConsejo'
-        : tipRuta;
-    } else {
-      _tipActual = t('¡Continúa tu ruta! Siguiente parada: $sitioActual 👉',
-        'Keep going! Next stop: $sitioActual 👉');
-    }
-    _poseActual = 'señalando';
-  }
-
-
 
   // Emojis por tipo de sitio
   String _emojiParaSitio(String nombre) {
@@ -10092,7 +10330,7 @@ class _RouteDetailScreenState extends State<RouteDetailScreen> {
   @override
   Widget build(BuildContext context) {
     final Color acento = kRutaColor(widget.ruta['acento'], kGold);
-    final List<String> sitiosList = List<String>.from(widget.ruta['sitiosList'] ?? []);
+    final List<String> sitiosList = parseSitiosList(widget.ruta);
     final int totalSitios = sitiosList.length;
     final int completados = _completados;
     final String premio = widget.ruta['premio'] ?? '';
@@ -10224,18 +10462,18 @@ class _RouteDetailScreenState extends State<RouteDetailScreen> {
 
           // Info rápida
           Wrap(spacing: 6, runSpacing: 6, children: [
-            _InfoPill(icon: '⏱', text: widget.ruta['tiempo']),
+            _InfoPill(icon: '⏱', text: widget.ruta['tiempo']?.toString() ?? ''),
             _InfoPill(icon: '📍', text: '$totalSitios ${t("sitios","spots")}'),
-            _InfoPill(icon: '', text: widget.ruta['transporte']),
+            _InfoPill(icon: '', text: widget.ruta['transporte']?.toString() ?? ''),
           ]),
           const SizedBox(height: 8),
 
           // Tipo experiencia + mejor hora + turismo responsable
           if (widget.ruta['tipoExperiencia'] != null)
             Wrap(spacing: 6, runSpacing: 6, children: [
-              _InfoPill(icon: '🎯', text: (kLang == 'en' ? widget.ruta['tipoExperienciaEN'] : widget.ruta['tipoExperiencia']) ?? ''),
+              _InfoPill(icon: '🎯', text: (kLang == 'en' ? widget.ruta['tipoExperienciaEN'] : widget.ruta['tipoExperiencia']?.toString() ?? '') ?? ''),
               if (widget.ruta['mejorHora'] != null)
-                _InfoPill(icon: '🕐', text: widget.ruta['mejorHora']),
+                _InfoPill(icon: '🕐', text: widget.ruta['mejorHora']?.toString() ?? ''),
               // 🚫 Turismo Responsable quitado — 30 mayo 2026
             ]),
           const SizedBox(height: 12),
@@ -10246,6 +10484,9 @@ class _RouteDetailScreenState extends State<RouteDetailScreen> {
               style: const TextStyle(color: kTextMuted, fontSize: 13, height: 1.6)),
             const SizedBox(height: 16),
           ],
+
+          // ── CÓMO LLEGAR ──────────────────────────────────────────────────
+          _ComoLlegarCard(ruta: widget.ruta),
 
           // Progreso detallado — complementa la barra del hero
           Container(padding: const EdgeInsets.all(16),
@@ -10303,6 +10544,7 @@ class _RouteDetailScreenState extends State<RouteDetailScreen> {
                 onCerrar: () => setState(() => _avatarVisible = false))),
 
           const SizedBox(height: 16),
+          _AntesDeSalirCard(ruta: widget.ruta),
           _ConsejosCard(ruta: widget.ruta),
           MisionEpicaCard(rutaNombre: widget.ruta['nombre']?.toString() ?? ''),
           const SizedBox(height: 4),
@@ -10363,6 +10605,31 @@ class _RouteDetailScreenState extends State<RouteDetailScreen> {
             style: TextStyle(fontSize: 13, fontWeight: FontWeight.w900, color: kTextMuted, letterSpacing: 2)),
           const SizedBox(height: 12),
 
+          // Mensaje si la ruta no tiene sitios cargados aún
+          if (sitiosList.isEmpty)
+            Container(
+              margin: const EdgeInsets.only(bottom: 20),
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: kCard,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: kGold.withOpacity(0.2))),
+              child: Column(children: [
+                const Text('🗺️', style: TextStyle(fontSize: 36)),
+                const SizedBox(height: 12),
+                Text(t('Ruta en preparación',
+                       'Route being prepared'),
+                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800,
+                    color: kText), textAlign: TextAlign.center),
+                const SizedBox(height: 8),
+                Text(t('Los sitios de esta ruta estarán disponibles muy pronto. '
+                       'Mientras tanto, explorá el mapa y la descripción.',
+                       'The spots for this route will be available soon. '
+                       'In the meantime, explore the map and description.'),
+                  style: const TextStyle(fontSize: 13, color: kTextMuted, height: 1.5),
+                  textAlign: TextAlign.center),
+              ])),
+
           // Lista de sitios reales de la ruta
           // FIX UX (16/05/2026): Si el sitio es 'active', pasarle el callback
           // que ANTES estaba en el botón gigante "GO TO" del final de la pantalla.
@@ -10370,20 +10637,44 @@ class _RouteDetailScreenState extends State<RouteDetailScreen> {
           ...sitiosList.asMap().entries.map((e) {
             final int idx = e.key;
             final String nombre = e.value;
-            String estado = 'locked';
-            if (idx < completados) estado = 'done';
-            if (idx == completados) estado = 'active';
+            // Rutas demo de Feria — orden libre para que el usuario
+            // pueda explorar aunque haya perdido eventos anteriores
+            final bool esFeria = [
+              'FERIA CLÁSICA',
+            ].contains(widget.ruta['nombre']?.toString() ?? '');
+            // 🛠️ Modo developer: admin ve todos los sitios activos para validar coords
+            final bool esDev = esAdmin;
+            String estado;
+            if (esFeria || esDev) {
+              // Orden libre: todos activos, los completados marcados como done
+              estado = _sitiosFeriaCompletados.contains(idx) ? 'done' : 'active';
+            } else {
+              // Orden secuencial normal
+              estado = 'locked';
+              if (idx < completados) estado = 'done';
+              if (idx == completados) estado = 'active';
+            }
             return _SiteItem(
               numero: idx + 1,
               nombre: nombre,
-              desc: estado == 'done' ? tVisitado : estado == 'active' ? t('📍 Siguiente destino','📍 Next stop') : tBloqueado,
+              desc: estado == 'done'
+                ? tVisitado
+                : estado == 'active'
+                  ? (esFeria
+                    ? t('📍 Tocá para validar con GPS y foto','📍 Tap to validate with GPS and photo')
+                    : t('📍 Siguiente destino','📍 Next stop'))
+                  : tBloqueado,
               estado: estado,
               emoji: _emojiParaSitio(nombre),
               acento: acento,
-              onValidar: estado == 'active' ? (_rutaComprada ? _irAValidarSitio : null) : null,
+              onValidar: estado == 'active' ? (_rutaComprada
+                ? (esFeria || esDev
+                  ? () => _irAValidarSitioFeria(idx)
+                  : _irAValidarSitio)
+                : null) : null,
               rutaComprada: _rutaComprada,
               distanciaMetros: estado == 'active' ? _distanciaAlSitioActivo : null,
-              rutaNombre: widget.ruta['nombre']?.toString(), // FIX junio 2026
+              rutaNombre: widget.ruta['nombre']?.toString(),
             );
           }),
 
@@ -10433,16 +10724,6 @@ class _RouteDetailScreenState extends State<RouteDetailScreen> {
             // RUTA COMPLETA — mostrar código de premio
             _PremioCard(ruta: widget.ruta, totalSitios: totalSitios),
           ] else ...[
-            // FIX UX (16/05/2026): Botón "VALIDAR SITIO" eliminado de aquí.
-            // Anteriormente este botón gigante al final de la pantalla forzaba
-            // al turista a hacer scroll hasta abajo para validar el sitio activo.
-            // Ahora vive DENTRO de la card del sitio activo (_SiteItem),
-            // junto al botón "CÓMO LLEGAR (Google Maps)" en layout horizontal.
-            // La lógica fue extraída al método _irAValidarSitio() del state.
-            // Beneficios:
-            //   - Reduce scroll del turista
-            //   - Las 2 acciones del sitio activo están juntas (más intuitivo)
-            //   - Feedback validado con pareja de turistas reales (15/05/2026)
             const SizedBox.shrink(),
 
           // ── Botón saltar terminal — solo si sitio 0 es opcional ──
@@ -10475,9 +10756,8 @@ class _RouteDetailScreenState extends State<RouteDetailScreen> {
                               _completados = 1;
                               _mostrarTipAvatar = true;
                               _poseActual = 'señalando';
-                              final tipSitio2 = kLang == 'en'
-                                ? (kTipsPorSitioEN[sitiosList[1]] ?? kTipsPorSitio[sitiosList[1]])
-                                : kTipsPorSitio[sitiosList[1]];
+                              final tipSitio2Raw = tipsService.getTip(sitiosList[1]);
+                              final tipSitio2 = tipSitio2Raw.isNotEmpty ? tipSitio2Raw : null;
                               _tipActual = tipSitio2 != null
                                 ? '📍 ${t("Dirígete a", "Head to")}: ${sitiosList[1]}\n\n$tipSitio2'
                                 : t('¡Perfecto! Empezamos desde ${sitiosList[1]} 👉',
@@ -10507,14 +10787,12 @@ class _RouteDetailScreenState extends State<RouteDetailScreen> {
                         color: acento, letterSpacing: 0.5)),
                   ])))),
         ],
-
-          const SizedBox(height: 80),
+        const SizedBox(height: 80),
         ]))),
       ]),
     );
   }
 }
-
 
 // ─────────────────────────────────────────
 //  SITIO INFO SCREEN — GPS + Info del sitio
@@ -10530,7 +10808,8 @@ class CuriosidadCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final data = kCuriosidadesPorSitio[sitioNombre];
+    // Primero hardcoded, fallback a Firestore sitiosDetalle
+    final data = kCuriosidadesPorSitio[sitioNombre] ?? RutasService().getCuriosidad(sitioNombre);
     if (data == null) return const SizedBox();
     final texto = kLang == 'en' ? (data['en'] ?? data['es'] ?? '') : (data['es'] ?? '');
     if (texto.isEmpty) return const SizedBox();
@@ -10572,7 +10851,8 @@ class _RetoCardState extends State<RetoCard> {
 
   @override
   Widget build(BuildContext context) {
-    final data = kRetosPorSitio[widget.sitioNombre];
+    // Primero hardcoded, fallback a Firestore sitiosDetalle
+    final data = kRetosPorSitio[widget.sitioNombre] ?? RutasService().getReto(widget.sitioNombre);
     if (data == null) return const SizedBox();
     final reto = kLang == 'en' ? (data['reto_en'] ?? data['reto_es']) : data['reto_es'];
     final puntos = data['puntos'] ?? 10;
@@ -10664,7 +10944,7 @@ class _TriviaCardState extends State<TriviaCard> {
     if (data == null) return const SizedBox();
     final pregunta = kLang == 'en' ? (data['pregunta_en'] ?? data['pregunta_es']) : data['pregunta_es'];
     final opciones = (kLang == 'en' ? data['opciones_en'] : data['opciones_es']) as List;
-    final correcta = data['correcta'] as int;
+    final correcta = (data['correcta'] as int?) ?? 0;
     final puntos = data['puntos'] ?? 10;
 
     return Container(
@@ -10750,7 +11030,8 @@ class TipSensorialCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final data = kTipsSensorialesPorSitio[sitioNombre];
+    // Primero hardcoded, fallback a Firestore sitiosDetalle
+    final data = kTipsSensorialesPorSitio[sitioNombre] ?? RutasService().getTip(sitioNombre);
     if (data == null) return const SizedBox();
     final texto = kLang == 'en' ? (data['en'] ?? data['es'] ?? '') : (data['es'] ?? '');
     final emoji = data['emoji'] ?? '✨';
@@ -10785,7 +11066,8 @@ class MisionEpicaCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final data = kMisionesPorRuta[rutaNombre];
+    // Primero hardcoded, fallback a Firestore
+    final data = kMisionesPorRuta[rutaNombre] ?? RutasService().getMisionEpica(rutaNombre);
     if (data == null) return const SizedBox();
     final nombre = kLang == 'en' ? data['nombre_en'] : data['nombre_es'];
     final descripcion = kLang == 'en' ? data['descripcion_en'] : data['descripcion_es'];
@@ -10873,10 +11155,7 @@ class _SitioInfoScreenState extends State<SitioInfoScreen> {
   bool _errorGps = false;  // FIX 13/05/2026: Para indicar fallo de GPS al usuario
   // Radio dinámico: 1° busca override del sitio específico, 2° radio de la ruta, 3° 30m default
   double get _radio {
-    // FIX (junio 2026): buscar por nombre + ruta para evitar colisión entre rutas
-    // que comparten nombres de sitios (ej: CLÁSICA y AVENTURA FAMILIAR del Jaime Duque
-    // tienen "Monumento a Dios", "Taj Mahal", etc. — sin filtro por ruta el firstWhere
-    // siempre devolvía el sitio de CLÁSICA con su radioGps incorrecto).
+    // FIX (junio 2026): buscar por nombre + ruta para evitar colisión entre rutas con sitios de mismo nombre.
     final rutaNombre = widget.ruta['nombre']?.toString() ?? '';
     try {
       final sitio = kSitiosMapa.firstWhere(
@@ -11026,13 +11305,13 @@ class _SitioInfoScreenState extends State<SitioInfoScreen> {
             const SizedBox(height: 4),
 
             // ── Avatar con narración del sitio actual ──
-            if (kTipsPorSitio.containsKey(widget.sitioNombre))
+            if (tipsService.containsKey(widget.sitioNombre))
               AvatarTip(
-                mensaje: kLang == 'en' ? (kTipsPorSitioEN[widget.sitioNombre] ?? kTipsPorSitio[widget.sitioNombre]!) : kTipsPorSitio[widget.sitioNombre]!,
+                mensaje: tipsService.getTip(widget.sitioNombre),
                 pose: 'tip',
                 autoClose: false,
                 onCerrar: null),
-            if (!kTipsPorSitio.containsKey(widget.sitioNombre))
+            if (!tipsService.containsKey(widget.sitioNombre))
               AvatarTip(
                 mensaje: t('¡Llegaste a ${widget.sitioNombre}! Explora el lugar y toma la foto para validar tu visita. 📸', 'You made it to ${widget.sitioNombre}! Explore and take a photo to validate your visit. 📸'),
                 pose: 'señalando',
@@ -11270,6 +11549,8 @@ class _CameraScreenState extends State<CameraScreen> with SingleTickerProviderSt
     super.initState();
     _scanCtrl = AnimationController(vsync: this, duration: const Duration(seconds: 2))..repeat();
     _scanAnim = Tween<double>(begin: 0, end: 1).animate(_scanCtrl);
+    // El usuario toca el botón de cámara — no se abre automáticamente
+    // Flujo: detalles del sitio → botón 📷 → cámara
   }
 
   @override
@@ -11739,25 +12020,6 @@ class _CameraScreenState extends State<CameraScreen> with SingleTickerProviderSt
                 child: Stack(children: [
                   Center(child: Text(widget.sitioEmoji,
                     style: const TextStyle(fontSize: 120))),
-                  // Avatar inferior derecho — sin cortarse
-                  Align(
-                    alignment: Alignment.bottomRight,
-                    child: Image.asset('assets/images/avatar/avatar_camara.png',
-                      height: 200,
-                      fit: BoxFit.contain,
-                      errorBuilder: (_, __, ___) => Text(
-                        widget.ruta['personaje'] ?? '🧑',
-                        style: const TextStyle(fontSize: 60)))),
-                  // Burbuja de tip
-                  Positioned(bottom: 195, right: 170,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: acento.withOpacity(0.95),
-                        borderRadius: BorderRadius.circular(12),
-                        boxShadow: [BoxShadow(color: acento.withOpacity(0.4), blurRadius: 8)]),
-                      child: Text(tTomaLaFoto,
-                        style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w800)))),
                   // Logo en cámara
                   Positioned(top: 12, left: 12,
                     child: Image.asset('assets/images/logo_rutero_badge.png',
@@ -12731,10 +12993,10 @@ class ProfileScreen extends StatelessWidget {
                     {'min': 1200, 'emoji': '🦅', 'nombre': 'Aventurero MDE',      'nombreEN': 'MDE Adventurer'},
                     {'min': 2000, 'emoji': '🏆', 'nombre': 'Leyenda de Medellín', 'nombreEN': 'Medellín Legend'},
                   ];
-                  final nivel = niveles.lastWhere((n) => puntos >= (n['min'] as int), orElse: () => niveles[0]);
+                  final nivel = niveles.lastWhere((n) => puntos >= ((n['min'] as int?) ?? 0), orElse: () => niveles[0]);
                   final int nivelIdx = niveles.indexOf(nivel) + 1;
-                  final String nombreNivel = kLang == 'en' ? nivel['nombreEN'] as String : nivel['nombre'] as String;
-                  final String nivelEmoji = nivel['emoji'] as String;
+                  final String nombreNivel = kLang == 'en' ? nivel['nombreEN']?.toString() ?? '' : nivel['nombre']?.toString() ?? '';
+                  final String nivelEmoji = nivel['emoji']?.toString() ?? '';
                   return Column(children: [
                     // Avatar con foto/emoji + botón editar + emoji nivel
                     Stack(alignment: Alignment.bottomRight, children: [
@@ -12854,9 +13116,9 @@ class ProfileScreen extends StatelessWidget {
                 {'min': 1200, 'max': 1999, 'nombre': t('Aventurero MDE','MDE Adventurer'),      'emoji': '🦅', 'siguiente': t('Leyenda','Legend')},
                 {'min': 2000, 'max': 99999,'nombre': t('Leyenda de Medellín','Medellín Legend'), 'emoji': '🏆', 'siguiente': ''},
               ];
-              final nivel = niveles.lastWhere((n) => puntos >= (n['min'] as int), orElse: () => niveles[0]);
-              final maxNivel = nivel['max'] as int;
-              final minNivel = nivel['min'] as int;
+              final nivel = niveles.lastWhere((n) => puntos >= ((n['min'] as int?) ?? 0), orElse: () => niveles[0]);
+              final maxNivel = (nivel['max'] as int?) ?? 0;
+              final minNivel = (nivel['min'] as int?) ?? 0;
               final progreso = maxNivel < 99999
                 ? (puntos - minNivel) / (maxNivel - minNivel + 1)
                 : 1.0;
@@ -12869,7 +13131,7 @@ class ProfileScreen extends StatelessWidget {
                     Container(width: 36, height: 36,
                       decoration: BoxDecoration(shape: BoxShape.circle,
                         gradient: LinearGradient(colors: [kGreen.withOpacity(0.3), kGold.withOpacity(0.2)])),
-                      child: Center(child: Text(nivel['emoji'] as String, style: const TextStyle(fontSize: 18)))),
+                      child: Center(child: Text(nivel['emoji']?.toString() ?? '', style: const TextStyle(fontSize: 18)))),
                     const SizedBox(width: 12),
                     Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                       Text('${nivel['nombre']}', style: const TextStyle(color: kText, fontSize: 13, fontWeight: FontWeight.w600)),
@@ -12988,11 +13250,6 @@ class ProfileScreen extends StatelessWidget {
             }),
 
 
-
-          _ProfileMenuItem(
-            emoji: '🎬', label: t('Colaboradores','Collaborators'),
-            onTap: () => Navigator.of(context, rootNavigator: false).push(
-              MaterialPageRoute(builder: (_) => const ColaboradoresScreen()))),
           _ProfileMenuItem(
             emoji: '❓', label: t('Ayuda y soporte','Help & support'),
             onTap: () => _mostrarAyuda(context)),
@@ -13098,12 +13355,16 @@ class AchievementsScreen extends StatelessWidget {
       body: Center(child: Text('Inicia sesión para ver tus logros',
         style: TextStyle(color: kTextMuted))));
 
-    final todasInsignias = kInsigniaPorRuta.entries.map((e) => {
-      'rutaNombre': e.key,
-      'insigniaImg': e.value,
-      'nombre': _nombreInsignia(e.key),
-      'emoji': _emojiRuta(e.key),
-    }).toList();
+    // Deduplicar — no mostrar la misma insignia dos veces
+    final _seenImgs = <String>{};
+    final todasInsignias = kInsigniaPorRuta.entries
+      .where((e) => _seenImgs.add(e.value))
+      .map((e) => {
+        'rutaNombre': e.key,
+        'insigniaImg': e.value,
+        'nombre': _nombreInsignia(e.key),
+        'emoji': _emojiRuta(e.key),
+      }).toList();
 
     return Scaffold(
       backgroundColor: kDark2,
@@ -13354,11 +13615,9 @@ class _InsigniaDetalleSheet extends StatelessWidget {
   }
 }
 
-
 // ─────────────────────────────────────────
 //  AVATAR RUTERO — TIPS POR SITIO
 // ─────────────────────────────────────────
-
 
 // ── Widget heredado para pasar cambiarIdioma a toda la app ──
 // i18n: usar langNotifier (ValueNotifier)
@@ -13569,7 +13828,6 @@ const Map<String, Map<String, String>> kCuriosidadesPorSitio = {
     'es': 'Esta calle peatonal fue remodelada en 2018 y hoy concentra más de 80 restaurantes gourmet en 4 cuadras.',
     'en': 'This pedestrian street was renovated in 2018 and today hosts over 80 gourmet restaurants in 4 blocks.',
   },
-  // ── RUTA LAURELES & TRADICIÓN ──
   'Estadio Atanasio Girardot': {
     'es': 'Inaugurado en 1953, ha albergado 3 Copas América y 2 partidos del Mundial Sub-20. Su capacidad actual es de 45.943 personas.',
     'en': 'Opened in 1953, it has hosted 3 Copa América tournaments and 2 U-20 World Cup matches. Current capacity is 45,943.',
@@ -13624,7 +13882,6 @@ const Map<String, Map<String, String>> kCuriosidadesPorSitio = {
     'es': 'Se estima que concentra más de 400 bares, restaurantes y discotecas en menos de 1 km².',
     'en': 'It is estimated to host over 400 bars, restaurants and clubs in less than 1 km².',
   },
-  // ── RUTA SENDEROS DE AGUA ──
   'Parque El Poblado (inicio)': {
     'es': 'Aquí se fundó Medellín el 2 de marzo de 1616 como "San Lorenzo de Aburrá". Este parque es el corazón histórico del sur.',
     'en': 'Medellín was founded here on March 2, 1616 as "San Lorenzo de Aburrá". This park is the historic heart of the south.',
@@ -13641,7 +13898,6 @@ const Map<String, Map<String, String>> kCuriosidadesPorSitio = {
     'es': 'Construido en 1930 por el empresario Diego Echavarría Misas imitando un castillo gótico francés. Tiene 7.000 m² de jardines.',
     'en': 'Built in 1930 by businessman Diego Echavarría Misas imitating a French gothic castle. 7,000 m² of gardens.',
   },
-  // ── RUTA ARTE, CIUDAD Y SABORES ──
   'Parque de Telemedellín': {
     'es': 'Es el canal público municipal más antiguo de Colombia (1996). Transmite 24/7 programación cultural y comunitaria.',
     'en': 'The oldest municipal public channel in Colombia (1996). Broadcasts 24/7 cultural and community programming.',
@@ -13744,6 +14000,27 @@ const Map<String, Map<String, String>> kCuriosidadesPorSitio = {
   'Malecón de Guatapé': {
     'es': 'El embalse cubre 64 km² y tiene más de 2.200 islas. Es el principal productor de hidroelectricidad de Colombia — abastece al 30% del país.',
     'en': 'The reservoir covers 64 km² with over 2,200 islands. It is Colombia main hydroelectric producer — supplying 30% of the country.',
+  },
+  // ── VIVE EL POBLADO ──
+  'El Garabato': {
+    'es': 'El Poblado fue el primer asentamiento español en el Valle de Aburrá, fundado en 1616 — más de 400 años antes de que se convirtiera en la zona más exclusiva de Medellín.',
+    'en': 'El Poblado was the first Spanish settlement in the Aburrá Valley, founded in 1616 — over 400 years before it became Medellín\'s most exclusive area.',
+  },
+  'UVA Ilusión Verde': {
+    'es': 'Las UVA (Unidades de Vida Articulada) fueron construidas por EPM sobre antiguas infraestructuras de agua. Son bibliotecas, centros culturales y espacios de encuentro comunitario — todo en uno.',
+    'en': 'The UVAs (Articulated Life Units) were built by EPM on former water infrastructure. They are libraries, cultural centers and community meeting spaces — all in one.',
+  },
+  'Mercados Campesinos Parque Lineal La Presidenta': {
+    'es': 'Los Mercados Campesinos son una política pública de Medellín que conecta al campesino directamente con el consumidor — sin intermediarios. Hay más de 20 puntos en toda la ciudad.',
+    'en': 'The Farmers\' Markets are a Medellín public policy that connects farmers directly with consumers — no middlemen. There are over 20 locations across the city.',
+  },
+  'Manila y Casa de los Vasco': {
+    'es': 'Manila fue uno de los primeros barrios residenciales del Poblado. Hoy alberga el Distrito Creativo Perpetuo Socorro, un ecosistema de artistas, diseñadores y emprendedores creativos.',
+    'en': 'Manila was one of El Poblado\'s first residential neighborhoods. Today it hosts the Perpetuo Socorro Creative District, an ecosystem of artists, designers and creative entrepreneurs.',
+  },
+  'Parque La Bailarina': {
+    'es': 'El barrio vecino Provenza fue inmortalizado por Karol G en una de sus canciones. El Parque La Bailarina toma su nombre de la escultura que lo adorna — un ícono del Poblado.',
+    'en': 'The neighboring barrio Provenza was immortalized by Karol G in one of her songs. Parque La Bailarina takes its name from the sculpture that adorns it — an icon of El Poblado.',
   },
 };
 
@@ -13917,7 +14194,6 @@ const Map<String, Map<String, dynamic>> kRetosPorSitio = {
     'reto_en': 'Try a reinvented paisa dish at an author restaurant',
     'puntos': 15,
   },
-  // ── RUTA LAURELES & TRADICIÓN ──
   'Estadio Atanasio Girardot': {
     'emoji': '⚽',
     'reto_es': 'Foto con la fachada del estadio — imposible no verla',
@@ -13986,7 +14262,6 @@ const Map<String, Map<String, dynamic>> kRetosPorSitio = {
     'reto_en': 'Find a bar with live music and stay at least 30 minutes',
     'puntos': 15,
   },
-  // ── RUTA SENDEROS DE AGUA ──
   'Parque Lineal La Presidenta': {
     'emoji': '💧',
     'reto_es': 'Identifica 3 aves distintas y fotografíalas',
@@ -13999,7 +14274,6 @@ const Map<String, Map<String, dynamic>> kRetosPorSitio = {
     'reto_en': 'Walk the gardens and count the statues',
     'puntos': 10,
   },
-  // ── RUTA ARTE, CIUDAD Y SABORES ──
   'Museo de Arte Moderno de Medellín (MAMM)': {
     'emoji': '🖼️',
     'reto_es': 'Elige tu obra favorita de la exposición temporal y tómale foto',
@@ -14117,6 +14391,37 @@ const Map<String, Map<String, dynamic>> kRetosPorSitio = {
     'reto_en': 'Take a short boat ride (10-15 min) or try a trout at the waterfront',
     'puntos': 15,
   },
+  // ── VIVE EL POBLADO ──
+  'El Garabato': {
+    'emoji': '📸',
+    'reto_es': 'Toma una foto panorámica desde la ladera de El Garabato hacia el valle',
+    'reto_en': 'Take a panoramic photo from the El Garabato hillside toward the valley',
+    'puntos': 10,
+  },
+  'UVA Ilusión Verde': {
+    'emoji': '📚',
+    'reto_es': 'Entra a la UVA y pregunta qué taller o evento tienen esta semana',
+    'reto_en': 'Enter the UVA and ask what workshop or event they have this week',
+    'puntos': 10,
+  },
+  'Mercados Campesinos Parque Lineal La Presidenta': {
+    'emoji': '🍊',
+    'reto_es': 'Compra una fruta exótica que no conozcas y pruébala en el mercado',
+    'reto_en': 'Buy an exotic fruit you don\'t recognize and try it at the market',
+    'puntos': 10,
+  },
+  'Manila y Casa de los Vasco': {
+    'emoji': '🎨',
+    'reto_es': 'Encuentra un taller del Distrito Creativo Perpetuo Socorro y habla con un artista local',
+    'reto_en': 'Find a Perpetuo Socorro Creative District workshop and talk to a local artist',
+    'puntos': 15,
+  },
+  'Parque La Bailarina': {
+    'emoji': '💃',
+    'reto_es': 'Encuentra la escultura de La Bailarina y tómate una foto imitando la pose',
+    'reto_en': 'Find La Bailarina sculpture and take a photo imitating the pose',
+    'puntos': 10,
+  },
 };
 
 /// Trivia por sitio — pregunta con 3 opciones (+10 pts si acierta)
@@ -14230,7 +14535,6 @@ const Map<String, Map<String, dynamic>> kTriviasPorSitio = {
     'correcta': 1,
     'puntos': 10,
   },
-  // ── RUTA LAURELES & TRADICIÓN ──
   'Estadio Atanasio Girardot': {
     'pregunta_es': '¿Cuál es la capacidad actual del estadio Atanasio Girardot?',
     'pregunta_en': 'What is the current capacity of the Atanasio Girardot stadium?',
@@ -14381,7 +14685,6 @@ const Map<String, Map<String, String>> kTipsSensorialesPorSitio = {
     'es': 'Siéntate en una banca y observa el contraste — el parque tranquilo de día, eléctrico de noche.',
     'en': 'Sit on a bench and feel the contrast — calm park by day, electric by night.',
   },
-  // ── RUTA LAURELES & TRADICIÓN ──
   'Primer Parque de Laureles': {
     'emoji': '☕',
     'es': 'Pide un tinto en un kiosco del parque y siéntate. Observa a los abuelos jugando dominó.',
@@ -14409,7 +14712,6 @@ const Map<String, Map<String, String>> kTipsSensorialesPorSitio = {
     'es': 'Si puedes, entra aunque no haya función. El silencio del teatro vacío tiene su propia magia.',
     'en': 'If you can, enter even without a show. The silence of an empty theater has its own magic.',
   },
-  // ── RUTA SENDEROS DE AGUA ──
   'Quebrada La Presidenta (sendero)': {
     'emoji': '💧',
     'es': 'Detente y escucha. El agua de la quebrada es el único sonido natural del centro de El Poblado.',
@@ -14420,7 +14722,6 @@ const Map<String, Map<String, String>> kTipsSensorialesPorSitio = {
     'es': 'Camina los jardines antes de entrar al museo. Cada rincón fue diseñado para contemplar.',
     'en': 'Walk the gardens before entering the museum. Every corner was designed for contemplation.',
   },
-  // ── RUTA ARTE, CIUDAD Y SABORES ──
   'Museo de Arte Moderno de Medellín (MAMM)': {
     'emoji': '🏭',
     'es': 'Observa las vigas de metal originales de la fábrica — son parte de la obra arquitectónica.',
@@ -14515,28 +14816,8 @@ const Map<String, Map<String, dynamic>> kMisionesPorRuta = {
     'recompensa_es': 'Insignia "Testigo del Cambio"',
     'recompensa_en': 'Badge "Witness of Change"',
   },
-  'RUTA PATRIMONIAL DEL CENTRO': {
-    'nombre_es': 'Arqueólogo Urbano',
-    'nombre_en': 'Urban Archaeologist',
-    'emoji': '🏛️',
-    'descripcion_es': 'Encuentra y fotografía 5 placas históricas o fechas grabadas en las fachadas de los edificios.',
-    'descripcion_en': 'Find and photograph 5 historical plaques or dates carved into building facades.',
-    'objetivo': 5,
-    'puntos': 15,
-    'recompensa_es': 'Insignia "Arqueólogo Urbano"',
-    'recompensa_en': 'Badge "Urban Archaeologist"',
-  },
-  'RUTA CENTRO REPUBLICANO': {
-    'nombre_es': 'Cronista Republicano',
-    'nombre_en': 'Republican Chronicler',
-    'emoji': '📖',
-    'descripcion_es': 'Identifica 3 estilos arquitectónicos diferentes en los edificios de la ruta.',
-    'descripcion_en': 'Identify 3 different architectural styles among the buildings on the route.',
-    'objetivo': 3,
-    'puntos': 15,
-    'recompensa_es': 'Insignia "Cronista Republicano"',
-    'recompensa_en': 'Badge "Republican Chronicler"',
-  },
+  // [eliminado] 'RUTA PATRIMONIAL DEL CENTRO': {
+  // [eliminado] 'RUTA CENTRO REPUBLICANO': {
   'RUTA VERDE DEL NORTE': {
     'nombre_es': 'Guardabosque Urbano',
     'nombre_en': 'Urban Forester',
@@ -14559,17 +14840,6 @@ const Map<String, Map<String, dynamic>> kMisionesPorRuta = {
     'recompensa_es': 'Insignia "Viajero de las Alturas"',
     'recompensa_en': 'Badge "Heights Traveler"',
   },
-  'RUTA LAURELES & TRADICIÓN': {
-    'nombre_es': 'Corazón Paisa',
-    'nombre_en': 'Paisa Heart',
-    'emoji': '🌺',
-    'descripcion_es': 'Habla con al menos 3 locales distintos durante la ruta — pregúntales por su lugar favorito.',
-    'descripcion_en': 'Talk to at least 3 different locals during the route — ask them for their favorite spot.',
-    'objetivo': 3,
-    'puntos': 15,
-    'recompensa_es': 'Insignia "Corazón Paisa"',
-    'recompensa_en': 'Badge "Paisa Heart"',
-  },
   'RUTA DE LOS MIRADORES': {
     'nombre_es': 'Cóndor de los Andes',
     'nombre_en': 'Andean Condor',
@@ -14581,39 +14851,7 @@ const Map<String, Map<String, dynamic>> kMisionesPorRuta = {
     'recompensa_es': 'Insignia "Cóndor de los Andes"',
     'recompensa_en': 'Badge "Andean Condor"',
   },
-  'RUTA CULTURAL NOCTURNA': {
-    'nombre_es': 'Noctámbulo Cultural',
-    'nombre_en': 'Cultural Night Owl',
-    'emoji': '🌙',
-    'descripcion_es': 'Descubre al menos 2 expresiones artísticas diferentes (teatro, música, arte plástico) en la noche.',
-    'descripcion_en': 'Discover at least 2 different art expressions (theater, music, visual arts) during the night.',
-    'objetivo': 2,
-    'puntos': 15,
-    'recompensa_es': 'Insignia "Noctámbulo Cultural"',
-    'recompensa_en': 'Badge "Cultural Night Owl"',
-  },
-  'SENDEROS DE AGUA Y NATURALEZA': {
-    'nombre_es': 'Explorador de Quebradas',
-    'nombre_en': 'Stream Explorer',
-    'emoji': '💧',
-    'descripcion_es': 'Graba un video corto en cada punto con agua (quebradas, fuentes, jardines) — al menos 3.',
-    'descripcion_en': 'Record a short video at each water point (streams, fountains, gardens) — at least 3.',
-    'objetivo': 3,
-    'puntos': 15,
-    'recompensa_es': 'Insignia "Explorador de Quebradas"',
-    'recompensa_en': 'Badge "Stream Explorer"',
-  },
-  'ARTE, CIUDAD Y SABORES': {
-    'nombre_es': 'Creador Urbano',
-    'nombre_en': 'Urban Creator',
-    'emoji': '🖼️',
-    'descripcion_es': 'Crea una historia en Instagram o TikTok con 3 momentos clave de la ruta.',
-    'descripcion_en': 'Create an Instagram or TikTok story with 3 key moments from the route.',
-    'objetivo': 3,
-    'puntos': 15,
-    'recompensa_es': 'Insignia "Creador Urbano"',
-    'recompensa_en': 'Badge "Urban Creator"',
-  },
+  // [eliminado] 'RUTA CULTURAL NOCTURNA': {
   'DEL ORIGEN PAISA A LA MEDELLÍN MODERNA': {
     'nombre_es': 'Embajador Paisa Moderno',
     'nombre_en': 'Modern Paisa Ambassador',
@@ -14650,486 +14888,27 @@ const Map<String, Map<String, dynamic>> kMisionesPorRuta = {
 };
 
 
-const Map<String, String> kTipsPorSitio = {
-  // ── Corredor Cultural de la 45 (Manrique) ──
-  'Estación Gardel — Puerta de Manrique': 'Llegas a Manrique por Carlos Gardel. El Zorzal Criollo nunca pisó este barrio, pero su música sí — y se quedó para siempre. La 45 que comienza aquí es el corazón musical del nororiente de Medellín. 🚇',
-  'Casa Gardeliana': 'Inaugurada en 1935, esta casa museo rinde homenaje a Carlos Gardel, el rey del tango. Aquí podrás escuchar sus discos originales y entender por qué Manrique se convirtió en la capital del tango en Colombia. Los viernes hay presentaciones en vivo. 🎶',
-  'Casa de la Cultura Manrique': 'Uno de los centros culturales más activos del nororiente. Aquí se forman los artistas, músicos y gestores culturales que mantienen viva la identidad del barrio. Pregunta por la cartelera de eventos — siempre hay algo pasando. 🎭',
-  'La 45 Gastronómica': 'La arteria principal de Manrique es también un festival de sabores. Desde mondongos y bandejas paisas hasta cafés de especialidad. Esta es la parte de Medellín que los turistas convencionales nunca ven — y se pierden de lo mejor. 🍽️',
-  'Hangar M45 Azotea': 'Un restaurante rooftop construido alrededor de un avión real de Aerolíneas de Antioquia. Las vistas del valle de Medellín desde aquí son espectaculares, especialmente al atardecer. Una de las experiencias más singulares de la ciudad. ✈️',
-  'UVA La Armonía — Punto de Inicio Constelaciones': 'Las UVAs (Unidades de Vida Articulada) son espacios públicos construidos sobre antiguas plantas de tratamiento de agua. Este es el punto de partida oficial para el recorrido por Constelaciones — el macromural más grande de Colombia. 💧',
-  'Macromural Constelaciones': '14.819 metros cuadrados de arte colectivo sobre las fachadas de San José de La Cima II y Brisas del Jardín. Cuatro colectivos artísticos transformaron 500 fachadas en un lienzo de resiliencia y memoria. Cada mural cuenta una historia real de alguien que vive aquí. 🌌',
-  'Mirador El Ojo de Dios': 'El punto más alto de este recorrido, con una vista panorámica del valle de Medellín que pocas personas conocen. Hay un bar en la cima donde puedes tomarte un tinto o una cerveza mientras contemplas la ciudad de arriba. El esfuerzo vale cada paso. 👁️',
-  // Ruta Memoria y Reflexión
-  'Museo Beyond Escobar': 'Aquí comienza la ruta. Este museo de gestión privada en San Javier, dirigido por Laura Escobar, comparte el relato familiar y local de un capítulo complejo de la historia de Medellín. El contexto que te dan aquí hace que los demás lugares de la ruta tengan mucho más sentido. Visita con cita previa. 🏛️',
-  'Barrio Los Olivos — El Techo': 'Carrera 79B N.° 45D-94. En el techo de esta casa, el 2 de diciembre de 1993, terminó una de las etapas más violentas de Medellín. Hoy es una calle residencial tranquila, con vecinos, niños y rutina. El contraste habla por sí solo. 🏘️',
-  'Cementerio Jardines Montesacro': 'Uno de los cementerios-jardín más grandes de Colombia. Aquí reposan los restos de Pablo Escobar. Recórrelo con respeto y en silencio — muchas familias de la ciudad tienen memorias aquí. 🌿',
-  'Parque Memorial Inflexión': 'Este parque fue construido en honor a las víctimas del narcotráfico. Antes aquí existía una de las propiedades más representativas de esa época. Hoy es un espacio de memoria, con 46 árboles sembrados con participación comunitaria. 🕊️',
-  // Ruta 1 — Transformación Urbana
-  'Estación San Javier (Metro)': '¡Bienvenido a San Javier! Esta estación es la puerta de entrada a la transformación más famosa de Medellín. En 2011 todo era muy diferente por aquí... 🚇',
-  'Biblioteca de San Javier': 'Esta biblioteca no es solo libros — es un símbolo de que la educación puede transformar un barrio entero. ¡Tiene más de 80.000 visitantes al año! 📚',
-  'Ciudadela de la 4° Revolución': 'Aquí nació el concepto de "urbanismo social" que le dio a Medellín el premio a la ciudad más innovadora del mundo en 2013. 🌍',
-  'Parque de la Paz': 'Este parque marca el inicio del recorrido de las escaleras. Antes era un sitio de conflicto — hoy es un símbolo de paz y reconciliación. 🕊️',
-  'Murales Hip Hop': '¡El arte urbano más impresionante de Colombia! Estos murales cuentan la historia de la Comuna 13 a través de colores y rap. 🎨',
-  'Escaleras electricas': '¡Las primeras escaleras eléctricas al aire libre del mundo usadas como transporte masivo! Suben 384 metros de desnivel en 6 tramos. ⚡ Los paisas llaman subir pa la loma a este recorrido — pero hoy vas en escaleras eléctricas, la innovación social más famosa de Medellín. 🚀 Dato paisa: PARCHE significa grupo de amigos que se reúne — tú ya haces parte del parche de viajeros de Rutero MDE.',
-  'Tienda de artesanos locales (Aliado)': 'Cada producto que compres aquí apoya directamente a una familia de la comunidad. ¡Son 100% hechos a mano! 🛍️',
-
-  // Ruta 2 — Patrimonial del Centro (20 sitios con narración)
-  'Parque Berrío': 'Aquí comenzó todo. Este fue el punto donde Medellín empezó a organizar su vida como ciudad, entre comercio, religión y encuentros cotidianos. Sigue siendo el corazón del centro. 🔵',
-  'Iglesia de La Candelaria': 'Frente a ti está la iglesia más antigua de Medellín. Durante siglos fue el eje espiritual de la ciudad, marcando el ritmo de la vida cotidiana. Imagina cómo era Medellín cuando apenas comenzaba a crecer. ⛪',
-  'Edificio Coltejer': 'Mira hacia arriba. Este edificio no es solo un rascacielos — es un símbolo. Su forma representa una aguja de coser, recordando cuando Medellín fue potencia textil y su economía giraba alrededor de esta industria. 🟡',
-  'Pasaje Junín': 'Este pasaje fue el lugar donde la ciudad salía a caminar, a conversar y a mostrarse. Durante décadas, aquí se vivía la vida social de Medellín, entre cafés, tiendas y encuentros que definían la cultura urbana. 🟤',
-  'Parque Bolívar': 'Este parque ha sido un espacio de encuentro tranquilo dentro del centro. Ha servido como escenario de actividades culturales, especialmente música, convirtiéndose en un lugar donde la ciudad respira diferente. 🌳',
-  'Catedral Basílica Metropolitana': 'Frente a ti está una de las construcciones en ladrillo más grandes del mundo. Su tamaño y diseño reflejan una época en la que la religión tenía un papel central en la vida de la ciudad. ⛪',
-  'Hotel Nutibara': 'Este hotel fue símbolo de modernidad. Aquí se hospedaban visitantes importantes cuando Medellín comenzaba a proyectarse como una ciudad relevante en el país. Representa una etapa de crecimiento y apertura. 🏨',
-  'Plaza Botero': 'Estás en un museo al aire libre. Las esculturas de Botero no solo decoran el espacio — transformaron esta zona en un punto cultural y turístico donde el arte se mezcla con la vida cotidiana. 🎨',
-  'Museo de Antioquia': 'Este museo guarda gran parte de la historia artística de la región. Su presencia aquí refuerza la importancia cultural de este sector del centro histórico. 🖼️',
-  'Palacio de la Cultura Rafael Uribe Uribe': 'Su diseño parece sacado de Europa. Este edificio muestra cómo Medellín buscaba proyectar poder y cultura a través de su arquitectura, y hoy sigue siendo un ícono del centro. 🏛️',
-  'Iglesia de La Veracruz': 'Esta iglesia representa una Medellín más antigua, cuando la ciudad empezaba a expanderse. Es un testimonio silencioso del crecimiento urbano de la ciudad. ⛪',
-  'Palacio Nacional': 'Este edificio cambió completamente su función. De ser un espacio de justicia, pasó a ser un lugar de comercio, reflejando cómo el centro se adapta constantemente a los tiempos. 🏬',
-  'Edificio Vásquez': 'Aquí se conectaba Medellín con el resto del país a través del ferrocarril. Fue clave para el crecimiento económico y la movilidad de mercancías en toda la región. 🟢',
-  'Edificio Carré': 'Este edificio refleja influencias europeas en la arquitectura local. Es parte del legado urbano de una ciudad que miraba hacia afuera para crecer e inspirarse. 🟢',
-  'Parque de las Luces': 'Este espacio simboliza la transformación del centro. Donde antes había deterioro, hoy hay un lugar abierto con 300 columnas de luz que representa el cambio urbano de Medellín. 💡',
-  'Centro Administrativo La Alpujarra': 'Aquí se toman muchas de las decisiones que afectan la ciudad. Es el núcleo del poder político y administrativo de Medellín y todo Antioquia. 🔴',
-  'Estación Ferrocarril de Antioquia': 'Este lugar recuerda la época en que el ferrocarril era vital para la economía. Desde aquí se movían productos y se conectaba Medellín con otras regiones del país. 🚆',
-  'Parque San Antonio': 'Este es un lugar de memoria. Aquí la ciudad recuerda momentos difíciles, pero también muestra su capacidad de resiliencia y transformación. Un símbolo de la Medellín que renació. 🟣',
-  'Iglesia de San Ignacio': 'Este espacio está ligado a los inicios de la educación en Medellín. Representa la conexión entre conocimiento, religión y desarrollo cultural de la ciudad. ⛪',
-  'Teatro Pablo Tobón Uribe (Centro)': 'Este teatro representa la Medellín actual: una ciudad que apuesta por la cultura, el arte y la expresión como parte de su identidad. Es uno de los espacios escénicos más importantes del país. 🎭',
-  'Museo Casa de la Memoria': '¡Cerramos la ruta con una parada muy especial! Inaugurado en 2012, este museo está dedicado a las víctimas del conflicto armado en Antioquia. Su arquitectura, obra de Juan Pablo Ortiz, ganó varios premios. La entrada es gratuita y las exposiciones transforman la manera de ver la ciudad. ¡Felicitaciones Rutero! 🕊️',
-
-  // Ruta 3 — Verde del Norte
-  'Jardín Botánico Joaquín Antonio Uribe': '¡El pulmón verde de Medellín! Tiene más de 4.500 especies de plantas y es sede del famoso Festival de las Flores. 🌺',
-  'Orquideorama': 'Una obra maestra de arquitectura biomimética. Su estructura imita flores de orquídea y ganó el premio Lápiz de Acero. 🌸',
-  'Parque Explora': 'Uno de los acuarios de agua dulce más grandes de Suramérica está aquí adentro. ¡Con más de 400 especies de peces! 🔬',
-  'Planetario de Medellín': 'Aquí puedes viajar al espacio sin salir de Medellín. Las funciones del domo digital son una experiencia única. 🪐',
-  'Parque de los Deseos': 'Diseñado para que la gente salga a la calle y recupere el espacio público. Sus noches de cine al aire libre son legendarias. ✨',
-  'Universidad de Antioquia (fachada)': 'Fundada en 1803, es una de las universidades más antiguas y prestigiosas de Colombia. ¡Ha formado a miles de líderes del país! 🎓',
-
-  // Ruta 4 — Metrocable
-  'Estación Acevedo (Metro)': 'Desde aquí empieza la aventura hacia las alturas de Medellín. La Línea K fue el primer metrocable urbano del mundo. 🚇 Los paisas dicen que "el metro es la madre de Medellín" — limpio, puntual y sin peleas. Regla de oro: silencio, no comer y no apoyarse en las puertas. El orden colectivo es un orgullo paisa. 🚇 Dato paisa: PARACO o PARCERO = amigo · úsalo con confianza.',
-  'Metrocable Línea K': '¡El primer cable aéreo del mundo usado como transporte masivo permanente! Conecta el centro con las comunas del noreste. 🚡',
-  'Biblioteca España (Santo Domingo)': 'Diseñada por Giancarlo Mazzanti. Ganó el premio Aga Khan de arquitectura. Desde aquí la vista de Medellín es espectacular. 📚',
-  'Parque Arví (entrada)': '¡1.600 hectáreas de bosque nativo a solo 45 minutos del centro! Los indígenas Nutabes lo habitaron hace más de 2.000 años. 🌿 ¡Llegaste al Parque Arví — 1.600 hectáreas de bosque a 2.550 metros sobre el nivel del mar! Los paisas vienen aquí a "despejarse" (despejar la mente). 🌿 Dato paisa: TINTO = café negro pequeño · pide un tinto caliente en el mercado campesino.',
-  'Mercado campesino de Arví': 'Aquí encuentras productos frescos cultivados por comunidades campesinas de Santa Elena. ¡Apoya la economía local! 🛒',
-
-
-  // ── RUTA 6 — Laureles & Tradición
-  'Estadio Atanasio Girardot': '¡Bienvenido a Laureles! Arrancamos en el estadio más moderno de Colombia, con capacidad para 45.943 personas. Aquí juegan Nacional y Medellín — la rivalidad más apasionada del país. ⚽',
-  'Avenida Carrera la 70 (Laureles)': 'La avenida más animada de Laureles. Restaurantes, bares y cafés se extienden por kilómetros. ¡El corazón gastronómico del barrio! 🌮',
-  'U.P.B Porteria': 'La Universidad Pontificia Bolivariana es una de las más reconocidas del país. Su campus es un oasis verde en medio de la ciudad. 🎓',
-  'Primer Parque de Laureles': '¡El salón de la ciudad! Aquí los laurelenses se reúnen, caminan perros y toman tinto. Pura vida paisa en su máxima expresión. 🌳',
-  'Segundo Parque de Laureles': 'El parque más tranquilo y familiar de la zona. Rodeado de restaurantes de cocina tradicional antioqueña. ¡Pide un sancocho al atardecer! 🍲',
-  'Restaurante local (Aliado)': '¡Llegaste al cierre perfecto! Un restaurante aliado donde la cocina paisa se vive sin turistificar. Aprovecha tu 10% de descuento y pide lo que recomiende el mesero. ¡Felicitaciones Rutero! 🍽️',
-
-  // ── RUTA 7 — Miradores
-  'Cerro Nutibara': '¡Arrancamos por el cerro más emblemático de Medellín! Desde aquí puedes ver toda la ciudad en 360°. En la cima está el famoso Pueblito Paisa, una réplica de pueblo antioqueño del siglo XIX. ⛰️',
-  'Mirador Avenida Las Palmas': 'La vía más espectacular de Medellín. Desde aquí la vista del Valle de Aburrá de día es impresionante, y de noche es absolutamente mágica. 🌃',
-  'Cerro El Picacho (fachada)': 'El cerro más alto del perímetro urbano de Medellín con casi 3.000 metros. Desde su fachada se ven 6 municipios del Valle de Aburrá. 🦅',
-  'Cerro de las Tres Cruces': 'El mirador favorito de los deportistas paisas. Se sube por senderos empinados y en la cima te esperan las tres cruces que le dan nombre — y una vista panorámica inolvidable. ✝️',
-  'Mirador de Belén': '¡Cerramos con el mirador más auténtico y menos turístico! Los paisas del barrio vienen aquí a ver el atardecer. Guarda el secreto. ¡Felicitaciones Rutero! 🌅',
-
-  // ── RUTA 8 — Cultural Nocturna
-  'Teatro Pablo Tobón Uribe': 'El teatro más elegante de Medellín inaugurado en 1967. Su programación cultural es de clase mundial todo el año. 🎭',
-  'Zona Rosa El Poblado': 'El epicentro de la vida nocturna de Medellín. Cientos de bares y restaurantes abren sus puertas cuando el sol se va. 🌃',
-  'Galería de arte (Provenza)': 'Arte colombiano contemporáneo en el corazón del Poblado. Los artistas emergentes de Medellín exhiben aquí sus obras. 🖼️',
-  'Parque Lleras (noche)': 'De día es un parque tranquilo — de noche es donde Medellín cobra vida. Músicos, artistas y gente de todo el mundo se dan cita aquí. 🌙',
-  'Bar de música en vivo aliado': '¡La mejor música en vivo de la ciudad! Jazz, salsa, rock y pop se mezclan en un ambiente único. ¡Reserva con tiempo! 🎵',
-
-  // ── COLOMBIAMODA 2026
-  'Colombiamoda 2026 — Plaza Mayor':
-    'La Semana de la Moda más importante de Latinoamérica — edición 37. Del 28 al 30 de julio en Plaza Mayor. 70.000 asistentes de 50 países, 17.000 compradores internacionales. Concepto 2026: "Lo que nos hace únicos es el nuevo lujo". 👗',
-  'Colombiamoda — Teatro Metropolitano':
-    'Ciudad Textil el 29 de julio — acceso libre con registro previo. Y el 31 de julio, el homenaje a los 100 años de Rafael Escalona, el Juglar Mayor del vallenato colombiano. El mismo día que arranca la Feria de las Flores. 🎭',
-
-  // ── FERIA DE LAS FLORES 2026 — Tips sitios validables
-  'Desfile Silleteros — Inicio Av. El Poblado':
-    'Aquí arranca el espectáculo. Los 500+ silleteros de Santa Elena comienzan a bajar cargando sus obras de arte en flor — algunas pesan más de 100 kg. Llega con 2 horas de anticipación para conseguir un buen puesto. 🌺',
-  'Desfile Silleteros — Puente de Guayaquil':
-    'Punto central del recorrido. Desde aquí se ven pasar las silletas monumentales en todo su esplendor. El puente Guayaquil es uno de los miradores más populares de todo el desfile — llega temprano. 🌹',
-  'Desfile Silleteros — Soterrado del Río':
-    'El tramo más especial del recorrido: las silletas pasan por el soterrado del río, con el contraste del verde floral sobre la arquitectura de Parques del Río. Un momento único. 💐',
-  'Desfile Silleteros — Av. del Ferrocarril':
-    'La recta final antes de Plaza Mayor. Aquí la emoción llega al máximo — los silleteros saben que están llegando a la meta y la multitud los anima con más fuerza. 🌸',
-  'Desfile Silleteros — Plaza Mayor (llegada)':
-    'La llegada del desfile. Los silleteros depositan sus silletas después de kilómetros de recorrido. La tradición dice que este es el momento más emotivo — muchos lloran al llegar. 🏆',
-  'Concierto Inaugural Feria 2026':
-    'La noche que enciende la Feria. El Concierto Inaugural frente al Obelisco marca el comienzo oficial de los 10 días de fiesta. Entrada gratuita — la energía de Medellín en este momento no tiene comparación. 🎤',
-  'Noche de Tango — CC La Central':
-    'Carlos Gardel nunca olvidó a Medellín — y Medellín nunca olvidó a Gardel. La Noche de Tango es un homenaje a esa conexión que nació en la carrera 45 y hoy llena de bandoneones el centro. 🎶',
-  'Primavera Urbana — Plazoleta Villa de Aburrá':
-    'Marcas locales, gastronomía y arte emergente de Medellín reunidos en un solo espacio. Del 31 jul al 2 ago — la vitrina de la creatividad paisa en su mejor momento. 🌼',
-  'Festival Gastronómico y Cervezas Artesanales':
-    'La cocina antioqueña y las cervezas artesanales de la región del 1 al 9 de agosto. La empanada paisa con cerveza artesanal local es la combinación perfecta para ver el desfile. 🍺',
-  'Florecer — Orquídeas Jardín Botánico':
-    'Más de 2.000 ejemplares de orquídeas transforman el Jardín Botánico en un paraíso floral del 4 al 9 de agosto. Colombia tiene la mayor biodiversidad de orquídeas del mundo — y aquí están todas. 🌸',
-  'Festival Infantil de Trova — Plaza Gardel':
-    'Los pequeños trovadores de Antioquia se miden en coplas y verraquera. El Festival Infantil de Trova es donde nace la próxima generación de este patrimonio cultural inmaterial de Colombia. 🎤',
-  'Festival Parrandero — Plaza Gardel':
-    'La parranda vallenata, la música de acordeón y el joropo en una noche de celebración total. El Festival Parrandero es el epílogo perfecto antes del Súper Concierto del día siguiente. 🪗',
-  'Súper Concierto Feria 2026 — Estadio Atanasio':
-    'La noche más grande de la Feria. Carin León, Silvestre Dangond, Grupo Niche, Luis Alfonso y Ariel Vega en el estadio más moderno de Colombia. Sábado 8 de agosto — boleta necesaria. 🎸',
-
-  // ── ALREDEDORES ──
-  // Ruta 9 — Guatapé & La Piedra
-  'Mirador El Alto del Chocho': '¡Llegaste al mirador donde arranca tu ruta! Desde aquí ya se ve parte del embalse y el contraste con el valle. Prepárate para un día espectacular. 🌄',
-  'Peñol (pueblo)': 'Este es el NUEVO Peñol. El pueblo original quedó bajo el agua del embalse en 1978 para construir la hidroeléctrica. Observa cómo su gente reconstruyó todo desde cero. 🏘️',
-  'Réplica Viejo Peñol': '¡Una joya de la memoria! Este es el pueblo sumergido recreado a escala. Caminarlo es entender lo que significó para sus 5.000 habitantes perderlo todo en nombre del progreso. 🏛️',
-  'La Casa al Revés': 'Una parada divertida para el camino — la casa está invertida y adentro los muebles cuelgan del techo. Perfecta para fotos locas. ¡Te reirás! 🏠',
-  'Piedra del Peñol (740 escalones)': '¡El momento clave de la ruta! 740 escalones, 220 metros de altura, una vista 360° que te cambia la vida. Respira, toma descansos y disfruta cada tramo. La cima vale cada paso. ⛰️',
-  'Parque Principal de Guatapé': '¡Ya estás en el pueblo más colorido de Colombia! Este parque es el corazón de Guatapé. Tómate un café, observa los zócalos y respira ambiente paisa-turístico. 🎨',
-  'Plazoleta de los Zócalos': 'Los zócalos son frisos decorativos que cuentan la historia de cada familia. Cada casa es una obra de arte — el pueblo entero es un museo al aire libre. 🖼️ Zócalos are the visual soul of Guatapé! Each colorful relief on the walls tells a story of the family inside. Read at least 5 before you leave. 🎨 Paisa word: BERRACO means brave and capable — climbing 740 steps made you berraco.',
-  'Calle del Recuerdo': 'Una de las calles más coloridas del pueblo. Las paredes están repletas de imágenes del antiguo Peñol y escenas de la vida cotidiana. Detente en cada casa. 🌸',
-  'Malecón de Guatapé': '¡Cerramos la ruta frente al embalse! Aquí salen las lanchas turísticas, hay restaurantes de trucha fresca y se ve uno de los atardeceres más bellos de Antioquia. ¡Felicitaciones Rutero! 🚤',
-
-  // Ruta 10 — Café en Santa Elena
-  'Parque de Santa Elena': 'Santa Elena es el corregimiento de las flores y el café. A solo 30 minutos de Medellín pero parece otro mundo. 🌸',
-  'Finca silletera (visita guiada)': '¡Las silletas de la Feria de las Flores nacen aquí! Una familia silletera te muestra cómo cultivan las flores y construyen las silletas. 🌺',
-  'Proceso del café: semilla a taza': 'Desde la planta hasta tu taza en 30 minutos. Aprenderás a despulpar, fermentar, secar y tostar el café. ¡Nunca más verás el tinto igual! ☕',
-  'Degustación de café de origen': 'Café cultivado a 1.800 metros en suelo volcánico antioqueño. Las notas de frutas tropicales y panela son únicas en el mundo. 🫗',
-  'Bosque El Romeral (entrada)': '5.000 hectáreas de bosque nativo con orquídeas, bromelias y quetzales. El ecosistema más biodiverso del Valle de Aburrá. 🌲',
-
-  // Ruta 11 — San Carlos & Charcos
-  'Terminal Norte (salida 6am)': '¡Madruga y vale la pena! San Carlos queda a 3 horas de Medellín. El paisaje de la cordillera central es absolutamente impresionante. 🚌',
-  'Municipio de San Carlos': 'Elegido el municipio más feliz de Colombia. ¡Después de años difíciles, San Carlos resurge como destino de ecoturismo! 🏘️',
-  'Charco El Remolino': '¡El charco más famoso de Antioquia! Sus aguas cristalinas a 18°C son perfectas para nadar. ¡Tienes que tirarte desde la piedra! 🌊',
-  'Ruta El Chispero (salto + rappel)': 'Salto al vacío de 8 metros, rappel en cascada y natación en corriente. ¡Para los más aventureros! ¡Adrenalina pura! 🧗',
-  'Río Samaná Norte': 'Uno de los ríos más limpios de Colombia con aguas color esmeralda. Aquí se practica rafting y kayak de clase mundial. 🏞️',
-  'Mirador El Cerro': 'Vista privilegiada del cañón del río Samaná. En días claros puedes ver hasta el nevado del Ruiz. ¡Foto obligatoria! ⛰️',
-
-  // Ruta 12 — Jardín Colonial
-  'Terminal Sur (salida)': '¡El bus más pintoresco de Antioquia! 3 horas por la cordillera occidental con paisajes de película. ¡Vale cada minuto! 🚌',
-  'Plaza Principal de Jardín': 'Declarado Monumento Nacional. La plaza más bella de Antioquia con su catedral neogótica y casas de balcones de colores. 🏘️',
-  'Finca cafetera El Paraíso': 'Café de origen en plena cordillera occidental. El microclima de Jardín produce uno de los mejores cafés de Colombia. 🏡',
-  'Mirador del cañón del Cauca': 'El Cañón del Cauca es una de las maravillas naturales de Antioquia. Desde aquí el río parece una cinta plateada. 🌅',
-
-  // Ruta 13 — Santa Fe de Antioquia
-  'Plaza Mayor Santa Fe de Antioquia': '¡La ciudad más antigua de Antioquia fundada en 1541! Su plaza colonial es Monumento Nacional y parece que el tiempo se detuvo. 🏛️',
-  'Catedral de la Inmaculada Concepción': 'Construida en mármol blanco en 1797. Es la catedral colonial más importante de Antioquia y una joya arquitectónica. ⛪',
-  'Calle Real (colonial)': 'La calle más auténtica del Occidente antioqueño. Sus adoquines, balcones floridos y casas blancas transportan al siglo XVIII. 🛤️',
-  'Iglesia de Chiquinquirá': 'La iglesia más antigua de Santa Fe. Sus muros de bahareque han sobrevivido terremotos y siglos de historia antioqueña. ⛪',
-  'Almuerzo típico local': '¡El sancocho de gallina criolla de Santa Fe es legendario! Con mote de queso y hogao — gastronomía colonial en estado puro. 🍽️',
-
-  // Ruta 14 — Envigado Natural
-  'Parque El Salado (entrada)': '¡El bosque urbano más grande del Valle de Aburrá! 60 hectáreas de naturaleza a solo 15 minutos del centro de Medellín. 🌳',
-  'Sendero de las aves': '¡Más de 120 especies de aves registradas en este sendero! Los birdwatchers vienen de todo el mundo a fotografiarlas. 🦋',
-  'Quebrada El Salado': 'Agua cristalina que baja directamente de los cerros. Sus piscinas naturales son el secreto mejor guardado de Envigado. 🌊',
-  'Parque Principal de Envigado': 'El municipio que vio crecer a Pablo Escobar pero que hoy es sinónimo de cultura, gastronomía y calidad de vida. 🏙️',
-  'Galería de Arte local': 'Envigado tiene una de las escenas artísticas más vibrantes de Antioquia. Artistas locales exhiben obras únicas y asequibles. 🖼️',
-
-  // ── TEMPORADA ──
-  // Semana Santa
-  'Catedral Metropolitana (Parque Bolívar)': '¡La catedral de ladrillo más grande del mundo! Construida entre 1875 y 1931 con millones de ladrillos hechos a mano. 🕊️',
-  'Basílica de la Candelaria': 'Durante Semana Santa, las procesiones nocturnas desde esta basílica son declaradas Patrimonio Cultural de Medellín. ⛪',
-  'Iglesia de San José': 'La iglesia más antigua del centro de Medellín. Sus campanas llevan más de 150 años llamando a los feligreses. ✝️',
-  'Recorrido de procesiones nocturnas': 'Las procesiones de Semana Santa en Medellín duran hasta las 2am. Miles de personas con velas crean un espectáculo único. 🕯️',
-  'Exposición de arte sacro': 'Arte religioso colonial del siglo XVI al XVIII. Piezas únicas traídas por los misioneros españoles que evangelizaron Antioquia. 🖼️',
-  'Plaza Botero (instalación especial)': 'Durante Semana Santa, las esculturas de Botero se iluminan especialmente y el ambiente es completamente diferente. 🗿',
-
-  // Feria de las Flores
-  'Parque de los Deseos (trova)': '¡La trova paisa en vivo! Improvisadores de versos musicales compiten en ingenio y humor. ¡Una tradición única en el mundo! 🌹 MISIÓN: Reta a un trovador a inventar una copla con tu nombre — si lo logras ganas 30 puntos extra.',
-  'Orquideorama — Exposición flores': 'Más de 500 especies de orquídeas y flores exóticas de Antioquia en exhibición. El olor es absolutamente embriagador. 🌸 MISIÓN: Identifica 3 variedades de orquídeas y aprende el nombre de una en latín.',
-  'Finca Silletera Santa Elena': '¡Las silletas de la Feria de las Flores nacen aquí! Una familia silletera lleva generaciones cultivando flores para la Feria. 💐 MISIÓN: Conoce a una familia silletera y averigua cuántas flores lleva una silleta — foto con ellos vale 50 puntos bono.',
-  'Placita de Flórez — Plaza de Flores': '¡El mercado de flores más auténtico de Medellín! Aquí los silleteros compran las flores que cargarán en sus espaldas. 🌺 MISIÓN: Compra una flor y regálasela a alguien local — eso es la Feria en su esencia.',
-  'Avenida Guayabal (Desfile Silleteros)': '¡El Desfile de Silleteros más importante de la historia — Edición 69! 600 familias, 80 kilos de flores en cada espalda, kilómetros de color. 🌹 MISIÓN: Fotografia una silleta monumental y encuentra el símbolo oculto en el diseño — vale 50 puntos bono.',
-  'Parques del Río (tablado musical)': '¡La música paisa más auténtica durante la Feria! Tablados barriales con cumbia, vallenato y música de cuerda hasta el amanecer. 🎵 MISIÓN: Baila con un local y aprende un paso de música paisa — la comunidad Rutero quiere ver el video.',
-  'Atanasio Girardot (Autos Clásicos)': '¡El Desfile de Autos Clásicos del Atanasio! Joyas de la mecánica con décadas de historia desfilan por el estadio más moderno de Colombia. 🚗 MISIÓN: Encuentra el auto más antiguo del desfile y averigua el año — ese número es tu código de insignia.',
-
-  'Plaza Mayor (exhibición silletas)': 'Las silletas ganadoras del concurso se exhiben aquí. Cada una cuenta una historia diferente de Colombia. 🏆',
-  'Tablado barrial (música en vivo)': 'La música de la Feria de las Flores suena en cada barrio. Cumbia, vallenato y música popular hasta el amanecer. 🎶',
-  'Plaza de las Flores': '¡El epicentro de la Feria! Flores por todas partes, artesanías y la energía más alegre de todo Medellín. 🌼',
-
-  // Tango
-  'Casa Gardeliana (museo)': '¡Carlos Gardel visitó Medellín en 1935 y los paisas lo adoptaron como propio! Este museo guarda su legado. 🎷',
-  'Plaza Gardel (epicentro)': 'La plaza más tanguera de Colombia. Durante el festival, milongas populares se toman las calles hasta el amanecer. 💃',
-  'Plaza Manrique (milonga popular)': 'La milonga más auténtica del festival. Aquí bailan los tangueros de toda la vida — veteranos que llevan décadas en la pista. 🎩',
-  'Bar tanguero aliado (clase incluida)': '¡Tu primera clase de tango incluida en el precio! En 1 hora aprenderás los pasos básicos de este baile fascinante. 🕺',
-
-  // Jazz
-  'Plaza Mayor (escenario principal)': '¡El escenario más grande del festival! Artistas internacionales de jazz tocan aquí bajo las estrellas antioqueñas. 🎵',
-  'Jardín Botánico (concierto)': 'Jazz rodeado de naturaleza tropical. El escenario del Jardín Botánico es uno de los más únicos del mundo. 🌺',
-  'Parque de los Deseos (jam session)': 'Las jam sessions del Medejazz son espontáneas e irrepetibles. Cualquier músico puede subir a tocar. 🎺',
-  'Bar de jazz aliado (show nocturno)': 'El cierre perfecto del día — jazz en vivo con tragos artesanales en el ambiente más íntimo del festival. 🥃',
-
-  // Libro y Cultura
-  'Jardín Botánico (sede principal)': 'Literatura rodeada de flores. El Jardín Botánico se convierte en la biblioteca a cielo abierto más hermosa del mundo. 📚',
-  'Orquideorama (presentaciones)': 'Escritores de todo el mundo leen sus obras bajo la estructura más icónica del Jardín. ¡Una experiencia irreal! 🌸',
-  'Parque Explora (talleres)': 'Talleres de escritura creativa para niños y adultos. La ciencia y la literatura se encuentran en un mismo espacio. 🔬',
-  'Biblioteca Pública Piloto': 'Una de las bibliotecas más importantes de Colombia. Durante la fiesta del libro se convierte en el corazón cultural de la ciudad. 📖',
-  'Librería aliada (firma + café)': '¡Trae tu libro favorito! Los autores firman ejemplares y el café de origen hace la espera más llevadera. ☕',
-
-  // Antioqueñidad
-  'Pueblito Paisa (Cerro Nutibara)': 'El escenario perfecto para la Feria de la Antioqueñidad. Música carranguera, danzas folclóricas y gastronomía típica en las alturas. 🎭',
-  'Feria de artesanías antioqueñas': '¡Más de 100 artesanos de todo Antioquia! Cerámicas de El Carmen, tejidos de Marinilla y sombreros aguadeños auténticos. 🎪',
-  'Degustación gastronomía típica': 'Bandeja paisa, sancocho trifásico, arepas de chócolo y mazamorra — la gastronomía antioqueña en toda su gloria. 🍽️',
-  'Espectáculo de danzas folclóricas': 'Grupos de danza de todo Antioquia muestran el bambuco, el torbellino y el pasillo — patrimonio cultural de Colombia. 💃',
-
-  // Alumbrado
-  'Desfile de Mitos y Leyendas (7 dic)': '¡El desfile más mágico del año! La Patasola, El Mohán y La Llorona cobran vida en carrozas iluminadas el 7 de diciembre. ✨',
-  'Paseo Fluvial del Río Medellín': 'El río más transformado de Colombia. De caño contaminado a paseo fluvial iluminado — Medellín nunca se rinde. 🎆',
-  'Parque Norte (instalación EPM)': 'EPM crea instalaciones de luz diferentes cada año. Las esculturas de luz del Parque Norte son el corazón del alumbrado. 💡',
-  'Parque de los Deseos (animaciones)': 'Animaciones de luz sincronizadas con música. Miles de personas se reúnen aquí cada noche de diciembre. ✨',
-  'Puente de Guayaquil iluminado': 'El puente más antiguo de Medellín vestido de luces navideñas. La reflexión en el río crea un efecto de espejo mágico. 🌉',
-  'Plaza Cisneros (nocturna)': 'Las 300 columnas de luz de día se transforman en una experiencia completamente diferente durante el alumbrado navideño. 🌃',
-  'Punto fotográfico oficial Rutero MDE': '¡La foto más instagrameable del alumbrado! Este punto fue seleccionado especialmente para los Ruteros MDE. 📸',
-
-  // Poesía
-  'Jardín Botánico (lectura principal)': '¡Poetas de 30 países leen sus obras en el jardín más hermoso de la ciudad! El festival más internacional de Medellín. 🌷',
-  'Parque de los Deseos (poesía)': 'Poesía callejera espontánea bajo las estrellas. Cualquier persona puede levantarse y leer sus versos. 🦋',
-  'Biblioteca EPM (taller escritura)': 'Talleres gratuitos de escritura creativa con autores de talla mundial. ¡Sal con tu primer poema! ✍️',
-  'Universidad de Antioquia (lecturas)': 'El campus universitario se llena de poetas y estudiantes. La tradición literaria de la UdeA es centenaria. 📚',
-  'Librería aliada (firma + café poesía)': '¡Libros de poesía de todo el mundo y café de origen! El lugar perfecto para terminar el día del festival. ☕',
-
-  // Colombiamoda
-  'Plaza Mayor (showrooms externos)': '¡El centro de la moda colombiana! Diseñadores de todo el país presentan sus colecciones en un ambiente de pasarela. 👗',
-  'Calle Provenza (tiendas diseñador)': 'Durante Colombiamoda, los diseñadores locales abren sus showrooms al público general. ¡Precios directos del creador! 🛍️',
-  'Mercado del Poblado (diseñadores)': 'El mercado más fashionista de Medellín. Marcas emergentes colombianas con diseños únicos y precios accesibles. 🛒',
-  'Showroom marca aliada (dcto exclusivo)': '¡Descuento exclusivo para Ruteros MDE! Presenta tu insignia Embajador del Diseño y accede a precios especiales. ✨',
-
-  'Parque El Poblado (inicio)': 'Este lugar representa el inicio histórico de la ciudad. Desde aquí comenzarás un recorrido que muestra cómo Medellín integra lo natural dentro de su crecimiento urbano. 🌳',
-  'Parque Lineal La Presidenta': 'Este parque sigue el curso de una quebrada. Aquí puedes observar cómo el agua ha sido un elemento clave en la formación del territorio. 💧',
-  'Quebrada La Presidenta (sendero)': 'A medida que avanzas, el entorno se vuelve más tranquilo. Este sendero conecta distintos sectores mientras mantiene una relación directa con la naturaleza. 🌿',
-  'Sector El Poblado Alto (zona verde)': 'Empiezas a notar un cambio: menos comercio y más residencias. Este sector combina urbanización con zonas verdes y tranquilidad. 🏡',
-  'Vías arborizadas hacia El Castillo': 'Este tramo implica una subida progresiva. A tu alrededor, la vegetación y el silencio contrastan con el ritmo del centro de la ciudad. ⛰️',
-  'El Castillo Museo y Jardines': 'Has llegado al Castillo, rodeado de jardines que refuerzan la conexión entre arquitectura y naturaleza. Este lugar refleja una época donde las familias buscaban espacios amplios y tranquilos. 🏰',
-  // Ruta Arte, Ciudad y Sabores
-  'Parque de Telemedellín': 'Este parque conecta comunicación, cultura y espacio público. Representa cómo Medellín integra lo institucional con la ciudadanía. 📡',
-  'Museo de Arte Moderno de Medellín (MAMM)': 'El MAMM es un referente del arte contemporáneo. Aquí la historia industrial del sector se transforma en expresión cultural. ¡Explora cada sala! 🖼️',
-  'Mercado del Río': 'Este espacio reúne las mejores propuestas gastronómicas de la ciudad, reflejando la mezcla cultural de Medellín. ¡Prueba lo que más te llame! 🍽️',
-  'Estación Industriales (Metro)': 'La estación Industriales conecta el pasado industrial de este sector con la movilidad moderna de Medellín. 🚇',
-  'Parque de la Conservación': '¡Cerramos la ruta aquí! Este espacio está enfocado en la protección de la biodiversidad y la educación ambiental. Un oasis verde en medio de la ciudad, cierre perfecto para una ruta que conecta arte, gastronomía y sostenibilidad. ¡Felicitaciones Rutero! 🌿',
-  // Ruta Del Origen Paisa a la Medellín Moderna
-  'Pueblito Paisa (inicio ruta)': 'Antes de descender, observa los detalles: la iglesia, la plaza central y las casas blancas con balcones. Este lugar sintetiza la vida rural antioqueña. 🏘️',
-  'Parques del Río Medellín': 'Un proyecto que redefine la relación entre la ciudad y su río. Aquí se evidencia la apuesta por el urbanismo sostenible y la recuperación de espacios públicos. 🌊',
-  'Parque de los Pies Descalzos': 'Este parque invita a desconectarte del ritmo urbano. Caminar descalzo sobre arena, piedra y agua genera una experiencia sensorial única en medio de la ciudad. 🦶',
-  'Museo del Agua EPM': 'El Museo del Agua muestra la importancia de este recurso en la vida urbana. A través de experiencias interactivas, comprenderás la relación entre naturaleza y ciudad. 💧',
-  'Plaza Mayor Medellín': 'Plaza Mayor es el centro de eventos más importante de la ciudad. Aquí Medellín se conecta con el mundo a través de ferias, congresos y encuentros internacionales. 🌍',
-  'Gobernación de Antioquia': 'Centro administrativo del departamento. Este punto simboliza la organización política que impulsa el desarrollo regional. Has completado una Medellín completa. 🏛️',
-  // Ruta Tranvía Cultural
-  'Tranvía de Ayacucho (recorrido)': '¡Arrancamos la ruta desde el tranvía! Observa cómo el centro se transforma desde la ventana. Este sistema retoma la historia del antiguo tranvía de Medellín, adaptado a la ciudad moderna. Viajar en él ya es parte de la experiencia. 🚃',
-  'Estación Bicentenario': 'Este punto marca la transición entre el centro tradicional y los barrios en expansión. Aquí comienza una lectura más cercana de la vida cotidiana. 🌆',
-  'Barrio Buenos Aires': 'Estás en el Medellín auténtico, lejos de los circuitos turísticos masivos. Observa los comercios, las viviendas y la interacción de las personas. 🏘️',
-  'Calle 49 Ayacucho (comercio)': 'Un eje comercial histórico lleno de vida. Tiendas, talleres y ventas que reflejan la economía diaria de la ciudad. El comercio informal como patrimonio vivo. 🛒',
-  'Placita de Flórez': '¡Cerramos la ruta aquí! Este mercado conecta el campo con la ciudad. Frutas, flores y productos frescos que hacen parte de la cultura alimentaria paisa. Aprovecha tu producto fresco en el puesto aliado y prueba algo local. ¡Felicitaciones Rutero! 🌸',
-  // Ruta Senderos del Arriero
-  'Parque Principal + Iglesia La Inmaculada (Ciudad Bolívar)': 'Bajo la sombra de árboles centenarios, el tiempo parece avanzar más lento. La iglesia marca no solo el centro del pueblo, sino el inicio de una historia construida entre fe, café y tradición arriera. ⛪',
-  'Casa de la Cultura Ernesto María González': 'Aquí se resguardan las voces del pasado. Fotografías, objetos y relatos reconstruyen la identidad de un pueblo forjado entre montañas y caminos de herradura. 📜',
-  'Avenida Las Palmas (corredor natural)': 'Las palmas se elevan como guardianes del paisaje. Este corredor natural conecta el pueblo con su esencia rural, acercándote a la identidad cafetera del suroeste. 🌴',
-  'Mirador Alto de La Mesa': 'Desde aquí, el territorio se revela en toda su magnitud. Montañas onduladas, cultivos y neblina crean una postal viva del suroeste antioqueño. ¡Saca el video panorámico! 🏔️',
-  'Farallones del Citará': 'Este ecosistema es refugio de biodiversidad y misterio. Aquí, la naturaleza no se adapta al visitante — el visitante aprende a respetarla. 🌿',
-  'Cascada Cola de Caballo': 'El sonido del agua cayendo rompe el silencio de la montaña. Este lugar simboliza la energía natural que ha moldeado el territorio durante siglos. 💦',
-  'Finca cafetera local (proceso del café)': 'El café no es solo un producto, es una forma de vida. Cada grano cuenta la historia de manos trabajadoras y tierras fértiles. ¡Participa en el proceso! ☕',
-  'Parque del Arriero (cierre)': 'Los arrieros fueron los verdaderos arquitectos de estos caminos. Su legado vive en cada sendero, en cada historia, en cada carga que cruzó la montaña. ¡Has conquistado el suroeste! 🐎',
-
-  // ── Rutas nuevas — Pueblos antioqueños ──
-  // Jardín
-  'Terminal del Sur (Inicio Jardín)': 'Desde aquí inicia tu viaje hacia uno de los pueblos más reconocidos del suroeste antioqueño. El trayecto dura entre 3 y 4 horas y atraviesa una geografía montañosa que anticipa el carácter del destino. 🚌',
-  'Parque Principal de Jardín': 'Declarado Patrimonio Arquitectónico de Colombia, este parque es uno de los más hermosos del país. Sus colores, su vegetación y su arquitectura colonial lo convierten en el corazón de la vida local. Aquí todo comienza y todo regresa. 🌳',
-  'Basílica Menor Nuestra Señora del Carmen': 'Esta iglesia neogótica domina el parque principal con sus torres de hasta 43 metros. Fue construida entre 1916 y 1942 y es uno de los edificios religiosos más imponentes de Antioquia. Su interior guarda vitrales y obras artísticas de gran valor. ⛪',
-  'Teleférico de Jardín': 'Inaugurado en 2011, este teleférico conecta el pueblo con los miradores de montaña en menos de 10 minutos. Desde arriba, la vista sobre Jardín y el cañón del río San Juan es espectacular. Un punto de perspectiva obligatorio. 🚠',
-  'Cascada La Escalera': 'Una de las cascadas más accesibles del municipio. Su nombre proviene de la forma escalonada en que el agua desciende entre las rocas. El sendero para llegar es corto pero revela la riqueza natural del entorno. 💧',
-  'Café local de origen (Jardín)': 'Jardín es uno de los municipios cafeteros más reconocidos de Antioquia. Aquí el café no es solo una bebida — es identidad, economía y cultura. Tomar una taza en un café local de origen es cerrar el ciclo del recorrido con el sabor del territorio. ☕',
-
-  // Santa Fe de Antioquia
-  'Terminal del Norte (Inicio Santa Fe)': 'Santa Fe de Antioquia queda a unos 80 kilómetros al noroeste de Medellín. El bus sale desde la Terminal Norte y el recorrido dura aproximadamente 2 horas, atravesando el cañón del río Cauca. 🚌',
-  'Parque Principal Santa Fe de Antioquia': 'Fundada en 1541 por Jorge Robledo, Santa Fe fue la primera capital de Antioquia. Su parque principal conserva la escala y el ritmo del siglo XVIII. Caminar aquí es retroceder en la historia del departamento. 🌳',
-  'Puente de Occidente (1887)': 'Este puente colgante sobre el río Cauca fue construido entre 1887 y 1895 por el ingeniero José María Villa. Con 291 metros de longitud, fue durante décadas el puente más largo de América Latina. Cruzarlo es tocar una obra de ingeniería histórica. 🌉',
-  'Museo Juan del Corral': 'Este museo está ubicado en la casa donde vivió Juan del Corral, quien declaró la libertad de los esclavos en Antioquia en 1814. Sus colecciones muestran la historia colonial y republicana de la región de forma accesible. 🏺',
-  'Calles coloniales de Santa Fe': 'Las calles empedradas y las fachadas encaladas del centro histórico han sido conservadas con rigor. Cada esquina es una foto. Cada puerta es una historia. Santa Fe tiene el mayor número de bienes de interés cultural del departamento. 🏘️',
-  'Zona gastronómica típica': 'El cierre ideal: empanadas, chicha, mazamorra y platos típicos antioqueños en los comedores locales. La gastronomía de Santa Fe es auténtica y asequible. Una última experiencia antes de regresar. 🍽️',
-
-  // Jericó
-  'Terminal del Sur (Inicio Jericó)': 'Jericó está a unas 3 horas de Medellín por el suroeste antioqueño. El viaje en bus atraviesa cordillera y paisaje cafetero. La anticipación del destino ya es parte de la experiencia. 🚌',
-  'Parque Principal de Jericó': 'Declarado monumento nacional, este parque es el centro de la vida cultural y religiosa de Jericó. Sus alrededor están marcados por la historia de Laura Montoya, primera santa colombiana canonizada en 2013. 🌳',
-  'Casa Natal de Santa Laura Montoya': 'En esta casa nació en 1874 quien sería la primera santa nacida en Colombia. Laura Montoya fue misionera, escritora y fundadora de la Congregación de las Hermanas Misioneras de María Auxiliadora. Un lugar de historia, fe y cultura nacional. 🏠',
-  'Mirador de Jericó': 'Desde las alturas del municipio, la vista sobre las montañas del suroeste antioqueño es impresionante. Jericó se asienta a más de 1.700 metros sobre el nivel del mar, lo que explica su clima fresco y su panorama verde. 🌄',
-  'Taller de carriel artesanal': 'El carriel es el bolso típico del arriero antioqueño, confeccionado en cuero y reconocido como símbolo cultural del departamento. En Jericó aún funcionan talleres donde se elaboran a mano. Conocer el proceso es entender parte del alma paisa. 🎒',
-  'Café local de origen (Jericó)': 'El suroeste antioqueño es una de las regiones cafeteras más importantes del país. Jericó produce cafés de altura con perfiles frutales y suaves. Probar una taza aquí es cerrar la ruta con el sabor del territorio. ☕',
-
-  // San Rafael
-  'Terminal del Norte (Inicio San Rafael)': 'San Rafael queda a unas 2 horas de Medellín por el oriente antioqueño. El recorrido en bus atraviesa zonas montañosas y represas que anticipan la riqueza hídrica del destino. 🚌',
-  'Parque Principal de San Rafael': 'Este parque es el punto de encuentro del municipio y la base desde donde se organizan los recorridos hacia ríos y cascadas. San Rafael es considerado uno de los municipios con mayor riqueza hídrica de Antioquia, con más de 50 fuentes naturales. 🌳',
-  'Río Arenal': 'El río Arenal es uno de los más representativos de San Rafael. Nace en zonas de alta montaña, lo que explica la pureza y la temperatura fresca de sus aguas. Sus riberas son ideales para el baño y la desconexión total. 💧',
-  'Charco El Trocadero': 'Este charco natural es uno de los más visitados del municipio por su profundidad y su tonalidad azul-verdosa. Se formó por la erosión del agua sobre la roca granítica durante miles de años. Un ejemplo vivo de cómo la naturaleza esculpe el territorio. 🏞️',
-  'Cascada Los Patios': 'Rodeada de vegetación densa, esta cascada es el punto más impresionante del recorrido acuático. El sonido del agua al caer domina el entorno y genera una sensación de aislamiento total del mundo urbano. 🌊',
-  'Sendero Ecológico La Planta': 'Este sendero permite entender la biodiversidad del territorio. Es común encontrar aves endémicas, insectos y plantas del bosque húmedo tropical. Un cierre natural y consciente para la ruta. 🌿',
-
-  // ── RUTAS GASTRONÓMICAS — Tips Avatar (ES) ──
-  'Empanarrica · Empanada paisa desde las 5am': 'La empanada paisa más auténtica del centro. La masa frita, el relleno de carne y papa molida... esto es lo que los abuelos paisas comían en el mercado. Pide una de pollo Y una de pipián para comparar. 🫔',
-  'La Jugosa Centro · Salpicón con helado y queso': '¡Salpicón con helado de crema y queso campesino! La combinación que los turistas miran raro y los paisas adoran. El dulce, el ácido y el salado en un solo vaso. Inténtalo antes de juzgar. 🧃',
-  'Restaurante Hacienda Junín · Bandeja paisa': '¡La bandeja paisa más emblemática de la Calle Junín! Fríjoles, chicharrón, carne molida, chorizo, aguacate, arroz, arepa y huevo frito. Misión: identifica los 8 ingredientes y aprende cada nombre — esa es la insignia. 🍽️',
-  '¡AHH QUÉ RICURA! · Chicharrón · Plaza de mercado': '¡El chicharrón más crocante del centro! En la Plaza de mercado encuentras los sabores que Medellín no muestra en las guías turísticas. Pide el chicharrón con arepa de chócolo — la combinación perfecta. 🐷',
-  'El Llanerito Centro · Chorizo + guarapo · vista al Centro': '¡Chorizo antioqueño con guarapo de caña desde el mirador del centro! El guarapo es la bebida de los arrieros — agua de caña fermentada que refresca diferente. Pide el combo y disfruta la vista. 🌆',
-  'Fonda Típicos · Desayuno paisa · limonada natural': '¡El desayuno paisa más completo de Laureles! Calentado, arepa, chocolate santafereño, huevo y queso. Los paisas dicen que el que no desayuna fuerte no trabaja bien — hoy aplica. Pide la limonada natural de la casa. ☕',
-  'Antioquena Capital · Bandeja paisa · abuela en cocina': '¡La bandeja paisa cocinada como la hacía la abuela! Aquí no hay atajos — todo se hace en olla de barro. La dueña lleva más de 20 años en el mismo fogón. Salúdala cuando la veas. 👵',
-  'AREPAPAS · Arepa rellena a la brasa': '¡La evolución paisa de la arepa! AREPAPAS lleva la tradición al siguiente nivel — rellenos creativos a la brasa en la Calle 70. Misión: elige tu relleno favorito y bautízalo con un nombre en jerga paisa. 🌽',
-  'La Tienda de la 70 · Empanadas + guarapo · 4685 reseñas': '¡4.685 reseñas no mienten! La Tienda de la 70 es el punto de encuentro de Laureles desde hace décadas. Las empanadas con ají + el guarapo de caña es la combinación que los paisas llaman "el combo perfecto". ⭐',
-  'Fonda de Laureles · Mondongo · 5.0 estrellas': '¡5 estrellas perfectas — el mondongo más querido de Laureles! El mondongo es la sopa de vísceras que divide a los turistas. Los valientes que lo prueban casi siempre quedan convertidos. ¿Te atreves? 🍲',
-  "Finas Frutas N°1 · Jugo de fruta exótica": '¡Frutas que probablemente no conoces! Lulo, guanábana, maracuyá, chontaduro, borojó... Colombia tiene la mayor variedad de frutas tropicales del mundo. Pide el jugo de la fruta más rara que encuentres. 🍓',
-  "Q'empanada de la 10 · Empanada paisa · 24 horas": "¡24 horas y siempre igual de buena! En El Poblado la empanada paisa convive con restaurantes de \$200.000. Q'empanada demuestra que lo mejor de Medellín no siempre es lo más caro. 🫔",
-  'Medellín Es Sabor-Champi · Bandeja paisa · 4453 reseñas': '¡4.453 reseñas — la bandeja más fotografiada de El Poblado! Misión épica: identifica los 8 ingredientes — fríjoles, chicharrón, carne molida, chorizo, aguacate, arroz, arepa y huevo. El que los nombra todos gana la insignia Maestro Paisa. 🏆',
-  'Ajiacos y Mondongos · Mondongo emblema de Medellín': '¡El mondongo que los expats de El Poblado descubren y ya no pueden dejar! Esta sopa de vísceras con maíz, papa y hierbas aromáticas es el plato más subestimado de la cocina paisa. Una sola cucharada convence. 🍲',
-  'Típicos Parce · Premio + código Rutero': '¡Última parada — tiempo de reclamar tu recompensa! Muestra tu progreso en la app al mesero de Típicos Parce y recibe tu cortesía especial. Parce significa amigo cercano en paisa — aquí ya eres uno de los nuestros. 🤝',
-  'La Gloria de Gloria · 1kg chicharrón · 4262 reseñas · Mié-Dom': '¡4.262 reseñas y décadas de tradición! La Gloria de Gloria sirve 1 kg de chicharrón crocante que los envigadeños consideran patrimonio gastronómico. Cierra lunes y martes — si estás aquí es porque planificaste bien. 🐷',
-  'El Trifásico · Plato trifásico emblema Envigado': '¡El plato más emblemático de Envigado! Trifásico porque tiene tres proteínas: chicharrón, carne y chorizo. Los envigadeños lo defienden como el único plato que supera a la bandeja paisa. ¿Estás de acuerdo? 🍽️',
-  'Restaurante Bar Donde Gloria · Cazuela de barrio': '¡La cazuela de barrio que los chefs de Medellín reconocen como referente! Misión épica: pregúntale al mesero qué tiene la cazuela que no tiene la bandeja paisa. Su respuesta es parte de la cultura gastronómica de Envigado. 🍲',
-  'Calle Jardín · Ambiente local · música en vivo fines de semana': '¡La calle más querida de Envigado! Entre parada y parada camina por la Calle Jardín y absorbe el ambiente que hace diferente a este municipio del resto del Área Metropolitana. Los fines de semana hay música en vivo desde las 5pm. 🎵',
-  'Darisa · Sancocho y mondongo auténtico': '¡El sancocho que los abuelos envigadeños reconocen como el de su infancia! Darisa es uno de esos lugares donde el menú no ha cambiado en 30 años porque no necesita hacerlo. Pide el mondongo y cierra la ruta como los locales. 🍲',
-  'Mercado de La Playa · Food hall urbano Centro': '¡El food hall más auténtico del centro! Mercado de La Playa mezcla lo tradicional del centro con conceptos gastronómicos modernos. El punto perfecto para arrancar la ruta urbana antes de llegar al Mercado del Río. 🛒',
-  'La Jugosa Laureles · Helado con frutas y queso': '¡Versión Laureles del clásico de La Jugosa! El helado de crema con frutas y queso campesino es una de las experiencias gastronómicas más paisas que existen. En Laureles el ambiente es diferente — más relajado que el Centro. 🍦',
-  'Mercado del Río · Versión moderna clásico paisa · 24.000+ reseñas': '¡24.000+ reseñas — el food hall más visitado de Colombia! Misión épica: prueba la versión moderna de un clásico paisa y decide · ¿es mejor que el original? Tu veredicto lo comparte la comunidad Rutero. ⚖️',
-  'Cerdología · Crispetas de chicharrón · dentro Mercado del Río': '¡El chicharrón reinventado que se volvió viral en toda Colombia! Cerdología tomó el chicharrón tradicional y lo convirtió en crispetas crocantes con salsas especiales. ¿Sacrilegio o evolución? Tú decides. 🐷',
-  // ── AVENTURA EN FAMILIA — 12 Estaciones (ES) ──
-  'Estación 1 — Monumento a Dios · ¿Por qué están agradecidos?': 'Frente al monumento más imponente del parque — 38 metros y 750 toneladas — cada miembro de la familia dice en voz alta una cosa por la que está agradecido hoy. Quien termine primero gana 10 puntos extra. 🙏',
-  'Estación 2 — Jardines del Amor · Carta de amor familiar': 'En este jardín cada persona escribe en su celular una frase de amor dedicada a otro miembro de la familia. Luego la leen en voz alta. Foto grupal entre las flores — el que mejor pose gana. 💌',
-  'Estación 3 — Taj Mahal · Sueño familiar compartido': 'Este Taj Mahal replica el amor eterno. Reto: cada familia elige UN destino que todos quieren visitar juntos algún día. Foto creativa frente a la réplica más famosa de Colombia. 🕌',
-  'Estación 4 — Fontana Mitológica · El poder de la imaginación': 'Los caballos alados de esta fuente representan la imaginación sin límites. Reto: en 30 segundos, cada persona inventa el superpoder que le daría a otro miembro de la familia. El más creativo gana. ⛲',
-  'Estación 5 — Gran Mapa de Colombia · Nuestro lugar favorito': 'Desde las pasarelas a 12 metros de altura pueden ver el país completo. Reto: cada miembro señala en el mapa el lugar de Colombia que más quiere visitar con la familia. Foto aérea grupal. 🗺️',
-  'Estación 6 — Siete Maravillas · La maravilla de nuestra familia': 'Las siete maravillas del mundo antiguo están aquí. Reto: la familia elige cuál sería su "maravilla familiar" — el logro del que más se enorgullecen juntos. Foto en su maravilla favorita. 🏛️',
-  'Estación 7 — Mar Caribe · La aventura que queremos vivir juntos': 'Un Mar Caribe completo con barco pirata y destructor de guerra. Reto: cada persona describe en una palabra la próxima aventura que quiere vivir con la familia. Foto en el barco pirata. 🌊',
-  'Estación 8 — Kayaks del Caribe · Trabajo en equipo': 'El agua del Caribe rodea esta estación. Reto de equipo: si algún miembro de la familia monta en kayak — todos ganan 50 puntos extra. Si no, foto creativa junto al agua como equipo. 🚣',
-  'Estación 9 — Bioparque Wakatá · Cuidar lo que amamos': 'El zoológico más completo de Colombia. Reto: cada persona elige un animal y explica por qué ese animal se parece a otro miembro de la familia. El más gracioso gana puntos extra. 🦁',
-  'Estación 10 — Comarca del Cóndor · Volar alto juntos': 'El Cóndor de los Andes — símbolo de libertad y altura. Reto: cada miembro comparte el sueño más grande que tiene para la familia en los próximos 5 años. Foto con los brazos extendidos como alas. 🦅',
-  'Estación 11 — Ecoparque Sabana · Sembrar para el futuro': '70 hectáreas de bosque andino restaurado. Reto: la familia hace una promesa colectiva de una acción ambiental que van a hacer juntos al regresar a casa. Foto en medio del bosque. 🌿',
-  'Estación 12 — Mirador Panorámico · La foto familiar del año': 'La cima del parque — todo Cundinamarca a sus pies. Reto final: la foto familiar más creativa del día. El que lleve hasta aquí todos los retos cumplidos recibe la Insignia Familia Aventurera. 📸',
-  // ── PARQUE JAIME DUQUE (ES) — Completo ──
-  'Monumento a Dios': '¡38 metros de altura y 750 toneladas — esta mano gigante sostiene el mundo entero! Tómate un momento para agradecer. Fíjate en los visitantes al pie del monumento para entender su verdadera escala. Dicen que quien lo visita con el corazón abierto, siempre regresa. 🌍',
-  'Taj Mahal Réplica': '¡El Taj Mahal colombiano! Construido con el mismo nivel de detalle que el original en India. Busca el museo interior — la historia de amor detrás del monumento original te va a sorprender. Mejor foto: párate al fondo del estanque reflectante en el atardecer. 🕌',
-  'Gran Mapa de Colombia en Relieve': '¡Estás a 12 metros de altura viendo Colombia completa! Busca tu ciudad natal y los departamentos que has visitado. No olvides mirar arriba — el aviario tiene aves que solo existen en Colombia. ¿Cuántos departamentos puedes identificar? 🗺️',
-  'Gran Mapa de Colombia & Aviario': '¡Estás a 12 metros de altura viendo Colombia completa! Busca tu ciudad natal y los lugares que has visitado. El aviario tiene aves endémicas de Colombia. Reto: identifica al menos 5 departamentos en el mapa. 🗺️',
-  'Fontana Mitológica': '¡Caballos alados de la mitología griega — representan la imaginación sin límites! Pide un deseo. Reto: cada persona describe el animal mitológico que sería y por qué. El más creativo gana 10 puntos extra. ⛲',
-  'Las Siete Maravillas del Mundo Antiguo': '¡Siete maravillas en un solo lugar! Los Jardines de Babilonia, el Coloso de Rodas, la Gran Pirámide... Reto: vota en familia por su maravilla favorita antes de seguir. El debate va a ser épico. 🏛️',
-  'Mar Caribe & Barco Pirata': '¡Un destructor de guerra real y un barco pirata en la sabana! El ARC Córdoba participó en operaciones reales de la Armada Nacional. Sube a bordo — la historia de Colombia también se escribió en el mar. Encuentra el timón del capitán. 🌊',
-  'Zoológico Bioparque Wakatá': '¡Wakatá significa "Lo Sagrado" en lengua Muisca! El 60% de los animales aquí fueron rescatados del tráfico ilegal. Cada visita contribuye directamente a su cuidado. Busca el hipopótamo — con más de 1.500kg es el animal más grande del parque. 🦁',
-  'Bioparque Wakatá — Ruta de la Biodiversidad': '¡La ruta más completa del Bioparque! Flamencos rosados, monos capuchinos, tapires amazónicos y bisontes — todo en una sola caminata. Reto: cuenta cuántas especies diferentes puedes ver. El récord es 23 en una sola visita. 🌱',
-  'Museo Aeroespacial FAC': '¡33 aviones reales que narran la historia del cielo colombiano! Algunos volaron misiones de combate reales. Busca el avión más antiguo — tiene más de 70 años de historia. Puedes subir a varios de ellos. ✈️',
-  'Mirador Panorámico del Parque': '¡El punto más alto del Parque Jaime Duque — todo el parque a tus pies! En días despejados se ven las montañas de Bogotá. La subida entre figuras mitológicas hace que el camino sea tan recompensante como la vista. El mejor punto para la foto familiar. 🌄',
-  'Parque Infantil Chiquimundo': '¡El reino de los pequeños exploradores! Chiquimundo está diseñado para que los niños descubran el mundo a su tamaño. Los adultos también pueden jugar hoy. Reto: los papás deben intentar al menos una atracción junto a sus hijos. 🎠',
-  'Jardín de los Dinosaurios': '¡Bienvenido al Jurásico colombiano! Réplicas a escala real de especies que existieron hace 65 millones de años. ¿Sabías que Colombia tuvo dinosaurios reales? Sus fósiles se han encontrado en el Desierto de la Tatacoa. Párate junto al T-Rex para entender su escala. 🦕',
-  'Castillo Medieval': '¡Un castillo del siglo XII en la sabana cundinamarquesa! Arquitectura europea medieval auténtica. Adentro encontrarás colecciones de armaduras y la historia de los caballeros. Reto: encuentra el escudo de armas oculto dentro del castillo. 🏰',
-  'Atracciones Mecánicas Plaza Cundinamarca': '¡La zona de mayor adrenalina del parque! Atracciones para todas las edades y estaturas. Verifica la estatura mínima antes de hacer fila. Reto familiar: todos intentan al menos una atracción — nadie se queda en la banca. 🎡',
-  'Kayaks del Caribe': '¡Rema en el Mar Caribe de la sabana junto al destructor ARC Córdoba! Más difícil de lo que parece — el trabajo en equipo es esencial. Reto: lleguen al extremo lejano del lago y regresen sin detenerse. 🚣',
-  'Comarca del Cóndor & Oso Andino': '¡El Cóndor de los Andes — el ave más grande del hemisferio occidental con hasta 3.2 metros de envergadura! Verlo volar es una experiencia que no se olvida. El Oso de Anteojos es igual de impresionante — ambos en peligro de extinción. Observa en silencio y déjate impactar. 🦅',
-  'Reserva Natural Ecoparque Sabana': '¡70 hectáreas de bosque andino restaurado — un ecosistema vivo! Esta reserva protege la Tingua de Pico Verde y polinizadores vitales. Más de 200.000 árboles nativos sembrados a mano. El Ecoparque cierra a la 1pm — llega temprano. 🌿',
-  'Sendero de la Memoria Muisca (5km)': '¡5 kilómetros de historia Muisca viva! Este pueblo habitó la sabana por siglos antes de la llegada española. Las esculturas del sendero cuentan su cosmogonía — la historia del sol, la luna y el agua. Alquila una bicicleta para recorrer el sendero completo. 🏺',
-  'Casa de la Tingua & Avistamiento de Aves': '¡La Tingua de Pico Verde casi desaparece de la sabana — hoy su población se está recuperando! Reto: identifica al menos 5 especies de aves diferentes antes de salir de esta estación. Los binoculares ayudan mucho. 🦜',
-
-  // San Carlos
-  'Terminal del Norte (Inicio San Carlos)': 'San Carlos queda a unas 3 horas de Medellín por el oriente antioqueño. El recorrido atraviesa paisajes montañosos que anticipan la naturaleza exuberante del destino. San Carlos es conocido mundialmente por su proceso de reconciliación y reconstrucción social. 🚌',
-  'Parque Principal de San Carlos': 'Este parque es símbolo de la reconstrucción del municipio. Después de años difíciles, San Carlos se reinventó como destino ecoturístico y hoy recibe visitantes de todo el mundo. El parque refleja esa transformación. 🌳',
-  'Cascada Velo de Novia': 'Su nombre proviene de la forma en que el agua cae, similar a un velo nupcial. Es una de las cascadas más accesibles y fotografiadas del municipio, ubicada a pocos minutos del casco urbano. 💧',
-  'Charco El Balseadero': 'Este charco natural de aguas claras y frescas es el favorito de los locales para el baño. Su profundidad permite saltar desde las rocas y su entorno verde invita a quedarse más tiempo del planeado. 🏞️',
-  'Río San Carlos': 'Este río ha sido fundamental para la vida del municipio tanto económica como culturalmente. Sus aguas limpias y su caudal constante son el resultado de la preservación ambiental que los habitantes han mantenido por décadas. 🌊',
-  'Mirador La Planta': 'Desde este mirador puedes observar la geografía montañosa que explica la abundancia de cascadas en San Carlos. El terreno quebrado y la alta pluviosidad crean las condiciones perfectas para que el agua fluya por todas partes. 🌄',
-
-  // Támesis
-  'Terminal del Sur (Inicio Támesis)': 'Támesis está a unas 3 horas de Medellín por el suroeste antioqueño. El viaje atraviesa municipios cafeteros y paisajes que cambian de tonalidad según la altura. Un trayecto que ya prepara los sentidos para lo que viene. 🚌',
-  'Parque Principal de Támesis': 'El parque de Támesis conserva la arquitectura republicana típica del suroeste. Desde aquí se organiza la vida cotidiana del municipio y es el punto de partida natural para todos los recorridos. 🌳',
-  'Petroglifos de Támesis': 'Estas piedras grabadas son evidencia de culturas indígenas que habitaron la región hace más de 1.000 años. Los petroglifos de Támesis son considerados uno de los patrimonios arqueológicos más importantes del departamento. Cada símbolo es una pregunta sin respuesta definitiva. 🗿',
-  'Cerro Cristo Rey': 'Desde este mirador la vista sobre el municipio y las montañas del suroeste es completa. A más de 1.800 metros sobre el nivel del mar, el Cerro Cristo Rey es tanto un punto panorámico como un lugar de significado espiritual para los habitantes. 🌄',
-  'Sendero de La Oculta': 'Este sendero conecta el casco urbano con zonas naturales preservadas. El nombre evoca el carácter escondido de los paisajes que guarda. Es ideal para caminatas de media intensidad con alto valor visual. 🌿',
-  'Finca cafetera local (Támesis)': 'El suroeste antioqueño es cafetero por naturaleza y por cultura. En las fincas de Támesis el café se cultiva a alturas que generan granos de alta calidad. Conocer el proceso — desde la mata hasta la taza — es entender una parte esencial de la identidad antioqueña. ☕',
-
-  // Concepción
-  'Terminal del Norte (Inicio Concepción)': 'Concepción está a unas 2 horas de Medellín por el oriente antioqueño. Es uno de los destinos menos conocidos del turismo regional, lo que lo convierte en una experiencia más auténtica y tranquila. El camino ya es una anticipación del ritmo del pueblo. 🚌',
-  'Parque Principal de Concepción': 'A diferencia de otros destinos turísticos, en Concepción el parque aún pertenece a sus habitantes. Aquí la vida local no ha sido desplazada por el turismo masivo. Observar y caminar lento es la mejor manera de entender este lugar. 🌳',
-  'Iglesia Nuestra Señora de la Inmaculada Concepción': 'Esta iglesia da nombre al municipio y ha sido el centro de su vida espiritual y cultural por siglos. Su arquitectura sobria y bien conservada refleja la historia religiosa del oriente antioqueño. ⛪',
-  'Calles empedradas de Concepción': 'Las piedras originales aún cubren gran parte de las calles del centro histórico. Caminar sobre ellas es conectar con el tiempo de las mulas y los arrieros. Concepción conserva este patrimonio con orgullo y sin intervenciones excesivas. 🏘️',
-  'Charco El Aguacate': 'Un charco natural de aguas limpias rodeado de vegetación, frecuentado principalmente por los habitantes locales. Llegar aquí implica alejarse del centro y adentrarse un poco en la naturaleza del municipio. 💧',
-  'Mirador Alto de la Virgen': 'Desde este punto se puede observar la totalidad del municipio, el río Concepción y las montañas del oriente. Es el cierre perfecto para una ruta que invita a ver con calma y detalle. 🌄',
-
-  // Necoclí
-  'Terminal del Norte (Inicio Necoclí)': 'Necoclí está a entre 8 y 10 horas de Medellín por carretera, en el Urabá antioqueño. Es un viaje largo, pero es también una transición geográfica y cultural completa: de la montaña al mar Caribe. Prepárate con snacks, música y disposición para el cambio de ritmo. 🚌',
-  'Playa Principal de Necoclí': 'Esta playa de aguas cálidas es el corazón del municipio. Sus arenas oscuras y su extensión permiten caminar largos tramos junto al mar. El contraste entre el Caribe antioqueño y las montañas de donde vienes es total. 🏖️',
-  'Malecón de Necoclí': 'El malecón es el espacio de encuentro social del municipio. Desde aquí se ve el golfo de Urabá, se escucha cumbia y se siente la hospitalidad caribeña del norte de Antioquia. Un lugar para caminar sin prisa. 🌊',
-  'Muelle Turístico de Necoclí': 'Desde este muelle salen las lanchas hacia Capurganá, Sapzurro y la frontera con Panamá. Necoclí es el punto de entrada al Darién desde el Caribe colombiano. Observar la actividad del muelle es entender el rol estratégico del municipio. 🚤',
-  'Mercado Local de Necoclí': 'Aquí se puede encontrar pescado fresco, frutas tropicales y la gastronomía típica del Urabá. El mercado refleja la cultura mestiza y afrocolombiana del territorio. Probar sus sabores es la mejor forma de entender el Caribe antioqueño. 🛍️',
-  'Playa Oeste — Zona de Atardecer': 'El atardecer sobre el mar Caribe desde la playa oeste de Necoclí es uno de los espectáculos naturales más impresionantes que puede ofrecer Antioquia. El cielo se tiñe de naranja, rojo y morado sobre el agua. El final perfecto para esta ruta. 🌅',
-  // ── SABOR VIAJERO — EL POBLADO ──
-  'Pergamino Café · Café de especialidad El Poblado': 'El café colombiano de especialidad en su máxima expresión. Granos de origen único de Antioquia. ☕ Pide el V60 con café de Jardín.',
-  'Encocadas · Cocina del Pacífico en El Poblado': 'La cocina afrocolombiana del Pacífico: encocado de camarón, patacones y arroz con coco. 🦐',
-  'Zorba El Griego · Fusión mediterránea paisa': 'Cocina mediterránea con ingredientes colombianos. El hummus de aguacate es su firma. 🫙',
-  'Mercado del Río (terraza) · Vista y cocina artesanal': 'La terraza del Mercado del Río con vista a los Parques del Río. Gastronomía artesanal colombiana. 🌆',
-  'Parque Lleras · Cócteles y bares internacionales': 'Cócteles con frutas tropicales: maracuyá sour, lulo fizz y chirimoya daiquiri. 🍹',
-  // ── SABOR PAISA PROFUNDO — ENVIGADO ──
-  'Mercado Campesino Envigado · Productos locales': 'El mercado campesino de Envigado concentra productores de la zona sur del Valle de Aburrá. Fruta fresca, quesillo, panela y café de finca. 🌾 Solo miércoles y domingos.',
-  'La Fritanguería Envigado · Fritanga tradicional': 'Morcilla, chorizo, chicharrón, papa criolla y arepa de chócolo. La tradición culinaria del sur. 🥩',
-  'Quesería Artesanal Las Palmas · Quesos de finca': 'Quesos artesanales de fincas de Envigado y El Retiro. Prueba el quesillo con bocadillo. 🧀',
-  'Panadería Envigado · Pan de bono y almojábanas': 'Pan de bono, almojábanas y pandebono. Recetas que no han cambiado en 50 años. 🥐',
-  'Parque El Chinguí · Jugo de lulo con pueblo paisa': 'Juguerías que llevan décadas sirviendo lulo, maracuyá y guanábana. El parque central de Envigado. 🧃',
-  // ── SABOR URBANO — MERCADO DEL RÍO ──
-  'Mercado del Río · Hall principal': 'El Mercado del Río: 30 restaurantes bajo un mismo techo. La nueva cocina colombiana en acción. 🌆',
-  'El Colmado · Tapas colombianas': 'Tapas con ingredientes colombianos: ceviche de tilapia, buñuelos de yuca y croquetas de bandeja. 🍢',
-  'Canasta · Cocina de mercado': 'Cocina de mercado con ingredientes del día. El menú cambia según lo que traen los agricultores. 🧺',
-  'La Barraca · Charcutería artesanal colombiana': 'Embutidos artesanales: chorizo santarrosano, longaniza y salchichón de Cali. 🥩',
-  'Bar Míster Babilla · Cócteles tropicales': 'Cócteles del Mercado del Río con frutas de temporada. 🍹 MISIÓN: Prueba una fruta que nunca hayas probado.',
-
-  // ── Popayán — Centro Histórico ──
-  'Catedral Basílica de Popayán': '¡La catedral más blanca de Colombia! Construida en 1906 sobre ruinas de edificios coloniales. Su fachada neoclásica domina el Parque Caldas. Busca las marcas del terremoto de 1983 que la destruyó parcialmente. 🏛️',
-  'Parque Caldas': '¡El corazón de Popayán! Fundado en 1537, este parque lleva el nombre del científico Francisco José de Caldas, nacido aquí. La estatua central es uno de los iconos más fotografiados del sur de Colombia. 🌿',
-  'Torre del Reloj': '¡El símbolo de Popayán! Esta torre data del siglo XVIII y ha sobrevivido terremotos y guerras. El reloj fue importado de Europa en 1737. MISIÓN: Toma la foto perfecta con la torre al fondo del Parque Caldas. ⏰',
-  'Puente del Humilladero': '¡El puente más antiguo de Colombia en uso! Construido en el siglo XVIII sobre el río Molino, tiene 12 arcos y conecta el centro histórico con el barrio Bolívar. Al amanecer se refleja perfectamente en el agua. 🌉',
-  'Casa Museo Mosquera': '¡La casa natal del General Tomás Cipriano de Mosquera, cuatro veces presidente de Colombia! Hoy museo con objetos personales, armas y retratos de la época republicana. 🏛️',
-  'Iglesia de San Francisco': '¡La iglesia colonial más elaborada de Popayán! Construida en 1775, su fachada barroca es única en Colombia. El interior tiene retablos de oro y una acústica extraordinaria. ⛪',
-  'Morro de Tulcán': '¡Una pirámide precolombina en medio de la ciudad! Este montículo ceremonial Pubén data del siglo X y hoy tiene una estatua de Belalcázar en la cima. La vista panorámica de la ciudad blanca es incomparable. ⛰️',
-  'Callejón de las Empanadas': '¡El callejón gastronómico más famoso del sur de Colombia! Las empanadas de pipián — rellenas de papa con ají amarillo — son patrimonio culinario de Popayán. MISIÓN: Come al menos 3 empanadas diferentes. 🌯',
-
-  'Pueblito Patojo': '¡Una réplica en miniatura de las casas coloniales de Popayán! Este conjunto de pequeñas construcciones blancas recrea la arquitectura típica de la ciudad. Es uno de los sitios más fotogénicos del centro histórico y el favorito de los niños. MISIÓN: Encuentra la casa más pequeña del pueblito y toma una foto desde abajo. 🏘️',
-
-  // ── Bogotá — La Candelaria ──
-  'Plaza de Bolívar': '¡El centro político de Colombia! Esta plaza ha sido escenario de los momentos más importantes de la historia del país. Rodeada por el Capitolio, la Catedral, el Palacio de Justicia y la Alcaldía. MISIÓN: Fotografía los 4 edificios en una sola panorámica. 🏛️',
-  'Museo del Oro': '¡El mejor museo de orfebrería precolombina del mundo! Más de 55,000 piezas de oro de culturas como Muisca, Quimbaya y Zenú. La sala de la Balsa Muisca es el origen de la leyenda de El Dorado. ✨',
-  'Catedral Primada de Colombia': '¡La catedral más grande de Colombia! Construida entre 1807 y 1823, ocupa el lugar donde se fundó Bogotá en 1538. Sus torres gemelas miden 58 metros. Busca la piedra fundacional de la ciudad en su interior. ⛪',
-  'Museo Botero': '¡Uno de los museos más visitados de Colombia — y es gratis! Fernando Botero donó 208 obras de su colección personal, incluyendo Picasso, Dalí y Monet. La entrada es completamente gratuita. 🎨',
-  'Casa de Nariño (exterior)': '¡La residencia del presidente de Colombia! Aunque no puedes entrar, la fachada neoclásica y el cambio de guardia son espectaculares. El jardín interior alberga el árbol de Navidad presidencial cada diciembre. 🏛️',
-  'Cerro de Monserrate': '¡El mirador más alto de Bogotá! A 3.152 metros sobre el nivel del mar, desde aquí ves los 8 millones de personas de la ciudad extenderse por la sabana. El santuario del Señor Caído data de 1650. ⛰️',
-  'Chorro de Quevedo': '¡El lugar exacto donde se fundó Bogotá el 6 de agosto de 1538! Esta plazoleta bohemia está rodeada de bares, artistas callejeros y la energía más auténtica de La Candelaria. Los domingos hay mercado de pulgas. 🎭',
-  'Palacio Liévano': '¡La sede de la Alcaldía de Bogotá! Este palacio de estilo francés fue construido en 1902 y frente a él está la estatua más famosa de Simón Bolívar. La fachada iluminada de noche es espectacular. 🏛️',
-
-};
-
 // Tips por ruta (al abrir la ruta)
 const Map<String, String> kTipsPorRuta = {
   'RUTA MEMORIA Y REFLEXIÓN': 'Esta no es una ruta turística común — es un espacio para entender. Te pido que la vivas con respeto, sin juzgar, sin idealizar. Medellín vivió algo muy difícil, pero también demostró una capacidad de transformación que hoy estudia el mundo entero. 🕊️',
   'RUTA TRANSFORMACIÓN URBANA': '¡Esta es la ruta más famosa de Medellín! La Comuna 13 pasó de ser la más peligrosa del mundo a un referente mundial de transformación social. ¡Prepárate para emocionarte! 🎨',
-  'RUTA PATRIMONIAL DEL CENTRO': 'El centro histórico de Medellín tiene más de 200 años de historia en cada esquina. Te recomiendo empezar temprano para aprovechar la luz del día. ☀️',
-  'RUTA CENTRO REPUBLICANO': 'La segunda cara del centro histórico — arquitectura republicana, instituciones y el Parque de las Luces. Un Medellín que pocos turistas conocen a fondo. 🏛️',
+  // [eliminado] 'RUTA PATRIMONIAL DEL CENTRO': 'El centro histórico de Medellín tiene más de 200
+  // [eliminado] 'RUTA CENTRO REPUBLICANO': 'La segunda cara del centro histórico — arquitectura 
   'RUTA VERDE DEL NORTE': '¡La ruta más verde de la ciudad! Llevas zapatos cómodos, ¿verdad? Vas a caminar entre jardines, ciencia y cultura en menos de 1 km. 🌿',
   'RUTA DEL METROCABLE & ARVÍ': '¡Aventura asegurada! Vas a subir más de 1.800 metros sobre el nivel del mar en cable. Las vistas son incomparables. Lleva algo de abrigo. 🚡',
-  'RUTA LAURELES & TRADICIÓN': 'El barrio favorito de los medellinenses para vivir. Tranquilo, lleno de parques y con la mejor gastronomía barrial de la ciudad. 🌸',
   'RUTA DE LOS MIRADORES': '¡Vas a ver Medellín desde las alturas! Lleva la cámara lista — las fotos desde el Cerro Nutibara al atardecer son espectaculares. 📸',
-  'RUTA CULTURAL NOCTURNA': '¡La noche de Medellín te espera! Esta ciudad cobra vida después de las 6pm. Lleva energía y ganas de explorar. 🌙',
-  'SENDEROS DE AGUA Y NATURALEZA': '¡Medellín Natural Oculta! Esta ruta te lleva por las quebradas y senderos verdes de la ciudad hasta el Castillo. Lleva calzado cómodo, hidratación y disfruta cada paso — ¡el agua te guiará! 🌿',
-  'ARTE, CIUDAD Y SABORES': '¡Arte, gastronomía y transformación urbana en un solo recorrido! Esta ruta conecta el origen histórico de Medellín con su versión más creativa y moderna. ¡Lleva apetito y ojos bien abiertos! 🎨',
+  // [eliminado] 'RUTA CULTURAL NOCTURNA': '¡La noche de Medellín te espera! Esta ciudad cobra vi
   'DEL ORIGEN PAISA A LA MEDELLÍN MODERNA': '¡Desde las raíces hasta la modernidad! Esta ruta desciende desde el Cerro Nutibara hasta el corazón institucional de Medellín. Calzado cómodo y ganas de descubrir cómo la ciudad evoluciona sin olvidar su esencia. 🏘️',
   'TRANVÍA CULTURAL': '¡Súbete al tranvía y descubre el Medellín auténtico! Esta ruta te lleva por barrios, mercados y calles que los circuitos turísticos no muestran. Lleva efectivo para la Placita de Flórez y ganas de explorar. 🚃',
-  'SENDEROS DEL ARRIERO Y LA MONTAÑA': '¡Una travesía épica por el suroeste antioqueño! Ciudad Bolívar guarda secretos entre montañas, café y tradición arriera. Día completo, calzado de trekking y cámara lista — cada parada es una historia viva. 🐎',
 
   // Alrededores
   'RUTA GUATAPÉ & LA PIEDRA': '¡Una de las excursiones más épicas de Colombia! 740 escalones te separan de la vista más impresionante de Antioquia. Lleva zapatos cómodos y mucha agua. ⛰️',
-  'RUTA DEL CAFÉ EN SANTA ELENA': 'A 30 minutos de Medellín y parece otro planeta. Las fincas silleterase cafeteras de Santa Elena son un tesoro cultural que pocos turistas conocen. 🌸',
-  'RUTA SAN CARLOS & CHARCOS': '¡El paraíso acuático de Antioquia! San Carlos tiene los charcos más cristalinos del departamento. Lleva traje de baño y ganas de aventura. 🌊',
-  'RUTA JARDÍN COLONIAL': '¡El pueblo más bonito de Antioquia! Jardín parece sacado de un cuento — colorido, tranquilo y rodeado de naturaleza. Dale todo el día que lo merece. 🏘️',
-  'RUTA SANTA FE DE ANTIOQUIA': '¡La ciudad más antigua de Antioquia fundada en 1541! Sus calles coloniales y el Puente de Occidente son patrimonio histórico de Colombia. 🏛️',
-  'RUTA ENVIGADO NATURAL': '¡El secreto mejor guardado del Valle de Aburrá! El Parque El Salado es un bosque urbano increíble a minutos de Medellín. 🌳',
-  'RUTA ALUMBRADO NAVIDEÑO': '¡La mejor época del año en Medellín! El alumbrado navideño convierte la ciudad en un sueño de luces. Solo disponible en diciembre y enero. ✨',
 
   // Temporada
-  'SEMANA SANTA PATRIMONIAL': '¡La Semana Santa de Medellín es Patrimonio Cultural! Las procesiones nocturnas por el centro histórico son una experiencia que te cambia. ✝️',
-  'FESTIVAL INTERNACIONAL DE TANGO': '¡Medellín es la capital del tango fuera de Buenos Aires! Carlos Gardel murió en Medellín en 1935 y los paisas lo adoptaron para siempre. 🎷',
-  'FESTIVAL DE POESÍA INTERNACIONAL': '¡El festival de poesía más importante de América Latina! Poetas de 30 países toman las calles de Medellín en julio. 🌷',
-  'COLOMBIAMODA — MODA & DISEÑO': '¡Medellín es la capital de la moda en Colombia! Colombiamoda reúne a los mejores diseñadores del país. ¡Prepárate para el glamour! 👗',
   'FERIA DE LAS FLORES': '¡El festival más colorido de Colombia! Los silleteros cargan hasta 80 kilos de flores en sus espaldas. ¡Una tradición única en el mundo! 🌹',
-  'MEDEJAZZ — FESTIVAL DE JAZZ': '¡El mejor jazz de Latinoamérica bajo las estrellas de Medellín! Artistas internacionales y locales en escenarios únicos de la ciudad. 🎵',
-  'FIESTA DEL LIBRO Y LA CULTURA': '¡Literatura, arte y cultura gratis en los espacios más hermosos de Medellín! El Jardín Botánico se convierte en biblioteca a cielo abierto. 📚',
-  'FERIA DE LA ANTIOQUEÑIDAD': '¡Celebra lo mejor de la cultura paisa! Música, danzas, gastronomía y artesanías del Antioquia más auténtico. 🎭',
-  'ALUMBRADO NAVIDEÑO — RÍO MEDELLÍN': '¡El alumbrado más espectacular de Colombia! El Desfile de Mitos y Leyendas el 7 de diciembre es una experiencia mágica única. 🎇',
 
   // ── Rutas nuevas — Pueblos antioqueños ──
-  'RUTA ESPÍRITU ARRIERO — JERICÓ': 'Bienvenido a Jericó, tierra de la primera santa colombiana y cuna de la cultura arriera del suroeste. Este municipio a más de 1.700 metros de altura combina fe, tradición artesanal y café de origen en una experiencia auténtica. El carriel que verás no es souvenir — es historia viva. 🐎',
-  'RUTA PARAÍSO NATURAL — SAN RAFAEL': 'Hoy te diriges a uno de los municipios más ricos en fuentes hídricas de Antioquia. San Rafael tiene más de 50 fuentes naturales y es considerado uno de los mejores destinos de ecoturismo del oriente. A lo largo del recorrido descubrirás cómo el agua ha moldeado el paisaje y la vida de sus habitantes. 🌿',
-  'RUTA MONTAÑA Y ANCESTRALIDAD — TÁMESIS': 'Hoy visitarás Támesis, un territorio donde aún se conservan rastros de culturas prehispánicas a través de sus petroglifos. Este recorrido combina arqueología, naturaleza y tradición cafetera en un solo día. Caminar sobre estas tierras es caminar sobre memoria viva. ☕',
-  'RUTA JOYA COLONIAL OCULTA — CONCEPCIÓN': 'Bienvenido a Concepción, un municipio donde el tiempo parece haberse detenido. Sus calles empedradas y su arquitectura conservada lo convierten en uno de los pueblos más auténticos del oriente antioqueño, aún poco explorado por el turismo masivo. Hoy no vienes a correr — vienes a observar con calma. 🏛️',
-  'RUTA CARIBE ANTIOQUEÑO — NECOCLÍ': 'Has llegado a Necoclí, la puerta de Antioquia al mar Caribe y punto estratégico del Urabá. Aquí el ritmo cambia completamente: el calor, la brisa y el sonido del mar marcan el tiempo. Desde el muelle salen lanchas hacia Capurganá y la frontera con Panamá. Esta no es solo una ruta turística — es una transición cultural completa. 🏝️',
+  'VIVE EL POBLADO': 'Descubre el otro lado del Poblado — más allá de los bares y restaurantes, esta ruta comunitaria te revela el alma del barrio: bibliotecas públicas en las lomas, mercados campesinos y calles con más de 400 años de historia. Nace de la colaboración oficial con la Secretaría de Turismo de Medellín. 🌿',
 };
 
 // ─────────────────────────────────────────
@@ -15147,803 +14926,20 @@ class _SitioMapa {
 }
 
 const List<_SitioMapa> kSitiosMapa = [
-  // ── CORREDOR CULTURAL DE LA 45 (Manrique) ──
-  _SitioMapa(nombre: 'Estación Gardel — Puerta de Manrique', emoji: '🚇', posicion: LatLng(6.2640, -75.5567), ruta: 'CORREDOR CULTURAL DE LA 45', color: Color(0xFFB07ABF), radioGps: 80),
-  _SitioMapa(nombre: 'Casa Gardeliana', emoji: '🎶', posicion: LatLng(6.2695, -75.5545), ruta: 'CORREDOR CULTURAL DE LA 45', color: Color(0xFFB07ABF), radioGps: 60),
-  _SitioMapa(nombre: 'Casa de la Cultura Manrique', emoji: '🎭', posicion: LatLng(6.2679, -75.5549), ruta: 'CORREDOR CULTURAL DE LA 45', color: Color(0xFFB07ABF), radioGps: 60),
-  _SitioMapa(nombre: 'La 45 Gastronómica', emoji: '🍽️', posicion: LatLng(6.2670, -75.5552), ruta: 'CORREDOR CULTURAL DE LA 45', color: Color(0xFFB07ABF), radioGps: 120),
-  _SitioMapa(nombre: 'Hangar M45 Azotea', emoji: '✈️', posicion: LatLng(6.2648, -75.5554), ruta: 'CORREDOR CULTURAL DE LA 45', color: Color(0xFFB07ABF), radioGps: 50),
-  _SitioMapa(nombre: 'UVA La Armonía — Punto de Inicio Constelaciones', emoji: '💧', posicion: LatLng(6.2742, -75.5453), ruta: 'CORREDOR CULTURAL DE LA 45', color: Color(0xFFB07ABF), radioGps: 80),
-  _SitioMapa(nombre: 'Macromural Constelaciones', emoji: '🌌', posicion: LatLng(6.2755, -75.5444), ruta: 'CORREDOR CULTURAL DE LA 45', color: Color(0xFFB07ABF), radioGps: 150),
-  _SitioMapa(nombre: 'Mirador El Ojo de Dios', emoji: '👁️', posicion: LatLng(6.2739, -75.5433), ruta: 'CORREDOR CULTURAL DE LA 45', color: Color(0xFFB07ABF), radioGps: 50),
-
-  // ── RUTA 1: TRANSFORMACIÓN URBANA ──
-  _SitioMapa(nombre: 'Estación San Javier (Metro)', emoji: '🚇', posicion: LatLng(6.257135, -75.615141), ruta: 'RUTA TRANSFORMACIÓN URBANA', color: kGreen),
-  _SitioMapa(nombre: 'Biblioteca de San Javier', emoji: '📚', posicion: LatLng(6.25445, -75.61332), ruta: 'RUTA TRANSFORMACIÓN URBANA', color: kGreen),
-  _SitioMapa(nombre: 'Ciudadela de la 4° Revolución', emoji: '🎓', posicion: LatLng(6.25358, -75.61351), ruta: 'RUTA TRANSFORMACIÓN URBANA', color: kGreen),
-  _SitioMapa(nombre: 'Parque de la paz', emoji: '🕊️', posicion: LatLng(6.25113, -75.62176), ruta: 'RUTA TRANSFORMACIÓN URBANA', color: kGreen),
-  _SitioMapa(nombre: 'Murales Hip Hop', emoji: '🎨', posicion: LatLng(6.24882, -75.62148), ruta: 'RUTA TRANSFORMACIÓN URBANA', color: kGreen),
-  _SitioMapa(nombre: 'Escaleras electricas', emoji: '🛗', posicion: LatLng(6.24847, -75.62182), ruta: 'RUTA TRANSFORMACIÓN URBANA', color: kGreen),
-  _SitioMapa(nombre: 'Tienda de artesanos locales (Aliado)', emoji: '🛍️', posicion: LatLng(6.24841, -75.62257), ruta: 'RUTA TRANSFORMACIÓN URBANA', color: kGreen),
-
-  // ── RUTA 2A: PATRIMONIAL DEL CENTRO (sitios 1–10) ──
-  _SitioMapa(nombre: 'Parque Berrío', emoji: '🔵', posicion: LatLng(6.25, -75.5685), ruta: 'RUTA PATRIMONIAL DEL CENTRO', color: kOrchid),
-  _SitioMapa(nombre: 'Iglesia de La Candelaria', emoji: '⛪', posicion: LatLng(6.25004, -75.56757), ruta: 'RUTA PATRIMONIAL DEL CENTRO', color: kOrchid),
-  _SitioMapa(nombre: 'Edificio Coltejer', emoji: '🟡', posicion: LatLng(6.25011, -75.56602), ruta: 'RUTA PATRIMONIAL DEL CENTRO', color: kOrchid),
-  _SitioMapa(nombre: 'Pasaje Junín', emoji: '🟤', posicion: LatLng(6.2507, -75.56601), ruta: 'RUTA PATRIMONIAL DEL CENTRO', color: kOrchid),
-  _SitioMapa(nombre: 'Parque Bolívar', emoji: '🌳', posicion: LatLng(6.25293, -75.56447), ruta: 'RUTA PATRIMONIAL DEL CENTRO', color: kOrchid),
-  _SitioMapa(nombre: 'Catedral Basílica Metropolitana', emoji: '⛪', posicion: LatLng(6.25385, -75.56399), ruta: 'RUTA PATRIMONIAL DEL CENTRO', color: kOrchid),
-  _SitioMapa(nombre: 'Hotel Nutibara', emoji: '🏨', posicion: LatLng(6.25241, -75.56693), ruta: 'RUTA PATRIMONIAL DEL CENTRO', color: kOrchid),
-  _SitioMapa(nombre: 'Plaza Botero', emoji: '🎨', posicion: LatLng(6.25216, -75.56843), ruta: 'RUTA PATRIMONIAL DEL CENTRO', color: kOrchid),
-  _SitioMapa(nombre: 'Museo de Antioquia', emoji: '🖼️', posicion: LatLng(6.25241, -75.56907), ruta: 'RUTA PATRIMONIAL DEL CENTRO', color: kOrchid),
-  _SitioMapa(nombre: 'Palacio de la Cultura Rafael Uribe Uribe', emoji: '🏛️', posicion: LatLng(6.25162, -75.56806), ruta: 'RUTA PATRIMONIAL DEL CENTRO', color: kOrchid),
-
-  // ── RUTA 2B: CENTRO REPUBLICANO (sitios 11–20) ──
-  _SitioMapa(nombre: 'Iglesia de La Veracruz', emoji: '⛪', posicion: LatLng(6.25126, -75.56954), ruta: 'RUTA CENTRO REPUBLICANO', color: kOrchid),
-  _SitioMapa(nombre: 'Palacio Nacional', emoji: '🏬', posicion: LatLng(6.24898, -75.57014), ruta: 'RUTA CENTRO REPUBLICANO', color: kOrchid),
-  _SitioMapa(nombre: 'Edificio Vásquez', emoji: '🟢', posicion: LatLng(6.24561, -75.57134), ruta: 'RUTA CENTRO REPUBLICANO', color: kOrchid),
-  _SitioMapa(nombre: 'Edificio Carré', emoji: '🟢', posicion: LatLng(6.24599, -75.57129), ruta: 'RUTA CENTRO REPUBLICANO', color: kOrchid),
-  _SitioMapa(nombre: 'Parque de las Luces', emoji: '💡', posicion: LatLng(6.24573, -75.57214), ruta: 'RUTA CENTRO REPUBLICANO', color: kOrchid),
-  _SitioMapa(nombre: 'Centro Administrativo La Alpujarra', emoji: '🔴', posicion: LatLng(6.24432, -75.57343), ruta: 'RUTA CENTRO REPUBLICANO', color: kOrchid),
-  _SitioMapa(nombre: 'Estación Ferrocarril de Antioquia', emoji: '🚆', posicion: LatLng(6.24486, -75.57204), ruta: 'RUTA CENTRO REPUBLICANO', color: kOrchid),
-  _SitioMapa(nombre: 'Parque San Antonio', emoji: '🟣', posicion: LatLng(6.24565, -75.56806), ruta: 'RUTA CENTRO REPUBLICANO', color: kOrchid),
-  _SitioMapa(nombre: 'Iglesia de San Ignacio', emoji: '⛪', posicion: LatLng(6.24607, -75.56426), ruta: 'RUTA CENTRO REPUBLICANO', color: kOrchid),
-  _SitioMapa(nombre: 'Teatro Pablo Tobón Uribe (Centro)', emoji: '🎭', posicion: LatLng(6.2476, -75.55955), ruta: 'RUTA CENTRO REPUBLICANO', color: kOrchid),
-  _SitioMapa(nombre: 'Museo Casa de la Memoria', emoji: '🕊️', posicion: LatLng(6.24596, -75.55655), ruta: 'RUTA CENTRO REPUBLICANO', color: kOrchid),
-
-  // ── RUTA 3: VERDE DEL NORTE ──
-  _SitioMapa(nombre: 'Estación Universidad (Metro)', emoji: '🚇', posicion: LatLng(6.26941, -75.56566), ruta: 'RUTA VERDE DEL NORTE', color: Color(0xFF4CAF50)),
-  _SitioMapa(nombre: 'Jardín Botánico Joaquín Antonio Uribe', emoji: '🌺', posicion: LatLng(6.26939, -75.56484), ruta: 'RUTA VERDE DEL NORTE', color: Color(0xFF4CAF50)),
-  _SitioMapa(nombre: 'Orquideorama', emoji: '🌸', posicion: LatLng(6.27093, -75.56409), ruta: 'RUTA VERDE DEL NORTE', color: Color(0xFF4CAF50)),
-  _SitioMapa(nombre: 'Parque Norte', emoji: '🌳', posicion: LatLng(6.27207, -75.56618), ruta: 'RUTA VERDE DEL NORTE', color: Color(0xFF4CAF50)),
-  _SitioMapa(nombre: 'Parque Explora', emoji: '🔬', posicion: LatLng(6.26998, -75.56572), ruta: 'RUTA VERDE DEL NORTE', color: Color(0xFF4CAF50)),
-  _SitioMapa(nombre: 'Planetario de Medellín', emoji: '🪐', posicion: LatLng(6.26917, -75.56587), ruta: 'RUTA VERDE DEL NORTE', color: Color(0xFF4CAF50)),
-  _SitioMapa(nombre: 'Universidad de Antioquia (fachada)', emoji: '🎓', posicion: LatLng(6.2674, -75.56729), ruta: 'RUTA VERDE DEL NORTE', color: Color(0xFF4CAF50)),
-  _SitioMapa(nombre: 'Parque de los Deseos', emoji: '✨', posicion: LatLng(6.2684, -75.56605), ruta: 'RUTA VERDE DEL NORTE', color: Color(0xFF4CAF50)),
-  _SitioMapa(nombre: 'Centro Comercial (Aliado)', emoji: '🛒', posicion: LatLng(6.26885, -75.5652), ruta: 'RUTA VERDE DEL NORTE', color: Color(0xFF4CAF50)),
-
-  // ── RUTA 4: METROCABLE & ARVÍ ──
-  _SitioMapa(nombre: 'Estación Acevedo (Metro)', emoji: '🚇', posicion: LatLng(6.2999, -75.55863), ruta: 'RUTA DEL METROCABLE & ARVÍ', color: Color(0xFF4A90D9)),
-  _SitioMapa(nombre: 'Metrocable Línea K', emoji: '🚡', posicion: LatLng(6.30033, -75.55832), ruta: 'RUTA DEL METROCABLE & ARVÍ', color: Color(0xFF4A90D9)),
-  _SitioMapa(nombre: 'Biblioteca España (Santo Domingo)', emoji: '📚', posicion: LatLng(6.29485, -75.54365), ruta: 'RUTA DEL METROCABLE & ARVÍ', color: Color(0xFF4A90D9)),
-  _SitioMapa(nombre: 'Mirador Santo Domingo', emoji: '🔭', posicion: LatLng(6.29368, -75.54358), ruta: 'RUTA DEL METROCABLE & ARVÍ', color: Color(0xFF4A90D9)),
-  _SitioMapa(nombre: 'Metrocable Línea L', emoji: '🚡', posicion: LatLng(6.29286, -75.54181), ruta: 'RUTA DEL METROCABLE & ARVÍ', color: Color(0xFF4A90D9)),
-  _SitioMapa(nombre: 'Parque Arví (entrada)', emoji: '🌿', posicion: LatLng(6.28236, -75.51694), ruta: 'RUTA DEL METROCABLE & ARVÍ', color: Color(0xFF4A90D9)),
-  // 🚫 PAUSADO — _SitioMapa(nombre: 'Mercado campesino de Arví', emoji: '🛒', posicion: LatLng(6.27776, -75.49509), ruta: 'RUTA DEL METROCABLE & ARVÍ', color: Color(0xFF4A90D9)),
-
-
-  // ── RUTA 6: LAURELES & TRADICIÓN ──
-  _SitioMapa(nombre: 'Estadio Atanasio Girardot', emoji: '🏟️', posicion: LatLng(6.25728, -75.59133), ruta: 'RUTA LAURELES & TRADICIÓN', color: kAccent),
-  _SitioMapa(nombre: 'Avenida Carrera la 70 (Laureles)', emoji: '🌸', posicion: LatLng(6.25275, -75.58794), ruta: 'RUTA LAURELES & TRADICIÓN', color: kAccent),
-  _SitioMapa(nombre: 'U.P.B Porteria', emoji: '🎓', posicion: LatLng(6.24437, -75.58925), ruta: 'RUTA LAURELES & TRADICIÓN', color: kAccent),
-  _SitioMapa(nombre: 'Primer Parque de Laureles', emoji: '🌳', posicion: LatLng(6.24609, -75.59283), ruta: 'RUTA LAURELES & TRADICIÓN', color: kAccent),
-  _SitioMapa(nombre: 'Segundo Parque de Laureles', emoji: '🌳', posicion: LatLng(6.24513, -75.59685), ruta: 'RUTA LAURELES & TRADICIÓN', color: kAccent),
-  // 🚫 PAUSADO — _SitioMapa(nombre: 'Restaurante local (Aliado)', emoji: '🍽️', posicion: LatLng(6.2445, -75.5988), ruta: 'RUTA LAURELES & TRADICIÓN', color: kAccent),
-
-  // ── RUTA 7: MIRADORES ──
-  _SitioMapa(nombre: 'Cerro Nutibara', emoji: '⛰️', posicion: LatLng(6.2362, -75.5807), ruta: 'RUTA DE LOS MIRADORES', color: kGold),
-  _SitioMapa(nombre: 'Mirador Avenida Las Palmas', emoji: '🔭', posicion: LatLng(6.19166, -75.54765), ruta: 'RUTA DE LOS MIRADORES', color: kGold),
-  _SitioMapa(nombre: 'Cerro El Picacho (fachada)', emoji: '⛰️', posicion: LatLng(6.30423, -75.58908), ruta: 'RUTA DE LOS MIRADORES', color: kGold),
-  _SitioMapa(nombre: 'Cerro de las Tres Cruces', emoji: '✝️', posicion: LatLng(6.21364, -75.61759), ruta: 'RUTA DE LOS MIRADORES', color: kGold),
-  _SitioMapa(nombre: 'Mirador de Belén', emoji: '🌅', posicion: LatLng(6.20775, -75.60856), ruta: 'RUTA DE LOS MIRADORES', color: kGold),
-
-  // ── RUTA 8: CULTURAL NOCTURNA ──
-  _SitioMapa(nombre: 'Teatro Pablo Tobón Uribe', emoji: '🎭', posicion: LatLng(6.24761, -75.5591), ruta: 'RUTA CULTURAL NOCTURNA', color: kOrchid),
-  _SitioMapa(nombre: 'Zona Rosa El Poblado', emoji: '🌃', posicion: LatLng(6.21037, -75.57094), ruta: 'RUTA CULTURAL NOCTURNA', color: kOrchid),
-  _SitioMapa(nombre: 'Galería de arte (Provenza)', emoji: '🖼️', posicion: LatLng(6.20788, -75.56593), ruta: 'RUTA CULTURAL NOCTURNA', color: kOrchid),
-  _SitioMapa(nombre: 'Parque Lleras (noche)', emoji: '🌙', posicion: LatLng(6.20894, -75.56767), ruta: 'RUTA CULTURAL NOCTURNA', color: kOrchid),
-  // 🚫 PAUSADO — _SitioMapa(nombre: 'Bar de música en vivo aliado', emoji: '🎵', posicion: LatLng(6.2078, -75.565), ruta: 'RUTA CULTURAL NOCTURNA', color: kOrchid),
-
-  // ── RUTA: MEMORIA Y REFLEXIÓN ──
-  _SitioMapa(nombre: 'Museo Beyond Escobar', emoji: '🏛️', posicion: LatLng(6.251546, -75.620789), ruta: 'RUTA MEMORIA Y REFLEXIÓN', color: Color(0xFF7A95B0)),
-  _SitioMapa(nombre: 'Barrio Los Olivos — El Techo', emoji: '🏘️', posicion: LatLng(6.25561, -75.58018), ruta: 'RUTA MEMORIA Y REFLEXIÓN', color: Color(0xFF7A95B0)),
-  _SitioMapa(nombre: 'Cementerio Jardines Montesacro', emoji: '🌿', posicion: LatLng(6.16004, -75.61932), ruta: 'RUTA MEMORIA Y REFLEXIÓN', color: Color(0xFF7A95B0)),
-  _SitioMapa(nombre: 'Parque Memorial Inflexión', emoji: '🕊️', posicion: LatLng(6.19138, -75.57763), ruta: 'RUTA MEMORIA Y REFLEXIÓN', color: Color(0xFF7A95B0)),
-
-  // ── RUTA 9: GUATAPÉ & LA PIEDRA ──
-  _SitioMapa(nombre: 'Mirador El Alto del Chocho', emoji: '🌄', posicion: LatLng(6.1938045, -75.2872104), ruta: 'RUTA GUATAPÉ & LA PIEDRA', color: Color(0xFF4A90D9), radioGps: 100),
-  _SitioMapa(nombre: 'Peñol (pueblo)', emoji: '🏘️', posicion: LatLng(6.21632, -75.24368), ruta: 'RUTA GUATAPÉ & LA PIEDRA', color: Color(0xFF4A90D9)),
-  _SitioMapa(nombre: 'Réplica Viejo Peñol', emoji: '🏛️', posicion: LatLng(6.2173891, -75.2292115), ruta: 'RUTA GUATAPÉ & LA PIEDRA', color: Color(0xFF4A90D9)),
-  _SitioMapa(nombre: 'La Casa al Revés', emoji: '🏠', posicion: LatLng(6.2105109, -75.2227151), ruta: 'RUTA GUATAPÉ & LA PIEDRA', color: Color(0xFF4A90D9)),
-  _SitioMapa(nombre: 'Piedra del Peñol (740 escalones)', emoji: '⛰️', posicion: LatLng(6.22269, -75.17840), ruta: 'RUTA GUATAPÉ & LA PIEDRA', color: Color(0xFF4A90D9)),
-  _SitioMapa(nombre: 'Plazoleta de los Zócalos', emoji: '🖼️', posicion: LatLng(6.23385, -75.16059), ruta: 'RUTA GUATAPÉ & LA PIEDRA', color: Color(0xFF4A90D9)),
-  _SitioMapa(nombre: 'Calle del Recuerdo', emoji: '🌸', posicion: LatLng(6.23345, -75.16075), ruta: 'RUTA GUATAPÉ & LA PIEDRA', color: Color(0xFF4A90D9)),
-  _SitioMapa(nombre: 'Parque Principal de Guatapé', emoji: '🎨', posicion: LatLng(6.2342773, -75.1617247), ruta: 'RUTA GUATAPÉ & LA PIEDRA', color: Color(0xFF4A90D9)),
-  _SitioMapa(nombre: 'Malecón de Guatapé', emoji: '🚤', posicion: LatLng(6.2356097, -75.1626319), ruta: 'RUTA GUATAPÉ & LA PIEDRA', color: Color(0xFF4A90D9)),
-
-  // ── RUTA 10: CAFÉ EN SANTA ELENA ──
-  _SitioMapa(nombre: 'Parque de Santa Elena', emoji: '🌳', posicion: LatLng(6.1975, -75.4870), ruta: 'RUTA DEL CAFÉ EN SANTA ELENA', color: kCafe),
-  _SitioMapa(nombre: 'Finca silletera (visita guiada)', emoji: '🌸', posicion: LatLng(6.1980, -75.4855), ruta: 'RUTA DEL CAFÉ EN SANTA ELENA', color: kCafe),
-  _SitioMapa(nombre: 'Proceso del café: semilla a taza', emoji: '☕', posicion: LatLng(6.1985, -75.4840), ruta: 'RUTA DEL CAFÉ EN SANTA ELENA', color: kCafe),
-  _SitioMapa(nombre: 'Degustación de café de origen', emoji: '🫗', posicion: LatLng(6.1990, -75.4830), ruta: 'RUTA DEL CAFÉ EN SANTA ELENA', color: kCafe),
-  _SitioMapa(nombre: 'Bosque El Romeral (entrada)', emoji: '🌲', posicion: LatLng(6.2010, -75.4810), ruta: 'RUTA DEL CAFÉ EN SANTA ELENA', color: kCafe),
-
-  // ── RUTA 11: SAN CARLOS & CHARCOS ──
-  _SitioMapa(nombre: 'Terminal Norte (salida 6am)', emoji: '🚌', posicion: LatLng(6.1880, -74.9947), ruta: 'RUTA SAN CARLOS & CHARCOS', color: Color(0xFF2AB8D0)),
-  _SitioMapa(nombre: 'Municipio de San Carlos', emoji: '🏘️', posicion: LatLng(6.1862, -74.9972), ruta: 'RUTA SAN CARLOS & CHARCOS', color: Color(0xFF2AB8D0)),
-  _SitioMapa(nombre: 'Charco El Remolino', emoji: '🌊', posicion: LatLng(6.1920, -74.9850), ruta: 'RUTA SAN CARLOS & CHARCOS', color: Color(0xFF2AB8D0)),
-  _SitioMapa(nombre: 'Ruta El Chispero (salto + rappel)', emoji: '🧗', posicion: LatLng(6.1950, -74.9800), ruta: 'RUTA SAN CARLOS & CHARCOS', color: Color(0xFF2AB8D0)),
-  _SitioMapa(nombre: 'Río Samaná Norte', emoji: '🏞️', posicion: LatLng(6.2010, -74.9750), ruta: 'RUTA SAN CARLOS & CHARCOS', color: Color(0xFF2AB8D0)),
-  _SitioMapa(nombre: 'Mirador El Cerro', emoji: '⛰️', posicion: LatLng(6.1930, -74.9770), ruta: 'RUTA SAN CARLOS & CHARCOS', color: Color(0xFF2AB8D0)),
-
-  // ── RUTA 12: JARDÍN COLONIAL ──
-  _SitioMapa(nombre: 'Terminal Sur (salida)', emoji: '🚌', posicion: LatLng(5.5986, -75.8208), ruta: 'RUTA JARDÍN COLONIAL', color: kGreen),
-  _SitioMapa(nombre: 'Plaza Principal de Jardín', emoji: '🏘️', posicion: LatLng(5.5989, -75.8203), ruta: 'RUTA JARDÍN COLONIAL', color: kGreen),
-  _SitioMapa(nombre: 'Basílica Menor Nuestra Señora del Carmen', emoji: '⛪', posicion: LatLng(5.5992, -75.8200), ruta: 'RUTA JARDÍN COLONIAL', color: kGreen),
-  _SitioMapa(nombre: 'Teleférico de Jardín', emoji: '🚡', posicion: LatLng(5.5975, -75.8190), ruta: 'RUTA JARDÍN COLONIAL', color: kGreen),
-  _SitioMapa(nombre: 'Finca cafetera El Paraíso', emoji: '🏡', posicion: LatLng(5.6010, -75.8150), ruta: 'RUTA JARDÍN COLONIAL', color: kGreen),
-  _SitioMapa(nombre: 'Mirador del cañón del Cauca', emoji: '🌅', posicion: LatLng(5.5950, -75.8100), ruta: 'RUTA JARDÍN COLONIAL', color: kGreen),
-
-  // ── RUTA 13: SANTA FE DE ANTIOQUIA ──
-  _SitioMapa(nombre: 'Plaza Mayor Santa Fe de Antioquia', emoji: '🏛️', posicion: LatLng(6.5569, -75.8270), ruta: 'RUTA SANTA FE DE ANTIOQUIA', color: kGold),
-  _SitioMapa(nombre: 'Catedral de la Inmaculada Concepción', emoji: '⛪', posicion: LatLng(6.5572, -75.8267), ruta: 'RUTA SANTA FE DE ANTIOQUIA', color: kGold),
-  _SitioMapa(nombre: 'Museo Juan del Corral', emoji: '🖼️', posicion: LatLng(6.5565, -75.8265), ruta: 'RUTA SANTA FE DE ANTIOQUIA', color: kGold),
-  _SitioMapa(nombre: 'Calle Real (colonial)', emoji: '🛤️', posicion: LatLng(6.5560, -75.8260), ruta: 'RUTA SANTA FE DE ANTIOQUIA', color: kGold),
-  _SitioMapa(nombre: 'Puente de Occidente (1887)', emoji: '🌉', posicion: LatLng(6.5383, -75.8455), ruta: 'RUTA SANTA FE DE ANTIOQUIA', color: kGold),
-  _SitioMapa(nombre: 'Iglesia de Chiquinquirá', emoji: '⛪', posicion: LatLng(6.5575, -75.8272), ruta: 'RUTA SANTA FE DE ANTIOQUIA', color: kGold),
-  _SitioMapa(nombre: 'Almuerzo típico local', emoji: '🍽️', posicion: LatLng(6.5558, -75.8258), ruta: 'RUTA SANTA FE DE ANTIOQUIA', color: kGold),
-
-  // ── RUTA 14: ENVIGADO NATURAL ──
-  _SitioMapa(nombre: 'Parque El Salado (entrada)', emoji: '🌳', posicion: LatLng(6.1680, -75.5720), ruta: 'RUTA ENVIGADO NATURAL', color: Color(0xFF4CAF50)),
-  _SitioMapa(nombre: 'Sendero de las aves', emoji: '🦋', posicion: LatLng(6.1695, -75.5705), ruta: 'RUTA ENVIGADO NATURAL', color: Color(0xFF4CAF50)),
-  _SitioMapa(nombre: 'Quebrada El Salado', emoji: '🌊', posicion: LatLng(6.1710, -75.5695), ruta: 'RUTA ENVIGADO NATURAL', color: Color(0xFF4CAF50)),
-  _SitioMapa(nombre: 'Parque Principal de Envigado', emoji: '🏙️', posicion: LatLng(6.1720, -75.5912), ruta: 'RUTA ENVIGADO NATURAL', color: Color(0xFF4CAF50)),
-  _SitioMapa(nombre: 'Galería de Arte local', emoji: '🖼️', posicion: LatLng(6.1715, -75.5905), ruta: 'RUTA ENVIGADO NATURAL', color: Color(0xFF4CAF50)),
-
-
-  // ── RUTA 15: ALUMBRADO NAVIDEÑO ──
-  _SitioMapa(nombre: 'Av. La Playa (inicio ruta)', emoji: '✨', posicion: LatLng(6.2545, -75.5698), ruta: 'ALUMBRADO NAVIDEÑO — RÍO MEDELLÍN', color: Color(0xFFFFD700)),
-  _SitioMapa(nombre: 'Paseo Fluvial del Río Medellín', emoji: '🎆', posicion: LatLng(6.2480, -75.5735), ruta: 'ALUMBRADO NAVIDEÑO — RÍO MEDELLÍN', color: Color(0xFFFFD700)),
-  _SitioMapa(nombre: 'Puente de Guayaquil iluminado', emoji: '🌉', posicion: LatLng(6.2462, -75.5720), ruta: 'ALUMBRADO NAVIDEÑO — RÍO MEDELLÍN', color: Color(0xFFFFD700)),
-  _SitioMapa(nombre: 'Parque Norte (instalación EPM)', emoji: '💡', posicion: LatLng(6.2723, -75.5652), ruta: 'ALUMBRADO NAVIDEÑO — RÍO MEDELLÍN', color: Color(0xFFFFD700)),
-  _SitioMapa(nombre: 'Parque de los Deseos (animaciones)', emoji: '✨', posicion: LatLng(6.2699, -75.5654), ruta: 'ALUMBRADO NAVIDEÑO — RÍO MEDELLÍN', color: Color(0xFFFFD700)),
-  _SitioMapa(nombre: 'Plaza Cisneros (nocturna)', emoji: '🌃', posicion: LatLng(6.2498, -75.5680), ruta: 'ALUMBRADO NAVIDEÑO — RÍO MEDELLÍN', color: Color(0xFFFFD700)),
-  _SitioMapa(nombre: 'Punto fotográfico oficial Rutero MDE', emoji: '📸', posicion: LatLng(6.2490, -75.5670), ruta: 'ALUMBRADO NAVIDEÑO — RÍO MEDELLÍN', color: Color(0xFFFFD700)),
-  // ── RUTA SENDEROS DE AGUA Y NATURALEZA ──
-  _SitioMapa(nombre: 'Parque El Poblado (inicio)', emoji: '🌳', posicion: LatLng(6.21034, -75.57094), ruta: 'SENDEROS DE AGUA Y NATURALEZA', color: Color(0xFF5BAD6F)),
-  _SitioMapa(nombre: 'Parque Lineal La Presidenta', emoji: '💧', posicion: LatLng(6.208, -75.57043), ruta: 'SENDEROS DE AGUA Y NATURALEZA', color: Color(0xFF5BAD6F)),
-  _SitioMapa(nombre: 'Quebrada La Presidenta (sendero)', emoji: '🌿', posicion: LatLng(6.20783, -75.5699), ruta: 'SENDEROS DE AGUA Y NATURALEZA', color: Color(0xFF5BAD6F)),
-  _SitioMapa(nombre: 'Sector El Poblado Alto (zona verde)', emoji: '🏡', posicion: LatLng(6.2015, -75.5665), ruta: 'SENDEROS DE AGUA Y NATURALEZA', color: Color(0xFF5BAD6F)),
-  _SitioMapa(nombre: 'Vías arborizadas hacia El Castillo', emoji: '🌲', posicion: LatLng(6.19609, -75.56848), ruta: 'SENDEROS DE AGUA Y NATURALEZA', color: Color(0xFF5BAD6F)),
-  _SitioMapa(nombre: 'El Castillo Museo y Jardines', emoji: '🏰', posicion: LatLng(6.19016, -75.56918), ruta: 'SENDEROS DE AGUA Y NATURALEZA', color: Color(0xFF5BAD6F)),
-  // ── RUTA ARTE, CIUDAD Y SABORES ──
-  _SitioMapa(nombre: 'Parque El Poblado (inicio)', emoji: '🌳', posicion: LatLng(6.21034, -75.57094), ruta: 'ARTE, CIUDAD Y SABORES', color: Color(0xFFB85CAE)),
-  _SitioMapa(nombre: 'Parque de Telemedellín', emoji: '📡', posicion: LatLng(6.21934, -75.57081), ruta: 'ARTE, CIUDAD Y SABORES', color: Color(0xFFB85CAE)),
-  _SitioMapa(nombre: 'Museo de Arte Moderno de Medellín (MAMM)', emoji: '🖼️', posicion: LatLng(6.22386, -75.57358), ruta: 'ARTE, CIUDAD Y SABORES', color: Color(0xFFB85CAE)),
-  _SitioMapa(nombre: 'Mercado del Río', emoji: '🍽️', posicion: LatLng(6.22606, -75.57509), ruta: 'ARTE, CIUDAD Y SABORES', color: Color(0xFFB85CAE)),
-  _SitioMapa(nombre: 'Estación Industriales (Metro)', emoji: '🚇', posicion: LatLng(6.23019, -75.5757), ruta: 'ARTE, CIUDAD Y SABORES', color: Color(0xFFB85CAE)),
-  _SitioMapa(nombre: 'Parque de la Conservación', emoji: '🌿', posicion: LatLng(6.22323, -75.58042), ruta: 'ARTE, CIUDAD Y SABORES', color: Color(0xFFB85CAE)),
-  // ── RUTA DEL ORIGEN PAISA A LA MEDELLÍN MODERNA ──
-  _SitioMapa(nombre: 'Pueblito Paisa (inicio ruta)', emoji: '🏘️', posicion: LatLng(6.23623, -75.58006), ruta: 'DEL ORIGEN PAISA A LA MEDELLÍN MODERNA', color: Color(0xFF8B5E3C)),
-  _SitioMapa(nombre: 'Parques del Río Medellín', emoji: '🌊', posicion: LatLng(6.24366, -75.5797), ruta: 'DEL ORIGEN PAISA A LA MEDELLÍN MODERNA', color: Color(0xFF8B5E3C)),
-  _SitioMapa(nombre: 'Parque de los Pies Descalzos', emoji: '🦶', posicion: LatLng(6.24481, -75.57716), ruta: 'DEL ORIGEN PAISA A LA MEDELLÍN MODERNA', color: Color(0xFF8B5E3C)),
-  _SitioMapa(nombre: 'Museo del Agua EPM', emoji: '💧', posicion: LatLng(6.2451, -75.57653), ruta: 'DEL ORIGEN PAISA A LA MEDELLÍN MODERNA', color: Color(0xFF8B5E3C)),
-  _SitioMapa(nombre: 'Plaza Mayor Medellín', emoji: '🌍', posicion: LatLng(6.24108, -75.57615), ruta: 'DEL ORIGEN PAISA A LA MEDELLÍN MODERNA', color: Color(0xFF8B5E3C)),
-  _SitioMapa(nombre: 'Gobernación de Antioquia', emoji: '🏛️', posicion: LatLng(6.24435, -75.57329), ruta: 'DEL ORIGEN PAISA A LA MEDELLÍN MODERNA', color: Color(0xFF8B5E3C)),
-  // ── RUTA TRANVÍA CULTURAL ──
-  _SitioMapa(nombre: 'Tranvía de Ayacucho (recorrido)', emoji: '🚃', posicion: LatLng(6.24702, -75.56943), ruta: 'TRANVÍA CULTURAL', color: Color(0xFF4A90D9)),
-  _SitioMapa(nombre: 'Estación Bicentenario', emoji: '🏙️', posicion: LatLng(6.24393, -75.55869), ruta: 'TRANVÍA CULTURAL', color: Color(0xFF4A90D9)),
-  _SitioMapa(nombre: 'Barrio Buenos Aires', emoji: '🏘️', posicion: LatLng(6.24142, -75.55409), ruta: 'TRANVÍA CULTURAL', color: Color(0xFF4A90D9)),
-  _SitioMapa(nombre: 'Calle 49 Ayacucho (comercio)', emoji: '🛒', posicion: LatLng(6.25, -75.5635), ruta: 'TRANVÍA CULTURAL', color: Color(0xFF4A90D9)),
-  _SitioMapa(nombre: 'Placita de Flórez', emoji: '🌸', posicion: LatLng(6.24582, -75.55966), ruta: 'TRANVÍA CULTURAL', color: Color(0xFF4A90D9)),
-  // ── RUTA SENDEROS DEL ARRIERO ──
-  _SitioMapa(nombre: 'Parque Principal + Iglesia La Inmaculada (Ciudad Bolívar)', emoji: '⛪', posicion: LatLng(5.8520, -76.0189), ruta: 'SENDEROS DEL ARRIERO Y LA MONTAÑA', color: Color(0xFF8B5E3C)),
-  _SitioMapa(nombre: 'Casa de la Cultura Ernesto María González', emoji: '📜', posicion: LatLng(5.8522, -76.0185), ruta: 'SENDEROS DEL ARRIERO Y LA MONTAÑA', color: Color(0xFF8B5E3C)),
-  _SitioMapa(nombre: 'Avenida Las Palmas (corredor natural)', emoji: '🌴', posicion: LatLng(5.8535, -76.0175), ruta: 'SENDEROS DEL ARRIERO Y LA MONTAÑA', color: Color(0xFF8B5E3C)),
-  _SitioMapa(nombre: 'Mirador Alto de La Mesa', emoji: '🏔️', posicion: LatLng(5.8560, -76.0155), ruta: 'SENDEROS DEL ARRIERO Y LA MONTAÑA', color: Color(0xFF8B5E3C)),
-  _SitioMapa(nombre: 'Farallones del Citará', emoji: '🌿', posicion: LatLng(5.8610, -76.0130), ruta: 'SENDEROS DEL ARRIERO Y LA MONTAÑA', color: Color(0xFF8B5E3C)),
-  _SitioMapa(nombre: 'Cascada Cola de Caballo', emoji: '💦', posicion: LatLng(5.8580, -76.0200), ruta: 'SENDEROS DEL ARRIERO Y LA MONTAÑA', color: Color(0xFF8B5E3C)),
-  _SitioMapa(nombre: 'Finca cafetera local (proceso del café)', emoji: '☕', posicion: LatLng(5.8545, -76.0210), ruta: 'SENDEROS DEL ARRIERO Y LA MONTAÑA', color: Color(0xFF8B5E3C)),
-  _SitioMapa(nombre: 'Parque del Arriero (cierre)', emoji: '🐎', posicion: LatLng(5.8518, -76.0192), ruta: 'SENDEROS DEL ARRIERO Y LA MONTAÑA', color: Color(0xFF8B5E3C)),
-
-  // ── FERIA DE LAS FLORES — Coordenadas reales verificadas ────
-  _SitioMapa(nombre: 'Parque de los Deseos (trova)', emoji: '🎭',
-    posicion: LatLng(6.268435, -75.566085),
-    ruta: 'FERIA DE LAS FLORES', color: Color(0xFFE85D26), radioGps: 40),
-  _SitioMapa(nombre: 'Orquideorama — Exposición flores', emoji: '🌸',
-    posicion: LatLng(6.270878, -75.564116),
-    ruta: 'FERIA DE LAS FLORES', color: Color(0xFFE85D26), radioGps: 35),
-  _SitioMapa(nombre: 'Finca Silletera Santa Elena', emoji: '💐',
-    posicion: LatLng(6.235904, -75.498569),
-    ruta: 'FERIA DE LAS FLORES', color: Color(0xFFE85D26), radioGps: 60),
-  _SitioMapa(nombre: 'Plaza Mayor (exhibición silletas)', emoji: '🏛️',
-    posicion: LatLng(6.240986, -75.575908),
-    ruta: 'FERIA DE LAS FLORES', color: Color(0xFFE85D26), radioGps: 40),
-  _SitioMapa(nombre: 'Placita de Flórez — Plaza de Flores', emoji: '🌺',
-    posicion: LatLng(6.245746, -75.559914),
-    ruta: 'FERIA DE LAS FLORES', color: Color(0xFFE85D26), radioGps: 35),
-  _SitioMapa(nombre: 'Avenida Guayabal (Desfile Silleteros)', emoji: '🌹',
-    posicion: LatLng(6.214292, -75.582091),
-    ruta: 'FERIA DE LAS FLORES', color: Color(0xFFE85D26), radioGps: 80),
-  _SitioMapa(nombre: 'Parques del Río (tablado musical)', emoji: '🎵',
-    posicion: LatLng(6.243595, -75.579525),
-    ruta: 'FERIA DE LAS FLORES', color: Color(0xFFE85D26), radioGps: 50),
-  _SitioMapa(nombre: 'Atanasio Girardot (Autos Clásicos)', emoji: '🚗',
-    posicion: LatLng(6.255236, -75.588036),
-    ruta: 'FERIA DE LAS FLORES', color: Color(0xFFE85D26), radioGps: 60),
-
-  // ── FERIA — Sitios nuevos 2026 ───────────────────────────────
-  _SitioMapa(nombre: 'Concierto inaugural (Obelisco)', emoji: '🎤',
-    posicion: LatLng(6.251167, -75.564944),
-    ruta: 'FERIA DE LAS FLORES', color: Color(0xFFE85D26), radioGps: 50),
-  _SitioMapa(nombre: 'Parque Gardel (tablados y música)', emoji: '🎷',
-    posicion: LatLng(6.259023, -75.572501),
-    ruta: 'FERIA DE LAS FLORES', color: Color(0xFFE85D26), radioGps: 45),
-  _SitioMapa(nombre: 'UPB (Desfile Autos Clásicos)', emoji: '🚗',
-    posicion: LatLng(6.263148, -75.589210),
-    ruta: 'FERIA DE LAS FLORES', color: Color(0xFFE85D26), radioGps: 50),
-  _SitioMapa(nombre: 'Parque Guayaquil (Desfile Chivas)', emoji: '🚌',
-    posicion: LatLng(6.242611, -75.570987),
-    ruta: 'FERIA DE LAS FLORES', color: Color(0xFFE85D26), radioGps: 45),
-
-  // ── COLOMBIAMODA 2026 — Plaza Mayor · Teatro Metropolitano ──
-  _SitioMapa(nombre: 'Colombiamoda 2026 — Plaza Mayor', emoji: '👗',
-    posicion: LatLng(6.2445, -75.5762),
-    ruta: 'FERIA DE LAS FLORES', color: Color(0xFFD05538), radioGps: 80),
-  _SitioMapa(nombre: 'Colombiamoda — Teatro Metropolitano', emoji: '🎭',
-    posicion: LatLng(6.2393, -75.5727),
-    ruta: 'FERIA DE LAS FLORES', color: Color(0xFFD05538), radioGps: 60),
-
-  // ── FERIA 2026 — Nuevos sitios validables ────────────────────
-
-  // Desfile de Silleteros — 5 puntos del recorrido oficial
-  // Recorrido: Av. El Poblado → Puente Guayaquil → Soterrado → Av. Ferrocarril → Plaza Mayor
-  _SitioMapa(nombre: 'Desfile Silleteros — Inicio Av. El Poblado', emoji: '🌺',
-    posicion: LatLng(6.2090, -75.5734),
-    ruta: 'FERIA DE LAS FLORES', color: Color(0xFFD05538), radioGps: 120),
-  _SitioMapa(nombre: 'Desfile Silleteros — Puente de Guayaquil', emoji: '🌹',
-    posicion: LatLng(6.2264, -75.5747),
-    ruta: 'FERIA DE LAS FLORES', color: Color(0xFFD05538), radioGps: 100),
-  _SitioMapa(nombre: 'Desfile Silleteros — Soterrado del Río', emoji: '💐',
-    posicion: LatLng(6.2348, -75.5763),
-    ruta: 'FERIA DE LAS FLORES', color: Color(0xFFD05538), radioGps: 100),
-  _SitioMapa(nombre: 'Desfile Silleteros — Av. del Ferrocarril', emoji: '🌸',
-    posicion: LatLng(6.2390, -75.5693),
-    ruta: 'FERIA DE LAS FLORES', color: Color(0xFFD05538), radioGps: 100),
-  _SitioMapa(nombre: 'Desfile Silleteros — Plaza Mayor (llegada)', emoji: '🏆',
-    posicion: LatLng(6.2445, -75.5762),
-    ruta: 'FERIA DE LAS FLORES', color: Color(0xFFD05538), radioGps: 80),
-
-  // Concierto Inaugural — Obelisco sector estadio
-  _SitioMapa(nombre: 'Concierto Inaugural Feria 2026', emoji: '🎤',
-    posicion: LatLng(6.2554, -75.5898),
-    ruta: 'FERIA DE LAS FLORES', color: Color(0xFFD05538), radioGps: 80),
-
-  // Noche de Tango — CC La Central
-  _SitioMapa(nombre: 'Noche de Tango — CC La Central', emoji: '🎶',
-    posicion: LatLng(6.2444, -75.5761),
-    ruta: 'FERIA DE LAS FLORES', color: Color(0xFFD05538), radioGps: 60),
-
-  // Primavera Urbana — Plazoleta Villa de Aburrá
-  _SitioMapa(nombre: 'Primavera Urbana — Plazoleta Villa de Aburrá', emoji: '🌼',
-    posicion: LatLng(6.2447, -75.5758),
-    ruta: 'FERIA DE LAS FLORES', color: Color(0xFFD05538), radioGps: 60),
-
-  // Festival Gastronómico — CC La Central
-  _SitioMapa(nombre: 'Festival Gastronómico y Cervezas Artesanales', emoji: '🍺',
-    posicion: LatLng(6.2444, -75.5761),
-    ruta: 'FERIA DE LAS FLORES', color: Color(0xFFD05538), radioGps: 60),
-
-  // Exposición Orquídeas — Jardín Botánico
-  _SitioMapa(nombre: 'Florecer — Orquídeas Jardín Botánico', emoji: '🌸',
-    posicion: LatLng(6.2736, -75.5615),
-    ruta: 'FERIA DE LAS FLORES', color: Color(0xFFD05538), radioGps: 60),
-
-  // Festival Infantil Trova y Festival Parrandero — Plaza Gardel
-  _SitioMapa(nombre: 'Festival Infantil de Trova — Plaza Gardel', emoji: '🎤',
-    posicion: LatLng(6.2193, -75.5878),
-    ruta: 'FERIA DE LAS FLORES', color: Color(0xFFD05538), radioGps: 60),
-  _SitioMapa(nombre: 'Festival Parrandero — Plaza Gardel', emoji: '🪗',
-    posicion: LatLng(6.2193, -75.5878),
-    ruta: 'FERIA DE LAS FLORES', color: Color(0xFFD05538), radioGps: 60),
-
-  // Super Concierto — Estadio Atanasio
-  _SitioMapa(nombre: 'Súper Concierto Feria 2026 — Estadio Atanasio', emoji: '🎸',
-    posicion: LatLng(6.2554, -75.5890),
-    ruta: 'FERIA DE LAS FLORES', color: Color(0xFFD05538), radioGps: 100),
-  _SitioMapa(nombre: 'Tablados Zona Norte (Manrique · Castilla)', emoji: '🥁',
-    posicion: LatLng(6.290500, -75.558000),
-    ruta: 'TABLADOS Y RUMBA', color: Color(0xFF1D9E75), radioGps: 300),
-  _SitioMapa(nombre: 'Tablados Zona Centro (Gardel · Deseos · Artistas)', emoji: '🎶',
-    posicion: LatLng(6.251800, -75.563600),
-    ruta: 'TABLADOS Y RUMBA', color: Color(0xFF1D9E75), radioGps: 300),
-  _SitioMapa(nombre: 'Tablados Zona Occidente (San Javier · Robledo)', emoji: '🎵',
-    posicion: LatLng(6.261000, -75.600000),
-    ruta: 'TABLADOS Y RUMBA', color: Color(0xFF1D9E75), radioGps: 300),
-  _SitioMapa(nombre: 'Tablados Zona Sur (El Poblado · San Antonio)', emoji: '🎸',
-    posicion: LatLng(6.210000, -75.568000),
-    ruta: 'TABLADOS Y RUMBA', color: Color(0xFF1D9E75), radioGps: 300),
-
-  // ── RUTA SILLETERA — Santa Elena y Arví ──────────────────────
-  _SitioMapa(nombre: 'Finca Silletera COSSE', emoji: '🌸',
-    posicion: LatLng(6.236500, -75.498000),
-    ruta: 'RUTA SILLETERA', color: Color(0xFF2D6A2F), radioGps: 80),
-  _SitioMapa(nombre: 'Finca El Pensamiento', emoji: '💐',
-    posicion: LatLng(6.234200, -75.496000),
-    ruta: 'RUTA SILLETERA', color: Color(0xFF2D6A2F), radioGps: 60),
-  _SitioMapa(nombre: 'Finca El Cartucho', emoji: '🌺',
-    posicion: LatLng(6.238000, -75.501000),
-    ruta: 'RUTA SILLETERA', color: Color(0xFF2D6A2F), radioGps: 60),
-  _SitioMapa(nombre: 'Parque Arví — Ciclada silletera', emoji: '🏔️',
-    posicion: LatLng(6.271300, -75.484200),
-    ruta: 'RUTA SILLETERA', color: Color(0xFF2D6A2F), radioGps: 120),
-  _SitioMapa(nombre: 'Mirador Santa Elena', emoji: '🌄',
-    posicion: LatLng(6.231000, -75.494500),
-    ruta: 'RUTA SILLETERA', color: Color(0xFF2D6A2F), radioGps: 80),
-
-  // ── RUTAS GASTRONÓMICAS — Sabores de Medellín ────────────────
-  // Ruta 1 — Sabor de Barrio · Centro
-  _SitioMapa(nombre: 'Empanarrica · Empanada paisa desde las 5am', emoji: '🫔', posicion: LatLng(6.2518, -75.5703), ruta: 'SABOR DE BARRIO — EL CENTRO', color: kCafeLight, radioGps: 30),
-  _SitioMapa(nombre: 'La Jugosa Centro · Salpicón con helado y queso', emoji: '🧃', posicion: LatLng(6.2510, -75.5695), ruta: 'SABOR DE BARRIO — EL CENTRO', color: kCafeLight, radioGps: 30),
-  _SitioMapa(nombre: 'Restaurante Hacienda Junín · Bandeja paisa', emoji: '🍽️', posicion: LatLng(6.2525, -75.5680), ruta: 'SABOR DE BARRIO — EL CENTRO', color: kCafeLight, radioGps: 35),
-  _SitioMapa(nombre: '¡AHH QUÉ RICURA! · Chicharrón · Plaza de mercado', emoji: '🐷', posicion: LatLng(6.2498, -75.5710), ruta: 'SABOR DE BARRIO — EL CENTRO', color: kCafeLight, radioGps: 35),
-  _SitioMapa(nombre: 'El Llanerito Centro · Chorizo + guarapo · vista al Centro', emoji: '🌆', posicion: LatLng(6.2530, -75.5672), ruta: 'SABOR DE BARRIO — EL CENTRO', color: kCafeLight, radioGps: 30),
-
-  // Ruta 2 — Sabor de Cancha · Laureles
-  _SitioMapa(nombre: 'Fonda Típicos · Desayuno paisa · limonada natural', emoji: '☕', posicion: LatLng(6.2474, -75.5902), ruta: 'SABOR DE CANCHA — LAURELES', color: kGreen, radioGps: 30),
-  _SitioMapa(nombre: 'Antioquena Capital · Bandeja paisa · abuela en cocina', emoji: '👵', posicion: LatLng(6.2466, -75.5888), ruta: 'SABOR DE CANCHA — LAURELES', color: kGreen, radioGps: 30),
-  _SitioMapa(nombre: 'AREPAPAS · Arepa rellena a la brasa', emoji: '🌽', posicion: LatLng(6.2458, -75.5895), ruta: 'SABOR DE CANCHA — LAURELES', color: kGreen, radioGps: 30),
-  _SitioMapa(nombre: 'La Tienda de la 70 · Empanadas + guarapo · 4685 reseñas', emoji: '⭐', posicion: LatLng(6.2450, -75.5880), ruta: 'SABOR DE CANCHA — LAURELES', color: kGreen, radioGps: 35),
-  _SitioMapa(nombre: 'Fonda de Laureles · Mondongo · 5.0 estrellas', emoji: '🍲', posicion: LatLng(6.2462, -75.5870), ruta: 'SABOR DE CANCHA — LAURELES', color: kGreen, radioGps: 30),
-
-  // Ruta 3 — Sabor Viajero · El Poblado
-  _SitioMapa(nombre: 'Finas Frutas N°1 · Jugo de fruta exótica', emoji: '🍓', posicion: LatLng(6.2108, -75.5686), ruta: 'SABOR VIAJERO — EL POBLADO', color: kGold, radioGps: 30),
-  _SitioMapa(nombre: "Q'empanada de la 10 · Empanada paisa · 24 horas", emoji: '🫔', posicion: LatLng(6.2095, -75.5672), ruta: 'SABOR VIAJERO — EL POBLADO', color: kGold, radioGps: 30),
-  _SitioMapa(nombre: 'Medellín Es Sabor-Champi · Bandeja paisa · 4453 reseñas', emoji: '🏆', posicion: LatLng(6.2088, -75.5660), ruta: 'SABOR VIAJERO — EL POBLADO', color: kGold, radioGps: 35),
-  _SitioMapa(nombre: 'Ajiacos y Mondongos · Mondongo emblema de Medellín', emoji: '🍲', posicion: LatLng(6.2080, -75.5675), ruta: 'SABOR VIAJERO — EL POBLADO', color: kGold, radioGps: 30),
-  _SitioMapa(nombre: 'Típicos Parce · Premio + código Rutero', emoji: '🤝', posicion: LatLng(6.2092, -75.5648), ruta: 'SABOR VIAJERO — EL POBLADO', color: kGold, radioGps: 30),
-
-  // Ruta 4 — Sabor Paisa Profundo · Envigado
-  _SitioMapa(nombre: 'La Gloria de Gloria · 1kg chicharrón · 4262 reseñas · Mié-Dom', emoji: '🐷', posicion: LatLng(6.1756, -75.5921), ruta: 'SABOR PAISA PROFUNDO — ENVIGADO', color: kAccent, radioGps: 30),
-  _SitioMapa(nombre: 'El Trifásico · Plato trifásico emblema Envigado', emoji: '🍽️', posicion: LatLng(6.1748, -75.5910), ruta: 'SABOR PAISA PROFUNDO — ENVIGADO', color: kAccent, radioGps: 30),
-  _SitioMapa(nombre: 'Restaurante Bar Donde Gloria · Cazuela de barrio', emoji: '🍲', posicion: LatLng(6.1762, -75.5905), ruta: 'SABOR PAISA PROFUNDO — ENVIGADO', color: kAccent, radioGps: 30),
-  _SitioMapa(nombre: 'Calle Jardín · Ambiente local · música en vivo fines de semana', emoji: '🎵', posicion: LatLng(6.1770, -75.5916), ruta: 'SABOR PAISA PROFUNDO — ENVIGADO', color: kAccent, radioGps: 40),
-  _SitioMapa(nombre: 'Darisa · Sancocho y mondongo auténtico', emoji: '🍲', posicion: LatLng(6.1752, -75.5898), ruta: 'SABOR PAISA PROFUNDO — ENVIGADO', color: kAccent, radioGps: 30),
-
-  // Ruta 5 — Sabor Urbano · Mercado del Río
-  _SitioMapa(nombre: 'Mercado de La Playa · Food hall urbano Centro', emoji: '🛒', posicion: LatLng(6.2502, -75.5668), ruta: 'SABOR URBANO — MERCADO DEL RÍO', color: kOrchid, radioGps: 35),
-  _SitioMapa(nombre: 'Antioquena Capital · Bandeja paisa · abuela en cocina', emoji: '👵', posicion: LatLng(6.2466, -75.5888), ruta: 'SABOR URBANO — MERCADO DEL RÍO', color: kOrchid, radioGps: 30),
-  _SitioMapa(nombre: 'La Jugosa Laureles · Helado con frutas y queso', emoji: '🍦', posicion: LatLng(6.2455, -75.5875), ruta: 'SABOR URBANO — MERCADO DEL RÍO', color: kOrchid, radioGps: 30),
-  _SitioMapa(nombre: 'Mercado del Río · Versión moderna clásico paisa · 24.000+ reseñas', emoji: '⚖️', posicion: LatLng(6.2380, -75.5782), ruta: 'SABOR URBANO — MERCADO DEL RÍO', color: kOrchid, radioGps: 50),
-  _SitioMapa(nombre: 'Cerdología · Crispetas de chicharrón · dentro Mercado del Río', emoji: '🐷', posicion: LatLng(6.2378, -75.5780), ruta: 'SABOR URBANO — MERCADO DEL RÍO', color: kOrchid, radioGps: 35),
-
-  // ── PARQUE JAIME DUQUE — Mapa oficial Feb 2025 ───────────────
-  // RUTA CLÁSICA — Monumentos & Maravillas
-  _SitioMapa(nombre: 'Monumento a Dios', emoji: '🤲',
-    posicion: LatLng(4.94581, -73.96170),
-    ruta: 'PARQUE JAIME DUQUE — CLÁSICA', color: Color(0xFF2E7D32), radioGps: 40),
-  _SitioMapa(nombre: 'Taj Mahal Réplica', emoji: '🕌',
-    posicion: LatLng(4.94687, -73.96283),
-    ruta: 'PARQUE JAIME DUQUE — CLÁSICA', color: Color(0xFF2E7D32), radioGps: 40),
-  _SitioMapa(nombre: 'Gran Mapa de Colombia & Aviario', emoji: '🗺️',
-    posicion: LatLng(4.94430, -73.96065),
-    ruta: 'PARQUE JAIME DUQUE — CLÁSICA', color: Color(0xFF2E7D32), radioGps: 45),
-  _SitioMapa(nombre: 'Fontana Mitológica', emoji: '⛲',
-    posicion: LatLng(4.94456, -73.96179),
-    ruta: 'PARQUE JAIME DUQUE — CLÁSICA', color: Color(0xFF2E7D32), radioGps: 35),
-  _SitioMapa(nombre: 'Las Siete Maravillas del Mundo Antiguo', emoji: '🏛️',
-    posicion: LatLng(4.94396, -73.96342),
-    ruta: 'PARQUE JAIME DUQUE — CLÁSICA', color: Color(0xFF2E7D32), radioGps: 40),
-  _SitioMapa(nombre: 'Mar Caribe & Barco Pirata', emoji: '🌊',
-    posicion: LatLng(4.94883, -73.96352),
-    ruta: 'PARQUE JAIME DUQUE — CLÁSICA', color: Color(0xFF2E7D32), radioGps: 40),
-  _SitioMapa(nombre: 'Zoológico Bioparque Wakatá', emoji: '🦁',
-    posicion: LatLng(4.95071, -73.96454),
-    ruta: 'PARQUE JAIME DUQUE — CLÁSICA', color: Color(0xFF2E7D32), radioGps: 50),
-  _SitioMapa(nombre: 'Museo Aeroespacial FAC', emoji: '✈️',
-    posicion: LatLng(4.94955, -73.96181),
-    ruta: 'PARQUE JAIME DUQUE — CLÁSICA', color: Color(0xFF2E7D32), radioGps: 40),
-
-  // RUTA FAMILIA & AVENTURA
-  _SitioMapa(nombre: 'Parque Infantil Chiquimundo', emoji: '🎠',
-    posicion: LatLng(4.94431, -73.96285),
-    ruta: 'PARQUE JAIME DUQUE — FAMILIA', color: Color(0xFFF9A825), radioGps: 40),
-  _SitioMapa(nombre: 'Jardín de los Dinosaurios', emoji: '🦕',
-    posicion: LatLng(4.94431, -73.96285),
-    ruta: 'PARQUE JAIME DUQUE — FAMILIA', color: Color(0xFFF9A825), radioGps: 40),
-  _SitioMapa(nombre: 'Castillo Medieval', emoji: '🏰',
-    posicion: LatLng(4.94420, -73.96300),
-    ruta: 'PARQUE JAIME DUQUE — FAMILIA', color: Color(0xFFF9A825), radioGps: 35),
-  _SitioMapa(nombre: 'Atracciones Mecánicas Plaza Cundinamarca', emoji: '🎡',
-    posicion: LatLng(4.94600, -73.96400),
-    ruta: 'PARQUE JAIME DUQUE — FAMILIA', color: Color(0xFFF9A825), radioGps: 50),
-  _SitioMapa(nombre: 'Kayaks del Caribe', emoji: '🚣',
-    posicion: LatLng(4.94952, -73.96411),
-    ruta: 'PARQUE JAIME DUQUE — FAMILIA', color: Color(0xFFF9A825), radioGps: 40),
-  _SitioMapa(nombre: 'Zoológico Bioparque Wakatá', emoji: '🦛',
-    posicion: LatLng(4.95071, -73.96454),
-    ruta: 'PARQUE JAIME DUQUE — FAMILIA', color: Color(0xFFF9A825), radioGps: 50),
-  _SitioMapa(nombre: 'Comarca del Cóndor & Oso Andino', emoji: '🦅',
-    posicion: LatLng(4.95150, -73.96500),
-    ruta: 'PARQUE JAIME DUQUE — FAMILIA', color: Color(0xFFF9A825), radioGps: 40),
-
-  // RUTA NATURALEZA & CONSERVACIÓN — Verde oscuro #1B5E3A
-  _SitioMapa(nombre: 'Reserva Natural Ecoparque Sabana', emoji: '🌿',
-    posicion: LatLng(4.94880, -73.95766),
-    ruta: 'PARQUE JAIME DUQUE — NATURALEZA', color: Color(0xFF1B5E20), radioGps: 80),
-  _SitioMapa(nombre: 'Sendero de la Memoria Muisca (5km)', emoji: '🏺',
-    posicion: LatLng(4.94820, -73.95900),
-    ruta: 'PARQUE JAIME DUQUE — NATURALEZA', color: Color(0xFF1B5E20), radioGps: 60),
-  _SitioMapa(nombre: 'Casa de la Tingua & Avistamiento de Aves', emoji: '🦜',
-    posicion: LatLng(4.94900, -73.95800),
-    ruta: 'PARQUE JAIME DUQUE — NATURALEZA', color: Color(0xFF1B5E20), radioGps: 40),
-  _SitioMapa(nombre: 'Gran Mapa de Colombia & Aviario', emoji: '🗺️',
-    posicion: LatLng(4.94430, -73.96065),
-    ruta: 'PARQUE JAIME DUQUE — NATURALEZA', color: Color(0xFF1B5E20), radioGps: 45),
-  _SitioMapa(nombre: 'Comarca del Cóndor & Oso Andino', emoji: '🦅',
-    posicion: LatLng(4.95150, -73.96500),
-    ruta: 'PARQUE JAIME DUQUE — NATURALEZA', color: Color(0xFF1B5E20), radioGps: 40),
-  _SitioMapa(nombre: 'Bioparque Wakatá — Ruta de la Biodiversidad', emoji: '🌱',
-    posicion: LatLng(4.95151, -73.96486),
-    ruta: 'PARQUE JAIME DUQUE — NATURALEZA', color: Color(0xFF1B5E20), radioGps: 50),
-
-  // RUTA AVENTURA EN FAMILIA — 12 Estaciones
-  _SitioMapa(nombre: 'Estación 1 — Monumento a Dios · ¿Por qué están agradecidos?', emoji: '🙏',
-    posicion: LatLng(4.94581, -73.96170),
-    ruta: 'PARQUE JAIME DUQUE — AVENTURA FAMILIAR', color: Color(0xFF1565C0), radioGps: 40),
-  _SitioMapa(nombre: 'Estación 2 — Jardines del Amor · Carta de amor familiar', emoji: '💌',
-    posicion: LatLng(4.94550, -73.96200),
-    ruta: 'PARQUE JAIME DUQUE — AVENTURA FAMILIAR', color: Color(0xFF1565C0), radioGps: 35),
-  _SitioMapa(nombre: 'Estación 3 — Taj Mahal · Sueño familiar compartido', emoji: '🕌',
-    posicion: LatLng(4.94687, -73.96283),
-    ruta: 'PARQUE JAIME DUQUE — AVENTURA FAMILIAR', color: Color(0xFF1565C0), radioGps: 40),
-  _SitioMapa(nombre: 'Estación 4 — Fontana Mitológica · El poder de la imaginación', emoji: '⛲',
-    posicion: LatLng(4.94456, -73.96179),
-    ruta: 'PARQUE JAIME DUQUE — AVENTURA FAMILIAR', color: Color(0xFF1565C0), radioGps: 35),
-  _SitioMapa(nombre: 'Estación 5 — Gran Mapa de Colombia · Nuestro lugar favorito', emoji: '🗺️',
-    posicion: LatLng(4.94430, -73.96065),
-    ruta: 'PARQUE JAIME DUQUE — AVENTURA FAMILIAR', color: Color(0xFF1565C0), radioGps: 45),
-  _SitioMapa(nombre: 'Estación 6 — Siete Maravillas · La maravilla de nuestra familia', emoji: '🏛️',
-    posicion: LatLng(4.94396, -73.96342),
-    ruta: 'PARQUE JAIME DUQUE — AVENTURA FAMILIAR', color: Color(0xFF1565C0), radioGps: 40),
-  _SitioMapa(nombre: 'Estación 7 — Mar Caribe · La aventura que queremos vivir juntos', emoji: '🌊',
-    posicion: LatLng(4.94883, -73.96352),
-    ruta: 'PARQUE JAIME DUQUE — AVENTURA FAMILIAR', color: Color(0xFF1565C0), radioGps: 40),
-  _SitioMapa(nombre: 'Estación 8 — Kayaks del Caribe · Trabajo en equipo', emoji: '🚣',
-    posicion: LatLng(4.94952, -73.96411),
-    ruta: 'PARQUE JAIME DUQUE — AVENTURA FAMILIAR', color: Color(0xFF1565C0), radioGps: 40),
-  _SitioMapa(nombre: 'Estación 9 — Bioparque Wakatá · Cuidar lo que amamos', emoji: '🦁',
-    posicion: LatLng(4.95071, -73.96454),
-    ruta: 'PARQUE JAIME DUQUE — AVENTURA FAMILIAR', color: Color(0xFF1565C0), radioGps: 50),
-  _SitioMapa(nombre: 'Estación 10 — Comarca del Cóndor · Volar alto juntos', emoji: '🦅',
-    posicion: LatLng(4.95150, -73.96500),
-    ruta: 'PARQUE JAIME DUQUE — AVENTURA FAMILIAR', color: Color(0xFF1565C0), radioGps: 40),
-  _SitioMapa(nombre: 'Estación 11 — Ecoparque Sabana · Sembrar para el futuro', emoji: '🌿',
-    posicion: LatLng(4.94880, -73.95766),
-    ruta: 'PARQUE JAIME DUQUE — AVENTURA FAMILIAR', color: Color(0xFF1565C0), radioGps: 60),
-  _SitioMapa(nombre: 'Estación 12 — Mirador Panorámico · La foto familiar del año', emoji: '📸',
-    posicion: LatLng(4.94761, -73.96575),
-    ruta: 'PARQUE JAIME DUQUE — AVENTURA FAMILIAR', color: Color(0xFF1565C0), radioGps: 35),
-
-  // ── POPAYÁN — Ruta 1: Centro Histórico ──────────────────────────────────
-  _SitioMapa(nombre: 'Parque Caldas', emoji: '🌿',
-    posicion: LatLng(2.44277, -76.60590),
-    ruta: 'CIRCUITO CENTRO HISTÓRICO — LA CIUDAD BLANCA', color: Color(0xFFD4AF7A), radioGps: 70),
-  _SitioMapa(nombre: 'Catedral Basílica de Popayán', emoji: '⛪',
-    posicion: LatLng(2.44295, -76.60643),
-    ruta: 'CIRCUITO CENTRO HISTÓRICO — LA CIUDAD BLANCA', color: Color(0xFFD4AF7A), radioGps: 60),
-  _SitioMapa(nombre: 'Torre del Reloj', emoji: '⏰',
-    posicion: LatLng(2.44236, -76.60666),
-    ruta: 'CIRCUITO CENTRO HISTÓRICO — LA CIUDAD BLANCA', color: Color(0xFFD4AF7A), radioGps: 50),
-  _SitioMapa(nombre: 'Iglesia de San Francisco', emoji: '⛪',
-    posicion: LatLng(2.44098, -76.60551),
-    ruta: 'CIRCUITO CENTRO HISTÓRICO — LA CIUDAD BLANCA', color: Color(0xFFD4AF7A), radioGps: 55),
-  _SitioMapa(nombre: 'La Ermita', emoji: '⛪',
-    posicion: LatLng(2.44015, -76.60285),
-    ruta: 'CIRCUITO CENTRO HISTÓRICO — LA CIUDAD BLANCA', color: Color(0xFFD4AF7A), radioGps: 50),
-  _SitioMapa(nombre: 'Puente del Humilladero', emoji: '🌉',
-    posicion: LatLng(2.44159, -76.60399),
-    ruta: 'CIRCUITO CENTRO HISTÓRICO — LA CIUDAD BLANCA', color: Color(0xFFD4AF7A), radioGps: 55),
-  _SitioMapa(nombre: 'Panteón de los Próceres', emoji: '🏛️',
-    posicion: LatLng(2.44286, -76.60636),
-    ruta: 'CIRCUITO CENTRO HISTÓRICO — LA CIUDAD BLANCA', color: Color(0xFFD4AF7A), radioGps: 45),
-  _SitioMapa(nombre: 'Morro de Tulcán', emoji: '⛰️',
-    posicion: LatLng(2.44512, -76.60383),
-    ruta: 'CIRCUITO CENTRO HISTÓRICO — LA CIUDAD BLANCA', color: Color(0xFFD4AF7A), radioGps: 80),
-
-  // ── POPAYÁN — Ruta 2: Catador del Cauca ──────────────────────────────────
-  _SitioMapa(nombre: 'Galería La Esmeralda', emoji: '🌽',
-    posicion: LatLng(2.44479, -76.61543),
-    ruta: 'CATADOR DEL CAUCA — SABORES DE LA CIUDAD BLANCA', color: Color(0xFFE8873A), radioGps: 60),
-  _SitioMapa(nombre: 'Hotel Dann Monasterio', emoji: '🏛️',
-    posicion: LatLng(2.44342, -76.60926),
-    ruta: 'CATADOR DEL CAUCA — SABORES DE LA CIUDAD BLANCA', color: Color(0xFFE8873A), radioGps: 50),
-  _SitioMapa(nombre: 'Cocina Tradicional de Pipián', emoji: '🌶️',
-    posicion: LatLng(2.44292, -76.60822),
-    ruta: 'CATADOR DEL CAUCA — SABORES DE LA CIUDAD BLANCA', color: Color(0xFFE8873A), radioGps: 40),
-  _SitioMapa(nombre: 'Mora Castilla', emoji: '🧃',
-    posicion: LatLng(2.44354, -76.60369),
-    ruta: 'CATADOR DEL CAUCA — SABORES DE LA CIUDAD BLANCA', color: Color(0xFFE8873A), radioGps: 45),
-  _SitioMapa(nombre: 'Mercado Bolívar', emoji: '🥬',
-    posicion: LatLng(2.44697, -76.60293),
-    ruta: 'CATADOR DEL CAUCA — SABORES DE LA CIUDAD BLANCA', color: Color(0xFFE8873A), radioGps: 60),
-  _SitioMapa(nombre: 'Parque Caldas', emoji: '🌿',
-    posicion: LatLng(2.44277, -76.60590),
-    ruta: 'CATADOR DEL CAUCA — SABORES DE LA CIUDAD BLANCA', color: Color(0xFFE8873A), radioGps: 70),
-
-  // ── POPAYÁN — Ruta 3: Congreso Gastronómico XXIV ─────────────────────────
-  _SitioMapa(nombre: 'Teatro Guillermo Valencia', emoji: '🎭',
-    posicion: LatLng(2.44298, -76.60610),
-    ruta: 'CONGRESO GASTRONÓMICO XXIV — SABOR INTERNACIONAL', color: Color(0xFFB8C94A), radioGps: 55),
-  _SitioMapa(nombre: 'Tarima del Sabor — Parque Caldas', emoji: '🍽️',
-    posicion: LatLng(2.44320, -76.60540),
-    ruta: 'CONGRESO GASTRONÓMICO XXIV — SABOR INTERNACIONAL', color: Color(0xFFB8C94A), radioGps: 60),
-  _SitioMapa(nombre: 'Stand Arequipa (Perú)', emoji: '🇵🇪',
-    posicion: LatLng(2.44260, -76.60510),
-    ruta: 'CONGRESO GASTRONÓMICO XXIV — SABOR INTERNACIONAL', color: Color(0xFFB8C94A), radioGps: 40),
-  _SitioMapa(nombre: 'Stand El Tambo (Cauca)', emoji: '🌴',
-    posicion: LatLng(2.44240, -76.60570),
-    ruta: 'CONGRESO GASTRONÓMICO XXIV — SABOR INTERNACIONAL', color: Color(0xFFB8C94A), radioGps: 40),
-  _SitioMapa(nombre: 'Stand Manizales (Caldas)', emoji: '☕',
-    posicion: LatLng(2.44280, -76.60620),
-    ruta: 'CONGRESO GASTRONÓMICO XXIV — SABOR INTERNACIONAL', color: Color(0xFFB8C94A), radioGps: 40),
-  _SitioMapa(nombre: 'Mercado Campesino — El Arroz', emoji: '🌾',
-    posicion: LatLng(2.44350, -76.60480),
-    ruta: 'CONGRESO GASTRONÓMICO XXIV — SABOR INTERNACIONAL', color: Color(0xFFB8C94A), radioGps: 50),
-
-
-  // ── ENVIGADO NATURAL ──────────────────────────────────────────────────────
-  _SitioMapa(nombre: 'Parque Principal Envigado', emoji: '🌳',
-    posicion: LatLng(6.17005, -75.58737),
-    ruta: 'RUTA ENVIGADO NATURAL', color: Color(0xFF4CAF50), radioGps: 60),
-  _SitioMapa(nombre: 'Casa Museo Débora Arango', emoji: '🎨',
-    posicion: LatLng(6.17399, -75.58585),
-    ruta: 'RUTA ENVIGADO NATURAL', color: Color(0xFF4CAF50), radioGps: 45),
-  _SitioMapa(nombre: 'Mercado del Tranvía Envigado', emoji: '🍽️',
-    posicion: LatLng(6.16905, -75.58749),
-    ruta: 'RUTA ENVIGADO NATURAL', color: Color(0xFF4CAF50), radioGps: 50),
-  _SitioMapa(nombre: 'Quebrada La Ayurá', emoji: '💧',
-    posicion: LatLng(6.18643, -75.58354),
-    ruta: 'RUTA ENVIGADO NATURAL', color: Color(0xFF4CAF50), radioGps: 60),
-  _SitioMapa(nombre: 'Parque El Salado', emoji: '🌿',
-    posicion: LatLng(6.13811, -75.57074),
-    ruta: 'RUTA ENVIGADO NATURAL', color: Color(0xFF4CAF50), radioGps: 80),
-  _SitioMapa(nombre: 'Sendero Ecológico El Salado', emoji: '🦜',
-    posicion: LatLng(6.13600, -75.56900),
-    ruta: 'RUTA ENVIGADO NATURAL', color: Color(0xFF4CAF50), radioGps: 70),
-  _SitioMapa(nombre: 'Charco El Salado', emoji: '🏊',
-    posicion: LatLng(6.13500, -75.56800),
-    ruta: 'RUTA ENVIGADO NATURAL', color: Color(0xFF4CAF50), radioGps: 55),
-
-  // ── RUTA DEL CAFÉ EN SANTA ELENA ──────────────────────────────────────────
-  _SitioMapa(nombre: 'Parque de Santa Elena', emoji: '🌸',
-    posicion: LatLng(6.20992, -75.49808),
-    ruta: 'RUTA DEL CAFÉ EN SANTA ELENA', color: Color(0xFF8D6E63), radioGps: 60),
-  _SitioMapa(nombre: 'Mirador de Santa Elena', emoji: '🔭',
-    posicion: LatLng(6.23762, -75.51114),
-    ruta: 'RUTA DEL CAFÉ EN SANTA ELENA', color: Color(0xFF8D6E63), radioGps: 70),
-  _SitioMapa(nombre: 'Finca Silletera', emoji: '🌺',
-    posicion: LatLng(6.23590, -75.49857),
-    ruta: 'RUTA DEL CAFÉ EN SANTA ELENA', color: Color(0xFF8D6E63), radioGps: 60),
-  _SitioMapa(nombre: 'Proceso del café: semilla a taza', emoji: '☕',
-    posicion: LatLng(6.21800, -75.50200),
-    ruta: 'RUTA DEL CAFÉ EN SANTA ELENA', color: Color(0xFF8D6E63), radioGps: 50),
-  _SitioMapa(nombre: 'Parque Ecológico Piedras Blancas', emoji: '🦋',
-    posicion: LatLng(6.29488, -75.49996),
-    ruta: 'RUTA DEL CAFÉ EN SANTA ELENA', color: Color(0xFF8D6E63), radioGps: 80),
-  _SitioMapa(nombre: 'Bosque El Romeral', emoji: '🌲',
-    posicion: LatLng(6.15336, -75.65137),
-    ruta: 'RUTA DEL CAFÉ EN SANTA ELENA', color: Color(0xFF8D6E63), radioGps: 70),
-
-  // ── RUTA SANTA FE DE ANTIOQUIA ────────────────────────────────────────────
-  _SitioMapa(nombre: 'Plaza Mayor Santa Fe de Antioquia', emoji: '🏛️',
-    posicion: LatLng(6.55698, -75.82740),
-    ruta: 'RUTA SANTA FE DE ANTIOQUIA', color: kGold, radioGps: 70),
-  _SitioMapa(nombre: 'Catedral de la Inmaculada Concepción', emoji: '⛪',
-    posicion: LatLng(6.55699, -75.82743),
-    ruta: 'RUTA SANTA FE DE ANTIOQUIA', color: kGold, radioGps: 55),
-  _SitioMapa(nombre: 'Museo Juan del Corral', emoji: '🏛️',
-    posicion: LatLng(6.55783, -75.82762),
-    ruta: 'RUTA SANTA FE DE ANTIOQUIA', color: kGold, radioGps: 45),
-  _SitioMapa(nombre: 'Iglesia de Chiquinquirá', emoji: '⛪',
-    posicion: LatLng(6.55842, -75.82994),
-    ruta: 'RUTA SANTA FE DE ANTIOQUIA', color: kGold, radioGps: 50),
-  _SitioMapa(nombre: 'Parroquia Santa Bárbara', emoji: '⛪',
-    posicion: LatLng(6.55705, -75.82575),
-    ruta: 'RUTA SANTA FE DE ANTIOQUIA', color: kGold, radioGps: 50),
-  _SitioMapa(nombre: 'Calle Real (colonial)', emoji: '🪨',
-    posicion: LatLng(6.55750, -75.82800),
-    ruta: 'RUTA SANTA FE DE ANTIOQUIA', color: kGold, radioGps: 60),
-  _SitioMapa(nombre: 'Puente de Occidente (1887)', emoji: '🌉',
-    posicion: LatLng(6.57788, -75.79841),
-    ruta: 'RUTA SANTA FE DE ANTIOQUIA', color: kGold, radioGps: 80),
-
-  // ── RUTA JOYA COLONIAL OCULTA — CONCEPCIÓN ────────────────────────────────
-  _SitioMapa(nombre: 'Parque Principal de Concepción', emoji: '🏛️',
-    posicion: LatLng(6.39535, -75.25932),
-    ruta: 'RUTA JOYA COLONIAL OCULTA — CONCEPCIÓN', color: Color(0xFFAD8B4A), radioGps: 60),
-  _SitioMapa(nombre: 'Iglesia Nuestra Señora de la Inmaculada Concepción', emoji: '⛪',
-    posicion: LatLng(6.39548, -75.25952),
-    ruta: 'RUTA JOYA COLONIAL OCULTA — CONCEPCIÓN', color: Color(0xFFAD8B4A), radioGps: 50),
-  _SitioMapa(nombre: 'Calles empedradas de Concepción', emoji: '🪨',
-    posicion: LatLng(6.39444, -75.25723),
-    ruta: 'RUTA JOYA COLONIAL OCULTA — CONCEPCIÓN', color: Color(0xFFAD8B4A), radioGps: 70),
-  _SitioMapa(nombre: 'Casa Museo José María Córdoba', emoji: '🏛️',
-    posicion: LatLng(6.39550, -75.25900),
-    ruta: 'RUTA JOYA COLONIAL OCULTA — CONCEPCIÓN', color: Color(0xFFAD8B4A), radioGps: 45),
-  _SitioMapa(nombre: 'Charco El Aguacate', emoji: '💧',
-    posicion: LatLng(6.40554, -75.25701),
-    ruta: 'RUTA JOYA COLONIAL OCULTA — CONCEPCIÓN', color: Color(0xFFAD8B4A), radioGps: 60),
-  _SitioMapa(nombre: 'Mirador Alto de la Virgen', emoji: '🔭',
-    posicion: LatLng(6.39703, -75.25755),
-    ruta: 'RUTA JOYA COLONIAL OCULTA — CONCEPCIÓN', color: Color(0xFFAD8B4A), radioGps: 50),
-
-  // ── RUTA SAN CARLOS & CHARCOS ─────────────────────────────────────────────
-  _SitioMapa(nombre: 'Parque Principal de San Carlos', emoji: '🌳',
-    posicion: LatLng(6.18872, -74.99208),
-    ruta: 'RUTA SAN CARLOS & CHARCOS', color: Color(0xFF0097A7), radioGps: 60),
-  _SitioMapa(nombre: 'Cascada San Antonio', emoji: '💦',
-    posicion: LatLng(6.19392, -75.00509),
-    ruta: 'RUTA SAN CARLOS & CHARCOS', color: Color(0xFF0097A7), radioGps: 70),
-  _SitioMapa(nombre: 'Charco El Remolino', emoji: '🏊',
-    posicion: LatLng(6.19800, -74.99500),
-    ruta: 'RUTA SAN CARLOS & CHARCOS', color: Color(0xFF0097A7), radioGps: 65),
-  _SitioMapa(nombre: 'Sendero Cascada La Chorrera', emoji: '🌊',
-    posicion: LatLng(6.19008, -75.03867),
-    ruta: 'RUTA SAN CARLOS & CHARCOS', color: Color(0xFF0097A7), radioGps: 80),
-  _SitioMapa(nombre: 'Río Samaná Norte', emoji: '🌿',
-    posicion: LatLng(6.20000, -74.98000),
-    ruta: 'RUTA SAN CARLOS & CHARCOS', color: Color(0xFF0097A7), radioGps: 80),
-  _SitioMapa(nombre: 'Mirador El Cerro', emoji: '🔭',
-    posicion: LatLng(6.19500, -74.99000),
-    ruta: 'RUTA SAN CARLOS & CHARCOS', color: Color(0xFF0097A7), radioGps: 60),
-
-  // ── RUTA PARAÍSO NATURAL — SAN RAFAEL ────────────────────────────────────
-  _SitioMapa(nombre: 'Parque Principal de San Rafael', emoji: '🌳',
-    posicion: LatLng(6.29544, -75.02826),
-    ruta: 'RUTA PARAÍSO NATURAL — SAN RAFAEL', color: Color(0xFF00897B), radioGps: 60),
-  _SitioMapa(nombre: 'Playa del Río Arenal', emoji: '🏖️',
-    posicion: LatLng(6.27694, -75.03370),
-    ruta: 'RUTA PARAÍSO NATURAL — SAN RAFAEL', color: Color(0xFF00897B), radioGps: 70),
-  _SitioMapa(nombre: 'Charco El Trocadero', emoji: '💧',
-    posicion: LatLng(6.27906, -75.03268),
-    ruta: 'RUTA PARAÍSO NATURAL — SAN RAFAEL', color: Color(0xFF00897B), radioGps: 60),
-  _SitioMapa(nombre: 'Cascada Los Simios', emoji: '💦',
-    posicion: LatLng(6.24748, -75.07407),
-    ruta: 'RUTA PARAÍSO NATURAL — SAN RAFAEL', color: Color(0xFF00897B), radioGps: 80),
-  _SitioMapa(nombre: 'Reserva Natural Piedra Montada', emoji: '🌲',
-    posicion: LatLng(6.27249, -75.11066),
-    ruta: 'RUTA PARAÍSO NATURAL — SAN RAFAEL', color: Color(0xFF00897B), radioGps: 100),
-  _SitioMapa(nombre: 'Sendero Ecológico La Planta', emoji: '🌿',
-    posicion: LatLng(6.29300, -75.02500),
-    ruta: 'RUTA PARAÍSO NATURAL — SAN RAFAEL', color: Color(0xFF00897B), radioGps: 70),
-
-  // ── RUTA JARDÍN COLONIAL ──────────────────────────────────────────────────
-  _SitioMapa(nombre: 'Plaza Principal de Jardín', emoji: '🌸',
-    posicion: LatLng(5.59908, -75.81937),
-    ruta: 'RUTA JARDÍN COLONIAL', color: Color(0xFFF06292), radioGps: 60),
-  _SitioMapa(nombre: 'Basílica Menor Nuestra Señora del Carmen', emoji: '⛪',
-    posicion: LatLng(5.59886, -75.81881),
-    ruta: 'RUTA JARDÍN COLONIAL', color: Color(0xFFF06292), radioGps: 55),
-  _SitioMapa(nombre: 'Vivorigen — Café de Especialidad', emoji: '☕',
-    posicion: LatLng(5.59890, -75.82018),
-    ruta: 'RUTA JARDÍN COLONIAL', color: Color(0xFFF06292), radioGps: 40),
-  _SitioMapa(nombre: 'La Garrucha (teleférico artesanal)', emoji: '🚡',
-    posicion: LatLng(5.59405, -75.81897),
-    ruta: 'RUTA JARDÍN COLONIAL', color: Color(0xFFF06292), radioGps: 50),
-  _SitioMapa(nombre: 'Mirador El Bosque', emoji: '🔭',
-    posicion: LatLng(5.58959, -75.82584),
-    ruta: 'RUTA JARDÍN COLONIAL', color: Color(0xFFF06292), radioGps: 70),
-  _SitioMapa(nombre: 'Cueva del Esplendor (agencia)', emoji: '🏔️',
-    posicion: LatLng(5.59816, -75.81434),
-    ruta: 'RUTA JARDÍN COLONIAL', color: Color(0xFFF06292), radioGps: 50),
-
-  // ── SENDEROS DEL ARRIERO Y LA MONTAÑA (Ciudad Bolívar) ────────────────────
-  _SitioMapa(nombre: 'Parque Principal + Iglesia La Inmaculada (Ciudad Bolívar)', emoji: '⛪',
-    posicion: LatLng(5.85780, -76.02160),
-    ruta: 'SENDEROS DEL ARRIERO Y LA MONTAÑA', color: Color(0xFF795548), radioGps: 70),
-  _SitioMapa(nombre: 'Casa de la Cultura Ernesto María González', emoji: '🎭',
-    posicion: LatLng(5.85800, -76.02000),
-    ruta: 'SENDEROS DEL ARRIERO Y LA MONTAÑA', color: Color(0xFF795548), radioGps: 50),
-  _SitioMapa(nombre: 'Avenida Las Palmas (corredor natural)', emoji: '🌴',
-    posicion: LatLng(5.86000, -76.02100),
-    ruta: 'SENDEROS DEL ARRIERO Y LA MONTAÑA', color: Color(0xFF795548), radioGps: 80),
-  _SitioMapa(nombre: 'Mirador Alto de La Mesa', emoji: '🔭',
-    posicion: LatLng(5.86500, -76.03000),
-    ruta: 'SENDEROS DEL ARRIERO Y LA MONTAÑA', color: Color(0xFF795548), radioGps: 100),
-  _SitioMapa(nombre: 'Farallones del Citará', emoji: '⛰️',
-    posicion: LatLng(5.87000, -76.04000),
-    ruta: 'SENDEROS DEL ARRIERO Y LA MONTAÑA', color: Color(0xFF795548), radioGps: 120),
-  _SitioMapa(nombre: 'Cascada Cola de Caballo', emoji: '💦',
-    posicion: LatLng(5.86200, -76.02800),
-    ruta: 'SENDEROS DEL ARRIERO Y LA MONTAÑA', color: Color(0xFF795548), radioGps: 80),
-  _SitioMapa(nombre: 'Finca cafetera local (proceso del café)', emoji: '☕',
-    posicion: LatLng(5.85900, -76.02300),
-    ruta: 'SENDEROS DEL ARRIERO Y LA MONTAÑA', color: Color(0xFF795548), radioGps: 60),
-  _SitioMapa(nombre: 'Parque del Arriero (cierre)', emoji: '🎒',
-    posicion: LatLng(5.85700, -76.02000),
-    ruta: 'SENDEROS DEL ARRIERO Y LA MONTAÑA', color: Color(0xFF795548), radioGps: 60),
-
-  // ── RUTA ESPÍRITU ARRIERO — JERICÓ ────────────────────────────────────────
-  _SitioMapa(nombre: 'Parque Principal de Jericó', emoji: '🌳',
-    posicion: LatLng(5.79147, -75.78621),
-    ruta: 'RUTA ESPÍRITU ARRIERO — JERICÓ', color: Color(0xFFE65100), radioGps: 60),
-  _SitioMapa(nombre: 'Casa Natal de Santa Laura Montoya', emoji: '⛪',
-    posicion: LatLng(5.79154, -75.78759),
-    ruta: 'RUTA ESPÍRITU ARRIERO — JERICÓ', color: Color(0xFFE65100), radioGps: 45),
-  _SitioMapa(nombre: 'Museo MAJA — Antropología y Artes', emoji: '🏛️',
-    posicion: LatLng(5.79041, -75.78573),
-    ruta: 'RUTA ESPÍRITU ARRIERO — JERICÓ', color: Color(0xFFE65100), radioGps: 45),
-  _SitioMapa(nombre: 'El Taller del Carriel', emoji: '👜',
-    posicion: LatLng(5.79195, -75.78730),
-    ruta: 'RUTA ESPÍRITU ARRIERO — JERICÓ', color: Color(0xFFE65100), radioGps: 35),
-  _SitioMapa(nombre: 'Mirador de las Olas', emoji: '🔭',
-    posicion: LatLng(5.81325, -75.78253),
-    ruta: 'RUTA ESPÍRITU ARRIERO — JERICÓ', color: Color(0xFFE65100), radioGps: 70),
-  _SitioMapa(nombre: 'Morro El Salvador', emoji: '⛰️',
-    posicion: LatLng(5.79406, -75.78398),
-    ruta: 'RUTA ESPÍRITU ARRIERO — JERICÓ', color: Color(0xFFE65100), radioGps: 60),
-
-  // ── RUTA MONTAÑA Y ANCESTRALIDAD — TÁMESIS ────────────────────────────────
-  _SitioMapa(nombre: 'Parque Principal de Támesis', emoji: '🌳',
-    posicion: LatLng(5.66855, -75.71965),
-    ruta: 'RUTA MONTAÑA Y ANCESTRALIDAD — TÁMESIS', color: Color(0xFF558B2F), radioGps: 60),
-  _SitioMapa(nombre: 'Petroglifos — Jardín Botánico', emoji: '🪨',
-    posicion: LatLng(5.66881, -75.71936),
-    ruta: 'RUTA MONTAÑA Y ANCESTRALIDAD — TÁMESIS', color: Color(0xFF558B2F), radioGps: 50),
-  _SitioMapa(nombre: 'Cerro Cristo Rey', emoji: '⛰️',
-    posicion: LatLng(5.67514, -75.72358),
-    ruta: 'RUTA MONTAÑA Y ANCESTRALIDAD — TÁMESIS', color: Color(0xFF558B2F), radioGps: 80),
-  _SitioMapa(nombre: 'La Oculta Lodge', emoji: '🌿',
-    posicion: LatLng(5.75768, -75.67808),
-    ruta: 'RUTA MONTAÑA Y ANCESTRALIDAD — TÁMESIS', color: Color(0xFF558B2F), radioGps: 100),
-  _SitioMapa(nombre: 'Mirador Jericó–Támesis', emoji: '🔭',
-    posicion: LatLng(5.69726, -75.73063),
-    ruta: 'RUTA MONTAÑA Y ANCESTRALIDAD — TÁMESIS', color: Color(0xFF558B2F), radioGps: 70),
-  _SitioMapa(nombre: 'Finca cafetera local (Támesis)', emoji: '☕',
-    posicion: LatLng(5.67200, -75.72000),
-    ruta: 'RUTA MONTAÑA Y ANCESTRALIDAD — TÁMESIS', color: Color(0xFF558B2F), radioGps: 60),
-
-  // ── RUTA CARIBE ANTIOQUEÑO — NECOCLÍ ──────────────────────────────────────
-  _SitioMapa(nombre: 'Parque Principal de Necoclí', emoji: '🌴',
-    posicion: LatLng(8.42413, -76.78684),
-    ruta: 'RUTA CARIBE ANTIOQUEÑO — NECOCLÍ', color: Color(0xFF0288D1), radioGps: 60),
-  _SitioMapa(nombre: 'Playa Principal de Necoclí', emoji: '🏖️',
-    posicion: LatLng(8.42200, -76.78700),
-    ruta: 'RUTA CARIBE ANTIOQUEÑO — NECOCLÍ', color: Color(0xFF0288D1), radioGps: 80),
-  _SitioMapa(nombre: 'Muelle Turístico de Necoclí', emoji: '⛵',
-    posicion: LatLng(8.42091, -76.78180),
-    ruta: 'RUTA CARIBE ANTIOQUEÑO — NECOCLÍ', color: Color(0xFF0288D1), radioGps: 60),
-  _SitioMapa(nombre: 'Restaurante Galápagos', emoji: '🐟',
-    posicion: LatLng(8.42359, -76.78728),
-    ruta: 'RUTA CARIBE ANTIOQUEÑO — NECOCLÍ', color: Color(0xFF0288D1), radioGps: 40),
-  _SitioMapa(nombre: 'Plataforma Avistamiento Tortugas Marinas', emoji: '🐢',
-    posicion: LatLng(8.59341, -76.88935),
-    ruta: 'RUTA CARIBE ANTIOQUEÑO — NECOCLÍ', color: Color(0xFF0288D1), radioGps: 150),
-  _SitioMapa(nombre: 'Playa Oeste — Zona de Atardecer', emoji: '🌅',
-    posicion: LatLng(8.42000, -76.79000),
-    ruta: 'RUTA CARIBE ANTIOQUEÑO — NECOCLÍ', color: Color(0xFF0288D1), radioGps: 80),
-
-  // ── BOGOTÁ — La Candelaria (orden geográfico) ────────────────────────────
-  _SitioMapa(nombre: 'Plaza de Bolívar', emoji: '🏛️',
-    posicion: LatLng(4.59802, -74.07592),
-    ruta: 'RUTA LA CANDELARIA — EL CORAZÓN DE BOGOTÁ', color: Color(0xFFC9A84C), radioGps: 80),
-  _SitioMapa(nombre: 'Catedral Primada de Colombia', emoji: '⛪',
-    posicion: LatLng(4.59836, -74.07534),
-    ruta: 'RUTA LA CANDELARIA — EL CORAZÓN DE BOGOTÁ', color: Color(0xFFC9A84C), radioGps: 60),
-  _SitioMapa(nombre: 'Palacio Liévano', emoji: '🏛️',
-    posicion: LatLng(4.59779, -74.07631),
-    ruta: 'RUTA LA CANDELARIA — EL CORAZÓN DE BOGOTÁ', color: Color(0xFFC9A84C), radioGps: 60),
-  _SitioMapa(nombre: 'Casa de Nariño (exterior)', emoji: '🏛️',
-    posicion: LatLng(4.59461, -74.07594),
-    ruta: 'RUTA LA CANDELARIA — EL CORAZÓN DE BOGOTÁ', color: Color(0xFFC9A84C), radioGps: 70),
-  _SitioMapa(nombre: 'Museo Botero', emoji: '🎨',
-    posicion: LatLng(4.59763, -74.07411),
-    ruta: 'RUTA LA CANDELARIA — EL CORAZÓN DE BOGOTÁ', color: Color(0xFFC9A84C), radioGps: 55),
-  _SitioMapa(nombre: 'Museo del Oro', emoji: '✨',
-    posicion: LatLng(4.60148, -74.07368),
-    ruta: 'RUTA LA CANDELARIA — EL CORAZÓN DE BOGOTÁ', color: Color(0xFFC9A84C), radioGps: 60),
-  _SitioMapa(nombre: 'Chorro de Quevedo', emoji: '🎭',
-    posicion: LatLng(4.59601, -74.07163),
-    ruta: 'RUTA LA CANDELARIA — EL CORAZÓN DE BOGOTÁ', color: Color(0xFFC9A84C), radioGps: 55),
-  _SitioMapa(nombre: 'Cerro de Monserrate', emoji: '⛰️',
-    posicion: LatLng(4.60536, -74.05614),
-    ruta: 'RUTA LA CANDELARIA — EL CORAZÓN DE BOGOTÁ', color: Color(0xFFC9A84C), radioGps: 100),
-
+  // Sitios migrados a Firestore — ver sitiosDetalle en cada documento de ruta
+  // Migración completada: 29 jul 2026
+  // Rutas eliminadas: PATRIMONIAL DEL CENTRO, CENTRO REPUBLICANO, SILLETERA, TABLADOS Y RUMBA
+  // Rutas migradas: TRANSFORMACIÓN URBANA, VERDE DEL NORTE, METROCABLE & ARVÍ,
+  //   MIRADORES, NOCTURNA, GUATAPÉ, TRANVÍA, DEL ORIGEN PAISA,
+  //   MEMORIA Y REFLEXIÓN, VIVE LAURELES, VIVE EL POBLADO
 ];
 
+// ══════════════════════════════════════════════════════════════════════════════
+// NOTA: kRutasData cierra arriba (];)
+// Las rutas de Feria (FERIA CLÁSICA, TABLADOS Y RUMBA) se inyectan via
+// kFeriaRutasCompletas y se mezclan en RutasService.rutas
+// ══════════════════════════════════════════════════════════════════════════════
 
-// ─────────────────────────────────────────
 //  TIPS DEL AVATAR POR SITIO
 // ─────────────────────────────────────────
 
@@ -15982,6 +14978,12 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
   _SitioMapa? _sitioSeleccionado;
   _CiudadRegistrada? _ciudadMapa;
 
+  // ── Capa EnCicla ─────────────────────────────────────────────────────────
+  bool _mostrarEnCicla = true; // siempre visible — puntos fijos en el mapa
+  List<Map<String, dynamic>> _estacionesEnCicla = [];
+  Map<String, dynamic>? _estacionEnCiclaSeleccionada;
+  double _zoomActual = 13.0; // zoom inicial — EnCicla visible desde 13.5
+
   // Centro dinámico según ciudad detectada
   LatLng get _centerCiudad {
     if (_ciudadMapa != null) return LatLng(_ciudadMapa!.lat, _ciudadMapa!.lng);
@@ -15997,18 +14999,49 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
   @override
   void initState() {
     super.initState();
-    // Inicializar animación de pulso para el pin seleccionado
     _pulseController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 900),
     )..repeat(reverse: true);
     _pulseAnim = Tween<double>(begin: 0.92, end: 1.08).animate(
       CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut));
-    // Cargar íconos con logo y rutas desbloqueadas
     _cargarIconos();
     _cargarRutasDesbloqueadas();
-    // Detectar ciudad para centrar mapa correctamente
     _detectarCiudadMapa();
+    _cargarEstacionesEnCicla();
+    // ── Escuchar cuando RutasService termina de cargar de Firestore ──
+    RutasService().addListener(_onRutasCargadasMapa);
+    // ── Forzar carga si aún no está lista ──────────────────────────
+    if (!RutasService().cargado) {
+      RutasService().cargarEnBackground();
+    } else {
+      // Ya cargado — reconstruir markers en el siguiente frame
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) setState(() {});
+      });
+    }
+  }
+
+  void _onRutasCargadasMapa() {
+    if (mounted) setState(() {}); // Refrescar pines cuando Firestore carga
+  }
+
+  Future<void> _cargarEstacionesEnCicla() async {
+    try {
+      final doc = await FirebaseFirestore.instance
+          .collection('capas_mapa')
+          .doc('encicla_estaciones')
+          .get();
+      if (doc.exists) {
+        final data = doc.data()!;
+        final lista = (data['estaciones'] as List<dynamic>? ?? [])
+            .map((e) => Map<String, dynamic>.from(e as Map))
+            .toList();
+        if (mounted) setState(() => _estacionesEnCicla = lista);
+      }
+    } catch (e) {
+      debugPrint('EnCicla: error cargando estaciones — $e');
+    }
   }
 
   Future<void> _detectarCiudadMapa() async {
@@ -16023,6 +15056,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
   @override
   void dispose() {
     _pulseController.dispose();
+    RutasService().removeListener(_onRutasCargadasMapa);
     super.dispose();
   }
 
@@ -16174,18 +15208,42 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
     catch (e) { debugPrint('🔴 Agrupado_3 error: \$e'); }
     try { _iconCache['Agrupado_4']   = await _crearIconoAgrupado(4); }
     catch (e) { debugPrint('🔴 Agrupado_4 error: \$e'); }
+    // Pin EnCicla — círculo verde pequeño con ícono de bicicleta
+    try { _iconCache['encicla']     = await _crearPinEnCicla(seleccionado: false); }
+    catch (e) { debugPrint('🔴 encicla error: $e'); }
+    try { _iconCache['encicla_sel'] = await _crearPinEnCicla(seleccionado: true); }
+    catch (e) { debugPrint('🔴 encicla_sel error: $e'); }
     if (mounted) setState(() => _iconsLoaded = true);
   }
 
+
+  Future<BitmapDescriptor> _crearPinEnCicla({required bool seleccionado}) async {
+    const size = 28.0;
+    final recorder = ui.PictureRecorder();
+    final canvas = Canvas(recorder);
+    final paint = Paint()
+      ..color = seleccionado ? const Color(0xFF004FA3) : const Color(0xFF0066CC)
+      ..style = PaintingStyle.fill;
+    final border = Paint()
+      ..color = Colors.white.withOpacity(seleccionado ? 1.0 : 0.7)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = seleccionado ? 2.5 : 1.5;
+    canvas.drawCircle(const Offset(size / 2, size / 2), size / 2 - 1, paint);
+    canvas.drawCircle(const Offset(size / 2, size / 2), size / 2 - 1, border);
+    final tp = TextPainter(
+      text: const TextSpan(text: '🚲', style: TextStyle(fontSize: 14)),
+      textDirection: TextDirection.ltr);
+    tp.layout();
+    tp.paint(canvas, Offset((size - tp.width) / 2, (size - tp.height) / 2));
+    final img = await recorder.endRecording().toImage(size.toInt(), size.toInt());
+    final bytes = await img.toByteData(format: ui.ImageByteFormat.png);
+    return BitmapDescriptor.fromBytes(bytes!.buffer.asUint8List());
+  }
 
   Future<void> _cargarRutasDesbloqueadas() async {
     // Rutas siempre visibles (punto de entrada gratuito)
     final rutasBase = {
       'RUTA TRANSFORMACIÓN URBANA',
-      'PARQUE JAIME DUQUE — CLÁSICA',
-      'PARQUE JAIME DUQUE — FAMILIA',
-      'PARQUE JAIME DUQUE — NATURALEZA',
-      'PARQUE JAIME DUQUE — AVENTURA FAMILIAR',
     };
 
     final user = AuthService.currentUser;
@@ -16237,24 +15295,23 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
 
   // _filtros se genera dinámicamente según ciudad seleccionada
   List<String> get _filtros {
-    final rutasDeEstaCiudad = kSitiosMapa
-      .map((s) => s.ruta)
-      .toSet()
-      .where((ruta) {
-        // Si hay ciudad seleccionada en HomeBody, filtrar por ella
-        // Detectar por nombre de ruta si es de Bogotá o Medellín
-        final esBogota = ruta.contains('JAIME DUQUE');
-        final esMedellin = !esBogota;
-        // Por ahora mostrar todas — el filtro visual ya existe
-        return true;
-      })
-      .toList()
-      ..sort();
-    return ['Todas', ...rutasDeEstaCiudad];
+    // Combinar rutas de kSitiosMapa + rutas de Firestore
+    final rutasHardcoded = kSitiosMapa.map((s) => s.ruta).toSet();
+    final rutasFirestore = <String>{};
+    for (final ruta in RutasService().rutas) {
+      final nombre = ruta['nombre']?.toString() ?? '';
+      final gpsRaw = ruta['gpsSitios'];
+      final gpsList = gpsRaw is List ? gpsRaw : <dynamic>[];
+      final detalle = parseSitiosDetalle(ruta['sitiosDetalle']);
+      if (nombre.isNotEmpty && (gpsList.isNotEmpty || detalle.isNotEmpty)) {
+        rutasFirestore.add(nombre);
+      }
+    }
+    final todas = {...rutasHardcoded, ...rutasFirestore}.toList()..sort();
+    return ['Todas', ...todas];
   }
 
   static const _centerMDE = LatLng(6.2518, -75.5636);
-  static const _centerBTA = LatLng(4.9458, -73.9610); // Parque Jaime Duque
 
   static const String _mapStyle = '''[
     {"elementType":"geometry","stylers":[{"color":"#0f1a0a"}]},
@@ -16268,30 +15325,110 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
   ]''';
 
   List<_SitioMapa> get _sitiosFiltrados {
+    // Combinar sitios hardcodeados + sitios de Firestore (gpsSitios/sitiosDetalle)
+    final todos = <_SitioMapa>[...kSitiosMapa];
+
+    // Agregar sitios de rutas de Firestore que NO están en kSitiosMapa
+    final nombresExistentes = kSitiosMapa.map((s) => '${s.nombre}||${s.ruta}').toSet();
+    for (final ruta in RutasService().rutas) {
+      final rutaNombre = ruta['nombre']?.toString() ?? '';
+      final acento = ruta['acento'];
+      final color = acento is Color ? acento : const Color(0xFFC9A84C);
+
+      // Usar sitiosDetalle si existe, sino gpsSitios
+      final detalle = parseSitiosDetalle(ruta['sitiosDetalle']);
+      final gpsRaw = ruta['gpsSitios'];
+      final gpsList = gpsRaw is List ? gpsRaw : <dynamic>[];
+
+      if (detalle.isNotEmpty) {
+        for (final s in detalle) {
+          if (s is! Map) continue;
+          final nombre = s['nombre']?.toString() ?? '';
+          final lat = (s['lat'] as num?)?.toDouble();
+          final lng = (s['lng'] as num?)?.toDouble();
+          if (nombre.isEmpty || lat == null || lng == null) continue;
+          if (nombresExistentes.contains('$nombre||$rutaNombre')) continue;
+          nombresExistentes.add('$nombre||$rutaNombre');
+          todos.add(_SitioMapa(
+            nombre: nombre,
+            emoji: s['emoji']?.toString() ?? '📍',
+            posicion: LatLng(lat, lng),
+            ruta: rutaNombre,
+            color: color,
+            radioGps: 60,
+          ));
+        }
+      } else if (gpsList.isNotEmpty) {
+        for (final g in gpsList) {
+          if (g is! Map) continue;
+          final nombre = g['nombre']?.toString() ?? '';
+          final lat = (g['lat'] as num?)?.toDouble();
+          final lng = (g['lng'] as num?)?.toDouble();
+          if (nombre.isEmpty || lat == null || lng == null) continue;
+          if (nombresExistentes.contains('$nombre||$rutaNombre')) continue;
+          nombresExistentes.add('$nombre||$rutaNombre');
+          todos.add(_SitioMapa(
+            nombre: nombre,
+            emoji: '📍',
+            posicion: LatLng(lat, lng),
+            ruta: rutaNombre,
+            color: color,
+            radioGps: 60,
+          ));
+        }
+      }
+    }
+
     // Filtrar por ruta seleccionada
     final porRuta = _filtroRuta == 'Todas'
-      ? kSitiosMapa
-      : kSitiosMapa.where((s) => s.ruta == _filtroRuta).toList();
+      ? todos
+      : todos.where((s) => s.ruta == _filtroRuta).toList();
     return porRuta;
   }
 
   // Zona de cada ruta para elegir ícono
   String _zonaDeRuta(String ruta) {
-    if (['RUTA TRANSFORMACIÓN URBANA','RUTA PATRIMONIAL DEL CENTRO','RUTA VERDE DEL NORTE',
-         'RUTA DEL METROCABLE & ARVÍ','RUTA LAURELES & TRADICIÓN',
-         'RUTA DE LOS MIRADORES','RUTA CULTURAL NOCTURNA',
-         'SENDEROS DE AGUA Y NATURALEZA','ARTE, CIUDAD Y SABORES',
+    if (['RUTA TRANSFORMACIÓN URBANA','RUTA VERDE DEL NORTE',
+         
          'DEL ORIGEN PAISA A LA MEDELLÍN MODERNA','TRANVÍA CULTURAL'].contains(ruta)) return 'Ciudad';
-    if (['RUTA GUATAPÉ & LA PIEDRA','RUTA DEL CAFÉ EN SANTA ELENA','RUTA SAN CARLOS & CHARCOS',
-         'RUTA JARDÍN COLONIAL','RUTA SANTA FE DE ANTIOQUIA','RUTA ENVIGADO NATURAL',
-                       'RUTA MONTAÑA Y ANCESTRALIDAD — TÁMESIS','RUTA JOYA COLONIAL OCULTA — CONCEPCIÓN',
-         'RUTA CARIBE ANTIOQUEÑO — NECOCLÍ'].contains(ruta)) return 'Alrededores';
+    if (['RUTA GUATAPÉ & LA PIEDRA', 'RUTA SANTA FE DE ANTIOQUIA', 'JOYA COLONIAL OCULTA — CONCEPCIÓN'].contains(ruta)) return 'Alrededores';
+
     return 'Temporada';
   }
 
   Set<Marker> _buildMarkers() {
     final bool selHay = _sitioSeleccionado != null;
     final Set<Marker> markers = {};
+
+    // ── Marcadores EnCicla ────────────────────────────────────────────────
+    if (_mostrarEnCicla && _zoomActual >= 13.5) {
+      for (final est in _estacionesEnCicla) {
+        final lat = (est['lat'] as num?)?.toDouble() ?? 0;
+        final lng = (est['lng'] as num?)?.toDouble() ?? 0;
+        if (lat == 0 && lng == 0) continue;
+        final id = est['id']?.toString() ?? '';
+        final nombre = est['nombre']?.toString() ?? '';
+        final esSeleccionada = _estacionEnCiclaSeleccionada?['id'] == id;
+        final icon = _iconCache['encicla${esSeleccionada ? '_sel' : ''}']
+            ?? BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen);
+        markers.add(Marker(
+          markerId: MarkerId('encicla_$id'),
+          position: LatLng(lat, lng),
+          icon: icon,
+          zIndex: esSeleccionada ? 2.5 : 0.8,
+          anchor: const Offset(0.5, 0.5),
+          onTap: () {
+            setState(() {
+              _estacionEnCiclaSeleccionada = est;
+              _sitioSeleccionado = null;
+            });
+            _mapController?.animateCamera(
+                CameraUpdate.newLatLngZoom(LatLng(lat, lng), 16));
+            _mostrarInfoEnCicla(est);
+          },
+        ));
+      }
+    }
 
     for (final sitio in _sitiosFiltrados) {
       final bool bloqueado = _rutaBloqueada(sitio.ruta);
@@ -16363,6 +15500,101 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
       ));
     }
     return markers;
+  }
+
+  Widget _enciclaInfoFila(String icon, String texto) => Padding(
+    padding: const EdgeInsets.only(bottom: 6),
+    child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Text(icon, style: const TextStyle(fontSize: 14)),
+      const SizedBox(width: 8),
+      Expanded(child: Text(texto, style: const TextStyle(color: kTextMuted, fontSize: 12))),
+    ]));
+
+  void _mostrarInfoEnCicla(Map<String, dynamic> estacion) {
+    final nombre = estacion['nombre']?.toString() ?? '';
+    final direccion = estacion['direccion']?.toString() ?? '';
+    final referencia = estacion['referencia']?.toString() ?? '';
+    final puestos = estacion['puestos']?.toString() ?? '';
+    final tipo = estacion['tipo']?.toString() ?? '';
+    final zona = estacion['zona']?.toString() ?? '';
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: kCard,
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      builder: (_) => Padding(
+        padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
+        child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+          // Handle
+          Center(child: Container(width: 40, height: 4,
+              decoration: BoxDecoration(color: kTextMuted.withOpacity(0.4),
+                  borderRadius: BorderRadius.circular(2)))),
+          const SizedBox(height: 16),
+          // Header
+          Row(children: [
+            Container(width: 44, height: 44,
+              decoration: BoxDecoration(color: const Color(0xFF0066CC).withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(12)),
+              child: const Center(child: Text('🚲', style: TextStyle(fontSize: 22)))),
+            const SizedBox(width: 12),
+            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(nombre, style: const TextStyle(color: kText, fontSize: 16,
+                  fontWeight: FontWeight.w700)),
+              Text(zona, style: const TextStyle(color: Color(0xFF0066CC), fontSize: 12)),
+            ])),
+            Container(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                  color: tipo == 'AUTOM.'
+                      ? const Color(0xFF0066CC).withOpacity(0.15)
+                      : kGold.withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(8)),
+              child: Text(tipo == 'AUTOM.' ? '⚡ Auto' : '👤 Manual',
+                  style: TextStyle(fontSize: 11,
+                      color: tipo == 'AUTOM.' ? const Color(0xFF0066CC) : kGold))),
+          ]),
+          const SizedBox(height: 16),
+          // Info
+          _enciclaInfoFila('📍', direccion),
+          if (referencia.isNotEmpty) _enciclaInfoFila('🗺️', referencia),
+          _enciclaInfoFila('🚲', '$puestos puestos disponibles'),
+          const SizedBox(height: 16),
+          // Info tarjeta
+          Container(padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(color: const Color(0xFF0066CC).withOpacity(0.08),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFF0066CC).withOpacity(0.2))),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              const Text('¿Cómo usar EnCicla?',
+                  style: TextStyle(color: kText, fontSize: 13, fontWeight: FontWeight.w700)),
+              const SizedBox(height: 6),
+              const Text('1. Registrate en encicla.gov.co o en Parque de los Deseos\n'
+                  '2. Cargá saldo en la estación automática\n'
+                  '3. Acercá tu tarjeta — ¡30 min gratis al día!\n'
+                  '4. Devolvé en cualquier estación EnCicla',
+                  style: TextStyle(color: kTextMuted, fontSize: 12, height: 1.6)),
+            ])),
+          const SizedBox(height: 12),
+          // Botón cómo llegar
+          SizedBox(width: double.infinity,
+            child: ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF0066CC),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
+              icon: const Icon(Icons.directions_bike, size: 18),
+              label: Text(t('Cómo llegar', 'Get Directions')),
+              onPressed: () async {
+                final lat = (estacion['lat'] as num?)?.toDouble() ?? 0;
+                final lng = (estacion['lng'] as num?)?.toDouble() ?? 0;
+                final uri = Uri.parse('https://www.google.com/maps/dir/?api=1&destination=$lat,$lng&travelmode=bicycling');
+                if (await canLaunchUrl(uri)) await launchUrl(uri, mode: LaunchMode.externalApplication);
+              },
+            )),
+        ]),
+      ),
+    ).whenComplete(() => setState(() => _estacionEnCiclaSeleccionada = null));
   }
 
   void _mostrarAlertaBloqueado(String ruta) {
@@ -16454,37 +15686,26 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
   String _imagenParaRuta(String ruta) {
     const Map<String, String> imgs = {
       'RUTA TRANSFORMACIÓN URBANA':           'assets/images/rutas/ruta_01_transformacion.jpg',
-      'RUTA PATRIMONIAL DEL CENTRO':          'assets/images/rutas/ruta_02_patrimonial.jpg',
-      'RUTA CENTRO REPUBLICANO':              'assets/images/rutas/ruta_02b_republicano.jpg',
+  // [eliminado] 'RUTA PATRIMONIAL DEL CENTRO':          'assets/images/rutas/ruta_02_patrimonial
+  // [eliminado] 'RUTA CENTRO REPUBLICANO':              'assets/images/rutas/ruta_02b_republican
       'RUTA VERDE DEL NORTE':                 'assets/images/rutas/ruta_03_verde_norte.jpg',
       'RUTA DEL METROCABLE & ARVÍ':           'assets/images/rutas/ruta_04_metrocable.jpg',
-      'RUTA LAURELES & TRADICIÓN':            'assets/images/rutas/ruta_06_laureles.jpg',
       'RUTA DE LOS MIRADORES':                'assets/images/rutas/ruta_07_miradores.jpg',
-      'RUTA CULTURAL NOCTURNA':               'assets/images/rutas/ruta_08_nocturna.jpg',
+  // [eliminado] 'RUTA CULTURAL NOCTURNA':               'assets/images/rutas/ruta_08_nocturna.jp
       'RUTA GUATAPÉ & LA PIEDRA':             'assets/images/rutas/ruta_09_guatape.jpg',
       'RUTA DEL CAFÉ EN SANTA ELENA':         'assets/images/rutas/ruta_10_santa_elena.jpg',
       'RUTA SAN CARLOS & CHARCOS':            'assets/images/rutas/ruta_11_san_carlos.jpg',
       'RUTA JARDÍN COLONIAL':                 'assets/images/rutas/ruta_12_jardin.jpg',
       'RUTA SANTA FE DE ANTIOQUIA':           'assets/images/rutas/ruta_13_santa_fe.jpg',
       'RUTA ENVIGADO NATURAL':                'assets/images/rutas/ruta_14_envigado.jpg',
-      'ALUMBRADO NAVIDEÑO — RÍO MEDELLÍN':    'assets/images/rutas/ruta_15_alumbrado.jpg',
-      'SEMANA SANTA PATRIMONIAL':             'assets/images/rutas/ruta_16_semana_santa.jpg',
       'FERIA DE LAS FLORES':                  'assets/images/rutas/ruta_17_feria_flores.jpg',
-      'FESTIVAL INTERNACIONAL DE TANGO':      'assets/images/rutas/ruta_18_tango.jpg',
-      'MEDEJAZZ — FESTIVAL DE JAZZ':          'assets/images/rutas/ruta_19_jazz.jpg',
-      'FIESTA DEL LIBRO Y LA CULTURA':        'assets/images/rutas/ruta_20_libro.jpg',
-      'FERIA DE LA ANTIOQUEÑIDAD':            'assets/images/rutas/ruta_21_antioqueñidad.jpg',
-      'FESTIVAL DE POESÍA INTERNACIONAL':     'assets/images/rutas/ruta_23_poesia.jpg',
       'SENDEROS DEL ARRIERO Y LA MONTAÑA':    'assets/images/rutas/ruta_arriero_ciudad_bolivar.jpg',
-      'SENDEROS DE AGUA Y NATURALEZA':        'assets/images/rutas/ruta_09_senderos_agua.jpg',
-      'ARTE, CIUDAD Y SABORES':               'assets/images/rutas/ruta_10_arte_ciudad_sabores.jpg',
+      'VIVE EL POBLADO':                      'assets/images/rutas/ruta_vive_poblado.jpg',
       'DEL ORIGEN PAISA A LA MEDELLÍN MODERNA': 'assets/images/rutas/ruta_11_origen_paisa_moderno.jpg',
       'TRANVÍA CULTURAL':                     'assets/images/rutas/ruta_12_tranvia_cultural.jpg',
       'RUTA ESPÍRITU ARRIERO — JERICÓ':       'assets/images/rutas/ruta_jerico.jpg',
       'RUTA PARAÍSO NATURAL — SAN RAFAEL':    'assets/images/rutas/ruta_san_rafael.jpg',
       'RUTA MONTAÑA Y ANCESTRALIDAD — TÁMESIS': 'assets/images/rutas/ruta_tamesis.jpg',
-      'RUTA JOYA COLONIAL OCULTA — CONCEPCIÓN': 'assets/images/rutas/ruta_concepcion.jpg',
-      'RUTA CARIBE ANTIOQUEÑO — NECOCLÍ':     'assets/images/rutas/ruta_necocli.jpg',
     };
     return imgs[ruta] ?? '';
   }
@@ -16504,11 +15725,6 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
     if (ruta.contains('SABOR VIAJERO'))     return kGold;
     if (ruta.contains('SABOR PAISA'))       return kAccent;
     if (ruta.contains('SABOR URBANO'))      return kOrchid;
-    // ── Parque Jaime Duque — colores institucionales del parque ──
-    if (ruta.contains('CLÁSICA'))           return const Color(0xFF2E7D32); // Verde institucional
-    if (ruta.contains('FAMILIA') && ruta.contains('JAIME')) return const Color(0xFFF9A825); // Amarillo institucional
-    if (ruta.contains('NATURALEZA'))        return const Color(0xFF1B5E20); // Verde bosque profundo
-    if (ruta.contains('AVENTURA FAMILIAR')) return const Color(0xFF1565C0); // Azul agua/Caribe
     // ── Rutas Medellín ──
     if (ruta.contains('Patrimonial') || ruta.contains('Nocturna') || ruta.contains('Navideño')) return kOrchid;
     if (ruta.contains('Gourmet') || ruta.contains('Café') || ruta.contains('Laureles')) return kCafe;
@@ -16604,7 +15820,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
                   return GestureDetector(onTap: () {
                     setState(() { _filtroRuta = f; _sitioSeleccionado = null; });
                     if (f != 'Todas') {
-                      final sitiosRuta = kSitiosMapa.where((s) => s.ruta == f).toList();
+                      final sitiosRuta = _sitiosFiltrados;
                       if (sitiosRuta.isNotEmpty) {
                         final lat = sitiosRuta.map((s) => s.posicion.latitude).reduce((a, b) => a + b) / sitiosRuta.length;
                         final lng = sitiosRuta.map((s) => s.posicion.longitude).reduce((a, b) => a + b) / sitiosRuta.length;
@@ -16642,6 +15858,11 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
             polylines: _polylines,
             onMapCreated: (c) { _mapController = c; c.setMapStyle(_mapStyle); },
             onTap: (_) => setState(() => _sitioSeleccionado = null),
+            onCameraMove: (pos) {
+              if ((pos.zoom - _zoomActual).abs() > 0.3) {
+                setState(() => _zoomActual = pos.zoom);
+              }
+            },
             myLocationEnabled: true, myLocationButtonEnabled: false,
             zoomControlsEnabled: false, mapToolbarEnabled: false, compassEnabled: false),
 
@@ -16750,7 +15971,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
                   border: Border.all(color: kGreen.withOpacity(0.2)),
                   boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.4), blurRadius: 20)]),
                 child: Row(mainAxisAlignment: MainAxisAlignment.spaceAround, children: [
-                  _MapStat(valor: '${kSitiosMapa.length}', label: t('Sitios\ntotales','Total\nspots'), color: kGold),
+                  _MapStat(valor: '${RutasService().rutas.fold<int>(0, (s,r) => s + ((r['sitiosDetalle'] as List?)?.length ?? 0))}', label: t('Sitios\ntotales','Total\nspots'), color: kGold),
                   Container(width: 1, height: 30, color: Colors.white.withOpacity(0.08)),
                   StreamBuilder<QuerySnapshot>(
                     stream: AuthService.currentUser != null
@@ -16779,7 +16000,6 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
     );
   }
 }
-
 
 // ─────────────────────────────────────────
 //  AVATAR RUTERO WIDGET
@@ -16893,12 +16113,9 @@ class _BubbleTailPainter extends CustomPainter {
   @override bool shouldRepaint(_) => false;
 }
 
-
 // ─────────────────────────────────────────
 //  WIDGETS REUTILIZABLES
 // ─────────────────────────────────────────
-
-
 
 // ─────────────────────────────────────────
 //  WIDGET AVATAR CON TIP
@@ -17086,7 +16303,7 @@ class _MisFotosScreenState extends State<MisFotosScreen> {
                     ]));
 
                   // Construir lista de rutas para filtro
-                  final rutasSet = {'Todas', ...fotos.map((f) => (f.data() as Map)['ruta'] as String? ?? '')};
+                  final rutasSet = {'Todas', ...fotos.map((f) => (f.data() as Map)['ruta']?.toString() ?? '')};
                   final rutasList = rutasSet.where((r) => r.isNotEmpty).toList();
 
                   final fotosFiltradas = _filtroRuta == 'Todas'
@@ -17148,13 +16365,13 @@ class _MisFotosScreenState extends State<MisFotosScreen> {
                         itemCount: fotosFiltradas.length,
                         itemBuilder: (ctx, i) {
                           final data = fotosFiltradas[i].data() as Map<String, dynamic>;
-                          final url = data['url'] as String?;
-                          final sitio = data['sitio'] as String? ?? '';
-                          final ruta = data['ruta'] as String? ?? '';
-                          final emoji = data['emoji'] as String? ?? '📍';
-                          final rutaEmoji = data['rutaEmoji'] as String? ?? '🗺️';
+                          final url = data['url']?.toString();
+                          final sitio = data['sitio']?.toString() ?? '';
+                          final ruta = data['ruta']?.toString() ?? '';
+                          final emoji = data['emoji']?.toString() ?? '📍';
+                          final rutaEmoji = data['rutaEmoji']?.toString() ?? '🗺️';
                           final acento = data['acento'] != null
-                            ? Color(data['acento'] as int)
+                            ? Color((data['acento'] as int?) ?? 0)
                             : kGreen;
                           final fecha = (data['fecha'] as Timestamp?)?.toDate();
 
@@ -17179,13 +16396,13 @@ class _MisFotosScreenState extends State<MisFotosScreen> {
                                               child: const Center(child: CircularProgressIndicator(
                                                 color: kGreen, strokeWidth: 2))),
                                         errorBuilder: (_, __, ___) {
-                                          final localPath = data['localPath'] as String?;
+                                          final localPath = data['localPath']?.toString();
                                           return localPath != null && File(localPath).existsSync()
                                             ? Image.file(File(localPath), fit: BoxFit.cover)
                                             : _placeholderFoto(emoji, acento);
                                         })
                                     : (() {
-                                        final localPath = data['localPath'] as String?;
+                                        final localPath = data['localPath']?.toString();
                                         return localPath != null && File(localPath).existsSync()
                                           ? Image.file(File(localPath), fit: BoxFit.cover)
                                           : _placeholderFoto(emoji, acento);
@@ -17243,11 +16460,11 @@ class _MisFotosScreenState extends State<MisFotosScreen> {
   }
 
   void _verFotoCompleta(BuildContext context, Map<String, dynamic> data) {
-    final url = data['url'] as String?;
-    final sitio = data['sitio'] as String? ?? '';
-    final ruta = data['ruta'] as String? ?? '';
-    final emoji = data['emoji'] as String? ?? '📍';
-    final acento = data['acento'] != null ? Color(data['acento'] as int) : kGreen;
+    final url = data['url']?.toString();
+    final sitio = data['sitio']?.toString() ?? '';
+    final ruta = data['ruta']?.toString() ?? '';
+    final emoji = data['emoji']?.toString() ?? '📍';
+    final acento = data['acento'] != null ? Color((data['acento'] as int?) ?? 0) : kGreen;
 
     showDialog(context: context, builder: (_) => Dialog(
       backgroundColor: Colors.transparent,
@@ -17256,7 +16473,7 @@ class _MisFotosScreenState extends State<MisFotosScreen> {
           borderRadius: BorderRadius.circular(20),
           child: Stack(children: [
             (() {
-              final localPath = data['localPath'] as String?;
+              final localPath = data['localPath']?.toString();
               if (url != null) {
                 return Image.network(url, fit: BoxFit.cover,
                   errorBuilder: (_, __, ___) => localPath != null && File(localPath).existsSync()
@@ -17310,10 +16527,10 @@ class _MisFotosScreenState extends State<MisFotosScreen> {
   }
 
   Future<void> _compartirFoto(Map<String, dynamic> data) async {
-    final sitio  = data['sitio'] as String? ?? '';
-    final ruta   = data['ruta']  as String? ?? '';
-    final url    = data['url']   as String?;
-    final localPath = data['localPath'] as String?;
+    final sitio  = data['sitio']?.toString() ?? '';
+    final ruta   = data['ruta']?.toString() ?? '';
+    final url    = data['url']?.toString();
+    final localPath = data['localPath']?.toString();
 
     try {
       // Texto de acompañamiento
@@ -17389,7 +16606,7 @@ class _PremioCardState extends State<_PremioCard> {
     final ahora = DateTime.now();
     final num = (ahora.day * 1000 + ahora.month * 100 + widget.totalSitios * 7) % 9000 + 1000;
     _codigo = 'RUT-$prefijo-$num';
-    _qrData = 'RUTERO-MDE|CODIGO:$_codigo|RUTA:${widget.ruta['nombre']}|PREMIO:${widget.ruta['premio']}|SITIOS:${widget.totalSitios}';
+    _qrData = 'RUTERO-MDE|CODIGO:$_codigo|RUTA:${widget.ruta['nombre'] ?? ''}|PREMIO:${widget.ruta['premio'] ?? ''}|SITIOS:${widget.totalSitios}';
     // Guardar en Firebase una sola vez
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!_guardado) {
@@ -17439,7 +16656,7 @@ class _PremioCardState extends State<_PremioCard> {
             child: Row(mainAxisSize: MainAxisSize.min, children: [
               Text(widget.ruta['personaje'] ?? '🏅', style: const TextStyle(fontSize: 16)),
               const SizedBox(width: 6),
-              Text('Insignia: ${widget.ruta['insignia']}',
+              Text('Insignia: ${widget.ruta['insignia'] ?? ''}',
                 style: TextStyle(color: acento, fontSize: 12, fontWeight: FontWeight.w700)),
             ])),
         Text(t('Has visitado los ${widget.totalSitios} sitios de esta ruta','You visited all ${widget.totalSitios} spots on this route'),
@@ -17536,7 +16753,6 @@ class _PremioCardState extends State<_PremioCard> {
       ]));
   }
 }
-
 
 // ─────────────────────────────────────────────────────────────────────────
 //  _AliadoRutaCard — Tarjeta de aliado asociado a la ruta
@@ -17675,7 +16891,7 @@ class _HomeAvatarNivel extends StatelessWidget {
         final data = snap.data?.data() as Map<String, dynamic>? ?? {};
         final int puntos = (data['puntosTotal'] ?? 0) as int;
         final nivel = _niveles.lastWhere(
-          (n) => puntos >= (n['min'] as int), orElse: () => _niveles.first);
+          (n) => puntos >= ((n['min'] as int?) ?? 0), orElse: () => _niveles.first);
         final int nivelIdx = _niveles.indexOf(nivel) + 1;
         return Column(mainAxisSize: MainAxisSize.min, children: [
           Container(width: 48, height: 48,
@@ -17687,9 +16903,9 @@ class _HomeAvatarNivel extends StatelessWidget {
               ? Image.network(AuthService.currentUser!.photoURL!,
                   fit: BoxFit.cover,
                   errorBuilder: (_, __, ___) => Center(
-                    child: Text(nivel['emoji'] as String,
+                    child: Text(nivel['emoji']?.toString() ?? '',
                       style: const TextStyle(fontSize: 24))))
-              : Center(child: Text(nivel['emoji'] as String,
+              : Center(child: Text(nivel['emoji']?.toString() ?? '',
                   style: const TextStyle(fontSize: 24))))),
           const SizedBox(height: 4),
           Container(
@@ -17761,8 +16977,6 @@ class _HeaderChip extends StatelessWidget {
     ]));
 }
 
-
-
 class _FiltroChip extends StatelessWidget {
   final String label;
   final bool activo;
@@ -17790,7 +17004,6 @@ class _FiltroChip extends StatelessWidget {
         fontWeight: activo ? FontWeight.w700 : FontWeight.w400,
         letterSpacing: activo ? 0.3 : 0))));
 }
-
 
 // ─────────────────────────────────────────────────────────────────────────
 //  🌹 FERIA DE LAS FLORES — Countdown Widget
@@ -18154,9 +17367,9 @@ class _RouteCard extends StatelessWidget {
                   }),
                   const SizedBox(height: 8),
                   Row(children: [
-                    _InfoPill(icon: '⏱', text: ruta['tiempo']),
+                    _InfoPill(icon: '⏱', text: ruta['tiempo']?.toString() ?? ''),
                     const SizedBox(width: 6),
-                    _InfoPill(icon: '📍', text: '${ruta["sitios"]} ${t("sitios","spots")}'),
+                    _InfoPill(icon: '📍', text: '${ruta["sitios"]} ${t("sitios","spots"?.toString() ?? '')}'),
                     const Spacer(),
                     // Botón Explorar
                     Container(
@@ -18181,6 +17394,112 @@ class _RouteCard extends StatelessWidget {
 // ─────────────────────────────────────────
 //  CONSEJOS CARD
 // ─────────────────────────────────────────
+// ─── CÓMO LLEGAR ─────────────────────────────────────────────────────────────
+class _ComoLlegarCard extends StatelessWidget {
+  final Map<String, dynamic> ruta;
+  const _ComoLlegarCard({required this.ruta});
+
+  @override
+  Widget build(BuildContext context) {
+    final nombre = ruta['nombre']?.toString() ?? '';
+    // Normalizar comoLlegar — puede venir como String, List o Map desde Firestore
+    String comoLlegar = '';
+    final rawComoLlegar = ruta['comoLlegar'];
+    if (rawComoLlegar is String && rawComoLlegar.isNotEmpty) {
+      comoLlegar = rawComoLlegar;
+    } else if (rawComoLlegar is List) {
+      comoLlegar = rawComoLlegar.map((e) => e.toString()).join('\n');
+    } else if (rawComoLlegar is Map) {
+      // { 'es': '...', 'en': '...' } — tomar según idioma
+      final val = rawComoLlegar[kLang == 'en' ? 'en' : 'es'];
+      if (val is String) comoLlegar = val;
+      else if (val is List) comoLlegar = val.map((e) => e.toString()).join('\n');
+    }
+    // Fallback a mapa local si Firestore no tiene comoLlegar
+    if (comoLlegar.isEmpty) comoLlegar = kComoLlegarPorRuta[nombre] ?? '';
+    final transporte = ruta['transporte']?.toString() ?? '';
+    if (comoLlegar.isEmpty && transporte.isEmpty) return const SizedBox.shrink();
+
+    final Color acento = kRutaColor(ruta['acento'], kGreen);
+
+    // Split comoLlegar by numbered steps (1️⃣, 2️⃣, etc or plain newlines)
+    final pasos = comoLlegar.isNotEmpty
+        ? comoLlegar.split('\n').where((s) => s.trim().isNotEmpty).toList()
+        : <String>[];
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      decoration: BoxDecoration(
+        color: kCard,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: acento.withOpacity(0.25))),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        // Header
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          child: Row(children: [
+            Container(width: 36, height: 36,
+              decoration: BoxDecoration(
+                color: acento.withOpacity(0.12), shape: BoxShape.circle),
+              child: const Center(child: Text('🗺️', style: TextStyle(fontSize: 18)))),
+            const SizedBox(width: 12),
+            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(t('Cómo llegar', 'Getting there'),
+                style: const TextStyle(color: kText, fontSize: 13, fontWeight: FontWeight.w700)),
+              _textoConWhoosh(transporte, fontSize: 11, baseColor: acento, fontWeight: FontWeight.w600),
+            ])),
+          ])),
+        // Pasos
+        if (pasos.isNotEmpty) ...[
+          Container(height: 1, color: acento.withOpacity(0.1)),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start,
+              children: pasos.map((paso) => Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Text(paso,
+                  style: const TextStyle(color: kText, fontSize: 12, height: 1.5)),
+              )).toList())),
+        ],
+      ]));
+  }
+}
+
+// ─── ANTES DE SALIR ───────────────────────────────────────────────────────────
+class _AntesDeSalirCard extends StatelessWidget {
+  final Map<String, dynamic> ruta;
+  const _AntesDeSalirCard({required this.ruta});
+
+  @override
+  Widget build(BuildContext context) {
+    final antesDeSalir = ruta['antesDeSalir']?.toString() ?? '';
+    if (antesDeSalir.isEmpty) return const SizedBox.shrink();
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [kFeriaDorado.withOpacity(0.08), kGreen.withOpacity(0.05)],
+          begin: Alignment.topLeft, end: Alignment.bottomRight),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: kFeriaDorado.withOpacity(0.35))),
+      child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        const Text('✅', style: TextStyle(fontSize: 20)),
+        const SizedBox(width: 10),
+        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(t('Antes de salir', 'Before you go'),
+            style: const TextStyle(
+              color: kFeriaDorado, fontSize: 11,
+              fontWeight: FontWeight.w800, letterSpacing: 0.8)),
+          const SizedBox(height: 5),
+          Text(antesDeSalir,
+            style: const TextStyle(color: kText, fontSize: 12, height: 1.5)),
+        ])),
+      ]));
+  }
+}
+
 class _ConsejosCard extends StatefulWidget {
   final Map<String, dynamic> ruta;
   const _ConsejosCard({required this.ruta});
@@ -18226,7 +17545,7 @@ class _ConsejosCardState extends State<_ConsejosCard> {
           Padding(padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               ...consejos.map((c) => Padding(padding: const EdgeInsets.only(bottom: 10),
-                child: Text(c, style: const TextStyle(color: kText, fontSize: 12, height: 1.4)))),
+                child: _textoConWhoosh(c, fontSize: 12))),
               if (momentoClave.isNotEmpty) ...[
                 const SizedBox(height: 4),
                 Container(padding: const EdgeInsets.all(12),
@@ -18280,8 +17599,6 @@ class _InfoPill extends StatelessWidget {
 //   • Cumple control: códigos generados quedan en log para cruce con Alianza
 //
 //  DESTINOS CUBIERTOS POR ALIANZA LOCAL TOURS:
-//   Guatapé · El Peñol · Concepción · Alejandría · San Vicente · Cisneros
-//   San Rafael · Necoclí (extensible)
 // ════════════════════════════════════════════════════════════════════════════
 
 /// Determina si una ruta tiene aliado de transporte (Alianza Local Tours).
@@ -18310,12 +17627,10 @@ String _prefijoCodigoTransporte(Map<String, dynamic> ruta) {
 String _destinoLegibleTransporte(Map<String, dynamic> ruta) {
   final nombre = (ruta['nombre']?.toString() ?? '').toUpperCase();
   if (nombre.contains('GUATAP') || nombre.contains('PEÑOL') || nombre.contains('PENOL')) return 'Guatapé';
-  if (nombre.contains('CONCEPCI')) return 'Concepción';
   if (nombre.contains('ALEJANDR')) return 'Alejandría';
   if (nombre.contains('SAN VICENTE')) return 'San Vicente Ferrer';
   if (nombre.contains('CISNEROS')) return 'Cisneros';
   if (nombre.contains('SAN RAFAEL')) return 'San Rafael';
-  if (nombre.contains('NECOCL')) return 'Necoclí';
   return 'destino';
 }
 
@@ -18538,7 +17853,9 @@ class _TransporteAliadoCardState extends State<_TransporteAliadoCard> {
 
 bool _tieneAliadoMuseoEscobar(Map<String, dynamic> ruta) {
   final nombre = (ruta['nombre']?.toString() ?? '').toUpperCase();
-  return nombre.contains('TRANSFORMACI');
+  // Solo en RUTA MEMORIA Y REFLEXIÓN — no en MEMORIA Y DERECHOS HUMANOS
+  if (nombre.contains('DERECHOS')) return false;
+  return nombre.contains('MEMORIA') || nombre.contains('REFLEXI');
 }
 
 class _MuseoEscobarCard extends StatefulWidget {
@@ -18746,8 +18063,7 @@ class _SiteItem extends StatelessWidget {
       default: numColor = kDark3; textColor = kTextMuted; icono = '🔒';
     }
     // FIX UX (16/05/2026): Obtener coords del sitio activo para botón "Cómo llegar"
-    // FIX (junio 2026): filtrar por rutaNombre para evitar colisión de nombres
-    // entre rutas que comparten sitios (ej: Jaime Duque CLÁSICA y AVENTURA FAMILIAR).
+    // FIX (junio 2026): filtrar por rutaNombre para evitar colisión de nombres entre rutas.
     double lat = 0, lng = 0;
     if (estado == 'active') {
       try {
@@ -18758,7 +18074,49 @@ class _SiteItem extends StatelessWidget {
           : kSitiosMapa.firstWhere((s) => s.nombre == nombre);
         lat = s.posicion.latitude;
         lng = s.posicion.longitude;
-      } catch (_) {}
+      } catch (_) {
+        // Sitio no está en kSitiosMapa — buscar en gpsSitios o sitiosDetalle de Firestore
+        try {
+          final rutaData = RutasService().rutas.firstWhere(
+            (r) => r['nombre']?.toString() == (rutaNombre ?? ''), orElse: () => {});
+
+          // 1. Buscar en gpsSitios
+          final gpsRaw = rutaData['gpsSitios'];
+          final gpsList = gpsRaw is List ? gpsRaw : <dynamic>[];
+          final gps = gpsList.firstWhere(
+            (g) => g is Map && g['nombre']?.toString() == nombre, orElse: () => null);
+          if (gps != null && gps is Map) {
+            lat = (gps['lat'] as num?)?.toDouble() ?? 0;
+            lng = (gps['lng'] as num?)?.toDouble() ?? 0;
+          }
+
+          // 2. Si no encontró en gpsSitios, buscar en sitiosDetalle (Feria, Vive Centro, etc.)
+          if (lat == 0 && lng == 0) {
+            final detalle = parseSitiosDetalle(rutaData['sitiosDetalle']);
+            final sitio = detalle.firstWhere(
+              (s) => s is Map && s['nombre']?.toString() == nombre, orElse: () => null);
+            if (sitio != null && sitio is Map) {
+              lat = (sitio['lat'] as num?)?.toDouble() ?? 0;
+              lng = (sitio['lng'] as num?)?.toDouble() ?? 0;
+            }
+          }
+
+          // 3. Buscar en kFeriaRutasCompletas si sigue sin encontrar
+          if (lat == 0 && lng == 0) {
+            for (final feriaRuta in kFeriaRutasCompletas) {
+              final feriaDetalle = parseSitiosDetalle(feriaRuta['sitiosDetalle']);
+              final sitio = feriaDetalle.firstWhere(
+                (s) => s is Map && s['nombre']?.toString() == nombre, orElse: () => null);
+              if (sitio != null && sitio is Map) {
+                lat = (sitio['lat'] as num?)?.toDouble() ?? 0;
+                lng = (sitio['lng'] as num?)?.toDouble() ?? 0;
+                break;
+              }
+            }
+          }
+        } catch (_) {}
+      }
+
     }
     return Container(margin: const EdgeInsets.only(bottom: 10), padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(color: kCard, borderRadius: BorderRadius.circular(12),
@@ -19102,7 +18460,6 @@ class _BadgeChip extends StatelessWidget {
   ]);
 }
 
-
 class _SwitchTile extends StatelessWidget {
   final String emoji, titulo, subtitulo;
   final bool valor;
@@ -19309,7 +18666,6 @@ class _GoogleButton extends StatelessWidget {
       ])));
 }
 
-
 // ═══════════════════════════════════════════════════════════════════════════════
 //  FERIA DE LAS FLORES — PANTALLA PRINCIPAL
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -19327,7 +18683,7 @@ class _FeriaScreenState extends State<FeriaScreen> with SingleTickerProviderStat
   @override
   void initState() {
     super.initState();
-    _tabCtrl = TabController(length: 4, vsync: this);
+    _tabCtrl = TabController(length: 3, vsync: this);
     // Notificaciones de la feria
     _programarNotificaciones();
   }
@@ -19347,7 +18703,7 @@ class _FeriaScreenState extends State<FeriaScreen> with SingleTickerProviderStat
     return Scaffold(
       backgroundColor: kDark2,
       body: NestedScrollView(
-        headerSliverBuilder: (context, _) => [
+        headerSliverBuilder: (context, innerBoxIsScrolled) => [
           SliverToBoxAdapter(
             child: ValueListenableBuilder<String>(
               valueListenable: langNotifier,
@@ -19362,8 +18718,7 @@ class _FeriaScreenState extends State<FeriaScreen> with SingleTickerProviderStat
           children: [
             _FeriaAgendaTab(),
             _FeriaRutasTab(),
-            _FeriaTableadosTab(),
-            _FeriaGuiaTab(),
+            _FeriaTableadosV2(),
           ],
         ),
       ),
@@ -19378,8 +18733,8 @@ class _FeriaHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final activa = diasParaFeria <= 0 && diasParaFeria >= -10;
-    final terminada = diasParaFeria < -10;
+    final activa = feriaActiva;       // usa el getter real de fecha
+    final terminada = DateTime.now().isAfter(DateTime(kFeriaAno, kFeriaFin[0], kFeriaFin[1], 23, 59));
     // Contenido primero — imagen se adapta al alto del contenido
     return LayoutBuilder(builder: (context, constraints) {
       return Stack(children: [
@@ -19450,21 +18805,148 @@ class _FeriaHeader extends StatelessWidget {
 
               const SizedBox(height: 12),
 
+              const SizedBox(height: 12),
+
               // Stats chips
               Row(children: [
                 _FeriaStatChip('21', t('tablados','stages'), kGreen),
                 const SizedBox(width: 6),
                 _FeriaStatChip('3', t('rutas','routes'), kFeriaDorado),
                 const SizedBox(width: 6),
-                _FeriaStatChip('🎵', t('eventos','events'), kFeriaRojo),
+                _FeriaStatChip('49', t('eventos','events'), kFeriaRojo),
               ]),
-              const SizedBox(height: 12),
+              const SizedBox(height: 16),
 
-              // Widget gamificación
+              // ── Contexto histórico enriquecido ──
+              _FeriaContextCard(),
+
+              const SizedBox(height: 12),
               _FeriaGameStats(),
             ]))),
       ]);
     });
+  }
+}
+
+// ─── CONTEXTO HISTÓRICO FERIA ─────────────────────────────────────────────────
+class _FeriaContextCard extends StatefulWidget {
+  const _FeriaContextCard();
+  @override
+  State<_FeriaContextCard> createState() => _FeriaContextCardState();
+}
+
+class _FeriaContextCardState extends State<_FeriaContextCard> {
+  bool _expandido = false;
+
+  static const _historiaES = '''La Feria de las Flores nació en 1957 como una idea del escritor y periodista Arturo Uribe Arango, inspirado en el carnaval de flores de Niza, Francia. La primera edición tuvo apenas 40 silleteros y unos pocos curiosos. Hoy es el festival más importante de Colombia, declarado Patrimonio Cultural de la Nación.
+
+🌺 LOS SILLETEROS
+Las familias silleteras de Santa Elena llevan más de 200 años cultivando flores en los suelos volcánicos a 2.600 metros de altura. La tradición nació cuando los campesinos bajaban a vender flores al centro de Medellín cargándolas en silletas de madera en sus espaldas — de ahí el nombre. Hoy hay más de 500 familias silleteras registradas. Una silleta Monumental puede pesar hasta 80 kilos y llevar más de 600 flores diferentes.
+
+🏆 EDICIÓN 69 · 2026
+Este año la Feria tiene un hito histórico: por primera vez participan 10 silleteros neurodiversos del Proceso Silleteando Ando de la Corporación de Silleteros de Santa Elena (COSSE). El lema oficial 2026 fue elegido por primera vez con votación ciudadana: "Medellín te quiere y florece para ti".
+
+📊 EN NÚMEROS
+• 328.000 visitantes esperados
+• 21 tablados en 16 comunas y 5 corregimientos
+• +120 actividades gratuitas
+• Derrama económica: \$60.6 millones USD
+• El metro es GRATUITO el día del Desfile de Silleteros (9 agosto)
+
+🌍 RECONOCIMIENTOS
+National Geographic incluyó a Medellín en los 25 destinos del mundo para visitar en 2026. La Feria de las Flores es la razón número 1 por la que turistas internacionales visitan Colombia en agosto.''';
+
+  static const _historiaEN = '''The Feria de las Flores was born in 1957 as the idea of writer and journalist Arturo Uribe Arango, inspired by the flower carnival of Nice, France. The first edition had just 40 silleteros and a few curious onlookers. Today it is Colombia's most important festival, declared National Cultural Heritage.
+
+🌺 THE SILLETEROS
+Santa Elena silletera families have been growing flowers in volcanic soils at 2,600 meters altitude for over 200 years. The tradition began when farmers walked down to sell flowers in downtown Medellín carrying them in wooden "silletas" on their backs — hence the name. Today over 500 silletera families are registered. A Monumental silleta can weigh up to 80 kilos and hold over 600 different flowers.
+
+🏆 69TH EDITION · 2026
+This year the Feria marks a historic milestone: for the first time, 10 neurodiverse silleteros from the Silleteando Ando Process of the Santa Elena Silleteros Corporation (COSSE) will participate. The 2026 official motto was chosen for the first time through citizen voting: "Medellín loves you and blooms for you".
+
+📊 BY THE NUMBERS
+• 328,000 expected visitors
+• 21 stages in 16 communes and 5 districts
+• 120+ free activities
+• Economic impact: \$60.6 million USD
+• Metro is FREE on Silleteros Parade day (August 9)
+
+🌍 RECOGNITION
+National Geographic included Medellín in the 25 world destinations to visit in 2026. The Feria de las Flores is the #1 reason international tourists visit Colombia in August.''';
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.black.withOpacity(0.45),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: kFeriaRojo.withOpacity(0.3))),
+      child: Column(children: [
+        // Header siempre visible
+        GestureDetector(
+          onTap: () => setState(() => _expandido = !_expandido),
+          child: Padding(
+            padding: const EdgeInsets.all(14),
+            child: Row(children: [
+              const Text('📖', style: TextStyle(fontSize: 18)),
+              const SizedBox(width: 10),
+              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text(t('Historia & Datos de la Feria','History & Feria Facts'),
+                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: kFeriaDorado)),
+                Text(t('69 años de tradición · Patrimonio Cultural de Colombia',
+                       '69 years of tradition · Colombian Cultural Heritage'),
+                  style: const TextStyle(fontSize: 11, color: kTextMuted)),
+              ])),
+              AnimatedRotation(
+                turns: _expandido ? 0.5 : 0,
+                duration: const Duration(milliseconds: 250),
+                child: const Icon(Icons.keyboard_arrow_down, color: kFeriaDorado, size: 20)),
+            ]))),
+
+        // Contenido expandible
+        AnimatedCrossFade(
+          duration: const Duration(milliseconds: 300),
+          crossFadeState: _expandido ? CrossFadeState.showFirst : CrossFadeState.showSecond,
+          firstChild: Padding(
+            padding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              const Divider(color: Colors.white12, height: 1),
+              const SizedBox(height: 12),
+              Wrap(spacing: 8, runSpacing: 6, children: [
+                _ContextChip('🌹 Fundada 1957', kFeriaRojo),
+                _ContextChip('🏔️ Santa Elena 2.600m', kFeriaDorado),
+                _ContextChip('👨‍👩‍👧 500+ familias', kGreen),
+                _ContextChip('🌸 3M flores', kFeriaRojo),
+                _ContextChip('🚇 Metro GRATIS 9 ago', kGreen),
+              ]),
+              const SizedBox(height: 12),
+              // Texto con altura máxima + scroll interno — evita overflow
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxHeight: 260),
+                child: SingleChildScrollView(
+                  physics: const BouncingScrollPhysics(),
+                  child: Text(t(_historiaES, _historiaEN),
+                    style: const TextStyle(fontSize: 12, color: kText, height: 1.55)))),
+            ])),
+          secondChild: const SizedBox.shrink()),
+      ]));
+  }
+}
+
+class _ContextChip extends StatelessWidget {
+  final String label;
+  final Color color;
+  const _ContextChip(this.label, this.color);
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withOpacity(0.35))),
+      child: Text(label,
+        style: TextStyle(fontSize: 10, color: color, fontWeight: FontWeight.w700)));
   }
 }
 
@@ -19493,7 +18975,7 @@ class _FeriaGameStats extends StatelessWidget {
         final int puntos = (data['puntosTotal'] ?? 0) as int;
         final int sitios = (data['sitiosVisitados'] ?? 0) as int;
         final nivel = _niveles.lastWhere(
-          (n) => puntos >= (n['min'] as int), orElse: () => _niveles.first);
+          (n) => puntos >= ((n['min'] as int?) ?? 0), orElse: () => _niveles.first);
         final int nivelIndex = _niveles.indexOf(nivel) + 1;
 
         return Container(
@@ -19509,9 +18991,9 @@ class _FeriaGameStats extends StatelessWidget {
             const SizedBox(height: 10),
             Row(children: [
               _GameStatCell(
-                emoji: nivel['emoji'] as String,
+                emoji: nivel['emoji']?.toString() ?? '',
                 valor: 'Nivel $nivelIndex',
-                label: t(nivel['nombre'] as String, nivel['nombreEN'] as String),
+                label: t(nivel['nombre']?.toString() ?? '', nivel['nombreEN']?.toString() ?? ''),
                 color: kGreen),
               const SizedBox(width: 8),
               _GameStatCell(
@@ -19608,10 +19090,10 @@ class _FeriaCountdownHoy extends StatelessWidget {
           color: kCard, borderRadius: BorderRadius.circular(10),
           border: Border.all(color: kFeriaRojo.withOpacity(0.2))),
         child: Row(children: [
-          Text(e['emoji'] as String, style: const TextStyle(fontSize: 16)),
+          Text(e['emoji']?.toString() ?? '', style: const TextStyle(fontSize: 16)),
           const SizedBox(width: 10),
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(e['titulo'] as String,
+            Text(t(e['titulo']?.toString() ?? '', e['tituloEN']?.toString() ?? e['titulo']?.toString() ?? ''),
               style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: kText)),
             Text('${e['hora']} · ${e['lugar']}',
               style: const TextStyle(fontSize: 10, color: kTextMuted)),
@@ -19663,7 +19145,6 @@ class _FeriaTabDelegate extends SliverPersistentHeaderDelegate {
           Tab(text: t('📅 Agenda','📅 Schedule')),
           Tab(text: t('🗺️ Rutas','🗺️ Routes')),
           Tab(text: t('🥁 Tablados','🥁 Stages')),
-          Tab(text: t('💡 Guía','💡 Guide')),
         ]));
   }
 }
@@ -19763,8 +19244,9 @@ class _FeriaAgendaTabState extends State<_FeriaAgendaTab> {
             }))
         : eventos;
 
-    return Column(children: [
-      Container(
+    return CustomScrollView(
+      slivers: [
+      SliverToBoxAdapter(child: Container(
         height: 68,
         color: kDark3,
         child: ListView.builder(
@@ -19790,9 +19272,9 @@ class _FeriaAgendaTabState extends State<_FeriaAgendaTab> {
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Text(d['dow'] as String,
+                    Text(d['dow']?.toString() ?? '',
                       style: TextStyle(fontSize: 9, color: sel ? Colors.white70 : kTextMuted)),
-                    Text(d['label'] as String,
+                    Text(d['label']?.toString() ?? '',
                       style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700,
                         color: sel ? Colors.white : kText)),
                     if (tieneEspecial)
@@ -19802,8 +19284,9 @@ class _FeriaAgendaTabState extends State<_FeriaAgendaTab> {
                           color: sel ? Colors.white70 : kFeriaDorado)),
                   ])));
           })),
+      ),
       // Toggle cercanía
-      Container(
+      SliverToBoxAdapter(child: Container(
         color: kDark3,
         padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
         child: Row(children: [
@@ -19825,25 +19308,103 @@ class _FeriaAgendaTabState extends State<_FeriaAgendaTab> {
                   style: TextStyle(fontSize: 11,
                     color: _ordenarPorCercania ? kGreen : kTextMuted,
                     fontWeight: FontWeight.w600)))),
-        ])),
-      Expanded(
-        child: ListView(
-          padding: const EdgeInsets.all(16),
-          children: [
-            if (esHoy)
+        ]))),
+      SliverPadding(
+        padding: const EdgeInsets.all(16),
+        sliver: SliverList(delegate: SliverChildListDelegate([
+            // ── Widget HOY enriquecido ──
+            if (esHoy) ...[
               Container(
-                margin: const EdgeInsets.only(bottom: 12),
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                margin: const EdgeInsets.only(bottom: 16),
                 decoration: BoxDecoration(
-                  color: kGreen.withOpacity(0.12),
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: kGreen.withOpacity(0.3))),
+                  gradient: LinearGradient(
+                    colors: [kFeriaRojo.withOpacity(0.25), kFeriaDorado.withOpacity(0.15)],
+                    begin: Alignment.topLeft, end: Alignment.bottomRight),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: kFeriaRojo.withOpacity(0.5))),
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Row(children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: kFeriaRojo,
+                          borderRadius: BorderRadius.circular(20)),
+                        child: Text(t('🟢 AHORA · FERIA EN VIVO','🟢 NOW · LIVE FERIA'),
+                          style: const TextStyle(fontSize: 10, color: Colors.white,
+                            fontWeight: FontWeight.w800, letterSpacing: 1))),
+                      const Spacer(),
+                      GestureDetector(
+                        onTap: () {
+                          final eventosHoy = eventosMostrar.map((e) =>
+                            '${e['emoji'] ?? '🎶'} ${e['titulo']} · ${e['hora'] ?? ''} · ${e['lugar'] ?? ''}').join('\n');
+                          Share.share(
+                            t('🌹 Feria de las Flores 2026 · HOY\n\n$eventosHoy\n\nDescubrí toda la programación en Rutero MDE → rutero-mde.web.app',
+                              '🌹 Feria de las Flores 2026 · TODAY\n\n$eventosHoy\n\nDiscover the full program on Rutero MDE → rutero-mde.web.app'),
+                            subject: t('Feria de las Flores · Hoy en Medellín','Feria de las Flores · Today in Medellín'));
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: kFeriaDorado.withOpacity(0.15),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: kFeriaDorado.withOpacity(0.4))),
+                          child: Row(mainAxisSize: MainAxisSize.min, children: [
+                            const Icon(Icons.share, size: 14, color: kGold),
+                            const SizedBox(width: 4),
+                            Text(t('Compartir','Share'),
+                              style: const TextStyle(fontSize: 11, color: kGold, fontWeight: FontWeight.w600)),
+                          ]))),
+                    ]),
+                    const SizedBox(height: 12),
+                    Text(t('📅 Hoy hay ${eventosMostrar.length} eventos','📅 ${eventosMostrar.length} events today'),
+                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: kText)),
+                    const SizedBox(height: 8),
+                    ...eventosMostrar.take(3).map((e) => Padding(
+                      padding: const EdgeInsets.only(bottom: 4),
+                      child: Row(children: [
+                        Text(e['emoji']?.toString() ?? '🎶', style: const TextStyle(fontSize: 14)),
+                        const SizedBox(width: 8),
+                        Expanded(child: Text(
+                          '${t(e['titulo']?.toString() ?? '', e['tituloEN']?.toString() ?? e['titulo']?.toString() ?? '')} · ${e['hora'] ?? ''}',
+                          style: TextStyle(fontSize: 12, color: kText.withOpacity(0.9)),
+                          maxLines: 1, overflow: TextOverflow.ellipsis)),
+                        if (e['gratuito'] == true)
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: kGreen.withOpacity(0.15),
+                              borderRadius: BorderRadius.circular(4)),
+                            child: Text(t('Gratis','Free'),
+                              style: const TextStyle(fontSize: 9, color: kGreen, fontWeight: FontWeight.w700))),
+                      ]))),
+                    if (eventosMostrar.length > 3)
+                      Text(t('+ ${eventosMostrar.length - 3} eventos más abajo ↓',
+                            '+ ${eventosMostrar.length - 3} more events below ↓'),
+                        style: TextStyle(fontSize: 11, color: kFeriaDorado)),
+                  ]))),
+            ] else if (DateTime.now().isBefore(DateTime(2026, 7, 31))) ...[
+              // Pre-feria: banner countdown
+              Container(
+                margin: const EdgeInsets.only(bottom: 16),
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: kFeriaRojo.withOpacity(0.08),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: kFeriaRojo.withOpacity(0.3))),
                 child: Row(children: [
-                  Text('🟢', style: TextStyle(fontSize: 12)),
-                  SizedBox(width: 8),
-                  Text(t('Hoy','Today'),
-                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: kGreen)),
+                  const Text('🌹', style: TextStyle(fontSize: 28)),
+                  const SizedBox(width: 12),
+                  Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text(textoContadorFeria,
+                      style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: kText)),
+                    Text(t('Explorá la programación y planificá tu Feria',
+                          'Explore the program and plan your Feria'),
+                      style: const TextStyle(fontSize: 11, color: kTextMuted)),
+                  ])),
                 ])),
+            ],
             if (eventosMostrar.isEmpty)
               Center(
                 child: Padding(
@@ -19852,11 +19413,11 @@ class _FeriaAgendaTabState extends State<_FeriaAgendaTab> {
                     style: TextStyle(color: kTextMuted)))),
             for (final e in eventosMostrar) ...[
               Builder(builder: (_) {
-                final color = _colorTipo(e['tipo'] as String);
+                final color = _colorTipo(e['tipo']?.toString() ?? '');
                 final esEstrella = e['esEstrellaFeria'] == true;
                 final lat = (e['lat'] as num?)?.toDouble();
                 final lng = (e['lng'] as num?)?.toDouble();
-                final transporte = e['transporte'] as String?;
+                final transporte = e['transporte']?.toString();
                 final distancia = (lat != null && lng != null) ? _distanciaKm(lat, lng) : null;
                 return Container(
                   margin: const EdgeInsets.only(bottom: 8),
@@ -19871,13 +19432,13 @@ class _FeriaAgendaTabState extends State<_FeriaAgendaTab> {
                     Container(
                       width: 3, height: 50, color: color,
                       margin: const EdgeInsets.only(right: 12)),
-                    Text(e['emoji'] as String, style: const TextStyle(fontSize: 22)),
+                    Text(e['emoji']?.toString() ?? '', style: const TextStyle(fontSize: 22)),
                     const SizedBox(width: 12),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(t(e['titulo'] as String, (e['tituloEN'] as String?) ?? e['titulo'] as String),
+                          Text(t(e['titulo']?.toString() ?? '', (e['tituloEN']?.toString()) ?? e['titulo']?.toString() ?? ''),
                             style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700,
                               color: esEstrella ? kFeriaRojo : kText)),
                           const SizedBox(height: 2),
@@ -19887,7 +19448,7 @@ class _FeriaAgendaTabState extends State<_FeriaAgendaTab> {
                             const SizedBox(height: 4),
                             Wrap(children: [
                               const Text('🎤 ', style: TextStyle(fontSize: 11)),
-                              Text(e['artistas'] as String,
+                              Text(e['artistas']?.toString() ?? '',
                                 style: const TextStyle(
                                   fontSize: 11, color: kGold,
                                   fontWeight: FontWeight.w600, height: 1.4)),
@@ -19895,7 +19456,7 @@ class _FeriaAgendaTabState extends State<_FeriaAgendaTab> {
                           ],
                           if (e['tip'] != null) ...[
                             const SizedBox(height: 6),
-                            Text(e['tip'] as String,
+                            Text(t(e['tip']?.toString() ?? '', e['tipEN']?.toString() ?? e['tip']?.toString() ?? ''),
                               style: TextStyle(
                                 fontSize: 11,
                                 color: kText.withOpacity(0.65),
@@ -19911,24 +19472,42 @@ class _FeriaAgendaTabState extends State<_FeriaAgendaTab> {
                         child: const Text('FREE',
                           style: TextStyle(fontSize: 9, color: kGreen, fontWeight: FontWeight.w700))),
                     ]),
-                    // Transporte + distancia + botón mapa
+                    // Transporte + distancia + botón mapa + compartir
                     if (transporte != null || lat != null) ...[
                       const SizedBox(height: 8),
                       const Divider(height: 1, color: Colors.white10),
                       const SizedBox(height: 8),
                       Row(children: [
                         if (transporte != null)
-                          Expanded(child: Text(transporte,
-                            style: const TextStyle(fontSize: 11, color: kTextMuted))),
+                          Expanded(child: _textoConWhoosh(transporte,
+                            fontSize: 11, baseColor: kTextMuted)),
                         if (distancia != null && distancia < 50)
                           Text(' · ${distancia.toStringAsFixed(1)} km',
                             style: TextStyle(fontSize: 11,
                               color: distancia < 1.5 ? kGreen : kTextMuted,
                               fontWeight: FontWeight.w600)),
-                        const SizedBox(width: 8),
+                        const SizedBox(width: 6),
+                        // Botón compartir
+                        GestureDetector(
+                          onTap: () {
+                            final titulo = t(e['titulo']?.toString() ?? '', (e['tituloEN']?.toString()) ?? e['titulo']?.toString() ?? '');
+                            final hora = e['hora'] ?? '';
+                            final lugar = e['lugar'] ?? '';
+                            final artistas = e['artistas'] != null ? '\n🎤 ${e['artistas']}' : '';
+                            Share.share(
+                              '🌹 Feria de las Flores 2026\n\n${e['emoji']} $titulo\n📍 $lugar\n🕐 $hora$artistas\n\n¡Seguímoslo en Rutero MDE! → rutero-mde.web.app',
+                              subject: 'Feria de las Flores · $titulo');
+                          },
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withOpacity(0.05),
+                              borderRadius: BorderRadius.circular(8)),
+                            child: const Icon(Icons.share, size: 14, color: kTextMuted))),
+                        const SizedBox(width: 6),
                         if (lat != null && lng != null)
                           GestureDetector(
-                            onTap: () => _abrirMapa(lat, lng, e['titulo'] as String),
+                            onTap: () => _abrirMapa(lat, lng, e['titulo']?.toString() ?? ''),
                             child: Container(
                               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                               decoration: BoxDecoration(
@@ -19947,7 +19526,7 @@ class _FeriaAgendaTabState extends State<_FeriaAgendaTab> {
                   ]));
               }),
             ],
-          ])),
+          ]))),
     ]);
   }
 }
@@ -19979,7 +19558,7 @@ class _FeriaRutasTab extends StatelessWidget {
                 Text(t('COLECCIÓN FERIA 2026','FESTIVAL 2026 COLLECTION'),
                   style: TextStyle(fontSize: 13, fontWeight: FontWeight.w900,
                     color: kFeriaDorado, letterSpacing: 1)),
-                Text(t('Completa las 3 rutas y gana la insignia especial','Complete all 3 routes and earn the special badge'),
+                Text(t('Completa las 2 rutas y gana la insignia especial','Complete both routes and earn the special badge'),
                   style: TextStyle(fontSize: 11, color: kTextMuted)),
               ])),
             ]),
@@ -19987,14 +19566,12 @@ class _FeriaRutasTab extends StatelessWidget {
             Row(children: [
               _ColeccionDot('🌹', true),
               _ColeccionLine(),
-              _ColeccionDot('🥁', false),
-              _ColeccionLine(),
               _ColeccionDot('🌿', false),
               _ColeccionLine(),
               _ColeccionDot('🏆', false),
             ]),
             const SizedBox(height: 8),
-            Text(t('Feria Clásica → Tablados → Silletera → Insignia Colección','Classic → Stages → Silletera → Collection Badge'),
+            Text(t('Feria Clásica → Silletera → Insignia Colección','Classic Feria → Silletera → Collection Badge'),
               style: TextStyle(fontSize: 10, color: kTextMuted)),
           ])),
         // Rutas
@@ -20030,11 +19607,32 @@ class _FeriaRutaCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: () {
-        // Buscar la ruta en kRutasData por nombre
+        // Buscar la ruta completa: primero en kFeriaRutasCompletas (siempre disponible),
+        // luego en RutasService si está cargado
+        const idToNombre = {
+          'feria_clasica':    'FERIA CLÁSICA',
+        };
+        final nombreBuscado = idToNombre[ruta['id']?.toString() ?? ''] ?? ruta['nombre']?.toString() ?? '';
+        // Buscar primero en kFeriaRutasCompletas (disponible sin esperar carga async)
+        final rutaLocal = kFeriaRutasCompletas.firstWhere(
+          (r) => r['nombre']?.toString() == nombreBuscado,
+          orElse: () => <String, dynamic>{});
+        // Si está en kFeriaRutasCompletas y tiene sitiosList → usar esa
+        final localSitios = (rutaLocal['sitiosList'] as List?) ?? parseSitiosDetalle(rutaLocal['sitiosDetalle']);
+        if (rutaLocal.isNotEmpty && localSitios?.isNotEmpty == true) {
+          RuteroNav.push(context, RouteDetailScreen(ruta: rutaLocal));
+          return;
+        }
+        // Fallback a RutasService (puede tener versión enriquecida desde Firestore)
         final rutaCompleta = RutasService().rutas.firstWhere(
-          (r) => r['nombre'] == ruta['nombre'] || r['id'] == ruta['id'],
-          orElse: () => ruta);
-        RuteroNav.push(context, FeriaRutaDetailScreen(rutaFeria: ruta));
+          (r) => r['nombre']?.toString() == nombreBuscado,
+          orElse: () => rutaLocal.isNotEmpty ? rutaLocal : ruta);
+        final completaSitios = (rutaCompleta['sitiosList'] as List?) ?? parseSitiosDetalle(rutaCompleta['sitiosDetalle']);
+        if (completaSitios?.isNotEmpty == true) {
+          RuteroNav.push(context, RouteDetailScreen(ruta: rutaCompleta));
+        } else {
+          RuteroNav.push(context, FeriaRutaDetailScreen(rutaFeria: ruta));
+        }
       },
       child: Container(
         margin: const EdgeInsets.only(bottom: 12),
@@ -20060,7 +19658,7 @@ class _FeriaRutaCard extends StatelessWidget {
             ]),
             const SizedBox(height: 12),
             Row(children: [
-              _RutaChip('${ruta['sitios']} sitios', kRutaColor(ruta['acento'], kGold)),
+              _RutaChip('${ruta['sitios'] ?? ''} sitios', kRutaColor(ruta['acento'], kGold)),
               const SizedBox(width: 8),
               _RutaChip(ruta['tiempo']?.toString() ?? '', kRutaColor(ruta['acento'], kGold)),
               const Spacer(),
@@ -20071,7 +19669,7 @@ class _FeriaRutaCard extends StatelessWidget {
                   borderRadius: BorderRadius.circular(8),
                   border: Border.all(color: kRutaColor(ruta['acento'], kGold).withOpacity(0.4))),
                 child: Row(children: [
-                  Text('${ruta['insigniaEmoji']} ${ruta['insignia']}',
+                  Text('${ruta['insigniaEmoji'] ?? ''} ${ruta['insignia'] ?? ''}',
                     style: const TextStyle(fontSize: 10, color: kGold, fontWeight: FontWeight.w600)),
                 ])),
             ]),
@@ -20093,6 +19691,258 @@ class _RutaChip extends StatelessWidget {
 // ═══════════════════════════════════════════════════════════════════════════════
 //  TAB 3 — TABLADOS POR ZONA
 // ═══════════════════════════════════════════════════════════════════════════════
+
+// ═══════════════════════════════════════════════════════════════════════════════
+//  TAB TABLADOS V2 — Por fecha → zona → barrio → info completa
+// ═══════════════════════════════════════════════════════════════════════════════
+
+class _FeriaTableadosV2 extends StatelessWidget {
+  const _FeriaTableadosV2();
+
+  static const _tablados = [
+    // ── Viernes 31 julio
+    {'fecha': 'Vie 31 jul', 'dia': 31, 'zona': '🏟️ Laureles Estadio',
+     'nombre': 'C11 Laureles Estadio', 'lugar': 'Sector Obelisco · Av. Centenaria con Cra. 74',
+     'hora': '7:00 pm', 'transporte': '🚇 Est. Suramericana (L.B) → 8 min',
+     'lat': 6.257020, 'lng': -75.591759},
+    // ── Sábado 1 agosto
+    {'fecha': 'Sáb 1 ago', 'dia': 1, 'zona': '🌿 Corregimientos Oriente',
+     'nombre': 'Corregimiento Santa Elena', 'lugar': 'Parque Principal de Santa Elena',
+     'hora': '7:00 pm', 'transporte': '🚌 Bus desde Parque Berrío → 40 min',
+     'lat': 6.210093, 'lng': -75.498444},
+    {'fecha': 'Sáb 1 ago', 'dia': 1, 'zona': '🌇 Zona Sur',
+     'nombre': 'C15 Guayabal', 'lugar': 'Cancha San Rafael, Guayabal',
+     'hora': '7:00 pm', 'transporte': '🚇 Est. Industriales (L.A) → buseta 10 min',
+     'lat': 6.2017, 'lng': -75.5940},
+    {'fecha': 'Sáb 1 ago', 'dia': 1, 'zona': '🌄 Zona Occidente',
+     'nombre': 'C13 San Javier', 'lugar': 'Cancha El Salado, San Javier',
+     'hora': '7:00 pm', 'transporte': '🚇 Est. San Javier (L.B) → 10 min a pie',
+     'lat': 6.253490, 'lng': -75.624122},
+    // ── Domingo 2 agosto
+    {'fecha': 'Dom 2 ago', 'dia': 2, 'zona': '🏔️ Zona Norte',
+     'nombre': 'C4 Aranjuez', 'lugar': 'Cancha La Brasilia, Aranjuez',
+     'hora': '7:00 pm', 'transporte': '🚇 Est. Caribe (L.A) → buseta Aranjuez',
+     'lat': 6.285419, 'lng': -75.555903},
+    {'fecha': 'Dom 2 ago', 'dia': 2, 'zona': '🌄 Corregimientos Occidente',
+     'nombre': 'Corregimiento Altavista', 'lugar': 'Parque Principal de Altavista',
+     'hora': '7:00 pm', 'transporte': '🚌 Bus desde el Centro → 30 min',
+     'lat': 6.2050, 'lng': -75.6170},
+    {'fecha': 'Dom 2 ago', 'dia': 2, 'zona': '🏔️ Corregimientos Occidente',
+     'nombre': 'Corregimiento San Sebastián de Palmitas', 'lugar': 'Parque Principal de Palmitas',
+     'hora': '7:00 pm', 'transporte': '🚌 Bus desde San Javier → 45 min',
+     'lat': 6.3168, 'lng': -75.6622},
+    // ── Lunes 3 agosto
+    {'fecha': 'Lun 3 ago', 'dia': 3, 'zona': '🌄 Zona Occidente',
+     'nombre': 'C12 La América', 'lugar': 'Parque La Floresta, La América',
+     'hora': '7:00 pm', 'transporte': '🚇 Est. Santa Lucía (L.B) → 10 min',
+     'lat': 6.255825, 'lng': -75.601519},
+    {'fecha': 'Lun 3 ago', 'dia': 3, 'zona': '🏔️ Zona Norte',
+     'nombre': 'C1 Popular', 'lugar': 'Cancha Granizal, Popular',
+     'hora': '7:00 pm', 'transporte': '🚇 Est. Acevedo → Metro Cable J → 15 min',
+     'lat': 6.291166, 'lng': -75.543920},
+    // ── Martes 4 agosto
+    {'fecha': 'Mar 4 ago', 'dia': 4, 'zona': '🏔️ Zona Norte',
+     'nombre': 'C3 Manrique', 'lugar': 'Cancha El Jardín, Manrique',
+     'hora': '7:00 pm', 'transporte': '🚇 Est. Acevedo → 15 min',
+     'lat': 6.276973, 'lng': -75.545300},
+    {'fecha': 'Mar 4 ago', 'dia': 4, 'zona': '🏔️ Zona Norte',
+     'nombre': 'C6 Doce de Octubre', 'lugar': 'Cancha La Tinajita',
+     'hora': '7:00 pm', 'transporte': '🚇 Est. Tricentenario (L.B) → 15 min',
+     'lat': 6.305823, 'lng': -75.572004},
+    // ── Miércoles 5 agosto
+    {'fecha': 'Mié 5 ago', 'dia': 5, 'zona': '🏙️ Zona Centro-Oriente',
+     'nombre': 'C9 Buenos Aires', 'lugar': 'Parque La Milagrosa',
+     'hora': '7:00 pm', 'transporte': '🚌 Bus desde el Centro → 15 min',
+     'lat': 6.235695, 'lng': -75.554299},
+    {'fecha': 'Mié 5 ago', 'dia': 5, 'zona': '🌇 Zona Sur',
+     'nombre': 'C14 El Poblado', 'lugar': 'Parque de El Poblado',
+     'hora': '7:00 pm', 'transporte': '🚇 Est. El Poblado (L.A) → 5 min',
+     'lat': 6.210551, 'lng': -75.570433},
+    // ── Jueves 6 agosto
+    {'fecha': 'Jue 6 ago', 'dia': 6, 'zona': '🌄 Zona Occidente',
+     'nombre': 'C16 Belén', 'lugar': 'Carrera 70, Aeroparque Juan Pablo II',
+     'hora': '7:00 pm', 'transporte': '🚇 Est. Estadio → bus Belén 15 min',
+     'lat': 6.222287, 'lng': -75.592441},
+    {'fecha': 'Jue 6 ago', 'dia': 6, 'zona': '🏛️ Zona Centro',
+     'nombre': 'C10 La Candelaria', 'lugar': 'Parque de Boston',
+     'hora': '7:00 pm', 'transporte': '🚇 Est. Prado (L.A) → 12 min',
+     'lat': 6.24807, 'lng': -75.55762},
+    // ── Viernes 7 agosto
+    {'fecha': 'Vie 7 ago', 'dia': 7, 'zona': '🏔️ Zona Norte',
+     'nombre': 'C5 Castilla', 'lugar': 'Feria de Ganado, Castilla',
+     'hora': '7:00 pm', 'transporte': '🚇 Est. Tricentenario (L.B) → 15 min',
+     'lat': 6.301272, 'lng': -75.563889},
+    {'fecha': 'Vie 7 ago', 'dia': 7, 'zona': '🏙️ Zona Centro-Oriente',
+     'nombre': 'C8 Villa Hermosa', 'lugar': 'Parque de Villa Hermosa',
+     'hora': '7:00 pm', 'transporte': '🚌 Bus desde La Alpujarra → 20 min',
+     'lat': 6.259027, 'lng': -75.551294},
+    {'fecha': 'Vie 7 ago', 'dia': 7, 'zona': '🌄 Corregimientos Occidente',
+     'nombre': 'Corregimiento San Cristóbal', 'lugar': 'Parque Principal de San Cristóbal',
+     'hora': '7:00 pm', 'transporte': '🚇 Est. San Javier → bus 20 min',
+     'lat': 6.277778, 'lng': -75.635208},
+    // ── Sábado 8 agosto
+    {'fecha': 'Sáb 8 ago', 'dia': 8, 'zona': '🌄 Zona Occidente',
+     'nombre': 'C7 Robledo', 'lugar': 'Calle 73, sector universitario',
+     'hora': '7:00 pm', 'transporte': '🚇 Est. Tricentenario (L.B) → 12 min',
+     'lat': 6.273092, 'lng': -75.587614},
+    {'fecha': 'Sáb 8 ago', 'dia': 8, 'zona': '🏔️ Zona Norte',
+     'nombre': 'C2 Santa Cruz', 'lugar': 'Cancha La Frontera',
+     'hora': '7:00 pm', 'transporte': '🚇 Est. Acevedo (L.A) → 15 min',
+     'lat': 6.305387, 'lng': -75.554017},
+    {'fecha': 'Sáb 8 ago', 'dia': 8, 'zona': '🌇 Corregimientos Sur',
+     'nombre': 'Corregimiento San Antonio de Prado', 'lugar': 'Parque Principal de San Antonio de Prado',
+     'hora': '7:00 pm', 'transporte': '🚌 Bus desde Itagüí → 20 min',
+     'lat': 6.184931, 'lng': -75.656489},
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    // Agrupar por fecha
+    final Map<String, List<Map<String, dynamic>>> porFecha = {};
+    for (final t in _tablados) {
+      final fecha = t['fecha']?.toString() ?? '';
+      porFecha.putIfAbsent(fecha, () => []).add(t);
+    }
+
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        // Header
+        Container(
+          margin: const EdgeInsets.only(bottom: 20),
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: kCard,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: kFeriaDorado.withOpacity(0.3))),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Row(children: [
+              const Text('🥁', style: TextStyle(fontSize: 28)),
+              const SizedBox(width: 10),
+              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text(t('21 TABLADOS · 16 COMUNAS', '21 STAGES · 16 COMMUNES'),
+                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800,
+                    color: kFeriaDorado, letterSpacing: 0.8)),
+                Text(t('Un tablado diferente cada noche · 31 jul – 8 ago · Gratis',
+                       'A different stage each night · Jul 31 – Aug 8 · Free'),
+                  style: const TextStyle(fontSize: 11, color: kTextMuted)),
+              ])),
+            ]),
+          ])),
+
+        // Por fecha
+        ...porFecha.entries.map((entry) {
+          final fecha = entry.key;
+          final tablados = entry.value;
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Header de fecha
+              Padding(
+                padding: const EdgeInsets.only(top: 8, bottom: 8),
+                child: Row(children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+                    decoration: BoxDecoration(
+                      color: kFeriaRojo.withOpacity(0.15),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: kFeriaRojo.withOpacity(0.4))),
+                    child: Text(fecha,
+                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700,
+                        color: kFeriaRojo, letterSpacing: 0.5))),
+                  const SizedBox(width: 8),
+                  Text('${tablados.length} ${tablados.length == 1 ? t("tablado","stage") : t("tablados","stages")}',
+                    style: const TextStyle(fontSize: 11, color: kTextMuted)),
+                ])),
+              // Cards de tablados
+              ...tablados.map((tab) => _TabladoCard(tablado: tab)),
+              const SizedBox(height: 4),
+            ]);
+        }),
+        const SizedBox(height: 20),
+      ],
+    );
+  }
+}
+
+class _TabladoCard extends StatelessWidget {
+  final Map<String, dynamic> tablado;
+  const _TabladoCard({required this.tablado});
+
+  @override
+  Widget build(BuildContext context) {
+    final lat = (tablado['lat'] as num).toDouble();
+    final lng = (tablado['lng'] as num).toDouble();
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      decoration: BoxDecoration(
+        color: kCard,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: kDark3)),
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          // Emoji zona
+          Container(
+            width: 42, height: 42,
+            decoration: BoxDecoration(
+              color: kFeriaDorado.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(10)),
+            child: Center(child: Text('🪗', style: const TextStyle(fontSize: 20)))),
+          const SizedBox(width: 12),
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(tablado['nombre']?.toString() ?? '',
+              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: kText)),
+            const SizedBox(height: 3),
+            Text(tablado['zona']?.toString() ?? '',
+              style: const TextStyle(fontSize: 11, color: kFeriaDorado, fontWeight: FontWeight.w600)),
+            const SizedBox(height: 5),
+            Row(children: [
+              const Icon(Icons.location_on_outlined, size: 12, color: kTextMuted),
+              const SizedBox(width: 3),
+              Expanded(child: Text(tablado['lugar']?.toString() ?? '',
+                style: const TextStyle(fontSize: 11, color: kTextMuted))),
+            ]),
+            const SizedBox(height: 2),
+            Row(children: [
+              const Icon(Icons.access_time, size: 12, color: kTextMuted),
+              const SizedBox(width: 3),
+              Text('${tablado['hora'] ?? ''} · ${t('Gratuito', 'Free')}',
+                style: const TextStyle(fontSize: 11, color: kTextMuted)),
+            ]),
+            const SizedBox(height: 2),
+            Row(children: [
+              const Icon(Icons.directions_transit, size: 12, color: kTextMuted),
+              const SizedBox(width: 3),
+              Expanded(child: Text(tablado['transporte']?.toString() ?? '',
+                style: const TextStyle(fontSize: 11, color: kTextMuted))),
+            ]),
+          ])),
+          // Botón GPS
+          GestureDetector(
+            onTap: () => _abrirMapa(lat, lng, tablado['nombre']?.toString() ?? ''),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              decoration: BoxDecoration(
+                color: kFeriaDorado.withOpacity(0.15),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: kFeriaDorado.withOpacity(0.4))),
+              child: Column(mainAxisSize: MainAxisSize.min, children: [
+                const Icon(Icons.navigation_outlined, size: 18, color: kFeriaDorado),
+                const SizedBox(height: 2),
+                Text(t('Ir','Go'),
+                  style: const TextStyle(fontSize: 9, color: kFeriaDorado, fontWeight: FontWeight.w700)),
+              ]))),
+        ])));
+  }
+
+  void _abrirMapa(double lat, double lng, String nombre) {
+    final uri = Uri.parse(
+      'https://www.google.com/maps/dir/?api=1&destination=$lat,$lng&travelmode=transit');
+    launchUrl(uri, mode: LaunchMode.externalApplication);
+  }
+}
 
 class _FeriaTableadosTab extends StatefulWidget {
   @override
@@ -20136,12 +19986,12 @@ class _FeriaTableadosTabState extends State<_FeriaTableadosTab> {
                 Padding(
                   padding: const EdgeInsets.all(14),
                   child: Row(children: [
-                    Text(zona['emoji'] as String, style: const TextStyle(fontSize: 24)),
+                    Text(zona['emoji']?.toString() ?? '', style: const TextStyle(fontSize: 24)),
                     const SizedBox(width: 12),
                     Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      Text(zona['zona'] as String,
+                      Text(zona['zona']?.toString() ?? '',
                         style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: kText)),
-                      Text('${(zona['tablados'] as List).length}' + t(' tablados · Validar uno',' stages · Validate one'),
+                      Text('${(zona['tablados'] as List).length}' + t(' tablados · Gratis · Toda la feria',' stages · Free · All festival'),
                         style: const TextStyle(fontSize: 11, color: kTextMuted)),
                     ])),
                     Container(
@@ -20160,39 +20010,62 @@ class _FeriaTableadosTabState extends State<_FeriaTableadosTab> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        ...(zona['tablados'] as List).map<Widget>((t) =>
-                          Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 4),
-                            child: Row(children: [
-                              const Text('🎶', style: TextStyle(fontSize: 14)),
-                              const SizedBox(width: 8),
-                              Text(t.toString(),
-                                style: const TextStyle(fontSize: 13, color: kText)),
-                            ]))).toList(),
-                        const SizedBox(height: 10),
-                        if (zona['transporte'] != null)
-                          Text(zona['transporte'] as String,
-                            style: const TextStyle(fontSize: 11, color: kTextMuted)),
-                        const SizedBox(height: 8),
-                        GestureDetector(
-                          onTap: () {
-                            final lat = zona['lat'] as double;
-                            final lng = zona['lng'] as double;
-                            final url = 'https://www.google.com/maps/dir/?api=1&destination=\$lat,\$lng&travelmode=transit';
-                            launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
-                          },
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        ...(zona['tablados'] as List).map<Widget>((tablado) {
+                          final nombre = tablado['nombre']?.toString() ?? tablado.toString();
+                          final barrio = tablado is Map ? tablado['barrio']?.toString() ?? '' : '';
+                          final lugar = tablado is Map ? tablado['lugar']?.toString() ?? '' : '';
+                          final lat = tablado is Map ? (tablado['lat'] as double?) : null;
+                          final lng = tablado is Map ? (tablado['lng'] as double?) : null;
+                          return Container(
+                            margin: const EdgeInsets.only(bottom: 8),
+                            padding: const EdgeInsets.all(10),
                             decoration: BoxDecoration(
-                              color: kGreen.withOpacity(0.12),
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(color: kGreen.withOpacity(0.3))),
-                            child: Row(mainAxisSize: MainAxisSize.min, children: [
-                              const Text('🗺️', style: TextStyle(fontSize: 14)),
-                              const SizedBox(width: 6),
-                              Text(t('Cómo llegar a esta zona','Get directions to this zone'),
-                                style: TextStyle(fontSize: 12, color: kGreen, fontWeight: FontWeight.w600)),
-                            ]))),
+                              color: Colors.black.withOpacity(0.2),
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(color: Colors.white.withOpacity(0.06))),
+                            child: Row(children: [
+                              const Text('🎶', style: TextStyle(fontSize: 18)),
+                              const SizedBox(width: 10),
+                              Expanded(child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(nombre,
+                                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: kText)),
+                                  if (barrio.isNotEmpty)
+                                    Text(barrio,
+                                      style: const TextStyle(fontSize: 10, color: kGreen)),
+                                  if (lugar.isNotEmpty)
+                                    Text(lugar,
+                                      style: const TextStyle(fontSize: 10, color: kTextMuted)),
+                                ])),
+                              if (lat != null && lng != null)
+                                GestureDetector(
+                                  onTap: () {
+                                    final url = 'https://www.google.com/maps/dir/?api=1&destination=$lat,$lng&travelmode=transit';
+                                    launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+                                  },
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                                    decoration: BoxDecoration(
+                                      color: kGreen.withOpacity(0.15),
+                                      borderRadius: BorderRadius.circular(8),
+                                      border: Border.all(color: kGreen.withOpacity(0.3))),
+                                    child: const Text('📍', style: TextStyle(fontSize: 14)))),
+                            ]));
+                        }).toList(),
+                        const SizedBox(height: 8),
+                        if (zona['transporte'] != null)
+                          Container(
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              color: kCard,
+                              borderRadius: BorderRadius.circular(8)),
+                            child: Row(children: [
+                              const Text('🚇', style: TextStyle(fontSize: 14)),
+                              const SizedBox(width: 8),
+                              Expanded(child: Text(zona['transporte']?.toString() ?? '',
+                                style: const TextStyle(fontSize: 11, color: kTextMuted))),
+                            ])),
                       ])),
                 ],
               ])));
@@ -20296,7 +20169,7 @@ class _FeriaGuiaTab extends StatelessWidget {
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(s['titulo'] as String,
+            Text(t(s['titulo']?.toString() ?? '', s['tituloEN']?.toString() ?? s['titulo']?.toString() ?? ''),
               style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: kText)),
             const SizedBox(height: 10),
             ...(s['items'] as List<String>).map((item) => Padding(
@@ -20323,14 +20196,12 @@ class FeriaRutaDetailScreen extends StatelessWidget {
   // Mapeo de id de ruta Feria → nombre en kRutasData
   static const Map<String, String> _idToNombre = {
     'feria_clasica':    'FERIA CLÁSICA',
-    'feria_tablados':   'TABLADOS Y RUMBA',
-    'feria_silletera':  'RUTA SILLETERA',
   };
 
   @override
   Widget build(BuildContext context) {
     // Buscar la ruta correcta en kRutasData según el id
-    final nombreBuscado = _idToNombre[rutaFeria['id'] as String] ?? rutaFeria['nombre'] as String;
+    final nombreBuscado = _idToNombre[rutaFeria['id']?.toString() ?? ''] ?? rutaFeria['nombre']?.toString() ?? '';
     final rutaCompleta = RutasService().rutas.firstWhere(
       (r) => r['nombre'] == nombreBuscado,
       orElse: () => rutaFeria);
@@ -20355,9 +20226,9 @@ class FeriaRutaDetailScreen extends StatelessWidget {
                   colors: [rutaFeria['color1'] as Color, rutaFeria['color2'] as Color])),
               child: Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
                 const SizedBox(height: 40),
-                Text(rutaFeria['emoji'] as String, style: const TextStyle(fontSize: 48)),
+                Text(rutaFeria['emoji']?.toString() ?? '', style: const TextStyle(fontSize: 48)),
                 const SizedBox(height: 8),
-                Text(t(rutaFeria['nombre'] as String, rutaFeria['nombreEN'] as String),
+                Text(t(rutaFeria['nombre']?.toString() ?? '', rutaFeria['nombreEN']?.toString() ?? ''),
                   style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900,
                     color: kText, letterSpacing: 2)),
               ])))),
@@ -20367,11 +20238,13 @@ class FeriaRutaDetailScreen extends StatelessWidget {
             padding: const EdgeInsets.all(20),
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               // Descripción
-              Text(t(rutaFeria['desc'] as String, rutaFeria['descEN'] as String),
+              Text(t(
+                rutaFeria['desc']?.toString() ?? rutaFeria['descripcion']?.toString() ?? '',
+                rutaFeria['descEN']?.toString() ?? rutaFeria['descripcionEN']?.toString() ?? ''),
                 style: const TextStyle(fontSize: 14, color: kTextMuted, height: 1.6)),
               const SizedBox(height: 20),
               // Validación por fecha
-              _FechaValidacionInfo(rutaId: rutaFeria['id'] as String),
+              _FechaValidacionInfo(rutaId: rutaFeria['id']?.toString() ?? ''),
               const SizedBox(height: 20),
               // Botón iniciar
               GestureDetector(
@@ -20412,10 +20285,6 @@ class _FechaValidacionInfo extends StatelessWidget {
           {'emoji': '🎸', 'titulo': 'Super Concierto', 'fecha': '8 ago · 7 pm', 'fechaData': kFeriaConcierto},
           {'emoji': '🎤', 'titulo': 'Final de la Trova', 'fecha': '7 ago · 6 pm', 'fechaData': kFeriaTrova},
           {'emoji': '🚗', 'titulo': 'Autos Clásicos', 'fecha': '6 ago · 10 am', 'fechaData': kFeriaAutos},
-        ];
-      case 'feria_silletera':
-        eventos = [
-          {'emoji': '🌿', 'titulo': 'Fincas silleteras', 'fecha': '19 jul – 9 ago', 'fechaData': null},
           {'emoji': '🏔️', 'titulo': 'Parque Arví', 'fecha': 'Toda la feria', 'fechaData': null},
         ];
       default:
@@ -20443,16 +20312,16 @@ class _FechaValidacionInfo extends StatelessWidget {
               return Padding(
                 padding: const EdgeInsets.only(bottom: 8),
                 child: Row(children: [
-                  Text(e['emoji'] as String, style: const TextStyle(fontSize: 16)),
+                  Text(e['emoji']?.toString() ?? '', style: const TextStyle(fontSize: 16)),
                   const SizedBox(width: 10),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(e['titulo'] as String,
+                        Text(t(e['titulo']?.toString() ?? '', e['tituloEN']?.toString() ?? e['titulo']?.toString() ?? ''),
                           style: const TextStyle(fontSize: 12,
                             fontWeight: FontWeight.w600, color: kText)),
-                        Text(e['fecha'] as String,
+                        Text(e['fecha']?.toString() ?? '',
                           style: const TextStyle(fontSize: 10, color: kTextMuted)),
                       ])),
                   if (esHoy2)

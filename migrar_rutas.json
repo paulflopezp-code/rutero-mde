@@ -1,0 +1,13 @@
+{
+  "type": "service_account",
+  "project_id": "rutero-mde",
+  "private_key_id": "97729a00eaf445a57f5972ab1a7ebbb2cddd18e8",
+  "private_key": "-----BEGIN PRIVATE KEY-----\nMIIEvAIBADANBgkqhkiG9w0BAQEFAASCBKYwggSiAgEAAoIBAQDf2zUmT9LpiPYa\n0SFyjCVB1YKYJRzuMok6JxgVY1pycQiUV3eDEVR3aOOLTq0obFdnsjN/T+Z7gvHn\n5JtYwEVPoIQ5+unYf2Q26Cx/asTkVI1lSMv6tS/SfwWT+zIEjjm/UMHsz5UQ/Rut\nKaG8KtyAJ+ivG0HNa9fAI1/4/GP0FeyzKYKq267aWU/Dq11HZwMIh0oujkRbHE+r\nZ22vyZsGQok0YNeIq8+45dUR2MZlXZT6EPTHkJ4Ib4HM/yxGnlaCGw9u/2yh399F\njEoSRiCBat3gukY6j3JenU6XdvLxH/ZWJQns51PIBlJdEhe1yNPd8GoLdCRqUuL8\nSubDp0znAgMBAAECggEASnu3jY3V0ZqeuIGJLYHwC52tHE6M97yc6FqFqugp+hYe\nEq2fuF6Vyj1+KKX++4pA8uHaPKwrNkF1mAD6p2ciKMJx/JC+KikJATPzSloONSLl\nASRdqoeK5/EXvAtCsz1XfY6zV8YiBUsSYGWPyPpB7+pXg5wAIweU+/tJPaFM6LOb\naj3GyPfGgaAiXUD5DFkwUImmODebWOmswWCWkxOeHbWpLCl2BXRbUjYnujbK1kPE\n+5dKqab7xEOttVO4Yfv0ZI5U0btmKxyOGn5+MJUVJbAKSSX36CV4O9DozWQCMcXS\njilcILejcmXJNzs+qBCpXmJw8CkqwIdKdEyb05YE4QKBgQD4a8XrS2DN5KjIuGxu\nIeRcrP9Blir9d7cha5fAByf1t9oLuE+w5TiQgl1Kokm2CMoQoHeE2KxlDm+oFTho\nz3W3ui5iORTMgG8OMbkXOd4J0aKx9vKCN2+ukmF4bGk0IajDr7pzftj9BQxcuEgE\n4C2IoJDZKAuzImSCVJU94gn43wKBgQDmr5QKoF8bvJRIDgw23JpVSPuXlrME83GC\n7a/LGzXiDm2rOa6mr7nFZK1hmaDlbZ2NO5zKt+fwbtFcXvuMqslnwwg/y0rSxUAn\nAEhm0SLrnZ48qe+TMkde6eASA70w7Lih07W4MWMTU8kCPYsaJQv03mxe0oZYU1eC\nKmK0REdE+QKBgGZ4Rh6FbDvhmwGYmRlgn4rezTenkroU3JRLhj/uc7w2hxmYgD6u\nfoOVUpgLky4kN/1dw48ntQzGRKZngmoxURRlFubrNroYLDcFqZx8ASu5rkuMWoH+\nDfJLbSs4RLj9PVjirp0fcLAFmhDQ7twcAIw/9x+sFg9hG2ZrL1hkWcqvAoGANQY2\nqRqjweRe0REpjZK3htL3wahKDeFHPikUN0NR51wZqTnhAz9xHAZANCbz7Mh9ZnFF\nYPNUxNc0GF9cwsCe+tLBmqhH0pq0XEKcYcXAmRfpv1fwUY1FCnQHpRxm6FABQHFB\nW80+ULr5gSJUTvYlAWv+zOznJHZDrw+/EGCBYUECgYB7SNYpnnug/x08TD3k/eey\nhu9vVp4z/CBVDfa6DRme+nb6RaxodRMrtqtsruhKnE3Llt8B9uyP6Eb3OhVTqO5H\n8aS+LcvGFPxi+cI3TST0yLyMLBT2l1H2+oBDRbCl8YyLiqMFUzAm78kaajWRzBVl\nwZXLYGs37X4bLcHmUuiBeQ==\n-----END PRIVATE KEY-----\n",
+  "client_email": "firebase-adminsdk-fbsvc@rutero-mde.iam.gserviceaccount.com",
+  "client_id": "104141068244397164846",
+  "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+  "token_uri": "https://oauth2.googleapis.com/token",
+  "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+  "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/firebase-adminsdk-fbsvc%40rutero-mde.iam.gserviceaccount.com",
+  "universe_domain": "googleapis.com"
+}

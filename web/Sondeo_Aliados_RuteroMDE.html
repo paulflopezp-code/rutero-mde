@@ -1,0 +1,621 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Rutero MDE · Sondeo de Aliados</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Inter', -apple-system, sans-serif;
+    background: linear-gradient(135deg, #0F1A0A 0%, #1B2E1A 50%, #0F1A0A 100%);
+    min-height: 100vh;
+    color: #F5F5F0;
+    line-height: 1.5;
+  }
+  .container { max-width: 720px; margin: 0 auto; padding: 24px 20px 60px; }
+
+  /* Progress bar */
+  .progress-bar {
+    position: fixed; top: 0; left: 0; right: 0;
+    height: 3px; background: rgba(255,255,255,0.08); z-index: 100;
+  }
+  .progress-fill {
+    height: 100%; width: 0%;
+    background: linear-gradient(90deg, #5BAD6F, #C9A84C);
+    transition: width 0.3s;
+  }
+
+  /* Hero */
+  .hero {
+    text-align: center; padding: 24px 16px 16px; margin-bottom: 20px;
+  }
+  .hero .emoji { font-size: 56px; margin-bottom: 8px; }
+  .hero h1 {
+    font-size: 28px; font-weight: 900; letter-spacing: 2px;
+    background: linear-gradient(135deg, #5BAD6F, #C9A84C);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    background-clip: text; margin-bottom: 4px;
+  }
+  .hero .tagline {
+    font-size: 13px; color: #C9A84C; font-style: italic;
+    letter-spacing: 0.5px;
+  }
+
+  /* Intro card - Propósito de la app */
+  .intro-card {
+    background: rgba(91, 173, 111, 0.08);
+    border: 1px solid rgba(91, 173, 111, 0.25);
+    border-radius: 20px;
+    padding: 24px 22px;
+    margin-bottom: 20px;
+  }
+  .intro-card .label {
+    display: inline-block;
+    background: rgba(201, 168, 76, 0.2);
+    color: #C9A84C;
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 1.5px;
+    margin-bottom: 12px;
+  }
+  .intro-card h2 {
+    font-size: 18px; font-weight: 800; color: #F5F5F0;
+    margin-bottom: 12px; line-height: 1.3;
+  }
+  .intro-card p {
+    font-size: 14px; color: rgba(245,245,240,0.85);
+    line-height: 1.6; margin-bottom: 12px;
+  }
+  .intro-card p:last-child { margin-bottom: 0; }
+  .intro-card strong { color: #5BAD6F; font-weight: 700; }
+
+  /* Benefits card - Qué gana el aliado */
+  .benefits-card {
+    background: linear-gradient(135deg, rgba(201,168,76,0.08), rgba(184,92,174,0.05));
+    border: 1px solid rgba(201, 168, 76, 0.3);
+    border-radius: 20px;
+    padding: 20px 22px;
+    margin-bottom: 24px;
+  }
+  .benefits-card .label {
+    display: inline-block;
+    background: rgba(91, 173, 111, 0.25);
+    color: #5BAD6F;
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 1.5px;
+    margin-bottom: 12px;
+  }
+  .benefits-card h3 {
+    font-size: 16px; font-weight: 800; color: #F5F5F0;
+    margin-bottom: 14px;
+  }
+  .benefit-item {
+    display: flex; gap: 12px; align-items: flex-start;
+    padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.05);
+  }
+  .benefit-item:last-child { border-bottom: none; padding-bottom: 0; }
+  .benefit-item .icon {
+    font-size: 22px; line-height: 1; flex-shrink: 0;
+  }
+  .benefit-item .text {
+    font-size: 13px; color: rgba(245,245,240,0.9); line-height: 1.5;
+  }
+  .benefit-item .text strong { color: #C9A84C; }
+
+  /* Divisor */
+  .divider {
+    text-align: center; margin: 32px 0 24px;
+    font-size: 11px; color: rgba(245,245,240,0.4);
+    letter-spacing: 3px; font-weight: 700;
+  }
+  .divider::before, .divider::after {
+    content: '─────'; color: rgba(91,173,111,0.3); margin: 0 12px;
+  }
+
+  /* Form */
+  .form-intro {
+    text-align: center; margin-bottom: 24px;
+    font-size: 14px; color: rgba(245,245,240,0.75);
+  }
+  .section {
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 16px;
+    padding: 22px 20px;
+    margin-bottom: 16px;
+    transition: all 0.2s;
+  }
+  .section:focus-within {
+    border-color: rgba(91,173,111,0.4);
+    background: rgba(91,173,111,0.04);
+  }
+  .q-number {
+    display: inline-block;
+    background: #5BAD6F; color: white;
+    width: 26px; height: 26px; border-radius: 50%;
+    text-align: center; line-height: 26px;
+    font-size: 13px; font-weight: 800;
+    margin-right: 10px;
+  }
+  .q-title {
+    font-size: 15px; font-weight: 700; color: #F5F5F0;
+    margin-bottom: 4px; display: flex; align-items: center; gap: 4px;
+  }
+  .q-hint {
+    font-size: 12px; color: rgba(245,245,240,0.5);
+    margin-left: 36px; margin-bottom: 14px;
+  }
+  .required { color: #B85CAE; font-size: 11px; margin-left: 4px; }
+
+  /* Inputs */
+  input[type="text"], input[type="email"], input[type="tel"], textarea, select {
+    width: 100%;
+    background: rgba(0,0,0,0.25);
+    border: 1px solid rgba(255,255,255,0.1);
+    color: #F5F5F0;
+    font-family: inherit;
+    font-size: 14px;
+    padding: 12px 14px;
+    border-radius: 10px;
+    margin-left: 36px;
+    width: calc(100% - 36px);
+    transition: all 0.2s;
+  }
+  input:focus, textarea:focus, select:focus {
+    outline: none;
+    border-color: #5BAD6F;
+    background: rgba(0,0,0,0.35);
+  }
+  textarea { resize: vertical; min-height: 80px; }
+
+  /* Radio/Checkbox options */
+  .options { margin-left: 36px; }
+  .option {
+    display: flex; align-items: flex-start; gap: 10px;
+    padding: 12px 14px;
+    background: rgba(0,0,0,0.2);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 10px;
+    margin-bottom: 8px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .option:hover {
+    background: rgba(91,173,111,0.08);
+    border-color: rgba(91,173,111,0.3);
+  }
+  .option input { display: none; }
+  .option .dot {
+    width: 20px; height: 20px; flex-shrink: 0;
+    border: 2px solid rgba(255,255,255,0.3);
+    border-radius: 50%;
+    margin-top: 1px;
+    transition: all 0.15s;
+    position: relative;
+  }
+  .option input[type="checkbox"] + .dot { border-radius: 4px; }
+  .option input:checked + .dot {
+    border-color: #5BAD6F;
+    background: #5BAD6F;
+  }
+  .option input:checked + .dot::after {
+    content: '✓';
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    color: white;
+    font-size: 12px;
+    font-weight: 900;
+  }
+  .option .label-text {
+    font-size: 14px; color: rgba(245,245,240,0.95);
+    flex: 1; padding-top: 1px;
+  }
+  .option input:checked ~ .label-text {
+    color: #5BAD6F; font-weight: 600;
+  }
+
+  /* Submit */
+  .submit-btn {
+    width: 100%;
+    padding: 16px;
+    background: linear-gradient(135deg, #5BAD6F, #3D8452);
+    color: white;
+    border: none;
+    border-radius: 14px;
+    font-family: inherit;
+    font-size: 15px;
+    font-weight: 800;
+    letter-spacing: 1.5px;
+    cursor: pointer;
+    margin-top: 12px;
+    transition: all 0.2s;
+    box-shadow: 0 8px 20px rgba(91,173,111,0.3);
+  }
+  .submit-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 12px 24px rgba(91,173,111,0.4);
+  }
+  .submit-btn:disabled {
+    background: rgba(255,255,255,0.1);
+    cursor: not-allowed;
+    box-shadow: none;
+    transform: none;
+  }
+
+  /* Success */
+  .success-card {
+    display: none;
+    text-align: center;
+    padding: 60px 30px;
+    background: rgba(91,173,111,0.1);
+    border: 2px solid rgba(91,173,111,0.3);
+    border-radius: 20px;
+    margin: 40px 0;
+  }
+  .success-card.show { display: block; }
+  .success-card .check {
+    font-size: 72px; margin-bottom: 16px;
+    animation: bounce 0.6s ease;
+  }
+  @keyframes bounce {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.2); }
+  }
+  .success-card h2 {
+    font-size: 26px; color: #5BAD6F;
+    margin-bottom: 12px; font-weight: 900;
+  }
+  .success-card p {
+    font-size: 15px; color: rgba(245,245,240,0.8);
+    margin-bottom: 8px;
+  }
+
+  /* Footer */
+  .footer {
+    text-align: center; margin-top: 40px;
+    font-size: 12px; color: rgba(245,245,240,0.4);
+    padding-bottom: 20px;
+  }
+  .footer strong { color: #5BAD6F; }
+
+  /* Error state */
+  .error-msg {
+    display: none;
+    background: rgba(184,92,174,0.15);
+    border: 1px solid rgba(184,92,174,0.4);
+    color: #D585D0;
+    padding: 12px 16px;
+    border-radius: 10px;
+    font-size: 13px;
+    margin-top: 12px;
+  }
+  .error-msg.show { display: block; }
+
+  @media (max-width: 600px) {
+    .hero h1 { font-size: 24px; }
+    .intro-card, .benefits-card { padding: 18px 16px; }
+    .section { padding: 18px 16px; }
+    input, .options, .q-hint { margin-left: 30px; width: calc(100% - 30px); }
+  }
+</style>
+</head>
+<body>
+
+<div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
+
+<div class="container">
+
+  <!-- HERO -->
+  <div class="hero">
+    <div class="emoji">🌿</div>
+    <h1>RUTERO MDE</h1>
+    <div class="tagline">Medellín, camina tu ciudad</div>
+  </div>
+
+  <!-- INTRO: Qué es la app -->
+  <div class="intro-card">
+    <span class="label">💡 QUÉ ES RUTERO MDE</span>
+    <h2>La app que convierte cada turista internacional en un cliente directo para tu negocio</h2>
+    <p>Somos una <strong>plataforma de turismo gamificado</strong> enfocada en turistas internacionales que llegan a Medellín y Antioquia. Creamos rutas temáticas por la ciudad y los pueblos cercanos — <strong>Comuna 13, Guatapé, Jardín, Santa Fe, Poblado</strong>, entre otras — que los turistas compran en la app y recorren por su cuenta.</p>
+    <p>En cada ruta los turistas visitan <strong>entre 5 y 10 sitios</strong>, validan su visita con foto, ganan insignias coleccionables y <strong>reciben descuentos exclusivos en negocios aliados</strong> que están en la ruta.</p>
+    <p>Nuestro norte es simple: <strong>llevar turistas reales a negocios reales</strong>, sin comisiones abusivas ni intermediarios complicados. Somos locales, no somos TripAdvisor ni Booking — somos paisas ayudando a paisas a recibir turismo de calidad.</p>
+  </div>
+
+  <!-- BENEFITS: Qué gana el aliado -->
+  <div class="benefits-card">
+    <span class="label">🎁 QUÉ GANAS SIENDO ALIADO</span>
+    <h3>Ser aliado no cuesta nada. Solo ganas.</h3>
+    <div class="benefit-item">
+      <span class="icon">👥</span>
+      <span class="text"><strong>Tráfico gratuito.</strong> Turistas que ya compraron la ruta llegan a tu negocio para canjear su beneficio.</span>
+    </div>
+    <div class="benefit-item">
+      <span class="icon">🌍</span>
+      <span class="text"><strong>Visibilidad internacional.</strong> Tu negocio aparece en la app con foto, descripción y mapa — en español e inglés.</span>
+    </div>
+    <div class="benefit-item">
+      <span class="icon">💵</span>
+      <span class="text"><strong>Pagos en dólares.</strong> Los turistas pagan la ruta en USD. Tu parte la recibes según el beneficio que tú ofrezcas (descuento, producto, experiencia).</span>
+    </div>
+    <div class="benefit-item">
+      <span class="icon">📊</span>
+      <span class="text"><strong>Datos de tu negocio.</strong> Ves cuántos turistas llegaron, de qué países, y qué consumieron — todo en un panel simple.</span>
+    </div>
+    <div class="benefit-item">
+      <span class="icon">🚫</span>
+      <span class="text"><strong>Sin exclusividad ni permanencia.</strong> Entras y sales cuando quieras. No firmas contratos largos.</span>
+    </div>
+  </div>
+
+  <div class="divider">QUEREMOS CONOCERTE</div>
+
+  <p class="form-intro">Responde estas 10 preguntas cortas (toma 4 minutos) y nos ponemos en contacto para conversar a fondo.</p>
+
+  <form id="sondeoForm" onsubmit="event.preventDefault(); enviarFormulario();">
+
+    <!-- 1. Nombre del negocio -->
+    <div class="section">
+      <div class="q-title"><span class="q-number">1</span>Nombre de tu negocio o emprendimiento<span class="required">*</span></div>
+      <div class="q-hint">Así lo conocen tus clientes.</div>
+      <input type="text" name="nombre_negocio" required placeholder="Ej: El Balcón Paisa">
+    </div>
+
+    <!-- 2. Tipo de negocio -->
+    <div class="section">
+      <div class="q-title"><span class="q-number">2</span>¿Qué tipo de negocio tienes?<span class="required">*</span></div>
+      <div class="q-hint">Selecciona la opción que mejor describa tu actividad principal.</div>
+      <div class="options">
+        <label class="option"><input type="radio" name="tipo_negocio" value="restaurante" required><span class="dot"></span><span class="label-text">🍽️ Restaurante / Café / Bar</span></label>
+        <label class="option"><input type="radio" name="tipo_negocio" value="hospedaje"><span class="dot"></span><span class="label-text">🏨 Hotel / Hostal / Airbnb</span></label>
+        <label class="option"><input type="radio" name="tipo_negocio" value="museo_atraccion"><span class="dot"></span><span class="label-text">🏛️ Museo / Atracción turística</span></label>
+        <label class="option"><input type="radio" name="tipo_negocio" value="tienda_artesania"><span class="dot"></span><span class="label-text">🎨 Tienda / Artesanías / Regalos</span></label>
+        <label class="option"><input type="radio" name="tipo_negocio" value="tour_experiencia"><span class="dot"></span><span class="label-text">🚶 Tour / Experiencia / Guía turístico</span></label>
+        <label class="option"><input type="radio" name="tipo_negocio" value="transporte"><span class="dot"></span><span class="label-text">🚗 Transporte (taxi, chiva, lancha)</span></label>
+        <label class="option"><input type="radio" name="tipo_negocio" value="spa_bienestar"><span class="dot"></span><span class="label-text">💆 Spa / Bienestar / Deporte</span></label>
+        <label class="option"><input type="radio" name="tipo_negocio" value="otro"><span class="dot"></span><span class="label-text">✨ Otro</span></label>
+      </div>
+    </div>
+
+    <!-- 3. Ubicación -->
+    <div class="section">
+      <div class="q-title"><span class="q-number">3</span>¿Dónde está ubicado?<span class="required">*</span></div>
+      <div class="q-hint">Ciudad o municipio donde opera tu negocio.</div>
+      <input type="text" name="ubicacion" required placeholder="Ej: Guatapé, El Poblado, Comuna 13, Jardín...">
+    </div>
+
+    <!-- 4. Tiempo operando -->
+    <div class="section">
+      <div class="q-title"><span class="q-number">4</span>¿Cuánto tiempo lleva operando tu negocio?<span class="required">*</span></div>
+      <div class="options">
+        <label class="option"><input type="radio" name="tiempo_operacion" value="menos_1" required><span class="dot"></span><span class="label-text">Menos de 1 año</span></label>
+        <label class="option"><input type="radio" name="tiempo_operacion" value="1_3"><span class="dot"></span><span class="label-text">Entre 1 y 3 años</span></label>
+        <label class="option"><input type="radio" name="tiempo_operacion" value="3_10"><span class="dot"></span><span class="label-text">Entre 3 y 10 años</span></label>
+        <label class="option"><input type="radio" name="tiempo_operacion" value="mas_10"><span class="dot"></span><span class="label-text">Más de 10 años</span></label>
+      </div>
+    </div>
+
+    <!-- 5. Turistas internacionales actuales -->
+    <div class="section">
+      <div class="q-title"><span class="q-number">5</span>¿Recibes turistas internacionales actualmente?<span class="required">*</span></div>
+      <div class="q-hint">Aproximadamente en tu día a día.</div>
+      <div class="options">
+        <label class="option"><input type="radio" name="turistas_actuales" value="muchos" required><span class="dot"></span><span class="label-text">🌍 Sí, muchos — es parte de mi clientela principal</span></label>
+        <label class="option"><input type="radio" name="turistas_actuales" value="algunos"><span class="dot"></span><span class="label-text">✈️ Sí, algunos — de vez en cuando</span></label>
+        <label class="option"><input type="radio" name="turistas_actuales" value="pocos"><span class="dot"></span><span class="label-text">🤷 Muy pocos — casi todos son locales</span></label>
+        <label class="option"><input type="radio" name="turistas_actuales" value="ninguno"><span class="dot"></span><span class="label-text">🇨🇴 Ninguno — solo clientes colombianos</span></label>
+      </div>
+    </div>
+
+    <!-- 6. Qué beneficio puede ofrecer -->
+    <div class="section">
+      <div class="q-title"><span class="q-number">6</span>¿Qué tipo de beneficio podrías ofrecer a los turistas de Rutero MDE?<span class="required">*</span></div>
+      <div class="q-hint">Puedes marcar varias opciones.</div>
+      <div class="options">
+        <label class="option"><input type="checkbox" name="beneficio[]" value="descuento"><span class="dot"></span><span class="label-text">🏷️ Descuento porcentual (10%, 15%, 20%...)</span></label>
+        <label class="option"><input type="checkbox" name="beneficio[]" value="producto_gratis"><span class="dot"></span><span class="label-text">🎁 Producto o porción gratis con la compra</span></label>
+        <label class="option"><input type="checkbox" name="beneficio[]" value="bebida_postre"><span class="dot"></span><span class="label-text">🥤 Bebida o postre de cortesía</span></label>
+        <label class="option"><input type="checkbox" name="beneficio[]" value="experiencia"><span class="dot"></span><span class="label-text">✨ Experiencia exclusiva (tour guiado, taller, degustación)</span></label>
+        <label class="option"><input type="checkbox" name="beneficio[]" value="combo"><span class="dot"></span><span class="label-text">📦 Combo o paquete especial</span></label>
+        <label class="option"><input type="checkbox" name="beneficio[]" value="no_seguro"><span class="dot"></span><span class="label-text">🤔 Aún no sé, me gustaría que conversemos</span></label>
+      </div>
+    </div>
+
+    <!-- 7. Conexión a internet / WhatsApp -->
+    <div class="section">
+      <div class="q-title"><span class="q-number">7</span>¿Cómo validarías el beneficio cuando llegue el turista?<span class="required">*</span></div>
+      <div class="q-hint">El turista llega con un código QR en su celular.</div>
+      <div class="options">
+        <label class="option"><input type="radio" name="metodo_validacion" value="qr_celular" required><span class="dot"></span><span class="label-text">📱 Tengo celular con internet — puedo escanear el QR</span></label>
+        <label class="option"><input type="radio" name="metodo_validacion" value="codigo_manual"><span class="dot"></span><span class="label-text">🔢 Prefiero código numérico que escribo manualmente</span></label>
+        <label class="option"><input type="radio" name="metodo_validacion" value="mixto"><span class="dot"></span><span class="label-text">✅ Cualquiera de las dos me funciona</span></label>
+        <label class="option"><input type="radio" name="metodo_validacion" value="no_tecnico"><span class="dot"></span><span class="label-text">❓ No soy muy técnico, necesitaría capacitación</span></label>
+      </div>
+    </div>
+
+    <!-- 8. Interés en inglés -->
+    <div class="section">
+      <div class="q-title"><span class="q-number">8</span>¿Tú o tu equipo pueden atender en inglés?<span class="required">*</span></div>
+      <div class="options">
+        <label class="option"><input type="radio" name="ingles" value="fluido" required><span class="dot"></span><span class="label-text">🇬🇧 Sí, hablamos inglés fluido</span></label>
+        <label class="option"><input type="radio" name="ingles" value="basico"><span class="dot"></span><span class="label-text">🗣️ Nivel básico, nos defendemos</span></label>
+        <label class="option"><input type="radio" name="ingles" value="no_pero_queremos"><span class="dot"></span><span class="label-text">📚 No, pero nos gustaría aprender</span></label>
+        <label class="option"><input type="radio" name="ingles" value="no"><span class="dot"></span><span class="label-text">🇨🇴 No, solo español</span></label>
+      </div>
+    </div>
+
+    <!-- 9. Nivel de interés -->
+    <div class="section">
+      <div class="q-title"><span class="q-number">9</span>¿Qué tan interesado estás en ser aliado de Rutero MDE?<span class="required">*</span></div>
+      <div class="options">
+        <label class="option"><input type="radio" name="interes" value="alto" required><span class="dot"></span><span class="label-text">🔥 Muy interesado — quiero empezar ya</span></label>
+        <label class="option"><input type="radio" name="interes" value="medio"><span class="dot"></span><span class="label-text">👍 Interesado — me gustaría conocer más</span></label>
+        <label class="option"><input type="radio" name="interes" value="curioso"><span class="dot"></span><span class="label-text">🤔 Curioso — necesito pensarlo</span></label>
+        <label class="option"><input type="radio" name="interes" value="no_aun"><span class="dot"></span><span class="label-text">⏸️ No por ahora, tal vez más adelante</span></label>
+      </div>
+    </div>
+
+    <!-- 10. Datos de contacto -->
+    <div class="section">
+      <div class="q-title"><span class="q-number">10</span>Datos de contacto<span class="required">*</span></div>
+      <div class="q-hint">Para ponernos en contacto contigo.</div>
+      <input type="text" name="contacto_nombre" required placeholder="Tu nombre completo" style="margin-bottom: 10px;">
+      <input type="tel" name="contacto_whatsapp" required placeholder="WhatsApp (ej: 3001234567)" style="margin-bottom: 10px;">
+      <input type="email" name="contacto_email" placeholder="Email (opcional)">
+    </div>
+
+    <!-- Observaciones -->
+    <div class="section">
+      <div class="q-title"><span class="q-number">+</span>¿Algo más que quieras contarnos?</div>
+      <div class="q-hint">Opcional — tu visión, preguntas, ideas.</div>
+      <textarea name="observaciones" placeholder="Cuéntanos lo que quieras..."></textarea>
+    </div>
+
+    <div class="error-msg" id="errorMsg"></div>
+
+    <button type="submit" class="submit-btn" id="submitBtn">ENVIAR SONDEO  🌿</button>
+
+  </form>
+
+  <!-- SUCCESS -->
+  <div class="success-card" id="successCard">
+    <div class="check">✅</div>
+    <h2>¡Gracias, Rutero!</h2>
+    <p>Recibimos tu información correctamente.</p>
+    <p>Nos pondremos en contacto contigo en los próximos días para conversar sobre la alianza.</p>
+    <p style="margin-top: 20px; font-size: 13px; color: rgba(245,245,240,0.5);">Si tienes alguna duda urgente, escríbenos a <strong style="color: #5BAD6F;">aliados@rutero-mde.app</strong></p>
+  </div>
+
+  <div class="footer">
+    <p>🌿 <strong>Rutero MDE</strong> · Medellín, camina tu ciudad</p>
+    <p style="margin-top: 4px;">Sondeo de aliados · 2026</p>
+  </div>
+
+</div>
+
+<!-- Firebase -->
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js";
+  import { getFirestore, collection, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyCA7_3AGEjG0fANt5gLPzyVcG3ETf_0VHk",
+    authDomain: "rutero-mde.firebaseapp.com",
+    projectId: "rutero-mde",
+    storageBucket: "rutero-mde.firebasestorage.app",
+    messagingSenderId: "596878013829",
+    appId: "1:596878013829:web:ab9f8adaca96cda7a7bc3e"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const db = getFirestore(app);
+
+  window.guardarEnFirestore = async (data) => {
+    try {
+      await addDoc(collection(db, "sondeo_aliados"), {
+        ...data,
+        fecha_envio: serverTimestamp(),
+        user_agent: navigator.userAgent,
+        idioma_browser: navigator.language || 'es'
+      });
+      return { ok: true };
+    } catch (e) {
+      console.error("Error Firestore:", e);
+      return { ok: false, error: e.message };
+    }
+  };
+</script>
+
+<script>
+  // Progress bar
+  const form = document.getElementById('sondeoForm');
+  const progressFill = document.getElementById('progressFill');
+
+  function updateProgress() {
+    const requiredFields = form.querySelectorAll('[required]');
+    const total = requiredFields.length;
+    let filled = 0;
+    const seenNames = new Set();
+
+    requiredFields.forEach(f => {
+      if (f.type === 'radio') {
+        if (!seenNames.has(f.name)) {
+          seenNames.add(f.name);
+          const checked = form.querySelector(`[name="${f.name}"]:checked`);
+          if (checked) filled++;
+        }
+      } else if (f.type === 'checkbox') {
+        // checkboxes no son required individual, se evalúa aparte
+      } else {
+        if (f.value.trim()) filled++;
+      }
+    });
+
+    // Ajustar total: contar radios por nombre único
+    const radioNames = new Set();
+    requiredFields.forEach(f => { if (f.type === 'radio') radioNames.add(f.name); });
+    const adjustedTotal = [...requiredFields].filter(f => f.type !== 'radio').length + radioNames.size;
+
+    const pct = Math.min(100, (filled / adjustedTotal) * 100);
+    progressFill.style.width = pct + '%';
+  }
+
+  form.addEventListener('input', updateProgress);
+  form.addEventListener('change', updateProgress);
+
+  async function enviarFormulario() {
+    const btn = document.getElementById('submitBtn');
+    const errorMsg = document.getElementById('errorMsg');
+    errorMsg.classList.remove('show');
+
+    // Recoger datos
+    const fd = new FormData(form);
+    const data = {};
+    fd.forEach((v, k) => {
+      if (k.endsWith('[]')) {
+        const key = k.slice(0, -2);
+        data[key] = data[key] ? [...data[key], v] : [v];
+      } else {
+        data[k] = v;
+      }
+    });
+
+    // Validar que al menos un beneficio esté marcado
+    if (!data.beneficio || data.beneficio.length === 0) {
+      errorMsg.textContent = '⚠️ Por favor selecciona al menos una opción en la pregunta 6 (¿Qué beneficio puedes ofrecer?).';
+      errorMsg.classList.add('show');
+      errorMsg.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      return;
+    }
+
+    btn.disabled = true;
+    btn.textContent = 'ENVIANDO...';
+
+    // Guardar en Firestore
+    const res = await window.guardarEnFirestore(data);
+
+    if (res.ok) {
+      form.style.display = 'none';
+      document.getElementById('successCard').classList.add('show');
+      progressFill.style.width = '100%';
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    } else {
+      btn.disabled = false;
+      btn.textContent = 'ENVIAR SONDEO  🌿';
+      errorMsg.textContent = '⚠️ No pudimos guardar tu respuesta. Intenta de nuevo o contáctanos por WhatsApp.';
+      errorMsg.classList.add('show');
+    }
+  }
+</script>
+
+</body>
+</html>

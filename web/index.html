@@ -1,0 +1,836 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Rutero MDE — Explora Medellín jugando · Feria de las Flores 2026</title>
+<meta name="description" content="La primera app que convierte el turismo en una aventura con GPS, insignias y recompensas reales. 49 eventos Feria de las Flores 2026. Gratis en Google Play.">
+<meta property="og:title" content="Rutero MDE — Explora Medellín jugando">
+<meta property="og:description" content="49 eventos Feria de las Flores con GPS. Rutas gamificadas. Insignias coleccionables. Gratis en Google Play.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://rutero-mde.web.app">
+<meta property="og:image" content="https://rutero-mde.web.app/assets/splash.jpg">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="theme-color" content="#111410">
+<link rel="canonical" href="https://rutero-mde.web.app">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;0,800;0,900;1,700;1,800&family=Inter:wght@300;400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.css">
+<style>
+:root {
+  --bg:     #111410;
+  --bg2:    #1A1A10;
+  --gold:   #C9A84C;
+  --orange: #E85D26;
+  --green:  #5BAD6F;
+  --text:   #F5F0E8;
+  --muted:  #8A8A7A;
+  --border: rgba(255,255,255,0.06);
+  --ft: 'Playfair Display', Georgia, serif;
+  --fb: 'Inter', system-ui, sans-serif;
+  --fn: 'Space Grotesk', sans-serif;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--text);font-family:var(--fb);line-height:1.6;overflow-x:hidden}
+img{display:block;max-width:100%}
+a{text-decoration:none;color:inherit}
+
+/* UTILS */
+.wrap{max-width:1200px;margin:0 auto;padding:0 24px}
+.sec{padding:100px 0}
+.tag{font-family:var(--fn);font-size:11px;font-weight:600;letter-spacing:3px;text-transform:uppercase;color:var(--gold);display:flex;align-items:center;gap:10px;margin-bottom:14px}
+.tag::before{content:'';display:block;width:24px;height:1px;background:var(--gold)}
+.h1{font-family:var(--ft);font-size:clamp(38px,5vw,64px);line-height:1.05;font-weight:800;margin-bottom:18px}
+.sub{font-size:17px;color:var(--muted);max-width:560px;line-height:1.75}
+.gold{color:var(--gold)}
+
+/* BTNS */
+.btn-gp{display:inline-flex;align-items:center;gap:12px;background:var(--gold);color:#0D0D0A;font-family:var(--fn);font-weight:700;font-size:15px;padding:16px 32px;border-radius:12px;transition:transform .2s,box-shadow .2s;box-shadow:0 0 40px rgba(201,168,76,.35)}
+.btn-gp:hover{transform:translateY(-3px);box-shadow:0 8px 48px rgba(201,168,76,.55)}
+.btn-gp small{display:block;font-size:10px;font-weight:500;opacity:.7}
+.btn-ghost{display:inline-flex;align-items:center;gap:10px;background:transparent;color:var(--text);font-family:var(--fn);font-weight:600;font-size:15px;padding:16px 28px;border-radius:12px;border:1px solid rgba(255,255,255,.15);transition:border-color .2s}
+.btn-ghost:hover{border-color:var(--gold)}
+
+/* NAV */
+.nav{position:fixed;top:0;left:0;right:0;z-index:200;transition:background .4s,box-shadow .4s}
+.nav.on{background:rgba(17,20,16,.95);backdrop-filter:blur(20px);box-shadow:0 1px 0 var(--border)}
+.nav-in{display:flex;align-items:center;justify-content:space-between;max-width:1200px;margin:0 auto;padding:18px 24px}
+.nav-logo{display:flex;align-items:center;gap:10px}
+.nav-logo img{width:36px;height:36px;border-radius:10px}
+.nav-logo-t{font-family:var(--ft);font-size:20px;font-weight:800}
+.nav-logo-t span{color:var(--gold)}
+.nav-links{display:flex;gap:28px}
+.nav-links a{font-size:14px;font-weight:500;color:var(--muted);transition:color .2s}
+.nav-links a:hover{color:var(--text)}
+.nav-dl{background:var(--gold);color:#0D0D0A;font-family:var(--fn);font-weight:700;font-size:13px;padding:9px 20px;border-radius:10px;border:none;cursor:pointer;transition:opacity .2s}
+.nav-dl:hover{opacity:.85}
+
+/* HERO */
+.hero{position:relative;min-height:100svh;display:flex;align-items:center;overflow:hidden}
+.hero-bg{position:absolute;inset:0;z-index:0}
+.hero-bg img{width:100%;height:100%;object-fit:cover;object-position:center 30%;filter:brightness(.28) saturate(1.3)}
+.hero-bg::after{content:'';position:absolute;inset:0;background:linear-gradient(to right,rgba(17,20,16,.94) 0%,rgba(17,20,16,.45) 60%,transparent 100%),linear-gradient(to top,rgba(17,20,16,.97) 0%,transparent 50%)}
+.hero-in{position:relative;z-index:1;display:grid;grid-template-columns:1fr 1fr;gap:80px;align-items:center;max-width:1200px;margin:0 auto;padding:120px 24px 80px;width:100%}
+.eyebrow{display:inline-flex;align-items:center;gap:8px;font-family:var(--fn);font-size:12px;font-weight:600;letter-spacing:2px;text-transform:uppercase;color:var(--gold);background:rgba(201,168,76,.1);border:1px solid rgba(201,168,76,.25);border-radius:20px;padding:6px 14px;margin-bottom:24px}
+.hero-title{font-family:var(--ft);font-size:clamp(52px,7vw,88px);line-height:1;font-weight:900;margin-bottom:20px}
+.hero-title em{font-style:italic;color:var(--gold)}
+.hero-sub{font-size:18px;color:var(--muted);line-height:1.75;margin-bottom:36px;max-width:480px}
+.hero-actions{display:flex;gap:14px;flex-wrap:wrap;margin-bottom:48px}
+.hero-stats{display:flex;gap:36px;padding-top:36px;border-top:1px solid var(--border)}
+.snum{display:block;font-family:var(--fn);font-size:34px;font-weight:700;color:var(--gold);line-height:1}
+.slabel{font-size:12px;color:var(--muted);font-weight:500;margin-top:4px}
+
+/* COUNTDOWN */
+.cd{display:inline-flex;align-items:center;gap:4px;background:rgba(201,168,76,.08);border:1px solid rgba(201,168,76,.2);border-radius:12px;padding:12px 20px;margin-bottom:28px}
+.cdu{text-align:center;min-width:44px}
+.cdn{font-family:var(--fn);font-size:28px;font-weight:700;color:var(--gold);display:block;line-height:1}
+.cds{font-size:9px;color:var(--muted);font-weight:600;letter-spacing:1px;text-transform:uppercase}
+.cdsp{font-family:var(--fn);font-size:22px;color:rgba(201,168,76,.4);padding-bottom:10px}
+
+/* PHONE */
+.hero-vis{display:flex;justify-content:center;align-items:center;position:relative}
+.phone{width:255px;height:530px;background:#1A1E18;border-radius:40px;border:1.5px solid rgba(255,255,255,.1);overflow:hidden;position:relative;box-shadow:0 60px 120px rgba(0,0,0,.7),0 0 0 1px rgba(255,255,255,.04)}
+.phone img{width:100%;height:100%;object-fit:cover;object-position:center top}
+.phone-notch{position:absolute;top:14px;left:50%;transform:translateX(-50%);width:80px;height:7px;background:rgba(0,0,0,.6);border-radius:4px;z-index:2}
+.phone-ov{position:absolute;inset:0;z-index:1;background:linear-gradient(to bottom,transparent 35%,rgba(17,20,16,.96) 75%);display:flex;flex-direction:column;justify-content:flex-end;padding:20px;gap:8px}
+.pchip{background:rgba(20,24,18,.92);border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:10px 14px;backdrop-filter:blur(8px)}
+.pchip-l{font-family:var(--fn);font-size:9px;font-weight:700;letter-spacing:1.5px;color:var(--gold);text-transform:uppercase;margin-bottom:3px}
+.pchip-t{font-size:11px;color:var(--muted);line-height:1.4}
+.pbadge{background:var(--orange);border-radius:8px;padding:8px 14px;font-family:var(--fn);font-size:10px;font-weight:700;color:#fff;text-align:center}
+.pdeco{position:absolute;pointer-events:none;border-radius:50%}
+.pdeco1{top:-30px;right:-30px;width:150px;height:150px;background:radial-gradient(circle,rgba(201,168,76,.15),transparent 70%)}
+.pdeco2{bottom:-20px;left:-20px;width:120px;height:120px;background:radial-gradient(circle,rgba(91,173,111,.12),transparent 70%)}
+
+/* WHY */
+.why{background:var(--bg2)}
+.why-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;margin-top:60px;background:var(--border);border:1px solid var(--border);border-radius:20px;overflow:hidden}
+.why-card{background:var(--bg2);padding:36px 28px;transition:background .3s}
+.why-card:hover{background:#1F1F14}
+.why-icon{width:50px;height:50px;background:rgba(201,168,76,.08);border:1px solid rgba(201,168,76,.15);border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:22px;margin-bottom:20px}
+.why-card h3{font-family:var(--ft);font-size:21px;font-weight:700;margin-bottom:10px;line-height:1.2}
+.why-card p{font-size:14px;color:var(--muted);line-height:1.65}
+
+/* FERIA HERO */
+.feria-hero{position:relative;height:580px;display:flex;align-items:center;overflow:hidden}
+.feria-bg{position:absolute;inset:0}
+.feria-bg img{width:100%;height:100%;object-fit:cover;object-position:center 25%;filter:brightness(.22) saturate(1.4)}
+.feria-bg::after{content:'';position:absolute;inset:0;background:linear-gradient(135deg,rgba(17,20,16,.96) 0%,rgba(17,20,16,.5) 60%,transparent 100%)}
+.feria-cnt{position:relative;z-index:1;max-width:1200px;margin:0 auto;padding:0 24px}
+.feria-pre{font-family:var(--fn);font-size:11px;font-weight:600;letter-spacing:3px;text-transform:uppercase;color:var(--orange);margin-bottom:14px}
+.feria-t{font-family:var(--ft);font-size:clamp(48px,7vw,96px);font-weight:900;line-height:.95;margin-bottom:20px}
+.feria-t em{font-style:italic;color:var(--gold)}
+.feria-d{font-family:var(--fn);font-size:15px;color:var(--muted);margin-bottom:36px}
+.feria-d strong{color:var(--text)}
+
+/* SWIPER RUTAS */
+.swiper-sec{background:var(--bg2);padding:60px 0}
+.swiper-sec .wrap{margin-bottom:36px}
+.swiper-outer{max-width:1200px;margin:0 auto;padding:0 24px}
+.swiper{overflow:visible !important}
+.route-card{background:var(--bg);border:1px solid var(--border);border-radius:20px;overflow:hidden;transition:transform .3s,border-color .3s;cursor:pointer}
+.route-card:hover{transform:translateY(-8px);border-color:rgba(201,168,76,.3)}
+.route-img{height:190px;position:relative;overflow:hidden;background:#111}
+.route-img img{width:100%;height:100%;object-fit:cover;filter:brightness(.55);transition:filter .3s}
+.route-card:hover .route-img img{filter:brightness(.7)}
+.route-body{padding:22px}
+.route-tag{font-family:var(--fn);font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;padding:3px 10px;border-radius:20px;margin-bottom:12px;display:inline-block}
+.route-name{font-family:var(--ft);font-size:22px;font-weight:800;margin-bottom:8px;line-height:1.1}
+.route-desc{font-size:13px;color:var(--muted);line-height:1.5}
+.route-meta{display:flex;gap:12px;margin-top:14px;padding-top:14px;border-top:1px solid var(--border)}
+.route-meta span{font-family:var(--fn);font-size:11px;color:var(--muted);font-weight:500}
+
+/* NETFLIX */
+.netflix{background:var(--bg)}
+.nscroll{overflow-x:auto;overflow-y:visible;padding:36px 24px 56px;scrollbar-width:none;display:flex;gap:18px;max-width:1248px;margin:0 auto}
+.nscroll::-webkit-scrollbar{display:none}
+.ncard{flex:0 0 250px;height:350px;border-radius:16px;overflow:hidden;position:relative;cursor:pointer;transition:transform .4s,box-shadow .4s}
+.ncard:hover{transform:scale(1.06);box-shadow:0 30px 60px rgba(0,0,0,.6);z-index:10}
+.ncard-bg{position:absolute;inset:0}
+.ncard-bg img{width:100%;height:100%;object-fit:cover;filter:brightness(.45);transition:filter .4s}
+.ncard:hover .ncard-bg img{filter:brightness(.6)}
+.ncard-ov{position:absolute;inset:0;background:linear-gradient(to bottom,transparent 30%,rgba(10,12,9,.97) 100%);display:flex;flex-direction:column;justify-content:flex-end;padding:18px}
+.ncard-city{font-family:var(--fn);font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--gold);margin-bottom:6px}
+.ncard-name{font-family:var(--ft);font-size:17px;font-weight:800;line-height:1.1;margin-bottom:8px}
+.ncard-info{display:flex;gap:8px;align-items:center}
+.ncard-info span{font-family:var(--fn);font-size:10px;color:var(--muted);font-weight:500}
+.ndot{width:3px;height:3px;border-radius:50%;background:var(--muted)}
+/* Gradientes fallback */
+.ng1{background:linear-gradient(135deg,#1A2E1C,#0F1A10)}
+.ng2{background:linear-gradient(135deg,#2A1500,#6B2E00)}
+.ng3{background:linear-gradient(135deg,#0D1A2E,#1A3050)}
+.ng4{background:linear-gradient(135deg,#1A1A00,#3A3000)}
+.ng5{background:linear-gradient(135deg,#2E0D1A,#5E1A35)}
+.ng6{background:linear-gradient(135deg,#1A2E2E,#0A2020)}
+
+/* INSIGNIAS */
+.insignias{background:var(--bg2)}
+.ins-intro{display:grid;grid-template-columns:1fr 1fr;gap:80px;align-items:center}
+.ins-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:20px}
+.ins-item{text-align:center;padding:12px;transition:transform .35s;cursor:default}
+.ins-item:hover{transform:translateY(-6px) rotate(2deg)}
+.ins-item img{width:130px;height:130px;object-fit:contain;margin:0 auto;filter:drop-shadow(0 6px 20px rgba(201,168,76,.4));transition:filter .35s,transform .35s}
+.ins-item:hover img{filter:drop-shadow(0 14px 36px rgba(201,168,76,.65));transform:scale(1.06)}
+.ins-name{display:block;margin-top:12px;font-family:var(--ft);font-size:13px;font-weight:700;color:var(--text);line-height:1.3}
+.ins-ruta{display:block;margin-top:4px;font-size:11px;color:var(--muted);font-family:var(--fn);font-weight:500}
+.ins-secret{text-align:center;padding:12px;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:190px}
+.ins-secret-q{width:80px;height:80px;border-radius:50%;background:rgba(255,255,255,.03);border:1.5px dashed rgba(255,255,255,.1);display:flex;align-items:center;justify-content:center;font-family:var(--ft);font-size:36px;color:rgba(255,255,255,.12);margin:0 auto 10px}
+.ins-secret span{font-size:11px;color:rgba(138,138,122,.5);font-family:var(--fn)}
+
+/* COMO */
+.como{background:var(--bg)}
+.como-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:0;margin-top:64px;position:relative}
+.como-grid::after{content:'';position:absolute;top:40px;left:12.5%;right:12.5%;height:1px;background:linear-gradient(90deg,transparent,var(--gold),transparent)}
+.paso{text-align:center;padding:0 20px}
+.paso-num{width:80px;height:80px;border-radius:50%;background:var(--bg2);border:1px solid var(--gold);display:flex;align-items:center;justify-content:center;font-family:var(--fn);font-size:28px;font-weight:700;color:var(--gold);margin:0 auto 24px;position:relative;z-index:1}
+.paso h3{font-family:var(--ft);font-size:20px;font-weight:700;margin-bottom:10px}
+.paso p{font-size:14px;color:var(--muted);line-height:1.65}
+
+/* VIDEO */
+.video-sec{background:var(--bg2);padding:90px 0}
+.vid-wrap{position:relative;padding-bottom:56.25%;height:0;border-radius:20px;overflow:hidden;border:1px solid var(--border);box-shadow:0 50px 100px rgba(0,0,0,.5);margin-top:48px}
+.vid-wrap iframe{position:absolute;inset:0;width:100%;height:100%}
+
+/* ALIADOS */
+.aliados{background:var(--bg);padding:64px 0}
+.aliados-grid{display:flex;border:1px solid var(--border);border-radius:16px;overflow:hidden}
+.aliado{flex:1;padding:28px 20px;border-right:1px solid var(--border);text-align:center;display:flex;align-items:center;justify-content:center;transition:background .2s}
+.aliado:last-child{border-right:none}
+.aliado:hover{background:var(--bg2)}
+.aliado-name{font-family:var(--ft);font-size:15px;font-weight:700;color:rgba(245,240,232,.4);transition:color .2s}
+.aliado:hover .aliado-name{color:var(--gold)}
+
+/* CTA */
+.cta{position:relative;min-height:580px;display:flex;align-items:center;justify-content:center;text-align:center;overflow:hidden}
+.cta-bg{position:absolute;inset:0}
+.cta-bg img{width:100%;height:100%;object-fit:cover;filter:brightness(.18) saturate(1.2)}
+.cta-bg::after{content:'';position:absolute;inset:0;background:radial-gradient(ellipse 70% 60% at 50% 50%,rgba(17,20,16,.4),rgba(17,20,16,.92))}
+.cta-in{position:relative;z-index:1;padding:90px 24px;max-width:680px}
+.cta-t{font-family:var(--ft);font-size:clamp(40px,6vw,72px);font-weight:900;line-height:1.05;margin-bottom:18px}
+.cta-s{font-size:17px;color:var(--muted);margin-bottom:44px;line-height:1.7}
+.cta-btns{display:flex;gap:14px;justify-content:center;flex-wrap:wrap}
+.cta-trust{margin-top:28px;font-family:var(--fn);font-size:12px;color:var(--muted);display:flex;gap:18px;justify-content:center;flex-wrap:wrap}
+.cta-trust span{display:flex;align-items:center;gap:5px}
+
+/* FOOTER */
+.footer{background:#0A0C09;border-top:1px solid var(--border);padding:52px 0 36px}
+.footer-in{display:grid;grid-template-columns:1fr 1fr 1fr;gap:48px;margin-bottom:40px}
+.f-brand{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+.f-brand img{width:32px;border-radius:8px}
+.f-brand-t{font-family:var(--ft);font-size:18px;font-weight:800}
+.f-brand-t span{color:var(--gold)}
+.f-tag{font-size:13px;color:var(--muted);line-height:1.6;max-width:220px}
+.f-col h4{font-family:var(--fn);font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:18px}
+.f-col a{display:block;font-size:14px;color:rgba(245,240,232,.55);margin-bottom:10px;transition:color .2s}
+.f-col a:hover{color:var(--text)}
+.f-bottom{border-top:1px solid var(--border);padding-top:22px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px}
+.f-credit{font-size:12px;color:rgba(138,138,122,.5)}
+
+/* RESPONSIVE */
+@media(max-width:1024px){
+  .hero-in{grid-template-columns:1fr;gap:40px;padding-top:100px}
+  .hero-vis{display:none}
+  .why-grid{grid-template-columns:repeat(2,1fr)}
+  .ins-intro{grid-template-columns:1fr;gap:40px}
+  .como-grid{grid-template-columns:repeat(2,1fr);gap:40px}
+  .como-grid::after{display:none}
+  .footer-in{grid-template-columns:1fr 1fr}
+}
+@media(max-width:768px){
+  .sec{padding:72px 0}
+  .nav-links{display:none}
+  .why-grid{grid-template-columns:1fr}
+  .ins-grid{grid-template-columns:repeat(2,1fr)}
+  .como-grid{grid-template-columns:1fr}
+  .aliados-grid{flex-wrap:wrap}
+  .aliado{flex:1 1 40%}
+  .footer-in{grid-template-columns:1fr;gap:28px}
+  .f-bottom{flex-direction:column;text-align:center}
+}
+@media(prefers-reduced-motion:reduce){*{animation-duration:.01ms !important;transition-duration:.01ms !important}}
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<header class="nav" id="nav">
+  <div class="nav-in">
+    <a href="#top" class="nav-logo">
+      <img src="assets/logo.png" alt="Rutero MDE">
+      <div class="nav-logo-t">Rutero <span>MDE</span></div>
+    </a>
+    <nav class="nav-links">
+      <a href="#feria">Feria de las Flores</a>
+      <a href="#rutas">Rutas</a>
+      <a href="#insignias">Insignias</a>
+      <a href="#como">Cómo funciona</a>
+    </nav>
+    <a href="https://play.google.com/store/apps/details?id=com.ruteromde.app" target="_blank" class="nav-dl">Descargar gratis</a>
+  </div>
+</header>
+
+<!-- HERO -->
+<section class="hero" id="top">
+  <div class="hero-bg">
+    <img src="assets/imagenes/rutas/ruta_corredor_45.jpg" alt="Medellín" loading="eager"
+         onerror="this.src='assets/splash.jpg'">
+  </div>
+  <div class="hero-in">
+    <div>
+      <div class="eyebrow" data-es="🌺 Feria de las Flores 2026 · 31 jul – 9 ago" data-en="🌺 Flower Festival 2026 · Jul 31 – Aug 9">🌺 Feria de las Flores 2026 · 31 jul – 9 ago</div>
+      <h1 class="hero-title">
+        Explora<br>
+        <em>Medellín</em><br>
+        jugando.
+      </h1>
+      <p class="hero-sub" data-es="La primera app que convierte el turismo en una aventura con GPS, insignias y recompensas reales." data-en="The first app that turns tourism into an adventure with GPS, badges and real rewards.">La primera app que convierte el turismo en una aventura con GPS, insignias y recompensas reales.</p>
+      <div class="cd">
+        <div class="cdu"><span class="cdn" id="cd-d">--</span><span class="cds">días</span></div>
+        <span class="cdsp">:</span>
+        <div class="cdu"><span class="cdn" id="cd-h">--</span><span class="cds">hrs</span></div>
+        <span class="cdsp">:</span>
+        <div class="cdu"><span class="cdn" id="cd-m">--</span><span class="cds">min</span></div>
+        <span class="cdsp">:</span>
+        <div class="cdu"><span class="cdn" id="cd-s">--</span><span class="cds">seg</span></div>
+      </div>
+      <div class="hero-actions">
+        <a href="https://play.google.com/store/apps/details?id=com.ruteromde.app" target="_blank" class="btn-gp">
+          <span style="font-size:22px">▶</span>
+          <div><small>Disponible en</small><strong>Google Play</strong></div>
+        </a>
+        <a href="#feria" class="btn-ghost">Explorar Feria →</a>
+      </div>
+      <div class="hero-stats">
+        <div><span class="snum">49</span><div class="slabel" data-es="eventos<br>con GPS" data-en="events<br>with GPS">eventos<br>con GPS</div></div>
+        <div><span class="snum">3</span><div class="slabel" data-es="rutas<br>gamificadas" data-en="gamified<br>routes">rutas<br>gamificadas</div></div>
+        <div><span class="snum">100%</span><div class="slabel" data-es="gratis<br>sin anuncios" data-en="free<br>no ads">gratis<br>sin anuncios</div></div>
+      </div>
+    </div>
+    <div class="hero-vis">
+      <div style="position:relative">
+        <div class="pdeco pdeco1"></div>
+        <div class="pdeco pdeco2"></div>
+        <div class="phone">
+          <div class="phone-notch"></div>
+          <img src="assets/splash.jpg" alt="Rutero MDE app">
+          <div class="phone-ov">
+            <div class="pchip">
+              <div class="pchip-l">🌹 Feria de las Flores 2026</div>
+              <div class="pchip-t">Concierto Inaugural — Obelisco<br>31 jul · Noche · Gratuito</div>
+            </div>
+            <div class="pchip">
+              <div class="pchip-l">📍 Cómo llegar</div>
+              <div class="pchip-t">Est. Suramericana (L.B) → 8 min</div>
+            </div>
+            <div class="pbadge">🎯 VALIDAR GPS · 150 PTS</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- WHY -->
+<section class="why sec">
+  <div class="wrap">
+    <div class="tag" id="why-tag-el">¿Por qué Rutero?</div>
+    <h2 class="h1" id="why-title-el">No es Google Maps.<br>Es un videojuego.</h2>
+    <div class="why-grid">
+      <div class="why-card"><div class="why-icon">📍</div><h3>GPS Real</h3><p id="why-p1">Validación por GPS en tiempo real. La app confirma que llegaste. Sin trampas, sin atajos. La insignia se gana caminando.</p></div>
+      <div class="why-card"><div class="why-icon">🏅</div><h3>Insignias</h3><p id="why-p2">Colecciones digitales únicas por ciudad y evento. Las de la Feria de las Flores 2026 solo existen este año.</p></div>
+      <div class="why-card"><div class="why-icon">🎁</div><h3>Recompensas</h3><p id="why-p3">Beneficios reales en negocios locales aliados. Completar una ruta tiene valor tangible, no solo virtual.</p></div>
+      <div class="why-card"><div class="why-icon">🏪</div><h3>Negocios Locales</h3><p id="why-p4">Conectamos turistas con el comercio auténtico de Medellín. No cadenas, no franquicias. Lo que hace único al destino.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- FERIA HERO -->
+<section class="feria-hero" id="feria">
+  <div class="feria-bg">
+    <img src="assets/imagenes/rutas/ruta_01_transformacion.jpg" alt="Feria 2026"
+         onerror="this.src='assets/splash.jpg'">
+  </div>
+  <div class="feria-cnt">
+    <div class="feria-pre" id="feria-pre-el">🌺 Módulo especial · Activo ahora</div>
+    <h2 class="feria-t">Feria de las<br><em>Flores</em> 2026</h2>
+    <p class="feria-d" id="feria-date-el"><strong>31 julio — 9 agosto</strong> · Medellín, Colombia</p>
+    <a href="https://play.google.com/store/apps/details?id=com.ruteromde.app" target="_blank" class="btn-gp">
+      <span style="font-size:22px">▶</span>
+      <div><small>Descargá y explorá</small><strong>Google Play</strong></div>
+    </a>
+  </div>
+</section>
+
+<!-- RUTAS FERIA SWIPER -->
+<div class="swiper-sec" id="rutas">
+  <div class="wrap">
+    <div class="tag">Rutas exclusivas</div>
+    <h2 class="h1" id="rutas-title-el" style="font-size:clamp(28px,4vw,44px)">3 rutas. 3 insignias. Solo en 2026.</h2>
+  </div>
+  <div class="swiper-outer">
+    <div class="swiper feria-swiper">
+      <div class="swiper-wrapper">
+
+        <div class="swiper-slide" style="width:340px">
+          <div class="route-card">
+            <div class="route-img">
+              <img src="assets/imagenes/rutas/feria_clasica.jpg" alt="Feria Clásica"
+                   onerror="this.parentElement.style.background='linear-gradient(135deg,#3D1500,#8B3500)';this.style.display='none'">
+            </div>
+            <div class="route-body">
+              <span class="route-tag" style="background:rgba(232,93,38,.15);color:#E85D26">FERIA · 13 EVENTOS</span>
+              <div class="route-name">Feria Clásica</div>
+              <p class="route-desc" id="rc-desc1">Los 13 momentos más icónicos. Obelisco, Desfile Silleteros, Súper Concierto, Plaza Gardel.</p>
+              <div class="route-meta"><span>🏅 Insignia Feria Clásica 2026</span></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="swiper-slide" style="width:340px">
+          <div class="route-card">
+            <div class="route-img">
+              <img src="assets/imagenes/rutas/ruta_silletera.jpg" alt="Ruta Silletera"
+                   onerror="this.parentElement.style.background='linear-gradient(135deg,#0D2B0F,#1D5C22)';this.style.display='none'">
+            </div>
+            <div class="route-body">
+              <span class="route-tag" style="background:rgba(91,173,111,.15);color:#5BAD6F">SANTA ELENA · 7 SITIOS</span>
+              <div class="route-name">Ruta Silletera</div>
+              <p class="route-desc" id="rc-desc2">Metrocable, Parque Arví, fincas silleteras El Pinar y La Playa, Parque de Santa Elena.</p>
+              <div class="route-meta"><span>🏅 Insignia Guardián Silletero</span></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="swiper-slide" style="width:340px">
+          <div class="route-card">
+            <div class="route-img">
+              <img src="assets/imagenes/rutas/tablados_y_rumba.jpg" alt="Tablados y Rumba"
+                   onerror="this.parentElement.style.background='linear-gradient(135deg,#1A0B2E,#4A1A6E)';this.style.display='none'">
+            </div>
+            <div class="route-body">
+              <span class="route-tag" style="background:rgba(138,43,226,.15);color:#C084FC">16 COMUNAS · 21 TABLADOS</span>
+              <div class="route-name">Tablados y Rumba</div>
+              <p class="route-desc" id="rc-desc3">Un tablado cada noche en toda la ciudad. Trova, salsa, vallenato. La Feria vive en los barrios.</p>
+              <div class="route-meta"><span>🏅 Insignia Gozador Paisa</span></div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+      <div class="swiper-pagination" style="margin-top:20px;position:static;text-align:left"></div>
+    </div>
+  </div>
+</div>
+
+<!-- NETFLIX -->
+<section class="netflix sec">
+  <div class="wrap">
+    <div class="tag">Explorar Medellín</div>
+    <h2 class="h1" id="netflix-title-el">Más rutas.<br>Más aventuras.</h2>
+    <p class="sub" data-es="60+ rutas en Medellín y Antioquia. Cada una con historia real, GPS y su insignia." data-en="60+ routes in Medellín and Antioquia. Each one with real history, GPS and its badge.">60+ rutas en Medellín y Antioquia. Cada una con historia real, GPS y su insignia.</p>
+  </div>
+  <div class="nscroll">
+
+    <div class="ncard ng1">
+      <div class="ncard-bg"><img src="assets/imagenes/rutas/ruta_corredor_45.jpg" alt="Corredor 45" loading="lazy" onerror="this.style.display='none'"></div>
+      <div class="ncard-ov">
+        <div class="ncard-city" id="nc1">Medellín · Norte</div>
+        <div class="ncard-name" id="nn1">Corredor Cultural de la 45</div>
+        <div class="ncard-info"><span>8 sitios</span><div class="ndot"></div><span>🏅</span></div>
+      </div>
+    </div>
+
+    <div class="ncard ng2">
+      <div class="ncard-bg"><img src="assets/imagenes/rutas/ruta_poblado_verde.jpg" alt="Poblado Verde" loading="lazy" onerror="this.style.display='none'"></div>
+      <div class="ncard-ov">
+        <div class="ncard-city" id="nc2">Medellín · El Poblado</div>
+        <div class="ncard-name" id="nn2">El Poblado Verde</div>
+        <div class="ncard-info"><span>6 sitios</span><div class="ndot"></div><span>🏅</span></div>
+      </div>
+    </div>
+
+    <div class="ncard ng3">
+      <div class="ncard-bg"><img src="assets/imagenes/rutas/ruta_04_metrocable.jpg" alt="Metrocable" loading="lazy" onerror="this.style.display='none'"></div>
+      <div class="ncard-ov">
+        <div class="ncard-city" id="nc3">Medellín · Metrocable</div>
+        <div class="ncard-name" id="nn3">Metrocable & Arví</div>
+        <div class="ncard-info"><span>5 sitios</span><div class="ndot"></div><span>🏅</span></div>
+      </div>
+    </div>
+
+    <div class="ncard ng4">
+      <div class="ncard-bg"><img src="assets/imagenes/rutas/ruta_09_guatape.jpg" alt="Guatapé" loading="lazy" onerror="this.style.display='none'"></div>
+      <div class="ncard-ov">
+        <div class="ncard-city" id="nc4">Oriente Antioqueño</div>
+        <div class="ncard-name" id="nn4">Guatapé & La Piedra</div>
+        <div class="ncard-info"><span>7 sitios</span><div class="ndot"></div><span>🏅</span></div>
+      </div>
+    </div>
+
+    <div class="ncard ng5">
+      <div class="ncard-bg"><img src="assets/imagenes/rutas/ruta_01_transformacion.jpg" alt="Transformación" loading="lazy" onerror="this.style.display='none'"></div>
+      <div class="ncard-ov">
+        <div class="ncard-city" id="nc5">Medellín · Norte</div>
+        <div class="ncard-name" id="nn5">Transformación Urbana</div>
+        <div class="ncard-info"><span>6 sitios</span><div class="ndot"></div><span>🏅</span></div>
+      </div>
+    </div>
+
+    <div class="ncard ng6">
+      <div class="ncard-ov">
+        <div class="ncard-city" id="nc6">Medellín · Laureles</div>
+        <div class="ncard-name" id="nn6">Sabores de la 70</div>
+        <div class="ncard-info"><span>7 sitios</span><div class="ndot"></div><span>🏅</span></div>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<!-- INSIGNIAS -->
+<section class="insignias sec" id="insignias">
+  <div class="wrap">
+    <div class="ins-intro">
+      <div>
+        <div class="tag">Colección 2026</div>
+        <h2 class="h1" id="ins-title-el">Insignias que<br>se <span class="gold">ganan.</span></h2>
+        <p class="sub" data-es="No se compran. No se regalan. Se consiguen completando rutas reales con GPS, sitio por sitio. Las de la Feria solo existen en 2026." data-en="Not bought. Not given. Earned by completing real GPS routes, site by site. Festival badges only exist in 2026.">No se compran. No se regalan. Se consiguen completando rutas reales con GPS, sitio por sitio. Las de la Feria solo existen en 2026.</p>
+      </div>
+      <div class="ins-grid">
+        <div class="ins-item">
+          <img src="assets/imagenes/insignias/insignia_feria_clasica.png" alt="Feria Clásica 2026">
+          <span class="ins-name" id="ins-name1">Feria Clásica</span>
+          <span class="ins-ruta" id="ins-ruta1">Ruta Feria Clásica</span>
+        </div>
+        <div class="ins-item">
+          <img src="assets/imagenes/insignias/insignia_feria_silletero_oro.png" alt="Silletero de Oro">
+          <span class="ins-name" id="ins-name2">Silletero de Oro</span>
+          <span class="ins-ruta" id="ins-ruta2">Las 3 rutas Feria</span>
+        </div>
+        <div class="ins-item">
+          <img src="assets/imagenes/insignias/insignia_feria_guardian_silletero.png" alt="Guardián Silletero">
+          <span class="ins-name" id="ins-name3">Guardián Silletero</span>
+          <span class="ins-ruta" id="ins-ruta3">Ruta Silletera</span>
+        </div>
+        <div class="ins-item">
+          <img src="assets/imagenes/insignias/insignia_guardian_patrimonio.png" alt="Guardián Patrimonio"
+               onerror="this.style.display='none'">
+          <span class="ins-name" id="ins-name4">Guardián Patrimonio</span>
+          <span class="ins-ruta" id="ins-ruta4">Ruta Patrimonial</span>
+        </div>
+        <div class="ins-item">
+          <img src="assets/imagenes/insignias/insignia_hijo_barrio.png" alt="Hijo del Barrio"
+               onerror="this.style.display='none'">
+          <span class="ins-name" id="ins-name5">Hijo del Barrio</span>
+          <span class="ins-ruta" id="ins-ruta5">Corredor Cultural</span>
+        </div>
+        <div class="ins-secret">
+          <div class="ins-secret-q">?</div>
+          <span id="ins-secret-el">+20 insignias más</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- COMO -->
+<section class="como sec" id="como">
+  <div class="wrap">
+    <div class="tag">Sin complicaciones</div>
+    <h2 class="h1" id="como-title-el">4 pasos.<br>Una aventura.</h2>
+    <div class="como-grid">
+      <div class="paso"><div class="paso-num">1</div><h3><span id="paso1-t">Descargá</span></h3><p>Gratis en Google Play. Sin registro obligatorio. Abrís y ya tenés todos los eventos y rutas disponibles.</p></div>
+      <div class="paso"><div class="paso-num">2</div><h3><span id="paso2-t">Elegí tu ruta</span></h3><p>Filtrá por ciudad, tema o duración. Cada ruta tiene historia real y un mapa con los sitios a visitar.</p></div>
+      <div class="paso"><div class="paso-num">3</div><h3><span id="paso3-t">Validá con GPS</span></h3><p>Llegá a cada sitio. El GPS confirma tu visita en tiempo real. Sin trampas, sin atajos, sin fotos falsas.</p></div>
+      <div class="paso"><div class="paso-num">4</div><h3><span id="paso4-t">Ganás</span></h3><p>Desbloqueás tu insignia coleccionable y accedés a beneficios reales en negocios locales aliados.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- VIDEO -->
+<section class="video-sec">
+  <div class="wrap">
+    <div class="tag">Miralo en acción</div>
+    <h2 class="h1" id="video-title-el" style="font-size:clamp(28px,4vw,48px)">Ve cómo se explora<br>Medellín con Rutero.</h2>
+    <div class="vid-wrap">
+      <iframe src="https://www.youtube.com/embed/Ds29XqpU_Pc"
+        title="Rutero MDE" frameborder="0"
+        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+        allowfullscreen loading="lazy"></iframe>
+    </div>
+  </div>
+</section>
+
+<!-- ALIADOS -->
+<section class="aliados">
+  <div class="wrap">
+    <div class="aliados-grid">
+      <div class="aliado"><div class="aliado-name">Créame</div></div>
+      <div class="aliado"><div class="aliado-name">Google Play</div></div>
+      <div class="aliado"><div class="aliado-name">Whoosh Colombia</div></div>
+      <div class="aliado"><div class="aliado-name">Secretaría de Turismo</div></div>
+    </div>
+  </div>
+</section>
+
+<!-- CTA -->
+<section class="cta" id="descarga">
+  <div class="cta-bg">
+    <img src="assets/imagenes/rutas/ruta_04_metrocable.jpg" alt="Medellín"
+         onerror="this.src='assets/splash.jpg'">
+  </div>
+  <div class="cta-in">
+    <h2 class="cta-t" id="cta-title-el">Tu próxima<br>aventura<br><em style="color:var(--gold)">empieza hoy.</em></h2>
+    <p class="cta-s" data-es="49 eventos de la Feria de las Flores con GPS. Rutas gamificadas. Insignias únicas. Todo gratis." data-en="49 Flower Festival events with GPS. Gamified routes. Unique badges. All free.">49 eventos de la Feria de las Flores con GPS. Rutas gamificadas. Insignias únicas. Todo gratis.</p>
+    <div class="cta-btns">
+      <a href="https://play.google.com/store/apps/details?id=com.ruteromde.app" target="_blank" class="btn-gp">
+        <span style="font-size:24px">▶</span>
+        <div><small>Descargar gratis en</small><strong>Google Play</strong></div>
+      </a>
+    </div>
+    <div class="cta-trust">
+      <span>✓ Gratis</span>
+      <span>✓ Sin anuncios</span>
+      <span>✓ Hecho en Medellín</span>
+      <span>✓ Créame · Alcaldía</span>
+    </div>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer class="footer">
+  <div class="wrap">
+    <div class="footer-in">
+      <div>
+        <div class="f-brand">
+          <img src="assets/logo.png" alt="Rutero MDE">
+          <div class="f-brand-t">Rutero <span>MDE</span></div>
+        </div>
+        <p class="f-tag" data-es="Turismo gamificado, hecho en Medellín. Programa Créame, Alcaldía de Medellín." data-en="Gamified tourism, made in Medellín. Créame Program, Medellín Mayor's Office.">Turismo gamificado, hecho en Medellín. Programa Créame, Alcaldía de Medellín.</p>
+      </div>
+      <div class="f-col">
+        <h4>Explorar</h4>
+        <a href="#feria">Feria de las Flores</a>
+        <a href="#rutas">Rutas</a>
+        <a href="#insignias">Insignias</a>
+        <a href="#como">Cómo funciona</a>
+      </div>
+      <div class="f-col">
+        <h4>Contacto</h4>
+        <a href="mailto:paulflopezp@gmail.com">paulflopezp@gmail.com</a>
+        <a href="https://instagram.com/ruteromde" target="_blank">Instagram</a>
+        <a href="https://facebook.com/ruteromde" target="_blank">Facebook</a>
+        <a href="privacidad.html">Política de privacidad</a>
+      </div>
+    </div>
+    <div class="f-bottom">
+      <p class="f-credit">© 2026 Rutero MDE · Programa Créame, Alcaldía de Medellín · DNDA 1-2025-110420</p>
+      <a href="https://play.google.com/store/apps/details?id=com.ruteromde.app" target="_blank"
+         style="font-family:var(--fn);font-size:12px;color:var(--gold);font-weight:600">
+        Descargar en Google Play →
+      </a>
+    </div>
+  </div>
+</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/ScrollTrigger.min.js"></script>
+<script>
+// Countdown
+(function tick(){
+  const t=new Date('2026-07-31T00:00:00-05:00'),diff=t-new Date();
+  const g=id=>document.getElementById(id);
+  if(diff<=0){['cd-d','cd-h','cd-m','cd-s'].forEach(id=>{const e=g(id);if(e)e.textContent='0'});return}
+  const e=g('cd-d');if(e)e.textContent=Math.floor(diff/86400000);
+  const h=g('cd-h');if(h)h.textContent=String(Math.floor((diff%86400000)/3600000)).padStart(2,'0');
+  const m=g('cd-m');if(m)m.textContent=String(Math.floor((diff%3600000)/60000)).padStart(2,'0');
+  const s=g('cd-s');if(s)s.textContent=String(Math.floor((diff%60000)/1000)).padStart(2,'0');
+  setTimeout(tick,1000);
+})();
+
+// Nav
+window.addEventListener('scroll',()=>{
+  document.getElementById('nav').classList.toggle('on',window.scrollY>40);
+},{passive:true});
+
+// Swiper
+new Swiper('.feria-swiper',{
+  slidesPerView:'auto',spaceBetween:20,grabCursor:true,
+  pagination:{el:'.swiper-pagination',clickable:true},
+  breakpoints:{768:{slidesPerView:2},1024:{slidesPerView:3}}
+});
+
+// GSAP
+gsap.registerPlugin(ScrollTrigger);
+gsap.from('.eyebrow',{opacity:0,y:20,duration:.8,delay:.2});
+gsap.from('.hero-title',{opacity:0,y:40,duration:1,delay:.4});
+gsap.from('.hero-sub',{opacity:0,y:20,duration:.8,delay:.6});
+gsap.from('.cd',{opacity:0,y:20,duration:.8,delay:.7});
+gsap.from('.hero-actions',{opacity:0,y:20,duration:.8,delay:.8});
+gsap.from('.hero-stats',{opacity:0,y:20,duration:.8,delay:1});
+gsap.from('.phone',{opacity:0,x:40,duration:1,delay:.6});
+
+gsap.utils.toArray('.why-card,.paso,.ins-item,.route-card').forEach((el,i)=>{
+  gsap.from(el,{opacity:0,y:28,duration:.7,delay:i*.08,
+    scrollTrigger:{trigger:el,start:'top 88%'}});
+});
+gsap.utils.toArray('.h1,.sub').forEach(el=>{
+  gsap.from(el,{opacity:0,y:22,duration:.8,
+    scrollTrigger:{trigger:el,start:'top 90%'}});
+});
+</script>
+
+<script>
+// ── i18n ─────────────────────────────────────────────────────
+const i18n = {
+  es: {
+    'nav-dl': 'Descargar gratis',
+    'why-tag': '¿Por qué Rutero?',
+    'why-title': 'No es Google Maps.<br>Es un videojuego.',
+    'why-p1': 'Validación por GPS en tiempo real. La app confirma que llegaste. Sin trampas, sin atajos. La insignia se gana caminando.',
+    'why-p2': 'Colecciones digitales únicas por ciudad y evento. Las de la Feria de las Flores 2026 solo existen este año.',
+    'why-p3': 'Beneficios reales en negocios locales aliados. Completar una ruta tiene valor tangible, no solo virtual.',
+    'why-p4': 'Conectamos turistas con el comercio auténtico de Medellín. No cadenas, no franquicias. Lo que hace único al destino.',
+    'feria-pre': '🌺 Módulo especial · Activo ahora',
+    'feria-date': '<strong>31 julio — 9 agosto</strong> · Medellín, Colombia',
+    'rutas-title': '3 rutas. 3 insignias. Solo en 2026.',
+    'rc-desc1': 'Los 13 momentos más icónicos. Obelisco, Desfile Silleteros, Súper Concierto, Plaza Gardel.',
+    'rc-desc2': 'Metrocable, Parque Arví, fincas silleteras El Pinar y La Playa, Parque de Santa Elena.',
+    'rc-desc3': 'Un tablado cada noche en toda la ciudad. Trova, salsa, vallenato. La Feria vive en los barrios.',
+    'netflix-title': 'Más rutas.<br>Más aventuras.',
+    'ins-title': 'Insignias que<br>se <span class="gold">ganan.</span>',
+    'como-title': '4 pasos.<br>Una aventura.',
+    'paso1-t': 'Descargá', 'paso1-p': 'Gratis en Google Play. Sin registro obligatorio. Abrís y ya tenés todos los eventos y rutas disponibles.',
+    'paso2-t': 'Elegí tu ruta', 'paso2-p': 'Filtrá por ciudad, tema o duración. Cada ruta tiene historia real y un mapa con los sitios a visitar.',
+    'paso3-t': 'Validá con GPS', 'paso3-p': 'Llegá a cada sitio. El GPS confirma tu visita en tiempo real. Sin trampas, sin atajos, sin fotos falsas.',
+    'paso4-t': 'Ganás', 'paso4-p': 'Desbloqueás tu insignia coleccionable y accedés a beneficios reales en negocios locales aliados.',
+    'video-title': 'Ve cómo se explora<br>Medellín con Rutero.',
+    'cta-title': 'Tu próxima<br>aventura<br><em style="color:var(--gold)">empieza hoy.</em>',
+    'btn-explore': 'Explorar Feria →',
+    'btn-dl-s': 'Disponible en', 'btn-dl-b': 'Google Play',
+    'btn-explore2': 'Descargá y explorá',
+    'btn-dl-cta-s': 'Descargar gratis en',
+    'ins-name1': 'Feria Clásica', 'ins-ruta1': 'Ruta Feria Clásica',
+    'ins-name2': 'Silletero de Oro', 'ins-ruta2': 'Las 3 rutas Feria',
+    'ins-name3': 'Guardián Silletero', 'ins-ruta3': 'Ruta Silletera',
+    'ins-name4': 'Guardián Patrimonio', 'ins-ruta4': 'Ruta Patrimonial',
+    'ins-name5': 'Hijo del Barrio', 'ins-ruta5': 'Corredor Cultural',
+    'ins-secret': '+20 insignias más',
+    'nc1': 'Medellín · Norte', 'nn1': 'Corredor Cultural de la 45',
+    'nc2': 'Medellín · El Poblado', 'nn2': 'El Poblado Verde',
+    'nc3': 'Medellín · Metrocable', 'nn3': 'Metrocable & Arví',
+    'nc4': 'Oriente Antioqueño', 'nn4': 'Guatapé & La Piedra',
+    'nc5': 'Medellín · Norte', 'nn5': 'Transformación Urbana',
+    'nc6': 'Medellín · Laureles', 'nn6': 'Sabores de la 70',
+  },
+  en: {
+    'nav-dl': 'Download free',
+    'why-tag': 'Why Rutero?',
+    'why-title': "It's not Google Maps.<br>It's a video game.",
+    'why-p1': 'Real-time GPS validation. The app confirms you arrived. No cheats, no shortcuts. The badge is earned by walking.',
+    'why-p2': 'Unique digital collections per city and event. The 2026 Flower Festival ones only exist this year.',
+    'why-p3': 'Real benefits at local partner businesses. Completing a route has tangible value, not just virtual.',
+    'why-p4': "We connect tourists with Medellín's authentic commerce. No chains, no franchises. What makes the destination unique.",
+    'feria-pre': '🌺 Special module · Active now',
+    'feria-date': '<strong>July 31 — August 9</strong> · Medellín, Colombia',
+    'rutas-title': '3 routes. 3 badges. Only in 2026.',
+    'rc-desc1': 'The 13 most iconic moments. Obelisco, Silleteros Parade, Super Concert, Plaza Gardel.',
+    'rc-desc2': 'Metrocable, Arví Park, El Pinar and La Playa silletera farms, Santa Elena Park.',
+    'rc-desc3': 'A stage every night across the city. Trova, salsa, vallenato. The Festival lives in the neighborhoods.',
+    'netflix-title': 'More routes.<br>More adventures.',
+    'ins-title': 'Badges that are<br><span class="gold">earned.</span>',
+    'como-title': '4 steps.<br>One adventure.',
+    'paso1-t': 'Download', 'paso1-p': 'Free on Google Play. No mandatory registration. Open it and you have all events and routes ready.',
+    'paso2-t': 'Choose your route', 'paso2-p': 'Filter by city, theme or duration. Each route has real history and a map with sites to visit.',
+    'paso3-t': 'Validate with GPS', 'paso3-p': 'Arrive at each site. GPS confirms your visit in real time. No cheats, no shortcuts, no fake photos.',
+    'paso4-t': 'You win', 'paso4-p': 'Unlock your collectible badge and access real benefits at local partner businesses.',
+    'video-title': 'See how<br>Medellín is explored with Rutero.',
+    'cta-title': 'Your next<br>adventure<br><em style="color:var(--gold)">starts today.</em>',
+    'btn-explore': 'Explore Festival →',
+    'btn-dl-s': 'Available on', 'btn-dl-b': 'Google Play',
+    'btn-explore2': 'Download & explore',
+    'btn-dl-cta-s': 'Download free on',
+    'ins-name1': 'Classic Festival', 'ins-ruta1': 'Feria Clásica Route',
+    'ins-name2': 'Golden Silletero', 'ins-ruta2': 'All 3 Festival Routes',
+    'ins-name3': 'Silletero Guardian', 'ins-ruta3': 'Silletera Route',
+    'ins-name4': 'Heritage Guardian', 'ins-ruta4': 'Heritage Route',
+    'ins-name5': 'Son of the Hood', 'ins-ruta5': 'Cultural Corridor',
+    'ins-secret': '+20 more badges',
+    'nc1': 'Medellín · North', 'nn1': 'Cultural Corridor 45',
+    'nc2': 'Medellín · El Poblado', 'nn2': 'Green El Poblado',
+    'nc3': 'Medellín · Metrocable', 'nn3': 'Metrocable & Arví',
+    'nc4': 'Eastern Antioquia', 'nn4': 'Guatapé & La Piedra',
+    'nc5': 'Medellín · North', 'nn5': 'Urban Transformation',
+    'nc6': 'Medellín · Laureles', 'nn6': 'Flavors of 70th Ave',
+  }
+};
+
+let currentLang = 'es';
+
+function t(key) { return i18n[currentLang][key] || i18n.es[key] || ''; }
+
+function applyLang() {
+  // data-es/data-en directos
+  document.querySelectorAll('[data-es]').forEach(el => {
+    el.innerHTML = currentLang === 'es' ? el.dataset.es : el.dataset.en;
+  });
+
+  // Elementos con data-i18n
+  document.querySelectorAll('[data-i18n]').forEach(el => {
+    const key = el.dataset.i18n;
+    if (t(key)) el.innerHTML = t(key);
+  });
+
+  // Aplicar todas las claves del diccionario a elementos con id o data-i18n
+  const set = (id, key) => { const e = document.getElementById(id); if(e && t(key)) e.innerHTML = t(key); };
+
+  // Why
+  set('why-tag-el','why-tag'); set('why-title-el','why-title');
+  set('why-p1','why-p1'); set('why-p2','why-p2'); set('why-p3','why-p3'); set('why-p4','why-p4');
+  // Feria
+  set('feria-pre-el','feria-pre'); set('feria-date-el','feria-date');
+  // Rutas
+  set('rutas-title-el','rutas-title');
+  set('rc-desc1','rc-desc1'); set('rc-desc2','rc-desc2'); set('rc-desc3','rc-desc3');
+  // Netflix
+  set('netflix-title-el','netflix-title');
+  for(let i=1;i<=6;i++){set('nc'+i,'nc'+i);set('nn'+i,'nn'+i);}
+  // Insignias
+  set('ins-title-el','ins-title');
+  for(let i=1;i<=5;i++){set('ins-name'+i,'ins-name'+i);set('ins-ruta'+i,'ins-ruta'+i);}
+  set('ins-secret-el','ins-secret');
+  // Como
+  set('como-title-el','como-title');
+  for(let i=1;i<=4;i++){set('paso'+i+'-t','paso'+i+'-t');set('paso'+i+'-p','paso'+i+'-p');}
+  // Video
+  set('video-title-el','video-title');
+  // CTA
+  set('cta-title-el','cta-title');
+
+  // Botones Google Play
+  document.querySelectorAll('.btn-gp-s').forEach(e => { if(t('btn-dl-s')) e.innerHTML = t('btn-dl-s'); });
+  document.querySelectorAll('.btn-explore-el').forEach(e => { if(t('btn-explore')) e.innerHTML = t('btn-explore'); });
+
+  // Toggle button
+  const btn = document.getElementById('lang-btn');
+  if(btn) btn.textContent = currentLang === 'es' ? 'EN' : 'ES';
+}
+
+function toggleLang() {
+  currentLang = currentLang === 'es' ? 'en' : 'es';
+  applyLang();
+  localStorage.setItem('rutero-lang', currentLang);
+}
+
+// Init
+window.addEventListener('DOMContentLoaded', () => {
+  const saved = localStorage.getItem('rutero-lang');
+  if(saved) currentLang = saved;
+  if(currentLang === 'en') applyLang();
+});
+</script>
+
+</body>
+</html>

@@ -1,0 +1,106 @@
+{
+  "project_info": {
+    "project_number": "300771058852",
+    "project_id": "rutero-mde",
+    "storage_bucket": "rutero-mde.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:300771058852:android:d89b55f65692168bfc3231",
+        "android_client_info": {
+          "package_name": "com.example.rutero_mde"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "300771058852-876d0uftjrbbji94k1b0u1j79ebac3k3.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.rutero_mde",
+            "certificate_hash": "b5ce859e3c77873f2cd1c3f08aa49a618322a9d2"
+          }
+        },
+        {
+          "client_id": "300771058852-q24eo87j9nulm4s602d8b68kjqbd0o74.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.rutero_mde",
+            "certificate_hash": "cc309bb9fe8481d1c41cd240ae73190a956f9a56"
+          }
+        },
+        {
+          "client_id": "300771058852-5d53fguf8gsinvj24719m0tkmnh5k7h4.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA37snNyEz7h-mOXcar1pnsNnzBntSbFTg"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "300771058852-5d53fguf8gsinvj24719m0tkmnh5k7h4.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "300771058852-nlj5rrvtbvi70fk2lpi8r8qjqbigh87t.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.ruteroMde"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:300771058852:android:b62403e53ecc9315fc3231",
+        "android_client_info": {
+          "package_name": "com.ruteromde.app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "300771058852-tcmvvt71rckch07blj4msks9kboth2jc.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.ruteromde.app",
+            "certificate_hash": "cc309bb9feb481d1c41cd240ae73190a956f9a56"
+          }
+        },
+        {
+          "client_id": "300771058852-5d53fguf8gsinvj24719m0tkmnh5k7h4.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA37snNyEz7h-mOXcar1pnsNnzBntSbFTg"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "300771058852-5d53fguf8gsinvj24719m0tkmnh5k7h4.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "300771058852-nlj5rrvtbvi70fk2lpi8r8qjqbigh87t.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.ruteroMde"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

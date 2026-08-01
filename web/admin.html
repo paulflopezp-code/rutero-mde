@@ -1,0 +1,3272 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Rutero MDE — Panel Admin</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  :root {
+    --verde: #5BAD6F; --oro: #C9A84C; --oscuro: #0D0D0D;
+    --card: #1C2018; --texto: #F5F0E8; --muted: #8A9278;
+    --acento: #E85D26; --peligro: #E24B4A;
+  }
+  body { font-family: 'Segoe UI', sans-serif; background: #0a0f08; color: var(--texto); min-height: 100vh; }
+  #login-screen { display: flex; align-items: center; justify-content: center; min-height: 100vh; }
+  .login-box { background: var(--card); border: 1px solid rgba(255,255,255,0.08); border-radius: 20px; padding: 40px; width: 360px; text-align: center; }
+  .login-box h1 { font-size: 22px; color: var(--oro); letter-spacing: 3px; margin-bottom: 4px; }
+  .login-box p { color: var(--muted); font-size: 13px; margin-bottom: 28px; }
+  .input-field { width: 100%; background: #111; border: 1px solid rgba(255,255,255,0.1); border-radius: 10px; padding: 12px 14px; color: var(--texto); font-size: 14px; margin-bottom: 12px; outline: none; }
+  .input-field:focus { border-color: var(--verde); }
+  .btn-primary { width: 100%; background: var(--verde); color: white; border: none; border-radius: 10px; padding: 13px; font-size: 14px; font-weight: 700; cursor: pointer; letter-spacing: 1px; }
+  .btn-primary:hover { opacity: 0.9; }
+  .error-msg { color: var(--peligro); font-size: 12px; margin-top: 8px; min-height: 18px; }
+  #app { display: none; }
+  .sidebar { position: fixed; left: 0; top: 0; width: 220px; height: 100vh; background: var(--card); border-right: 1px solid rgba(255,255,255,0.06); padding: 24px 0; overflow-y: auto; }
+  .sidebar-logo { padding: 0 20px 20px; border-bottom: 1px solid rgba(255,255,255,0.06); margin-bottom: 12px; }
+  .sidebar-logo h2 { font-size: 14px; color: var(--oro); letter-spacing: 2px; }
+  .sidebar-logo p { font-size: 11px; color: var(--muted); margin-top: 2px; }
+  .nav-item { display: flex; align-items: center; gap: 10px; padding: 11px 20px; cursor: pointer; font-size: 13px; color: var(--muted); border-left: 3px solid transparent; transition: all 0.2s; }
+  .nav-item:hover { color: var(--texto); background: rgba(255,255,255,0.03); }
+  .nav-item.active { color: var(--verde); border-left-color: var(--verde); background: rgba(91,173,111,0.08); }
+  .nav-item .icon { font-size: 16px; width: 20px; }
+  .main-content { margin-left: 220px; padding: 28px; min-height: 100vh; }
+  .topbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
+  .topbar h1 { font-size: 20px; font-weight: 700; }
+  .btn-sm { padding: 8px 16px; border-radius: 8px; font-size: 12px; font-weight: 600; cursor: pointer; border: none; letter-spacing: 0.5px; }
+  .btn-verde { background: var(--verde); color: white; }
+  .btn-oro { background: var(--oro); color: #1a1000; }
+  .btn-danger { background: var(--peligro); color: white; }
+  .btn-ghost { background: transparent; color: var(--muted); border: 1px solid rgba(255,255,255,0.1); }
+  .btn-sm:hover { opacity: 0.85; }
+  .tab-content { display: none; }
+  .tab-content.active { display: block; }
+  .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 24px; }
+  .stat-card { background: var(--card); border-radius: 14px; padding: 18px; border: 1px solid rgba(255,255,255,0.06); }
+  .stat-card .label { font-size: 11px; color: var(--muted); letter-spacing: 1px; text-transform: uppercase; margin-bottom: 8px; }
+  .stat-card .value { font-size: 28px; font-weight: 800; }
+  .stat-card .sub { font-size: 11px; color: var(--muted); margin-top: 4px; }
+  .card { background: var(--card); border-radius: 14px; border: 1px solid rgba(255,255,255,0.06); overflow: hidden; margin-bottom: 20px; }
+  .card-header { padding: 16px 20px; border-bottom: 1px solid rgba(255,255,255,0.06); display: flex; justify-content: space-between; align-items: center; }
+  .card-header h3 { font-size: 14px; font-weight: 600; }
+  table { width: 100%; border-collapse: collapse; }
+  th { text-align: left; padding: 11px 16px; font-size: 11px; color: var(--muted); letter-spacing: 1px; text-transform: uppercase; border-bottom: 1px solid rgba(255,255,255,0.06); background: rgba(0,0,0,0.2); }
+  td { padding: 12px 16px; font-size: 13px; border-bottom: 1px solid rgba(255,255,255,0.04); vertical-align: middle; }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: rgba(255,255,255,0.02); }
+  .badge { display: inline-block; padding: 3px 10px; border-radius: 20px; font-size: 10px; font-weight: 700; letter-spacing: 0.5px; }
+  .badge-verde { background: rgba(91,173,111,0.15); color: var(--verde); }
+  .badge-oro { background: rgba(201,168,76,0.15); color: var(--oro); }
+  .badge-rojo { background: rgba(226,75,74,0.15); color: var(--peligro); }
+  .badge-gris { background: rgba(138,146,120,0.15); color: var(--muted); }
+  .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 100; align-items: center; justify-content: center; }
+  .modal-overlay.open { display: flex; }
+  .modal { background: var(--card); border-radius: 20px; padding: 28px; width: 560px; max-height: 85vh; overflow-y: auto; border: 1px solid rgba(255,255,255,0.1); }
+  .modal h2 { font-size: 18px; margin-bottom: 20px; }
+  .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; }
+  .form-group { margin-bottom: 12px; }
+  .form-group label { font-size: 11px; color: var(--muted); letter-spacing: 1px; display: block; margin-bottom: 6px; }
+  .form-group input, .form-group select, .form-group textarea { width: 100%; background: #111; border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; padding: 10px 12px; color: var(--texto); font-size: 13px; outline: none; }
+  .form-group input:focus, .form-group select:focus, .form-group textarea:focus { border-color: var(--verde); }
+  .form-group textarea { height: 80px; resize: vertical; }
+  .modal-footer { display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px; padding-top: 16px; border-top: 1px solid rgba(255,255,255,0.06); }
+  .search-bar { display: flex; gap: 10px; margin-bottom: 16px; }
+  .search-input { flex: 1; background: var(--card); border: 1px solid rgba(255,255,255,0.1); border-radius: 10px; padding: 10px 14px; color: var(--texto); font-size: 13px; outline: none; }
+  .search-input:focus { border-color: var(--verde); }
+  .loading { text-align: center; padding: 40px; color: var(--muted); }
+  .spinner { display: inline-block; width: 24px; height: 24px; border: 2px solid rgba(91,173,111,0.2); border-top-color: var(--verde); border-radius: 50%; animation: spin 0.8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .validar-box { max-width: 480px; margin: 0 auto; }
+  .codigo-input { font-size: 24px; font-weight: 800; letter-spacing: 4px; text-transform: uppercase; text-align: center; }
+  .resultado-validacion { margin-top: 20px; padding: 20px; border-radius: 14px; text-align: center; display: none; }
+  .resultado-ok { background: rgba(91,173,111,0.1); border: 1px solid rgba(91,173,111,0.3); }
+  .resultado-err { background: rgba(226,75,74,0.1); border: 1px solid rgba(226,75,74,0.3); }
+  .empty-state { text-align: center; padding: 40px; color: var(--muted); font-size: 13px; }
+  .cat-badge { display:inline-block;padding:3px 10px;border-radius:20px;font-size:10px;font-weight:700; }
+  .cat-concierto { background:rgba(184,92,174,0.15);color:#B85CAE; }
+  .cat-festival { background:rgba(232,93,38,0.15);color:var(--acento); }
+  .cat-deporte { background:rgba(91,173,111,0.15);color:var(--verde); }
+  .cat-cultura { background:rgba(201,168,76,0.15);color:var(--oro); }
+  .cat-gastronomia { background:rgba(226,75,74,0.15);color:var(--peligro); }
+  .cat-moda { background:rgba(55,138,221,0.15);color:#4A90D9; }
+  .cat-arte { background:rgba(90,173,200,0.15);color:#5AADC8; }
+  .cat-otro { background:rgba(138,146,120,0.15);color:var(--muted); }
+  .evento-finalizado { opacity:0.5; }
+  .sitios-body { max-height: 2000px; overflow: hidden; transition: max-height 0.3s ease; }
+  .sitios-body.collapsed { max-height: 0; }
+  .sitio-detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 12px; }
+  @media (max-width: 768px) { .sitio-detail-grid { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="login-screen">
+  <div class="login-box">
+    <div style="font-size:48px;margin-bottom:12px;">🗺️</div>
+    <h1>RUTERO MDE</h1>
+    <p>Panel de Administración</p>
+    <input class="input-field" type="email" id="login-email" placeholder="Email de administrador">
+    <input class="input-field" type="password" id="login-pass" placeholder="Contraseña" onkeydown="if(event.key==='Enter')doLogin()">
+    <button class="btn-primary" onclick="doLogin()">INGRESAR</button>
+    <div class="error-msg" id="login-error"></div>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="app">
+  <div class="sidebar">
+    <div class="sidebar-logo">
+      <h2>🗺️ RUTERO MDE</h2>
+      <p>Panel Admin</p>
+    </div>
+    <div class="nav-item active" onclick="showTab('dashboard',this)"><span class="icon">📊</span> Dashboard</div>
+    <div class="nav-item" onclick="showTab('rutas',this)"><span class="icon">🗺️</span> Rutas</div>
+    <div class="nav-item" onclick="showTab('usuarios',this)"><span class="icon">👥</span> Usuarios</div>
+    <div class="nav-item" onclick="showTab('aliados',this)"><span class="icon">🤝</span> Aliados</div>
+    <div class="nav-item" onclick="showTab('premios',this)"><span class="icon">🏆</span> Premios</div>
+    <div class="nav-item" onclick="showTab('eventos',this)"><span class="icon">🎪</span> Eventos</div>
+    <div class="nav-item" onclick="showTab('validar',this)"><span class="icon">✅</span> Validar Código</div>
+
+    <div class="nav-item" onclick="showTab('pipeline',this)"><span class="icon">🎯</span> Pipeline CRM</div>
+    <div class="nav-item" onclick="showTab('importar',this)"><span class="icon">📥</span> Importar Rutas</div>
+    <div class="nav-item" onclick="showTab('colaboradores',this)"><span class="icon">🎬</span> Colaboradores</div>
+    <div class="nav-item" onclick="showTab('servicios',this)"><span class="icon">🧭</span> Servicios Viajeros</div>
+    <div class="nav-item" onclick="showTab('codigos',this)"><span class="icon">🎫</span> Códigos Aliado</div>
+    <div style="position:absolute;bottom:20px;left:0;right:0;padding:0 20px;">
+      <button class="btn-sm btn-ghost" style="width:100%" onclick="doLogout()">🚪 Cerrar sesión</button>
+    </div>
+  </div>
+
+  <div class="main-content">
+    <div class="topbar">
+      <h1 id="page-title">Dashboard</h1>
+      <div><span style="font-size:12px;color:var(--muted)" id="admin-email"></span></div>
+    </div>
+
+    <!-- DASHBOARD -->
+    <div id="tab-dashboard" class="tab-content active">
+      <div class="stats-grid">
+        <div class="stat-card"><div class="label">Usuarios registrados</div><div class="value" style="color:var(--verde)" id="stat-usuarios">—</div><div class="sub">Total en la app</div></div>
+        <div class="stat-card"><div class="label">Rutas activas</div><div class="value" style="color:var(--oro)" id="stat-rutas">—</div><div class="sub">MDE · BOG · PPN</div></div>
+        <div class="stat-card"><div class="label">Premios generados</div><div class="value" style="color:var(--acento)" id="stat-premios">—</div><div class="sub">Códigos QR creados</div></div>
+        <div class="stat-card"><div class="label">Premios canjeados</div><div class="value" style="color:#B85CAE" id="stat-canjeados">—</div><div class="sub">Validados por aliados</div></div>
+        <div class="stat-card"><div class="label">Aliados activos</div><div class="value" style="color:#5BAAA0" id="stat-aliados">—</div><div class="sub">Establecimientos vinculados</div></div>
+        <div class="stat-card"><div class="label">Ciudades activas</div><div class="value" style="color:var(--oro)">3</div><div class="sub">Medellín · Bogotá · Popayán</div></div>
+      </div>
+      <div class="card">
+        <div class="card-header"><h3>📈 Últimos usuarios registrados</h3></div>
+        <div id="tabla-ultimos-usuarios"><div class="loading"><div class="spinner"></div></div></div>
+      </div>
+      <div class="card">
+        <div class="card-header"><h3>🏆 Últimos premios generados</h3></div>
+        <div id="tabla-ultimos-premios"><div class="loading"><div class="spinner"></div></div></div>
+      </div>
+    </div>
+
+    <!-- RUTAS -->
+    <div id="tab-rutas" class="tab-content">
+      <div class="search-bar">
+        <input class="search-input" placeholder="🔍 Buscar ruta..." id="search-rutas" oninput="filtrarRutas()">
+        <button class="btn-sm btn-verde" onclick="abrirModalRuta()">+ Nueva ruta</button>
+        <button class="btn-sm btn-oro" id="btn-sincronizar" onclick="sincronizarRutas()">🔄 Sincronizar rutas</button>
+      </div>
+      <div class="card">
+        <div class="card-header">
+          <h3>Catálogo de rutas</h3>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <button class="btn-sm btn-verde" id="zona-Todas" onclick="filtrarZona('Todas')">Todas</button>
+            <button class="btn-sm btn-ghost" id="zona-Ciudad" onclick="filtrarZona('Ciudad')">🏙️ Ciudad</button>
+            <button class="btn-sm btn-ghost" id="zona-Alrededores" onclick="filtrarZona('Alrededores')">🗻 Alrededores</button>
+            <button class="btn-sm btn-ghost" id="zona-Temporada" onclick="filtrarZona('Temporada')">🎆 Temporada</button>
+            <button class="btn-sm btn-ghost" id="zona-Comida Urbana" onclick="filtrarZona('Comida Urbana')">🍟 Comida</button>
+            <button class="btn-sm btn-ghost" id="zona-Eventos" onclick="filtrarZona('Eventos')">🎪 Eventos</button>
+          </div>
+          <!-- Filtro por ciudad -->
+          <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
+            <span style="font-size:11px;color:var(--muted);align-self:center">CIUDAD:</span>
+            <button class="btn-sm btn-verde" id="ciudad-Todas" onclick="filtrarCiudad('Todas')">Todas</button>
+            <button class="btn-sm btn-ghost" id="ciudad-Medellín" onclick="filtrarCiudad('Medellín')">🏙️ Medellín</button>
+            <button class="btn-sm btn-ghost" id="ciudad-Bogotá" onclick="filtrarCiudad('Bogotá')">🏛️ Bogotá</button>
+            <button class="btn-sm btn-ghost" id="ciudad-Popayán" onclick="filtrarCiudad('Popayán')">🏛️ Popayán</button>
+          </div>
+        </div>
+        <div id="tabla-rutas"><div class="loading"><div class="spinner"></div></div></div>
+      </div>
+    </div>
+
+    <!-- USUARIOS -->
+    <div id="tab-usuarios" class="tab-content">
+      <div class="search-bar">
+        <input class="search-input" placeholder="🔍 Buscar usuario..." id="search-usuarios" oninput="filtrarUsuarios()">
+      </div>
+      <div class="card">
+        <div class="card-header"><h3>👥 Usuarios registrados</h3><span id="count-usuarios" style="font-size:12px;color:var(--muted)"></span></div>
+        <div id="tabla-usuarios"><div class="loading"><div class="spinner"></div></div></div>
+      </div>
+    </div>
+
+    <!-- ALIADOS -->
+    <div id="tab-aliados" class="tab-content">
+      <div class="search-bar">
+        <input class="search-input" placeholder="🔍 Buscar aliado...">
+        <button class="btn-sm btn-verde" onclick="abrirModalAliado()">+ Nuevo aliado</button>
+      </div>
+      <div class="card">
+        <div class="card-header"><h3>🤝 Aliados y premios</h3></div>
+        <div id="tabla-aliados"><div class="loading"><div class="spinner"></div></div></div>
+      </div>
+    </div>
+
+    <!-- PREMIOS -->
+    <div id="tab-premios" class="tab-content">
+      <div class="search-bar">
+        <input class="search-input" placeholder="🔍 Buscar por código o ruta..." id="search-premios" oninput="filtrarPremios()">
+        <select class="search-input" style="max-width:160px" id="filtro-estado-premio" onchange="filtrarPremios()">
+          <option value="">Todos</option>
+          <option value="false">Disponibles</option>
+          <option value="true">Canjeados</option>
+        </select>
+      </div>
+      <div class="card">
+        <div class="card-header"><h3>🏆 Códigos de premio generados</h3></div>
+        <div id="tabla-premios"><div class="loading"><div class="spinner"></div></div></div>
+      </div>
+    </div>
+
+    <!-- EVENTOS -->
+    <div id="tab-eventos" class="tab-content">
+      <div class="search-bar">
+        <input class="search-input" placeholder="🔍 Buscar evento..." id="search-eventos" oninput="filtrarEventos()">
+        <select class="search-input" style="max-width:150px" id="filtro-cat-evento" onchange="filtrarEventos()">
+          <option value="">Todas las categorías</option>
+          <option value="Concierto">🎤 Concierto</option>
+          <option value="Festival">🎪 Festival</option>
+          <option value="Deporte">⚽ Deporte</option>
+          <option value="Cultura">🎭 Cultura</option>
+          <option value="Gastronomía">🍽️ Gastronomía</option>
+          <option value="Moda">👗 Moda</option>
+          <option value="Arte">🎨 Arte</option>
+          <option value="Otro">📌 Otro</option>
+        </select>
+        <select class="search-input" style="max-width:140px" id="filtro-estado-evento" onchange="filtrarEventos()">
+          <option value="">Todos los estados</option>
+          <option value="activo">🟢 Activos</option>
+          <option value="proximo">🟡 Próximos</option>
+          <option value="finalizado">⚫ Finalizados</option>
+        </select>
+        <button class="btn-sm btn-verde" onclick="abrirModalEvento()">+ Nuevo evento</button>
+      </div>
+      <div class="stats-grid" style="grid-template-columns:repeat(3,1fr);margin-bottom:20px">
+        <div class="stat-card"><div class="label">Total eventos</div><div class="value" style="color:var(--verde)" id="stat-total-eventos">—</div></div>
+        <div class="stat-card"><div class="label">Activos hoy</div><div class="value" style="color:var(--acento)" id="stat-eventos-activos">—</div></div>
+        <div class="stat-card"><div class="label">Próximos 30 días</div><div class="value" style="color:#B85CAE" id="stat-eventos-proximos">—</div></div>
+      </div>
+      <div class="card">
+        <div class="card-header"><h3>🎪 Eventos</h3><span style="font-size:12px;color:var(--muted)" id="count-eventos"></span></div>
+        <div id="tabla-eventos"><div class="loading"><div class="spinner"></div></div></div>
+      </div>
+    </div>
+
+    <!-- VALIDAR -->
+    <div id="tab-validar" class="tab-content">
+      <div class="validar-box">
+        <div id="banner-qr" style="display:none;background:rgba(91,173,111,0.1);border:1px solid rgba(91,173,111,0.3);border-radius:12px;padding:14px 18px;margin-bottom:16px;align-items:center;gap:12px">
+          <span style="font-size:24px">📷</span>
+          <div>
+            <div style="font-size:12px;font-weight:700;color:var(--verde);letter-spacing:1px">CODIGO DETECTADO DESDE QR</div>
+            <div style="font-size:11px;color:var(--muted);margin-top:2px">Escaneado por el aliado — verificando automaticamente...</div>
+          </div>
+        </div>
+        <div class="card" style="padding:28px">
+          <h3 style="margin-bottom:6px">✅ Validar codigo de premio</h3>
+          <p style="font-size:12px;color:var(--muted);margin-bottom:20px">Ingresa el codigo del cliente o escanea el QR — se verifica y registra automaticamente</p>
+          <div class="form-group">
+            <label>CODIGO DEL CLIENTE</label>
+            <input class="input-field codigo-input" id="codigo-validar" placeholder="RUT-XXXX-0000" maxlength="40" onkeydown="if(event.key==='Enter')validarCodigo()">
+          </div>
+          <button class="btn-sm btn-verde" style="width:100%;padding:13px;font-size:14px" onclick="validarCodigo()">🔍 VERIFICAR CODIGO</button>
+          <div class="resultado-validacion" id="resultado-validacion"></div>
+        </div>
+        <div class="card" style="margin-top:16px">
+          <div class="card-header"><h3>📊 Canjes recientes</h3><button class="btn-sm btn-ghost" onclick="loadEstadisticasCanjes()">🔄 Actualizar</button></div>
+          <div id="tabla-canjes-recientes"><div class="loading"><div class="spinner"></div></div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SONDEO -->
+    <div id="tab-sondeo" class="tab-content" style="display:none!important">
+      <div class="stats-grid" style="grid-template-columns:repeat(4,1fr);margin-bottom:20px">
+        <div class="stat-card"><div class="label">Total respuestas</div><div class="value" style="color:var(--verde)" id="stat-sondeo-total">—</div></div>
+        <div class="stat-card"><div class="label">🔥 Muy interesados</div><div class="value" style="color:var(--oro)" id="stat-sondeo-interesados">—</div></div>
+        <div class="stat-card"><div class="label">Reciben turistas internac.</div><div class="value" style="color:var(--acento)" id="stat-sondeo-dispuestos">—</div></div>
+        <div class="stat-card"><div class="label">Hablan inglés</div><div class="value" style="color:#B85CAE" id="stat-sondeo-internet">—</div></div>
+      </div>
+      <div class="search-bar">
+        <input class="search-input" placeholder="🔍 Buscar por negocio, ubicación..." id="search-sondeo" oninput="filtrarSondeo()">
+        <select class="search-input" style="max-width:160px" id="filtro-tipo-negocio" onchange="filtrarSondeo()">
+          <option value="">Todos los tipos</option>
+          <option value="restaurante">🍽️ Restaurante / Café / Bar</option>
+          <option value="hospedaje">🏨 Hotel / Hostal / Airbnb</option>
+          <option value="museo_atraccion">🏛️ Museo / Atracción</option>
+          <option value="tienda_artesania">🎨 Tienda / Artesanías</option>
+          <option value="tour_experiencia">🚶 Tour / Experiencia</option>
+          <option value="transporte">🚗 Transporte</option>
+          <option value="spa_bienestar">💆 Spa / Bienestar / Deporte</option>
+          <option value="otro">✨ Otro</option>
+        </select>
+        <select class="search-input" style="max-width:160px" id="filtro-interes" onchange="filtrarSondeo()">
+          <option value="">Todos niveles interés</option>
+          <option value="alto">🔥 Muy interesados</option>
+          <option value="medio">👍 Interesados</option>
+          <option value="curioso">🤔 Curiosos</option>
+          <option value="no_aun">⏸️ No por ahora</option>
+        </select>
+        <button class="btn-sm btn-verde" onclick="exportarSondeoCSV()">📥 Exportar CSV</button>
+      </div>
+      <div class="card">
+        <div class="card-header">
+          <h3>📋 Respuestas del sondeo</h3>
+          <span style="font-size:12px;color:var(--muted)" id="count-sondeo"></span>
+        </div>
+        <div id="tabla-sondeo"><div class="loading"><div class="spinner"></div></div></div>
+      </div>
+    </div>
+
+    <!-- PESTAÑA PIPELINE CRM -->
+    <div id="tab-importar" class="tab-content">
+  <div class="section-header" style="margin-bottom:20px">
+    <h2>📥 Importar Rutas</h2>
+    <p style="color:var(--muted);font-size:13px;margin-top:4px">Carga rutas masivamente desde CSV o descríbelas en texto y la IA genera el formato automáticamente.</p>
+  </div>
+
+  <!-- Método A: CSV -->
+  <div class="card" style="margin-bottom:20px">
+    <div class="card-header">
+      <h3>📊 Método A — Importar desde CSV</h3>
+      <a href="plantilla_rutas_rutero.csv" download class="btn-sm btn-ghost">⬇️ Descargar plantilla</a>
+    </div>
+    <div style="padding:20px">
+      <p style="color:var(--muted);font-size:13px;margin-bottom:16px">
+        Descarga la plantilla Excel/CSV, llena los datos de tus rutas (una por fila) y súbela aquí.
+        Los campos separados por <code style="background:rgba(255,255,255,0.08);padding:2px 6px;border-radius:4px">|</code>
+        permiten múltiples valores (sitios, consejos, GPS).
+      </p>
+      <div style="border:2px dashed rgba(255,255,255,0.15);border-radius:12px;padding:32px;text-align:center;cursor:pointer;transition:all 0.2s"
+           id="csv-dropzone"
+           ondragover="event.preventDefault();this.style.borderColor='var(--oro)'"
+           ondragleave="this.style.borderColor='rgba(255,255,255,0.15)'"
+           ondrop="handleCSVDrop(event)">
+        <div style="font-size:32px;margin-bottom:8px">📂</div>
+        <div style="font-weight:600;margin-bottom:4px">Arrastra el CSV aquí</div>
+        <div style="color:var(--muted);font-size:12px;margin-bottom:16px">o haz clic para seleccionar</div>
+        <input type="file" id="csv-input" accept=".csv" style="display:none" onchange="handleCSVFile(this.files[0])">
+        <button class="btn-sm btn-oro" onclick="document.getElementById('csv-input').click()">Seleccionar archivo CSV</button>
+      </div>
+      <!-- Preview CSV -->
+      <div id="csv-preview" style="display:none;margin-top:16px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+          <div id="csv-count" style="font-weight:600;color:var(--oro)"></div>
+          <div style="display:flex;gap:8px">
+            <button class="btn-sm btn-ghost" onclick="limpiarCSV()">✕ Limpiar</button>
+            <button class="btn-sm btn-verde" onclick="subirCSVaFirestore()">🚀 Subir a Firestore</button>
+          </div>
+        </div>
+        <div id="csv-tabla" style="overflow-x:auto;max-height:300px;overflow-y:auto"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Método B: JSON directo -->
+  <div class="card" style="margin-bottom:20px">
+    <div class="card-header">
+      <h3>📋 Método B — Pegar JSON directo</h3>
+      <span style="font-size:11px;color:var(--verde);letter-spacing:1px">COPIA → PEGA → SUBE</span>
+    </div>
+    <div style="padding:20px">
+      <p style="color:var(--muted);font-size:13px;margin-bottom:12px">
+        Pegá el JSON completo de una ruta (generado por Claude u otra fuente). 
+        Soporta <strong style="color:var(--oro)">sitiosDetalle</strong> con tips, curiosidades, retos y horarios.
+      </p>
+      <textarea id="json-directo-input" rows="16" class="form-group"
+        style="width:100%;font-family:monospace;font-size:11px;resize:vertical"
+        placeholder='Pegá el JSON aquí — soporta UNA ruta {...} o VARIAS en array [{...}, {...}]'></textarea>
+      <div style="display:flex;gap:10px;margin-top:10px;align-items:center;flex-wrap:wrap">
+        <button class="btn-sm btn-oro" onclick="previewJSONDirecto()">👁️ Preview</button>
+        <button class="btn-sm btn-verde" onclick="subirJSONDirecto()" id="btn-json-subir" disabled>🚀 Subir a Firestore</button>
+        <button class="btn-sm btn-verde" onclick="subirBatchJSONDirecto()" id="btn-json-batch" style="display:none">🚀 Subir TODAS a Firestore</button>
+        <button class="btn-sm btn-ghost" onclick="document.getElementById('json-directo-input').value='';document.getElementById('json-directo-preview').innerHTML='';document.getElementById('btn-json-subir').disabled=true;document.getElementById('btn-json-batch').style.display='none';document.getElementById('json-directo-status').textContent=''">✕ Limpiar</button>
+        <span id="json-directo-status" style="font-size:12px;color:var(--muted)"></span>
+      </div>
+      <!-- Preview -->
+      <div id="json-directo-preview" style="margin-top:16px"></div>
+    </div>
+  </div>
+
+  <!-- Método C: IA (v2 — con sitiosDetalle) -->
+  <div class="card">
+    <div class="card-header">
+      <h3>🤖 Método C — Generar ruta completa con IA</h3>
+      <span style="font-size:11px;color:var(--oro);letter-spacing:1px">POWERED BY CLAUDE · v2 SITIOS DETALLE</span>
+    </div>
+    <div style="padding:20px">
+      <p style="color:var(--muted);font-size:13px;margin-bottom:8px">
+        Describe la ruta en lenguaje natural — la IA genera <strong style="color:var(--oro)">ruta + sitios con horarios, tips, curiosidades y retos</strong> en ES/EN, listos para Firestore.
+      </p>
+      <!-- API Key -->
+      <div style="margin-bottom:12px;padding:10px 14px;background:rgba(201,168,76,0.06);border:1px solid rgba(201,168,76,0.2);border-radius:10px;display:flex;gap:10px;align-items:center">
+        <label style="font-size:11px;color:var(--oro);white-space:nowrap;letter-spacing:1px">🔑 API KEY</label>
+        <input type="password" id="ia-api-key" class="input-field" 
+          style="margin-bottom:0;flex:1;font-size:12px;font-family:monospace" 
+          placeholder="sk-ant-api03-..." 
+          oninput="if(this.value.trim()) sessionStorage.setItem('rutero_claude_key', this.value.trim())">
+        <button class="btn-sm btn-ghost" onclick="document.getElementById('ia-api-key').type = document.getElementById('ia-api-key').type==='password'?'text':'password'" style="font-size:10px">👁️</button>
+      </div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px">
+        <span class="badge badge-verde">📍 Sitios detallados</span>
+        <span class="badge badge-oro">🕐 Horarios</span>
+        <span class="badge badge-gris">💡 Tips locales</span>
+        <span class="badge badge-gris">🧠 Curiosidades</span>
+        <span class="badge badge-gris">🎯 Retos gamificados</span>
+        <span class="badge badge-gris">🇬🇧 ES + EN</span>
+      </div>
+      <textarea id="ia-prompt" rows="8" class="form-group"
+        style="width:100%;resize:vertical;font-size:13px"
+        placeholder="Describe la ruta con el mayor detalle posible. Ejemplo:&#10;&#10;Quiero crear la ruta VIVE EL POBLADO en Medellín, zona Ciudad, dificultad fácil, duración 3-4h. Los sitios son:&#10;1. Parque Lleras — centro de vida nocturna y gastronomía&#10;2. Museo El Castillo — casa-museo estilo francés con jardines&#10;3. Milla de Oro — corredor financiero con arquitectura moderna&#10;4. Parque de El Poblado — centro histórico del barrio&#10;5. Vía Primavera — calle boutique y diseño&#10;&#10;Quiero tips basados en la Guía Vive Medellín, horarios reales, curiosidades históricas y retos que motiven la exploración. Colores cálidos verdes y dorados..."></textarea>
+      <div style="display:flex;gap:10px;margin-top:12px;align-items:center;flex-wrap:wrap">
+        <button class="btn-sm btn-oro" onclick="generarRutaConIA()" id="btn-ia-generar">
+          ✨ Generar ruta completa
+        </button>
+        <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);cursor:pointer">
+          <input type="checkbox" id="ia-solo-sitios" style="accent-color:var(--verde)">
+          Solo regenerar sitiosDetalle (mantener ruta existente)
+        </label>
+        <span id="ia-status" style="font-size:12px;color:var(--muted)"></span>
+      </div>
+      <!-- Resultado IA -->
+      <div id="ia-resultado" style="display:none;margin-top:20px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+          <div style="font-weight:600;color:var(--oro)">✅ Ruta generada con sitios detallados</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <button class="btn-sm btn-ghost" onclick="editarJSONGenerado()">✏️ Editar JSON</button>
+            <button class="btn-sm btn-ghost" onclick="copiarJSONGenerado()">📋 Copiar JSON</button>
+            <button class="btn-sm btn-verde" onclick="subirRutaIAaFirestore()">🚀 Subir a Firestore</button>
+          </div>
+        </div>
+        <!-- Preview card (ruta header) -->
+        <div id="ia-card-preview" style="background:rgba(255,255,255,0.04);border-radius:12px;padding:16px;margin-bottom:12px"></div>
+        <!-- Preview sitios detallados -->
+        <div id="ia-sitios-preview" style="margin-bottom:12px"></div>
+        <!-- JSON editable -->
+        <div id="ia-json-container" style="display:none">
+          <textarea id="ia-json-editor" rows="30" class="form-group"
+            style="width:100%;font-family:monospace;font-size:11px;resize:vertical"></textarea>
+          <div style="display:flex;gap:8px;margin-top:8px">
+            <button class="btn-sm btn-oro" onclick="recargarPreviewDesdeJSON()">🔄 Recargar preview desde JSON</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Método D: Importar Capa (EnCicla, Whoosh, etc.) -->
+  <div class="card" style="margin-top:20px">
+    <div class="card-header">
+      <h3>🗺️ Método D — Importar Capa del Mapa</h3>
+      <span style="font-size:11px;color:var(--verde);letter-spacing:1px">capas_mapa → Firestore</span>
+    </div>
+    <div style="padding:20px">
+      <p style="color:var(--muted);font-size:13px;margin-bottom:12px">
+        Importa capas de movilidad u otros puntos de interés (EnCicla, Whoosh, etc.) a la colección
+        <code style="background:rgba(255,255,255,0.08);padding:2px 6px;border-radius:4px">capas_mapa</code>
+        en Firestore. El JSON debe tener un campo <strong style="color:var(--oro)">capaId</strong> que será el ID del documento.
+      </p>
+      <textarea id="capa-json-input" rows="10" class="form-group"
+        style="width:100%;font-family:monospace;font-size:11px;resize:vertical"
+        placeholder='Pegá el JSON de la capa aquí — debe tener el campo "capaId" (ej: "encicla_estaciones")'></textarea>
+      <div style="display:flex;gap:10px;margin-top:10px;align-items:center;flex-wrap:wrap">
+        <button class="btn-sm btn-oro" onclick="previewCapaJSON()">👁️ Preview</button>
+        <button class="btn-sm btn-verde" onclick="subirCapaJSON()" id="btn-capa-subir" disabled>🚀 Subir a capas_mapa</button>
+        <button class="btn-sm btn-ghost" onclick="limpiarCapaJSON()">✕ Limpiar</button>
+        <span id="capa-status" style="font-size:12px;color:var(--muted)"></span>
+      </div>
+      <div id="capa-preview" style="margin-top:16px"></div>
+    </div>
+  </div>
+
+  <!-- Método E: Importar Colección Genérica (tips, traducciones, etc.) -->
+  <div class="card" style="margin-top:20px">
+    <div class="card-header">
+      <h3>📚 Método E — Importar Colección Genérica</h3>
+      <span style="font-size:11px;color:var(--verde);letter-spacing:1px">cualquier colección → Firestore</span>
+    </div>
+    <div style="padding:20px">
+      <p style="color:var(--muted);font-size:13px;margin-bottom:12px">
+        Importa documentos a <strong>cualquier colección</strong> de Firestore (tips, traducciones, etc.).<br>
+        Formato esperado: <code style="background:rgba(255,255,255,0.08);padding:2px 6px;border-radius:4px">{ "coleccion": "nombre_coleccion", "documentos": [ { "nombre": "...", ... } ] }</code><br>
+        El campo <strong style="color:var(--oro)">nombre</strong> de cada documento se usa como ID en Firestore.
+      </p>
+      <textarea id="coleccion-json-input" rows="10" class="form-group"
+        style="width:100%;font-family:monospace;font-size:11px;resize:vertical"
+        placeholder='{ "coleccion": "tips_por_sitio", "documentos": [ { "nombre": "Plaza Botero", "es": "...", "en": "..." } ] }'></textarea>
+      <div style="display:flex;gap:10px;margin-top:10px;align-items:center;flex-wrap:wrap">
+        <button class="btn-sm btn-oro" onclick="previewColeccionJSON()">👁️ Preview</button>
+        <button class="btn-sm btn-verde" onclick="subirColeccionJSON()" id="btn-coleccion-subir" disabled>🚀 Subir a Firestore</button>
+        <button class="btn-sm btn-ghost" onclick="limpiarColeccionJSON()">✕ Limpiar</button>
+        <span id="coleccion-status" style="font-size:12px;color:var(--muted)"></span>
+      </div>
+      <div id="coleccion-preview" style="margin-top:16px"></div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════
+     TAB: COLABORADORES (01/07/2026)
+     Creadores de contenido aliados a Rutero MDE
+═══════════════════════════════════════════════════════════ -->
+<div id="tab-colaboradores" class="tab-content">
+  <div class="search-bar">
+    <input class="search-input" id="input-colab-nombre" placeholder="🎬 Nombre o @handle del colaborador">
+    <button class="btn-sm btn-verde" onclick="guardarColaborador()">+ Agregar colaborador</button>
+  </div>
+  <div class="card" style="margin-bottom:16px">
+    <div class="card-header"><h3>🎬 Datos del colaborador</h3></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:16px">
+      <div><label style="color:var(--texto-muted);font-size:11px">Handle / @usuario</label><input class="search-input" id="input-colab-handle" placeholder="@TequesucaTravels" style="margin-top:4px"></div>
+      <div><label style="color:var(--texto-muted);font-size:11px">Red social principal</label><input class="search-input" id="input-colab-red" placeholder="YouTube / TikTok / Instagram" style="margin-top:4px"></div>
+      <div><label style="color:var(--texto-muted);font-size:11px">WhatsApp / Contacto</label><input class="search-input" id="input-colab-wa" placeholder="57300..." style="margin-top:4px"></div>
+      <div><label style="color:var(--texto-muted);font-size:11px">Seguidores aprox.</label><input class="search-input" id="input-colab-seguidores" placeholder="96500" type="number" style="margin-top:4px"></div>
+      <div style="grid-column:1/-1"><label style="color:var(--texto-muted);font-size:11px">Notas (audiencia, acuerdo, contenido pactado)</label><textarea class="search-input" id="input-colab-notas" rows="2" placeholder="Ej: Hombres colombianos 25-52 años. Video Guatapé 1 jul 2026..." style="margin-top:4px;resize:vertical"></textarea></div>
+      <div><label style="color:var(--texto-muted);font-size:11px">Estado</label>
+        <select class="search-input" id="input-colab-estado" style="margin-top:4px">
+          <option value="activo">✅ Activo</option>
+          <option value="pendiente">⏳ Pendiente</option>
+          <option value="negociacion">💬 En negociación</option>
+          <option value="inactivo">❌ Inactivo</option>
+        </select>
+      </div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-header"><h3>📋 Colaboradores registrados</h3></div>
+    <div id="tabla-colaboradores" style="padding:16px"><div class="loading"><div class="spinner"></div></div></div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════
+     TAB: SERVICIOS VIAJEROS (01/07/2026)
+     Iguideu, MedeGuide y futuros servicios para turistas
+═══════════════════════════════════════════════════════════ -->
+<div id="tab-servicios" class="tab-content">
+  <div class="search-bar">
+    <input class="search-input" id="input-serv-nombre" placeholder="🧭 Nombre del servicio">
+    <button class="btn-sm btn-verde" onclick="guardarServicio()">+ Agregar servicio</button>
+  </div>
+  <div class="card" style="margin-bottom:16px">
+    <div class="card-header"><h3>🧭 Datos del servicio</h3></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:16px">
+      <div><label style="color:var(--texto-muted);font-size:11px">Nombre del servicio</label><input class="search-input" id="input-serv-nombre2" placeholder="Iguideu" style="margin-top:4px"></div>
+      <div><label style="color:var(--texto-muted);font-size:11px">Tipo</label>
+        <select class="search-input" id="input-serv-tipo" style="margin-top:4px">
+          <option value="guia">🗺️ Guía turístico</option>
+          <option value="transporte">🚌 Transporte</option>
+          <option value="seguro">🛡️ Seguro de viaje</option>
+          <option value="cambio">💱 Cambio de moneda</option>
+          <option value="sim">📱 SIM / Conectividad</option>
+          <option value="otro">📦 Otro</option>
+        </select>
+      </div>
+      <div><label style="color:var(--texto-muted);font-size:11px">WhatsApp / Contacto</label><input class="search-input" id="input-serv-wa" placeholder="57300..." style="margin-top:4px"></div>
+      <div><label style="color:var(--texto-muted);font-size:11px">Idiomas</label><input class="search-input" id="input-serv-idiomas" placeholder="ES / EN / FR" style="margin-top:4px"></div>
+      <div><label style="color:var(--texto-muted);font-size:11px">URL o perfil</label><input class="search-input" id="input-serv-url" placeholder="https://iguideu.com" style="margin-top:4px"></div>
+      <div><label style="color:var(--texto-muted);font-size:11px">Estado</label>
+        <select class="search-input" id="input-serv-estado" style="margin-top:4px">
+          <option value="activo">✅ Activo en app</option>
+          <option value="pendiente">⏳ Pendiente</option>
+          <option value="inactivo">❌ Inactivo</option>
+        </select>
+      </div>
+      <div style="grid-column:1/-1"><label style="color:var(--texto-muted);font-size:11px">Descripción / Notas</label><textarea class="search-input" id="input-serv-notas" rows="2" placeholder="Ej: Guía bilingüe EN↔ES, aparece en ServiciosScreen..." style="margin-top:4px;resize:vertical"></textarea></div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-header"><h3>📋 Servicios registrados</h3></div>
+    <div id="tabla-servicios" style="padding:16px"><div class="loading"><div class="spinner"></div></div></div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════
+     TAB: CÓDIGOS ALIADO (01/07/2026)
+     Gestión de códigos de comisión para aliados (museo, hostales, etc.)
+═══════════════════════════════════════════════════════════ -->
+<div id="tab-codigos" class="tab-content">
+  <div class="search-bar">
+    <input class="search-input" id="input-cod-aliado" placeholder="🎫 Nombre del aliado (ej: Museo Pablo Escobar)">
+    <button class="btn-sm btn-verde" onclick="guardarCodigo()">+ Agregar aliado con código</button>
+  </div>
+  <div class="card" style="margin-bottom:16px">
+    <div class="card-header"><h3>🎫 Datos del aliado y comisión</h3></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:16px">
+      <div><label style="color:var(--texto-muted);font-size:11px">Nombre del aliado</label><input class="search-input" id="input-cod-nombre" placeholder="Museo de Pablo Escobar" style="margin-top:4px"></div>
+      <div><label style="color:var(--texto-muted);font-size:11px">Prefijo del código</label><input class="search-input" id="input-cod-prefijo" placeholder="RUT-PEM" style="margin-top:4px" maxlength="8"></div>
+      <div><label style="color:var(--texto-muted);font-size:11px">WhatsApp de contacto</label><input class="search-input" id="input-cod-wa" placeholder="573022449897" style="margin-top:4px"></div>
+      <div><label style="color:var(--texto-muted);font-size:11px">% Comisión</label><input class="search-input" id="input-cod-comision" placeholder="10" type="number" min="1" max="50" style="margin-top:4px"></div>
+      <div><label style="color:var(--texto-muted);font-size:11px">Ruta asociada (nombre exacto)</label><input class="search-input" id="input-cod-ruta" placeholder="RUTA TRANSFORMACIÓN URBANA" style="margin-top:4px"></div>
+      <div><label style="color:var(--texto-muted);font-size:11px">Sitio asociado (nombre exacto)</label><input class="search-input" id="input-cod-sitio" placeholder="Museo de Pablo Escobar" style="margin-top:4px"></div>
+      <div style="grid-column:1/-1"><label style="color:var(--texto-muted);font-size:11px">Notas / Condiciones</label><textarea class="search-input" id="input-cod-notas" rows="2" placeholder="Ej: 10% sobre compras en el museo. Turista muestra código al llegar..." style="margin-top:4px;resize:vertical"></textarea></div>
+    </div>
+    <div style="padding:0 16px 16px">
+      <button class="btn-sm" style="background:var(--verde);color:#000;font-weight:700" onclick="generarCodigoPreview()">🎲 Previsualizar código de ejemplo</button>
+      <span id="preview-codigo" style="margin-left:12px;color:var(--oro);font-weight:700;font-size:14px;letter-spacing:1px"></span>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-header"><h3>📋 Aliados con código registrados</h3></div>
+    <div id="tabla-codigos" style="padding:16px"><div class="loading"><div class="spinner"></div></div></div>
+  </div>
+</div>
+
+<div id="tab-pipeline" class="tab-content">
+      <div class="stats-grid" style="grid-template-columns:repeat(4,1fr);margin-bottom:20px">
+        <div class="stat-card"><div class="label">Total contactos</div><div class="value" style="color:var(--verde)" id="stat-pipe-total">—</div></div>
+        <div class="stat-card"><div class="label">🥇 Tier 1 (validados)</div><div class="value" style="color:var(--oro)" id="stat-pipe-tier1">—</div></div>
+        <div class="stat-card"><div class="label">💰 Con revenue</div><div class="value" style="color:var(--acento)" id="stat-pipe-revenue">—</div></div>
+        <div class="stat-card"><div class="label">🏆 Sponsors potenciales</div><div class="value" style="color:#B85CAE" id="stat-pipe-sponsors">—</div></div>
+      </div>
+      <div class="search-bar">
+        <input class="search-input" placeholder="🔍 Buscar aliado..." id="search-pipe" oninput="filtrarPipeline()">
+        <select class="search-input" style="max-width:160px" id="filtro-tier" onchange="filtrarPipeline()">
+          <option value="">Todos los tiers</option>
+          <option value="tier1">🥇 Tier 1 (validados)</option>
+          <option value="tier2">🥈 Tier 2 (interesados)</option>
+          <option value="sponsor">🏆 Sponsor</option>
+        </select>
+        <select class="search-input" style="max-width:160px" id="filtro-estado" onchange="filtrarPipeline()">
+          <option value="">Todos los estados</option>
+          <option value="por_contactar">🟣 Por contactar</option>
+          <option value="mensaje_enviado">📤 Mensaje enviado</option>
+          <option value="sondeo_llenado">📝 Sondeo llenado</option>
+          <option value="conversacion">📞 Conversación agendada</option>
+          <option value="alianza_activa">🤝 Alianza activa</option>
+          <option value="descartado">❌ Descartado</option>
+        </select>
+        <button class="btn-sm btn-verde" onclick="nuevoAliado()">+ Nuevo aliado</button>
+        <button class="btn-sm btn-ghost" onclick="exportarPipelineCSV()">📥 CSV</button>
+        <button class="btn-sm btn-oro" onclick="sembrarHostales()">🏨 Cargar 21 Hostales</button>
+      </div>
+      <div class="card">
+        <div class="card-header">
+          <h3>🎯 Pipeline de Aliados — CRM</h3>
+          <span style="font-size:12px;color:var(--muted)" id="count-pipe"></span>
+        </div>
+        <div id="tabla-pipeline"><div class="loading"><div class="spinner"></div></div></div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- MODAL ALIADO DE PIPELINE -->
+<div class="modal-overlay" id="modal-pipe">
+  <div class="modal">
+    <h2 id="modal-pipe-title">➕ Nuevo aliado al pipeline</h2>
+    <input type="hidden" id="pipe-id">
+    <div class="form-row">
+      <div class="form-group"><label>NOMBRE DEL NEGOCIO</label><input id="pipe-nombre" placeholder="Artesanías de mi Pueblo"></div>
+      <div class="form-group"><label>CONTACTO (persona)</label><input id="pipe-contacto" placeholder="Laura, Felipe..."></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>CATEGORÍA</label>
+        <select id="pipe-categoria">
+          <option value="restaurante">🍽️ Restaurante</option>
+          <option value="hospedaje">🏨 Hospedaje</option>
+          <option value="museo_atraccion">🏛️ Museo / Atracción</option>
+          <option value="tienda_artesania">🎨 Tienda / Artesanías</option>
+          <option value="tour_experiencia">🚶 Tour / Experiencia</option>
+          <option value="transporte">🚗 Transporte</option>
+          <option value="spa_bienestar">💆 Deporte / Bienestar</option>
+          <option value="otro">✨ Otro</option>
+        </select>
+      </div>
+      <div class="form-group"><label>CIUDAD / UBICACIÓN</label><input id="pipe-ubicacion" placeholder="Guatapé, El Poblado, Comuna 13..."></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>TIER</label>
+        <select id="pipe-tier">
+          <option value="tier2">🥈 Tier 2 (interesado)</option>
+          <option value="tier1">🥇 Tier 1 (validado)</option>
+          <option value="sponsor">🏆 Sponsor potencial</option>
+        </select>
+      </div>
+      <div class="form-group"><label>ESTADO</label>
+        <select id="pipe-estado">
+          <option value="por_contactar">🟣 Por contactar</option>
+          <option value="mensaje_enviado">📤 Mensaje enviado</option>
+          <option value="sondeo_llenado">📝 Sondeo llenado</option>
+          <option value="conversacion">📞 Conversación agendada</option>
+          <option value="alianza_activa">🤝 Alianza activa</option>
+          <option value="descartado">❌ Descartado</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>WHATSAPP</label><input id="pipe-whatsapp" placeholder="3001234567"></div>
+      <div class="form-group"><label>COMISIÓN RECIBIDA (COP)</label><input id="pipe-revenue" type="number" placeholder="0"></div>
+    </div>
+    <div class="form-group"><label>¿CÓMO LO CONOCÍ?</label>
+      <select id="pipe-fuente">
+        <option value="campo">📍 Viaje de campo</option>
+        <option value="sondeo">📋 Respondió sondeo web</option>
+        <option value="uber">🚗 Conduciendo Uber</option>
+        <option value="referido">🤝 Referido por otro aliado</option>
+        <option value="redes">📱 Redes sociales</option>
+        <option value="otro">✨ Otro</option>
+      </select>
+    </div>
+    <div class="form-group"><label>NOTAS / CONTEXTO</label><textarea id="pipe-notas" placeholder="Detalles de la conversación, contexto, referencias..."></textarea></div>
+    <div class="modal-footer">
+      <button class="btn-sm btn-danger" onclick="eliminarPipe()" id="btn-pipe-delete" style="display:none">🗑️ Eliminar</button>
+      <button class="btn-sm btn-ghost" onclick="cerrarModalPipe()">Cancelar</button>
+      <button class="btn-sm btn-verde" onclick="guardarPipe()">💾 Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL RUTA -->
+<div class="modal-overlay" id="modal-ruta">
+  <div class="modal" style="max-width:680px">
+    <h2 id="modal-ruta-title">➕ Nueva ruta</h2>
+    <input type="hidden" id="ruta-id">
+    <!-- Fila 1: Nombre + Emoji + Estado -->
+    <div class="form-row">
+      <div class="form-group" style="flex:3"><label>NOMBRE</label><input class="form-group" id="ruta-nombre" placeholder="RUTA PATRIMONIAL DEL CENTRO"></div>
+      <div class="form-group" style="flex:0.6"><label>EMOJI</label><input class="form-group" id="ruta-emoji" placeholder="🏛️"></div>
+      <div class="form-group" style="flex:1">
+        <label>ESTADO</label>
+        <select class="form-group" id="ruta-activa">
+          <option value="true">🟢 Activa</option>
+          <option value="false">⏸️ Pausada</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-group"><label>SUBTÍTULO</label><input class="form-group" id="ruta-subtitulo" placeholder="Centro · La Candelaria · Historia"></div>
+    <!-- Fila 2: Zona + Ciudad + Precio -->
+    <div class="form-row">
+      <div class="form-group"><label>ZONA</label>
+        <select class="form-group" id="ruta-zona">
+          <option>Ciudad</option><option>Alrededores</option><option>Temporada</option><option>Comida Urbana</option><option>Eventos</option>
+        </select>
+      </div>
+      <div class="form-group"><label>CIUDAD</label>
+        <select class="form-group" id="ruta-ciudad">
+          <option>Medellín</option><option>Bogotá</option><option>Popayán</option><option>Guatapé</option><option>Otra</option>
+        </select>
+      </div>
+      <div class="form-group"><label>PRECIO</label><input class="form-group" id="ruta-precio" placeholder="$24.900"></div>
+    </div>
+    <!-- Fila 3: Duración + Dificultad + Transporte -->
+    <div class="form-row">
+      <div class="form-group"><label>DURACIÓN</label><input class="form-group" id="ruta-tiempo" placeholder="3h"></div>
+      <div class="form-group"><label>DIFICULTAD</label>
+        <select class="form-group" id="ruta-dificultad"><option>FÁCIL</option><option>MEDIO</option><option>DIFÍCIL</option></select>
+      </div>
+      <div class="form-group"><label>MEJOR HORA</label><input class="form-group" id="ruta-mejorHora" placeholder="9:00 am – 4:00 pm"></div>
+    </div>
+    <div class="form-group"><label>TRANSPORTE</label><input class="form-group" id="ruta-transporte" placeholder="🚇 Metro + caminata"></div>
+    <!-- Hook -->
+    <div class="form-group"><label>HOOK (frase de enganche)</label><textarea class="form-group" id="ruta-hook" rows="2" placeholder="Hubo un tiempo en que Medellín era..."></textarea></div>
+    <!-- Descripción -->
+    <div class="form-group"><label>DESCRIPCIÓN</label><textarea class="form-group" id="ruta-descripcion" rows="2" placeholder="Un recorrido para comprender..."></textarea></div>
+    <!-- Sitios -->
+    <div class="form-group"><label>SITIOS (uno por línea)</label><textarea class="form-group" id="ruta-sitios" rows="4" placeholder="Plaza Botero&#10;Museo de Antioquia"></textarea></div>
+    <!-- Premio / Insignia / Personaje -->
+    <div class="form-row">
+      <div class="form-group" style="flex:2"><label>PREMIO AL COMPLETAR</label><input class="form-group" id="ruta-premio" placeholder="Insignia + beneficio aliado"></div>
+      <div class="form-group"><label>INSIGNIA</label><input class="form-group" id="ruta-insignia" placeholder="Guardián del Patrimonio"></div>
+      <div class="form-group" style="flex:0.6"><label>PERSONAJE</label><input class="form-group" id="ruta-personaje" placeholder="🦉"></div>
+    </div>
+    <!-- Misión épica + Momento clave -->
+    <div class="form-group"><label>MISIÓN ÉPICA</label><textarea class="form-group" id="ruta-misionEpica" rows="2" placeholder="Fotografía las 4 iglesias más antiguas..."></textarea></div>
+    <div class="form-group"><label>MOMENTO CLAVE</label><input class="form-group" id="ruta-momentoClave" placeholder="El Morro de Tulcán — vista panorámica..."></div>
+    <!-- Tipo de experiencia + País -->
+    <div class="form-row">
+      <div class="form-group" style="flex:2"><label>TIPO DE EXPERIENCIA</label><input class="form-group" id="ruta-tipoExperiencia" placeholder="Patrimonio & Historia"></div>
+      <div class="form-group"><label>PAÍS</label>
+        <select class="form-group" id="ruta-pais">
+          <option>Colombia</option><option>Perú</option><option>Ecuador</option><option>Venezuela</option><option>Otro</option>
+        </select>
+      </div>
+    </div>
+    <!-- Colores -->
+    <div class="form-row">
+      <div class="form-group"><label>COLOR 1 (hex)</label><input class="form-group" id="ruta-color1" placeholder="#0F0F0A"></div>
+      <div class="form-group"><label>COLOR 2 (hex)</label><input class="form-group" id="ruta-color2" placeholder="#1A1A10"></div>
+      <div class="form-group"><label>ACENTO (hex)</label><input class="form-group" id="ruta-acento" placeholder="#D4AF7A"></div>
+    </div>
+    <!-- Tag + Tag Pausada -->
+    <div class="form-row">
+      <div class="form-group" style="flex:2"><label>TAG</label><input class="form-group" id="ruta-tag" placeholder="🏛️ Patrimonio colonial"></div>
+      <div class="form-group" style="flex:2"><label>TAG PAUSADA</label><input class="form-group" id="ruta-tagPausada" placeholder="🚧 Próximamente"></div>
+    </div>
+    <!-- Imagen + Imagen insignia -->
+    <div class="form-row">
+      <div class="form-group" style="flex:2"><label>IMAGEN (path)</label><input class="form-group" id="ruta-imagen" placeholder="assets/images/rutas/ruta_ppn_01.jpg"></div>
+      <div class="form-group" style="flex:2"><label>INSIGNIA IMG (path)</label><input class="form-group" id="ruta-insigniaImg" placeholder="assets/images/insignias/insignia_ppn.png"></div>
+    </div>
+    <!-- Consejos -->
+    <div class="form-group"><label>CONSEJOS (uno por línea, incluir emoji al inicio)</label><textarea class="form-group" id="ruta-consejos" rows="4" placeholder="🏛️ Muchas iglesias cierran al mediodía&#10;🌧️ Popayán es lluviosa — lleva paraguas"></textarea></div>
+    <!-- Temporada -->
+    <div style="border:1px solid rgba(255,255,255,0.08);border-radius:12px;padding:16px;margin-bottom:12px">
+      <div style="font-size:11px;color:var(--muted);letter-spacing:1.5px;margin-bottom:12px">TEMPORADA (solo para rutas con fecha activa)</div>
+      <div class="form-row">
+        <div class="form-group"><label>MES INICIO</label><input class="form-group" type="number" id="ruta-tempMesInicio" placeholder="9" min="1" max="12"></div>
+        <div class="form-group"><label>DÍA INICIO</label><input class="form-group" type="number" id="ruta-tempDiaInicio" placeholder="3" min="1" max="31"></div>
+        <div class="form-group"><label>MES FIN</label><input class="form-group" type="number" id="ruta-tempMesFin" placeholder="9" min="1" max="12"></div>
+        <div class="form-group"><label>DÍA FIN</label><input class="form-group" type="number" id="ruta-tempDiaFin" placeholder="6" min="1" max="31"></div>
+      </div>
+    </div>
+    <!-- Editor GPS por sitio -->
+    <div style="border:1px solid rgba(255,212,0,0.2);border-radius:12px;padding:16px;margin-bottom:12px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+        <div style="font-size:11px;color:var(--oro);letter-spacing:1.5px">📍 GPS POR SITIO</div>
+        <button class="btn-sm btn-oro" onclick="agregarFilaGPS()" type="button">+ Agregar sitio</button>
+      </div>
+      <div id="gps-editor">
+        <div style="display:grid;grid-template-columns:2fr 1fr 1fr 40px;gap:6px;margin-bottom:6px">
+          <span style="font-size:10px;color:var(--muted);letter-spacing:1px">SITIO</span>
+          <span style="font-size:10px;color:var(--muted);letter-spacing:1px">LATITUD</span>
+          <span style="font-size:10px;color:var(--muted);letter-spacing:1px">LONGITUD</span>
+          <span></span>
+        </div>
+        <div id="gps-filas"></div>
+      </div>
+      <div style="font-size:10px;color:var(--muted);margin-top:8px">💡 Los sitios deben coincidir exactamente con los nombres en SITIOS (arriba)</div>
+    </div>
+    <!-- Sitios Detalle (JSON) -->
+    <div style="border:1px solid rgba(232,93,38,0.2);border-radius:12px;padding:16px;margin-bottom:12px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+        <div style="font-size:11px;color:var(--acento);letter-spacing:1.5px">📍 SITIOS DETALLE (horarios, tips, curiosidades, retos)</div>
+        <button class="btn-sm btn-ghost" onclick="toggleSitiosDetalleEditor()" type="button">▼ Mostrar/Ocultar</button>
+      </div>
+      <div id="sitios-detalle-editor" style="display:none">
+        <p style="font-size:11px;color:var(--muted);margin-bottom:8px">JSON array con detalle por sitio. Editar manualmente o pegar desde Método C (IA).</p>
+        <textarea class="form-group" id="ruta-sitiosDetalle" rows="10"
+          style="font-family:monospace;font-size:11px;resize:vertical"
+          placeholder='[{"nombre":"Sitio 1","nombreEN":"Site 1","emoji":"📍","orden":1,"lat":6.25,"lng":-75.58,"horario":"Mar-Dom 9am-5pm","tip":"🎒 Tip local","tipEN":"🎒 Local tip","curiosidad":"🧠 Dato curioso","curiosidadEN":"🧠 Fun fact","reto":"🎯 Reto","retoEN":"🎯 Challenge","puntosReto":100}]'></textarea>
+        <div style="display:flex;gap:8px;margin-top:6px">
+          <button class="btn-sm btn-ghost" onclick="validarSitiosDetalleJSON()" type="button">✅ Validar JSON</button>
+          <button class="btn-sm btn-ghost" onclick="autoSyncSitiosDesdeDetalle()" type="button">🔄 Sync → Sitios + GPS</button>
+          <span id="sitios-detalle-status" style="font-size:11px;color:var(--muted);align-self:center"></span>
+        </div>
+      </div>
+    </div>
+    <!-- Versión EN -->
+    <div style="border:1px solid rgba(255,255,255,0.08);border-radius:12px;padding:16px;margin-bottom:12px">
+      <div style="font-size:11px;color:var(--muted);letter-spacing:1.5px;margin-bottom:12px">🇬🇧 VERSIÓN EN INGLÉS (opcional)</div>
+      <div class="form-group"><label>NOMBRE EN</label><input class="form-group" id="ruta-nombreEN" placeholder="HISTORIC DOWNTOWN CIRCUIT"></div>
+      <div class="form-group"><label>SUBTÍTULO EN</label><input class="form-group" id="ruta-subtituloEN" placeholder="Cathedral · Morro de Tulcán · Pantheon"></div>
+      <div class="form-group"><label>HOOK EN</label><textarea class="form-group" id="ruta-hookEN" rows="2" placeholder="Colombia's whitest city holds 500 years of history..."></textarea></div>
+      <div class="form-group"><label>DESCRIPCIÓN EN</label><textarea class="form-group" id="ruta-descripcionEN" rows="2" placeholder="Popayán is a Colombian Heritage site..."></textarea></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-sm btn-ghost" onclick="cerrarModal('modal-ruta')">Cancelar</button>
+      <button class="btn-sm btn-danger" id="btn-eliminar-ruta" style="display:none" onclick="eliminarRutaActual()">🗑️ Eliminar</button>
+      <button class="btn-sm btn-verde" onclick="guardarRuta()">💾 Guardar ruta</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL ALIADO -->
+<div class="modal-overlay" id="modal-aliado">
+  <div class="modal" style="max-width:620px">
+    <h2 id="modal-aliado-title">🤝 Aliado</h2>
+    <input type="hidden" id="aliado-id">
+    <div class="form-row">
+      <div class="form-group" style="flex:3"><label>NOMBRE DEL ESTABLECIMIENTO</label><input class="form-group" id="aliado-nombre" placeholder="Café Pergamino"></div>
+      <div class="form-group" style="flex:0.6"><label>EMOJI</label><input class="form-group" id="aliado-emoji" placeholder="☕"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>TIPO</label>
+        <select class="form-group" id="aliado-tipo"><option>Café</option><option>Restaurante</option><option>Tienda</option><option>Museo</option><option>Hotel</option><option>Tour operador</option><option>Artesanías</option><option>Mirador</option><option>Otro</option></select>
+      </div>
+      <div class="form-group"><label>ESTADO</label>
+        <select class="form-group" id="aliado-activo">
+          <option value="true">🟢 Activo</option>
+          <option value="false">⏸️ Inactivo</option>
+        </select>
+      </div>
+      <div class="form-group" style="flex:0.8"><label>COMISIÓN %</label><input class="form-group" type="number" id="aliado-comision" placeholder="10" min="0" max="50"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group" style="flex:2"><label>CIUDAD</label>
+        <select class="form-group" id="aliado-ciudad">
+          <option>Medellín</option><option>Bogotá</option><option>Popayán</option><option>Guatapé</option><option>Otra</option>
+        </select>
+      </div>
+      <div class="form-group" style="flex:3"><label>DIRECCIÓN</label><input class="form-group" id="aliado-direccion" placeholder="Calle Provenza, El Poblado"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>WHATSAPP</label><input class="form-group" id="aliado-whatsapp" placeholder="+57 315 360 7201"></div>
+      <div class="form-group"><label>EMAIL / CONTACTO</label><input class="form-group" id="aliado-contacto" placeholder="correo@establecimiento.com"></div>
+    </div>
+    <div class="form-group"><label>BENEFICIO QUE OFRECE AL TURISTA</label><input class="form-group" id="aliado-beneficio" placeholder="10% descuento + souvenir de cortesía"></div>
+    <div class="form-group"><label>RUTAS ASOCIADAS (separadas por coma)</label><input class="form-group" id="aliado-rutas" placeholder="RUTA GUATAPÉ & LA PIEDRA, RUTA LAURELES"></div>
+    <div class="form-group"><label>SITIO ESPECÍFICO <span style="color:var(--muted);font-weight:400;font-size:10px">(opcional — aparece en el detalle de ese sitio)</span></label><input class="form-group" id="aliado-sitio" placeholder="El Peñol · Mirador La Piedra"></div>
+    <div class="form-group"><label>NOTAS INTERNAS</label><textarea class="form-group" id="aliado-notas" rows="2" placeholder="Contexto del aliado, historial de contacto..."></textarea></div>
+    <div class="modal-footer">
+      <button class="btn-sm btn-ghost" onclick="cerrarModal('modal-aliado')">Cancelar</button>
+      <button class="btn-sm btn-danger" id="btn-eliminar-aliado" style="display:none" onclick="eliminarAliadoActual()">🗑️ Eliminar</button>
+      <button class="btn-sm btn-verde" onclick="guardarAliado()">💾 Guardar aliado</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL EVENTO -->
+<div class="modal-overlay" id="modal-evento">
+  <div class="modal" style="width:620px">
+    <h2 id="modal-evento-title">🎪 Nuevo evento</h2>
+    <input type="hidden" id="evento-id">
+    <div class="form-row">
+      <div class="form-group"><label>NOMBRE DEL EVENTO</label><input class="form-group" id="evento-nombre" placeholder="Morat en Medellín"></div>
+      <div class="form-group"><label>EMOJI</label><input class="form-group" id="evento-emoji" placeholder="🎤" style="max-width:80px"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>CATEGORÍA</label>
+        <select class="form-group" id="evento-categoria">
+          <option>Concierto</option><option>Festival</option><option>Deporte</option>
+          <option>Cultura</option><option>Gastronomía</option><option>Moda</option><option>Arte</option><option>Otro</option>
+        </select>
+      </div>
+      <div class="form-group"><label>ESTADO</label>
+        <select class="form-group" id="evento-estado">
+          <option value="proximo">🟡 Próximo</option>
+          <option value="activo">🟢 Activo</option>
+          <option value="finalizado">⚫ Finalizado</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-group"><label>LUGAR / VENUE</label><input class="form-group" id="evento-lugar" placeholder="Plaza Mayor · Atanasio Girardot"></div>
+    <div class="form-row">
+      <div class="form-group"><label>FECHA INICIO</label><input class="form-group" type="date" id="evento-fecha-inicio"></div>
+      <div class="form-group"><label>FECHA FIN</label><input class="form-group" type="date" id="evento-fecha-fin"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>HORA</label><input class="form-group" type="time" id="evento-hora"></div>
+      <div class="form-group"><label>PRECIO ENTRADA</label><input class="form-group" id="evento-precio" placeholder="$80.000 COP · Gratis"></div>
+    </div>
+    <div class="form-group"><label>ARTISTAS / PARTICIPANTES</label><input class="form-group" id="evento-artistas" placeholder="Morat, Sebastián Yatra..."></div>
+    <div class="form-group"><label>DESCRIPCIÓN</label><textarea class="form-group" id="evento-descripcion"></textarea></div>
+    <div class="form-group"><label>LINK ENTRADAS</label><input class="form-group" id="evento-link" placeholder="https://tuboleta.com/..."></div>
+    <div class="modal-footer">
+      <button class="btn-sm btn-ghost" onclick="cerrarModal('modal-evento')">Cancelar</button>
+      <button class="btn-sm btn-danger" id="btn-eliminar-evento" style="display:none" onclick="eliminarEventoActual()">🗑️ Eliminar</button>
+      <button class="btn-sm btn-verde" onclick="guardarEvento()">💾 Guardar evento</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+<script>
+// ─── FIREBASE ───
+const firebaseConfig = {
+  apiKey: "AIzaSyBaC-aTKIUg_gYEE7QDcb2_-d5uZrhePsI",
+  authDomain: "rutero-mde.firebaseapp.com",
+  projectId: "rutero-mde",
+  storageBucket: "rutero-mde.firebasestorage.app",
+  messagingSenderId: "300771058852",
+  appId: "1:300771058852:web:1b21fe476d0268defc3231"
+};
+firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+const db = firebase.firestore();
+
+// ─── AUTH ───
+const ADMINS_EMAIL = ['paulflopezp@gmail.com'];
+
+auth.onAuthStateChanged(user => {
+  if (user && ADMINS_EMAIL.includes(user.email)) {
+    document.getElementById('login-screen').style.display = 'none';
+    document.getElementById('app').style.display = 'block';
+    document.getElementById('admin-email').textContent = user.email;
+    // Restore API key from session
+    const savedKey = sessionStorage.getItem('rutero_claude_key');
+    if (savedKey) document.getElementById('ia-api-key').value = savedKey;
+    loadDashboard(); loadRutas(); loadUsuarios(); loadAliados(); loadPremios(); loadEventos();
+  } else if (user) {
+    auth.signOut();
+  } else {
+    document.getElementById('login-screen').style.display = 'flex';
+    document.getElementById('app').style.display = 'none';
+  }
+});
+
+async function doLogin() {
+  const email = document.getElementById('login-email').value.trim();
+  const pass = document.getElementById('login-pass').value;
+  const errEl = document.getElementById('login-error');
+  errEl.textContent = '';
+  if (!email || !pass) { errEl.textContent = 'Ingresa email y contraseña'; return; }
+  if (!ADMINS_EMAIL.includes(email)) { errEl.textContent = 'Email no autorizado como admin'; return; }
+  errEl.textContent = 'Verificando...';
+  try {
+    await auth.signInWithEmailAndPassword(email, pass);
+    errEl.textContent = '';
+  } catch(e) {
+    console.error(e);
+    if (e.code === 'auth/wrong-password' || e.code === 'auth/invalid-credential') {
+      errEl.textContent = 'Contraseña incorrecta';
+    } else if (e.code === 'auth/user-not-found') {
+      errEl.textContent = 'Email no registrado';
+    } else if (e.code === 'auth/network-request-failed') {
+      errEl.textContent = 'Sin conexión a internet';
+    } else {
+      errEl.textContent = 'Error: ' + (e.message || e.code);
+    }
+  }
+}
+
+function doLogout() {
+  if (confirm('¿Cerrar sesión del panel admin?')) auth.signOut();
+}
+
+// ─── NAVEGACIÓN ───
+function showTab(tab, el) {
+  document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('tab-' + tab).classList.add('active');
+  if (el) el.classList.add('active');
+  const titles = {dashboard:'Dashboard',rutas:'Rutas',usuarios:'Usuarios',aliados:'Aliados',premios:'Premios',eventos:'Eventos',validar:'Validar Codigo',pipeline:'Pipeline CRM',colaboradores:'Colaboradores',servicios:'Servicios Viajeros',codigos:'Códigos Aliado',importar:'Importar Rutas y Capas'};
+
+  if (tab === 'pipeline') loadPipeline();
+  if (tab === 'validar') { loadEstadisticasCanjes(); detectarCodigoDesdeURL(); }
+  if (tab === 'colaboradores') loadColaboradores();
+  if (tab === 'servicios') loadServicios();
+  if (tab === 'codigos') loadCodigos();
+  document.getElementById('page-title').textContent = titles[tab] || tab;
+}
+
+// ════════════════════════════════════════════════════════
+//  COLABORADORES (01/07/2026)
+// ════════════════════════════════════════════════════════
+function limpiarFormColaborador() {
+  ['input-colab-nombre','input-colab-handle','input-colab-red','input-colab-wa',
+   'input-colab-seguidores','input-colab-notas'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = '';
+  });
+  const est = document.getElementById('input-colab-estado');
+  if (est) est.value = 'activo';
+}
+
+async function guardarColaborador() {
+  const nombre = document.getElementById('input-colab-nombre').value.trim()
+               || document.getElementById('input-colab-nombre').value.trim();
+  const handle = document.getElementById('input-colab-handle').value.trim();
+  const red = document.getElementById('input-colab-red').value.trim();
+  const wa = document.getElementById('input-colab-wa').value.trim();
+  const seguidores = parseInt(document.getElementById('input-colab-seguidores').value) || 0;
+  const notas = document.getElementById('input-colab-notas').value.trim();
+  const estado = document.getElementById('input-colab-estado').value;
+  if (!handle) { alert('El handle (@usuario) es obligatorio'); return; }
+  try {
+    await db.collection('colaboradores').add({
+      nombre, handle, red, wa, seguidores, notas, estado,
+      creadoEn: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    limpiarFormColaborador();
+    loadColaboradores();
+    alert('✅ Colaborador guardado');
+  } catch(e) { alert('Error: ' + e.message); }
+}
+
+async function loadColaboradores() {
+  const cont = document.getElementById('tabla-colaboradores');
+  if (!cont) return;
+  cont.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+  try {
+    const snap = await db.collection('colaboradores').orderBy('creadoEn','desc').get();
+    if (snap.empty) { cont.innerHTML = '<p style="color:var(--texto-muted);padding:12px">No hay colaboradores registrados aún.</p>'; return; }
+    let html = '<table style="width:100%;border-collapse:collapse">';
+    html += '<tr style="color:var(--texto-muted);font-size:11px;border-bottom:1px solid var(--borde)"><th style="padding:8px;text-align:left">Handle</th><th style="padding:8px;text-align:left">Red</th><th style="padding:8px;text-align:left">WhatsApp</th><th style="padding:8px;text-align:right">Seguidores</th><th style="padding:8px;text-align:left">Estado</th><th style="padding:8px"></th></tr>';
+    snap.forEach(doc => {
+      const d = doc.data();
+      const estadoColor = d.estado === 'activo' ? 'var(--verde)' : d.estado === 'pendiente' ? 'var(--oro)' : 'var(--texto-muted)';
+      const estadoLabel = {activo:'✅ Activo', pendiente:'⏳ Pendiente', negociacion:'💬 Negociando', inactivo:'❌ Inactivo'}[d.estado] || d.estado;
+      html += `<tr style="border-bottom:1px solid var(--borde)">
+        <td style="padding:8px;font-weight:700;color:var(--acento)">${d.handle || '—'}<br><span style="font-size:10px;color:var(--texto-muted);font-weight:400">${d.nombre || ''}</span></td>
+        <td style="padding:8px">${d.red || '—'}</td>
+        <td style="padding:8px">${d.wa ? `<a href="https://wa.me/${d.wa}" target="_blank" style="color:var(--verde)">📱 ${d.wa}</a>` : '—'}</td>
+        <td style="padding:8px;text-align:right">${d.seguidores ? d.seguidores.toLocaleString() : '—'}</td>
+        <td style="padding:8px;color:${estadoColor};font-size:12px">${estadoLabel}</td>
+        <td style="padding:8px"><button class="btn-sm" style="background:var(--rojo);color:#fff;font-size:10px" onclick="eliminarDoc('colaboradores','${doc.id}',loadColaboradores)">🗑️</button></td>
+      </tr>`;
+      if (d.notas) html += `<tr><td colspan="6" style="padding:4px 8px 12px;color:var(--texto-muted);font-size:11px;font-style:italic">📝 ${d.notas}</td></tr>`;
+    });
+    html += '</table>';
+    cont.innerHTML = html;
+  } catch(e) { cont.innerHTML = '<p style="color:var(--rojo)">Error: ' + e.message + '</p>'; }
+}
+
+// ════════════════════════════════════════════════════════
+//  SERVICIOS VIAJEROS (01/07/2026)
+// ════════════════════════════════════════════════════════
+function limpiarFormServicio() {
+  ['input-serv-nombre','input-serv-nombre2','input-serv-wa','input-serv-idiomas','input-serv-url','input-serv-notas'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = '';
+  });
+}
+
+async function guardarServicio() {
+  const nombre = document.getElementById('input-serv-nombre2').value.trim()
+              || document.getElementById('input-serv-nombre').value.trim();
+  const tipo = document.getElementById('input-serv-tipo').value;
+  const wa = document.getElementById('input-serv-wa').value.trim();
+  const idiomas = document.getElementById('input-serv-idiomas').value.trim();
+  const url = document.getElementById('input-serv-url').value.trim();
+  const notas = document.getElementById('input-serv-notas').value.trim();
+  const estado = document.getElementById('input-serv-estado').value;
+  if (!nombre) { alert('El nombre del servicio es obligatorio'); return; }
+  try {
+    await db.collection('serviciosViajeros').add({
+      nombre, tipo, wa, idiomas, url, notas, estado,
+      creadoEn: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    limpiarFormServicio();
+    loadServicios();
+    alert('✅ Servicio guardado');
+  } catch(e) { alert('Error: ' + e.message); }
+}
+
+async function loadServicios() {
+  const cont = document.getElementById('tabla-servicios');
+  if (!cont) return;
+  cont.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+  try {
+    const snap = await db.collection('serviciosViajeros').orderBy('creadoEn','desc').get();
+    if (snap.empty) { cont.innerHTML = '<p style="color:var(--texto-muted);padding:12px">No hay servicios registrados aún. Agrega Iguideu y MedeGuide para empezar.</p>'; return; }
+    const tipoLabel = {guia:'🗺️ Guía',transporte:'🚌 Transporte',seguro:'🛡️ Seguro',cambio:'💱 Cambio',sim:'📱 SIM',otro:'📦 Otro'};
+    let html = '<table style="width:100%;border-collapse:collapse">';
+    html += '<tr style="color:var(--texto-muted);font-size:11px;border-bottom:1px solid var(--borde)"><th style="padding:8px;text-align:left">Servicio</th><th style="padding:8px;text-align:left">Tipo</th><th style="padding:8px;text-align:left">Contacto</th><th style="padding:8px;text-align:left">Idiomas</th><th style="padding:8px;text-align:left">Estado</th><th style="padding:8px"></th></tr>';
+    snap.forEach(doc => {
+      const d = doc.data();
+      const estadoColor = d.estado === 'activo' ? 'var(--verde)' : 'var(--texto-muted)';
+      html += `<tr style="border-bottom:1px solid var(--borde)">
+        <td style="padding:8px;font-weight:700">${d.nombre}<br>${d.url ? `<a href="${d.url}" target="_blank" style="font-size:10px;color:var(--acento)">${d.url}</a>` : ''}</td>
+        <td style="padding:8px">${tipoLabel[d.tipo] || d.tipo}</td>
+        <td style="padding:8px">${d.wa ? `<a href="https://wa.me/${d.wa}" target="_blank" style="color:var(--verde)">📱 ${d.wa}</a>` : '—'}</td>
+        <td style="padding:8px">${d.idiomas || '—'}</td>
+        <td style="padding:8px;color:${estadoColor};font-size:12px">${d.estado === 'activo' ? '✅ En app' : '⏳ Pendiente'}</td>
+        <td style="padding:8px"><button class="btn-sm" style="background:var(--rojo);color:#fff;font-size:10px" onclick="eliminarDoc('serviciosViajeros','${doc.id}',loadServicios)">🗑️</button></td>
+      </tr>`;
+      if (d.notas) html += `<tr><td colspan="6" style="padding:4px 8px 12px;color:var(--texto-muted);font-size:11px;font-style:italic">📝 ${d.notas}</td></tr>`;
+    });
+    html += '</table>';
+    cont.innerHTML = html;
+  } catch(e) { cont.innerHTML = '<p style="color:var(--rojo)">Error: ' + e.message + '</p>'; }
+}
+
+// ════════════════════════════════════════════════════════
+//  CÓDIGOS ALIADO (01/07/2026)
+// ════════════════════════════════════════════════════════
+function generarCodigoPreview() {
+  const prefijo = document.getElementById('input-cod-prefijo').value.trim().toUpperCase();
+  if (!prefijo) { alert('Escribe el prefijo primero (ej: RUT-PEM)'); return; }
+  const num = Math.floor(1000 + Math.random() * 9000);
+  document.getElementById('preview-codigo').textContent = `${prefijo}-${num}`;
+}
+
+function limpiarFormCodigo() {
+  ['input-cod-aliado','input-cod-nombre','input-cod-prefijo','input-cod-wa','input-cod-comision','input-cod-ruta','input-cod-sitio','input-cod-notas'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = '';
+  });
+  const prev = document.getElementById('preview-codigo');
+  if (prev) prev.textContent = '';
+}
+
+async function guardarCodigo() {
+  const nombre = document.getElementById('input-cod-nombre').value.trim()
+              || document.getElementById('input-cod-aliado').value.trim();
+  const prefijo = document.getElementById('input-cod-prefijo').value.trim().toUpperCase();
+  const wa = document.getElementById('input-cod-wa').value.trim();
+  const comision = parseFloat(document.getElementById('input-cod-comision').value) || 0;
+  const ruta = document.getElementById('input-cod-ruta').value.trim();
+  const sitio = document.getElementById('input-cod-sitio').value.trim();
+  const notas = document.getElementById('input-cod-notas').value.trim();
+  if (!nombre || !prefijo) { alert('Nombre y prefijo son obligatorios'); return; }
+  try {
+    await db.collection('codigosAliado').add({
+      nombre, prefijo, wa, comision, ruta, sitio, notas,
+      activo: true,
+      creadoEn: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    limpiarFormCodigo();
+    loadCodigos();
+    alert('✅ Aliado con código guardado');
+  } catch(e) { alert('Error: ' + e.message); }
+}
+
+async function loadCodigos() {
+  const cont = document.getElementById('tabla-codigos');
+  if (!cont) return;
+  cont.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+  try {
+    const snap = await db.collection('codigosAliado').orderBy('creadoEn','desc').get();
+    if (snap.empty) { cont.innerHTML = '<p style="color:var(--texto-muted);padding:12px">No hay aliados con código registrados. Agrega el Museo de Pablo Escobar para empezar.</p>'; return; }
+    let html = '<table style="width:100%;border-collapse:collapse">';
+    html += '<tr style="color:var(--texto-muted);font-size:11px;border-bottom:1px solid var(--borde)"><th style="padding:8px;text-align:left">Aliado</th><th style="padding:8px;text-align:left">Prefijo código</th><th style="padding:8px;text-align:left">WhatsApp</th><th style="padding:8px;text-align:right">% Comisión</th><th style="padding:8px;text-align:left">Ruta / Sitio</th><th style="padding:8px"></th></tr>';
+    snap.forEach(doc => {
+      const d = doc.data();
+      const ejemploCod = `${d.prefijo}-${Math.floor(1000+Math.random()*9000)}`;
+      html += `<tr style="border-bottom:1px solid var(--borde)">
+        <td style="padding:8px;font-weight:700">${d.nombre}</td>
+        <td style="padding:8px"><span style="color:var(--oro);font-weight:700;letter-spacing:1px">${d.prefijo}</span><br><span style="font-size:10px;color:var(--texto-muted)">Ej: ${ejemploCod}</span></td>
+        <td style="padding:8px">${d.wa ? `<a href="https://wa.me/${d.wa}" target="_blank" style="color:var(--verde)">📱 ${d.wa}</a>` : '—'}</td>
+        <td style="padding:8px;text-align:right;font-weight:700;color:var(--verde)">${d.comision ? d.comision + '%' : '—'}</td>
+        <td style="padding:8px;font-size:11px">${d.ruta ? `🗺️ ${d.ruta}` : '—'}<br>${d.sitio ? `📍 ${d.sitio}` : ''}</td>
+        <td style="padding:8px"><button class="btn-sm" style="background:var(--rojo);color:#fff;font-size:10px" onclick="eliminarDoc('codigosAliado','${doc.id}',loadCodigos)">🗑️</button></td>
+      </tr>`;
+      if (d.notas) html += `<tr><td colspan="6" style="padding:4px 8px 12px;color:var(--texto-muted);font-size:11px;font-style:italic">📝 ${d.notas}</td></tr>`;
+    });
+    html += '</table>';
+    cont.innerHTML = html;
+  } catch(e) { cont.innerHTML = '<p style="color:var(--rojo)">Error: ' + e.message + '</p>'; }
+}
+
+function eliminarDoc(coleccion, id, callback) {
+  if (!confirm('¿Eliminar este registro? Esta acción no se puede deshacer.')) return;
+  db.collection(coleccion).doc(id).delete()
+    .then(() => { callback && callback(); })
+    .catch(e => alert('Error al eliminar: ' + e.message));
+}
+
+
+
+// ─── DASHBOARD ───
+async function loadDashboard() {
+  try {
+    // Usuarios
+    const usuarios = await db.collection('usuarios').get();
+    document.getElementById('stat-usuarios').textContent = usuarios.size;
+
+    // Rutas activas desde Firestore + hardcodeadas otras ciudades
+    const rutasSnap = await db.collection('rutas').get();
+    const rutasFirestoreNombres = new Set();
+    const rutasFirestoreContadas = new Set(); // evita duplicados por nombre
+    let rutasActivasCount = 0;
+    rutasSnap.forEach(d => {
+      const data = d.data();
+      const nombre = data.nombre;
+      // Ignorar pausadas, inactivas y duplicados por nombre
+      if (data.activa === false || data.pausada === true) return;
+      if (rutasFirestoreContadas.has(nombre)) return; // duplicado — solo contar 1 vez
+      rutasFirestoreContadas.add(nombre);
+      rutasFirestoreNombres.add(nombre);
+      rutasActivasCount++;
+    });
+    // Solo Firestore
+    document.getElementById('stat-rutas').textContent = rutasActivasCount;
+
+    // Aliados activos
+    const aliadosSnap = await db.collection('aliados').get();
+    let aliadosActivos = 0;
+    aliadosSnap.forEach(d => { if (d.data().activo !== false) aliadosActivos++; });
+    const statAliados = document.getElementById('stat-aliados');
+    if (statAliados) statAliados.textContent = aliadosActivos;
+
+    // Premios
+    let totalPremios = 0, totalCanjeados = 0;
+    const allPremios = await db.collectionGroup('premios').get();
+    allPremios.forEach(d => { totalPremios++; if (d.data().canjeado) totalCanjeados++; });
+    document.getElementById('stat-premios').textContent = totalPremios;
+    document.getElementById('stat-canjeados').textContent = totalCanjeados;
+    const ultimos = await db.collection('usuarios').orderBy('fechaRegistro','desc').limit(8).get();
+    let h = '<table><tr><th>Usuario</th><th>Email</th><th>Rutas</th><th>Puntos</th><th>Registro</th></tr>';
+    ultimos.forEach(d => {
+      const u = d.data();
+      const f = u.fechaRegistro ? new Date(u.fechaRegistro.seconds*1000).toLocaleDateString('es-CO') : '—';
+      h += `<tr><td>👤 ${u.nombre||'—'}</td><td style="color:var(--muted)">${u.email||'—'}</td><td><span class="badge badge-verde">${u.rutasCompletadas||0}</span></td><td style="color:var(--oro)">${u.puntosTotal||0} pts</td><td style="color:var(--muted)">${f}</td></tr>`;
+    });
+    document.getElementById('tabla-ultimos-usuarios').innerHTML = ultimos.empty ? '<div class="empty-state">Sin usuarios aún</div>' : h + '</table>';
+    const ultPremios = await db.collectionGroup('premios').orderBy('fecha','desc').limit(8).get();
+    let h2 = '<table><tr><th>Código</th><th>Ruta</th><th>Insignia</th><th>Estado</th><th>Fecha</th></tr>';
+    ultPremios.forEach(d => {
+      const p = d.data();
+      const f = p.fecha ? new Date(p.fecha.seconds*1000).toLocaleDateString('es-CO') : '—';
+      h2 += `<tr><td style="font-weight:700;color:var(--oro);letter-spacing:2px">${p.codigo||'—'}</td><td>${p.rutaNombre||'—'}</td><td style="color:var(--muted)">${p.insignia||'—'}</td><td><span class="badge ${p.canjeado?'badge-gris':'badge-verde'}">${p.canjeado?'Canjeado':'Disponible'}</span></td><td style="color:var(--muted)">${f}</td></tr>`;
+    });
+    document.getElementById('tabla-ultimos-premios').innerHTML = ultPremios.empty ? '<div class="empty-state">Sin premios aún</div>' : h2 + '</table>';
+  } catch(e) { console.log('Dashboard error:', e.message); }
+}
+
+// ─── RUTAS ───
+let todasLasRutas = []; let filtroZonaActivo = 'Todas';
+// RUTAS_FALLBACK eliminado — todo desde Firestore
+const RUTAS_FALLBACK = [];
+async function loadRutas() {
+  try {
+    const snap = await db.collection('rutas').get({ source: 'server' });
+    const rutasFirestore = [];
+    const nombresVistos = new Set();
+    snap.forEach(d => {
+      const r = {id:d.id,...d.data()};
+      if (!r.ciudad) r.ciudad = 'Medellín';
+      // Deduplicar por nombre — si hay duplicados queda el último (más reciente)
+      if (nombresVistos.has(r.nombre)) {
+        const idx = rutasFirestore.findIndex(x => x.nombre === r.nombre);
+        if (idx !== -1) rutasFirestore[idx] = r;
+        return;
+      }
+      nombresVistos.add(r.nombre);
+      rutasFirestore.push(r);
+    });
+
+    if (rutasFirestore.length > 0) {
+      todasLasRutas = rutasFirestore;
+    } else {
+      todasLasRutas = [];
+    }
+  } catch(e) {
+    console.error('Error cargando rutas:', e);
+    todasLasRutas = [];
+  }
+  renderRutas(todasLasRutas);
+}
+
+function filtrarRutas() {
+  const q = document.getElementById('search-rutas').value.toLowerCase();
+  let rutas = todasLasRutas;
+  if (filtroZonaActivo !== 'Todas') rutas = rutas.filter(r => r.zona === filtroZonaActivo);
+  if (filtroCiudadActivo !== 'Todas') rutas = rutas.filter(r => (r.ciudad||'Medellín') === filtroCiudadActivo);
+  if (q) rutas = rutas.filter(r => r.nombre.toLowerCase().includes(q) || r.zona.toLowerCase().includes(q));
+  renderRutas(rutas);
+}
+function filtrarCiudad(ciudad) {
+  filtroCiudadActivo = ciudad;
+  document.querySelectorAll('[id^="ciudad-"]').forEach(b => b.className = 'btn-sm btn-ghost');
+  const btn = document.getElementById('ciudad-'+ciudad);
+  if(btn) btn.className = 'btn-sm btn-verde';
+  aplicarFiltros();
+}
+
+function aplicarFiltros() {
+  let rutas = todasLasRutas;
+  if (filtroZonaActivo !== 'Todas') rutas = rutas.filter(r => r.zona === filtroZonaActivo);
+  if (filtroCiudadActivo !== 'Todas') rutas = rutas.filter(r => (r.ciudad || 'Medellín') === filtroCiudadActivo);
+  renderRutas(rutas);
+}
+
+function filtrarZona(zona) {
+  filtroZonaActivo = zona;
+  document.querySelectorAll('[id^="zona-"]').forEach(b => b.className = 'btn-sm btn-ghost');
+  const btn = document.getElementById('zona-'+zona);
+  if(btn) btn.className = 'btn-sm btn-verde';
+  aplicarFiltros();
+}
+
+function renderRutas(rutas) {
+  if (!rutas.length) { document.getElementById('tabla-rutas').innerHTML = '<div class="empty-state">Sin rutas</div>'; return; }
+  const zb = {Ciudad:'badge-verde',Alrededores:'badge-oro','Comida Urbana':'badge-rojo',Temporada:'badge-gris'};
+  let h = '<table><tr><th></th><th>Ruta</th><th>Zona</th><th>Ciudad</th><th>Precio</th><th>Dificultad</th><th>Estado</th><th>Acciones</th></tr>';
+  rutas.forEach(r => {
+    const activa = r.activa !== false;
+    h += `<tr style="opacity:${activa?1:0.55}">
+    <td style="font-size:20px">${r.emoji||''}</td>
+    <td style="font-weight:600">${r.nombre}<br><span style="font-size:11px;color:var(--muted);font-weight:400">${r.sitiosList ? r.sitiosList.length+' sitios' : (r.sitios||'—')+' sitios'}${r.sitiosDetalle?.length ? ' <span class="badge badge-oro" style="font-size:9px">✨ detalle</span>' : ''}</span></td>
+    <td><span style="font-size:11px;padding:3px 8px;border-radius:20px;background:rgba(255,255,255,0.06);color:var(--muted)">${r.ciudad||'Medellín'}</span></td>
+    <td><span class="badge ${zb[r.zona]||'badge-gris'}">${r.zona}</span></td>
+    <td style="color:var(--muted);font-size:12px">${r.ciudad||'Medellín'}</td>
+    <td style="color:var(--oro);font-weight:700">${r.precio||'—'}</td>
+    <td><span class="badge ${r.dificultad==='DIFÍCIL'?'badge-rojo':r.dificultad==='MEDIO'?'badge-oro':'badge-verde'}">${r.dificultad||'—'}</span></td>
+    <td><span class="badge ${activa?'badge-verde':'badge-gris'}" style="cursor:pointer" title="Click para cambiar estado" onclick="toggleRutaActiva('${r.id}',${activa})">${activa?'🟢 Activa':'⏸️ Pausada'}</span></td>
+    <td><button class="btn-sm btn-ghost" onclick="editarRuta('${r.id}')">✏️ Editar</button></td></tr>`;
+  });
+  document.getElementById('tabla-rutas').innerHTML = h + '</table>';
+}
+
+async function toggleRutaActiva(id, activa) {
+  try {
+    await db.collection('rutas').doc(id).update({activa: !activa, fechaActualizacion: firebase.firestore.FieldValue.serverTimestamp()});
+    const r = todasLasRutas.find(r => r.id===id);
+    if (r) r.activa = !activa;
+    renderRutas(todasLasRutas.filter(r => filtroZonaActivo==='Todas'||r.zona===filtroZonaActivo));
+  } catch(e) { alert('Error: '+e.message); }
+}
+
+function abrirModalRuta() {
+  document.getElementById('modal-ruta-title').textContent = '➕ Nueva ruta';
+  document.getElementById('ruta-id').value = '';
+  document.getElementById('btn-eliminar-ruta').style.display = 'none';
+  ['nombre','emoji','subtitulo','precio','tiempo','transporte','premio','insignia','personaje','hook','descripcion','mejorHora',
+   'misionEpica','momentoClave','tipoExperiencia','color1','color2','acento','tag','tagPausada','imagen','insigniaImg',
+   'nombreEN','subtituloEN','hookEN','descripcionEN','tempMesInicio','tempDiaInicio','tempMesFin','tempDiaFin'
+  ].forEach(f => { const el = document.getElementById('ruta-'+f); if(el) el.value=''; });
+  document.getElementById('ruta-sitios').value = '';
+  document.getElementById('ruta-consejos').value = '';
+  document.getElementById('ruta-sitiosDetalle').value = '';
+  document.getElementById('sitios-detalle-editor').style.display = 'none';
+  document.getElementById('sitios-detalle-status').textContent = '';
+  document.getElementById('ruta-zona').value = 'Ciudad';
+  document.getElementById('ruta-ciudad').value = 'Medellín';
+  document.getElementById('ruta-pais').value = 'Colombia';
+  document.getElementById('ruta-dificultad').value = 'FÁCIL';
+  document.getElementById('ruta-activa').value = 'true';
+  limpiarGPS();
+  document.getElementById('modal-ruta').classList.add('open');
+}
+function editarRuta(id) {
+  const r = todasLasRutas.find(r => r.id===id); if(!r) return;
+  document.getElementById('modal-ruta-title').textContent = '✏️ Editar ruta';
+  document.getElementById('btn-eliminar-ruta').style.display = 'inline-flex';
+  document.getElementById('ruta-id').value = id;
+  document.getElementById('ruta-nombre').value = r.nombre||'';
+  document.getElementById('ruta-emoji').value = r.emoji||'';
+  document.getElementById('ruta-subtitulo').value = r.subtitulo||'';
+  document.getElementById('ruta-zona').value = r.zona||'Ciudad';
+  document.getElementById('ruta-ciudad').value = r.ciudad||'Medellín';
+  document.getElementById('ruta-precio').value = r.precio||'';
+  document.getElementById('ruta-tiempo').value = r.tiempo||'';
+  document.getElementById('ruta-dificultad').value = r.dificultad||'FÁCIL';
+  document.getElementById('ruta-transporte').value = r.transporte||'';
+  document.getElementById('ruta-mejorHora').value = r.mejorHora||'';
+  document.getElementById('ruta-hook').value = r.hook||'';
+  document.getElementById('ruta-descripcion').value = r.descripcion||'';
+  document.getElementById('ruta-sitios').value = (r.sitiosList||[]).join('\n');
+  document.getElementById('ruta-premio').value = r.premio||'';
+  document.getElementById('ruta-insignia').value = r.insignia||'';
+  document.getElementById('ruta-personaje').value = r.personaje||'';
+  document.getElementById('ruta-activa').value = String(r.activa !== false);
+  // Campos nuevos
+  document.getElementById('ruta-misionEpica').value = r.misionEpica||'';
+  document.getElementById('ruta-momentoClave').value = r.momentoClave||'';
+  document.getElementById('ruta-tipoExperiencia').value = r.tipoExperiencia||'';
+  document.getElementById('ruta-pais').value = r.pais||'Colombia';
+  document.getElementById('ruta-color1').value = r.color1||'';
+  document.getElementById('ruta-color2').value = r.color2||'';
+  document.getElementById('ruta-acento').value = r.acento||'';
+  document.getElementById('ruta-tag').value = r.tag||'';
+  document.getElementById('ruta-tagPausada').value = r.tagPausada||'';
+  document.getElementById('ruta-imagen').value = r.imagen||'';
+  document.getElementById('ruta-insigniaImg').value = r.insigniaImg||'';
+  document.getElementById('ruta-consejos').value = (r.consejos||[]).join('\n');
+  document.getElementById('ruta-nombreEN').value = r.nombreEN||'';
+  document.getElementById('ruta-subtituloEN').value = r.subtituloEN||'';
+  document.getElementById('ruta-hookEN').value = r.hookEN||'';
+  document.getElementById('ruta-descripcionEN').value = r.descripcionEN||'';
+  // Temporada
+  if (r.temporadaInicio) {
+    document.getElementById('ruta-tempMesInicio').value = r.temporadaInicio[0]||'';
+    document.getElementById('ruta-tempDiaInicio').value = r.temporadaInicio[1]||'';
+  }
+  if (r.temporadaFin) {
+    document.getElementById('ruta-tempMesFin').value = r.temporadaFin[0]||'';
+    document.getElementById('ruta-tempDiaFin').value = r.temporadaFin[1]||'';
+  }
+  // GPS
+  cargarGPS(r.gpsSitios||[]);
+  // Sitios Detalle
+  if (r.sitiosDetalle && r.sitiosDetalle.length) {
+    document.getElementById('ruta-sitiosDetalle').value = JSON.stringify(r.sitiosDetalle, null, 2);
+    document.getElementById('sitios-detalle-status').textContent = `✅ ${r.sitiosDetalle.length} sitios con detalle`;
+  } else {
+    document.getElementById('ruta-sitiosDetalle').value = '';
+    document.getElementById('sitios-detalle-status').textContent = '';
+  }
+  document.getElementById('sitios-detalle-editor').style.display = 'none';
+  document.getElementById('modal-ruta').classList.add('open');
+}
+async function eliminarRutaActual() {
+  const id = document.getElementById('ruta-id').value; if(!id) return;
+  const r = todasLasRutas.find(r => r.id===id);
+  if (!confirm(`¿Eliminar la ruta "${r?.nombre||id}"? Esta acción no se puede deshacer.`)) return;
+  try { await db.collection('rutas').doc(id).delete(); cerrarModal('modal-ruta'); loadRutas(); alert('🗑️ Ruta eliminada'); }
+  catch(e) { alert('Error: '+e.message); }
+}
+async function guardarRuta() {
+  const nombre = document.getElementById('ruta-nombre').value.trim();
+  if (!nombre) { alert('El nombre de la ruta es requerido'); return; }
+  const sitiosRaw = document.getElementById('ruta-sitios').value;
+  const datos = {
+    nombre,
+    emoji: document.getElementById('ruta-emoji').value,
+    subtitulo: document.getElementById('ruta-subtitulo').value,
+    zona: document.getElementById('ruta-zona').value,
+    ciudad: document.getElementById('ruta-ciudad').value,
+    precio: document.getElementById('ruta-precio').value,
+    tiempo: document.getElementById('ruta-tiempo').value,
+    dificultad: document.getElementById('ruta-dificultad').value,
+    transporte: document.getElementById('ruta-transporte').value,
+    mejorHora: document.getElementById('ruta-mejorHora').value,
+    hook: document.getElementById('ruta-hook').value,
+    descripcion: document.getElementById('ruta-descripcion').value,
+    sitiosList: sitiosRaw.split('\n').map(s=>s.trim()).filter(s=>s),
+    sitios: sitiosRaw.split('\n').filter(s=>s.trim()).length,
+    premio: document.getElementById('ruta-premio').value,
+    insignia: document.getElementById('ruta-insignia').value,
+    personaje: document.getElementById('ruta-personaje').value,
+    activa: document.getElementById('ruta-activa').value === 'true',
+    pais: document.getElementById('ruta-pais').value,
+    misionEpica: document.getElementById('ruta-misionEpica').value,
+    momentoClave: document.getElementById('ruta-momentoClave').value,
+    tipoExperiencia: document.getElementById('ruta-tipoExperiencia').value,
+    color1: document.getElementById('ruta-color1').value,
+    color2: document.getElementById('ruta-color2').value,
+    acento: document.getElementById('ruta-acento').value,
+    tag: document.getElementById('ruta-tag').value,
+    tagPausada: document.getElementById('ruta-tagPausada').value,
+    imagen: document.getElementById('ruta-imagen').value,
+    insigniaImg: document.getElementById('ruta-insigniaImg').value,
+    consejos: document.getElementById('ruta-consejos').value.split('\n').map(s=>s.trim()).filter(s=>s),
+    nombreEN: document.getElementById('ruta-nombreEN').value,
+    subtituloEN: document.getElementById('ruta-subtituloEN').value,
+    hookEN: document.getElementById('ruta-hookEN').value,
+    descripcionEN: document.getElementById('ruta-descripcionEN').value,
+    gpsSitios: obtenerGPS(),
+    sitiosDetalle: (() => {
+      const raw = document.getElementById('ruta-sitiosDetalle').value.trim();
+      if (!raw) return [];
+      try { return JSON.parse(raw); } catch(e) { return []; }
+    })(),
+    temporadaInicio: (() => {
+      const m = parseInt(document.getElementById('ruta-tempMesInicio').value);
+      const d = parseInt(document.getElementById('ruta-tempDiaInicio').value);
+      return (!isNaN(m) && !isNaN(d)) ? [m, d] : null;
+    })(),
+    temporadaFin: (() => {
+      const m = parseInt(document.getElementById('ruta-tempMesFin').value);
+      const d = parseInt(document.getElementById('ruta-tempDiaFin').value);
+      return (!isNaN(m) && !isNaN(d)) ? [m, d] : null;
+    })(),
+    fechaActualizacion: firebase.firestore.FieldValue.serverTimestamp()
+  };
+  const id = document.getElementById('ruta-id').value;
+  try {
+    if(id){ await db.collection('rutas').doc(id).update(datos); }
+    else { await db.collection('rutas').add({...datos, fechaCreacion: firebase.firestore.FieldValue.serverTimestamp()}); }
+    cerrarModal('modal-ruta'); loadRutas(); alert('✅ Ruta guardada');
+  } catch(e) { alert('Error: '+e.message); }
+}
+
+
+// ─── GPS EDITOR ───
+function agregarFilaGPS(sitio='', lat='', lng='', radio=50) {
+  const container = document.getElementById('gps-filas');
+  const idx = container.children.length;
+  const div = document.createElement('div');
+  div.style.cssText = 'display:grid;grid-template-columns:2fr 1fr 1fr 40px;gap:6px;margin-bottom:6px';
+  div.innerHTML = `
+    <input class="form-group" placeholder="Nombre del sitio" value="${sitio}" data-gps="sitio" style="font-size:12px;padding:6px 10px">
+    <input class="form-group" placeholder="6.2442" value="${lat}" data-gps="lat" style="font-size:12px;padding:6px 10px">
+    <input class="form-group" placeholder="-75.5812" value="${lng}" data-gps="lng" style="font-size:12px;padding:6px 10px">
+    <button class="btn-sm btn-danger" onclick="this.parentElement.remove()" type="button" style="padding:4px 8px">✕</button>
+  `;
+  container.appendChild(div);
+}
+
+function limpiarGPS() {
+  document.getElementById('gps-filas').innerHTML = '';
+}
+
+function obtenerGPS() {
+  const filas = document.querySelectorAll('#gps-filas > div');
+  const resultado = [];
+  filas.forEach(fila => {
+    const sitio = fila.querySelector('[data-gps="sitio"]').value.trim();
+    const lat = parseFloat(fila.querySelector('[data-gps="lat"]').value);
+    const lng = parseFloat(fila.querySelector('[data-gps="lng"]').value);
+    if (sitio && !isNaN(lat) && !isNaN(lng)) {
+      resultado.push({ sitio, lat, lng });
+    }
+  });
+  return resultado;
+}
+
+function cargarGPS(gpsList) {
+  limpiarGPS();
+  if (!gpsList || !Array.isArray(gpsList)) return;
+  gpsList.forEach(g => agregarFilaGPS(g.sitio||'', g.lat||'', g.lng||''));
+}
+
+
+// ─── SITIOS DETALLE HELPERS ──────────────────────────────────────────────────
+function toggleSitiosDetalleEditor() {
+  const el = document.getElementById('sitios-detalle-editor');
+  el.style.display = el.style.display === 'none' ? 'block' : 'none';
+}
+
+function validarSitiosDetalleJSON() {
+  const raw = document.getElementById('ruta-sitiosDetalle').value.trim();
+  const status = document.getElementById('sitios-detalle-status');
+  if (!raw) { status.textContent = '⚠️ Vacío'; status.style.color = 'var(--muted)'; return; }
+  try {
+    const arr = JSON.parse(raw);
+    if (!Array.isArray(arr)) throw new Error('Debe ser un array []');
+    const missing = [];
+    arr.forEach((s, i) => {
+      if (!s.nombre) missing.push(`Sitio ${i+1}: falta nombre`);
+    });
+    if (missing.length) {
+      status.textContent = '⚠️ ' + missing.join('; ');
+      status.style.color = 'var(--peligro)';
+    } else {
+      status.textContent = `✅ ${arr.length} sitios válidos`;
+      status.style.color = 'var(--verde)';
+    }
+  } catch(e) {
+    status.textContent = '❌ JSON inválido: ' + e.message;
+    status.style.color = 'var(--peligro)';
+  }
+}
+
+function autoSyncSitiosDesdeDetalle() {
+  const raw = document.getElementById('ruta-sitiosDetalle').value.trim();
+  if (!raw) { alert('No hay sitiosDetalle para sincronizar'); return; }
+  try {
+    const arr = JSON.parse(raw);
+    if (!Array.isArray(arr)) throw new Error('Debe ser un array');
+    // Sync sitiosList
+    document.getElementById('ruta-sitios').value = arr.map(s => s.nombre).join('\n');
+    // Sync GPS
+    limpiarGPS();
+    arr.forEach(s => {
+      if (s.nombre && s.lat && s.lng) {
+        agregarFilaGPS(s.nombre, s.lat, s.lng, s.radio || 50);
+      }
+    });
+    document.getElementById('sitios-detalle-status').textContent = `🔄 Sincronizado: ${arr.length} sitios → lista + GPS`;
+    document.getElementById('sitios-detalle-status').style.color = 'var(--verde)';
+  } catch(e) {
+    alert('Error en JSON: ' + e.message);
+  }
+}
+
+// ─── IMPORTAR RUTAS ───────────────────────────────────────────────────────────
+
+// ── CSV ──────────────────────────────────────────────────────────────────────
+let rutasCSV = [];
+
+function handleCSVDrop(event) {
+  event.preventDefault();
+  document.getElementById('csv-dropzone').style.borderColor = 'rgba(255,255,255,0.15)';
+  const file = event.dataTransfer.files[0];
+  if (file && file.name.endsWith('.csv')) handleCSVFile(file);
+  else alert('Por favor sube un archivo .csv');
+}
+
+function handleCSVFile(file) {
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try {
+      rutasCSV = parsearCSV(e.target.result);
+      mostrarPreviewCSV(rutasCSV);
+    } catch(err) {
+      alert('Error leyendo el CSV: ' + err.message);
+    }
+  };
+  reader.readAsText(file, 'UTF-8');
+}
+
+function parsearCSV(texto) {
+  const lineas = texto.split('\n').filter(l => l.trim());
+  const headers = lineas[0].split(',').map(h => h.trim().replace(/^"|"$/g,''));
+  const rutas = [];
+  for (let i = 1; i < lineas.length; i++) {
+    const vals = lineas[i].match(/(".*?"|[^,]+)/g) || [];
+    if (!vals[0] || !vals[0].trim()) continue;
+    const obj = {};
+    headers.forEach((h, idx) => {
+      obj[h] = (vals[idx]||'').trim().replace(/^"|"$/g,'');
+    });
+    rutas.push(csvRowToRuta(obj));
+  }
+  return rutas;
+}
+
+function csvRowToRuta(row) {
+  return {
+    nombre: row.nombre||'',
+    nombreEN: row.nombreEN||'',
+    emoji: row.emoji||'🗺️',
+    zona: row.zona||'Ciudad',
+    ciudad: row.ciudad||'Medellín',
+    pais: row.pais||'Colombia',
+    subtitulo: row.subtitulo||'',
+    subtituloEN: row.subtituloEN||'',
+    tag: row.tag||'',
+    tiempo: row.tiempo||'',
+    dificultad: row.dificultad||'FÁCIL',
+    transporte: row.transporte||'',
+    mejorHora: row.mejorHora||'',
+    tipoExperiencia: row.tipoExperiencia||'',
+    tipoExperienciaEN: row.tipoExperienciaEN||'',
+    hook: row.hook||'',
+    hookEN: row.hookEN||'',
+    descripcion: row.descripcion||'',
+    descripcionEN: row.descripcionEN||'',
+    momentoClave: row.momentoClave||'',
+    momentoClaveEN: row.momentoClaveEN||'',
+    misionEpica: row.misionEpica||'',
+    misionEpicaEN: row.misionEpicaEN||'',
+    sitiosList: row.sitios_lista ? row.sitios_lista.split('|').map(s=>s.trim()).filter(s=>s) : [],
+    sitios: row.sitios_lista ? row.sitios_lista.split('|').filter(s=>s.trim()).length : 0,
+    consejos: row.consejos ? row.consejos.split('|').map(s=>s.trim()).filter(s=>s) : [],
+    consejosEN: row.consejosEN ? row.consejosEN.split('|').map(s=>s.trim()).filter(s=>s) : [],
+    gpsSitios: row.gps_sitios ? row.gps_sitios.split('|').map(g => {
+      const [sitio,lat,lng] = g.split(':');
+      return {sitio:sitio?.trim(), lat:parseFloat(lat), lng:parseFloat(lng)};
+    }).filter(g=>g.sitio && !isNaN(g.lat)) : [],
+    insignia: row.insignia||'',
+    premio: row.premio||'',
+    personaje: row.personaje||'',
+    imagen: row.imagen||'',
+    insigniaImg: row.insigniaImg||'',
+    color1: row.color1||'',
+    color2: row.color2||'',
+    acento: row.acento||'',
+    tagPausada: row.tagPausada||'',
+    temporadaInicio: row.temporadaInicio ? row.temporadaInicio.split('/').map(Number) : null,
+    temporadaFin: row.temporadaFin ? row.temporadaFin.split('/').map(Number) : null,
+    activa: row.activa !== 'false',
+    fechaCreacion: firebase.firestore.FieldValue.serverTimestamp(),
+  };
+}
+
+function mostrarPreviewCSV(rutas) {
+  document.getElementById('csv-preview').style.display = 'block';
+  document.getElementById('csv-count').textContent = `${rutas.length} ruta${rutas.length!==1?'s':''} listas para subir`;
+  const tabla = `<table style="width:100%;border-collapse:collapse;font-size:12px">
+    <thead><tr style="color:var(--muted)">
+      <th style="text-align:left;padding:6px 8px">NOMBRE</th>
+      <th style="text-align:left;padding:6px 8px">CIUDAD</th>
+      <th style="text-align:left;padding:6px 8px">ZONA</th>
+      <th style="text-align:left;padding:6px 8px">SITIOS</th>
+      <th style="text-align:left;padding:6px 8px">GPS</th>
+    </tr></thead>
+    <tbody>${rutas.map(r => `<tr style="border-top:1px solid rgba(255,255,255,0.05)">
+      <td style="padding:6px 8px;font-weight:600">${r.emoji} ${r.nombre}</td>
+      <td style="padding:6px 8px;color:var(--muted)">${r.ciudad}</td>
+      <td style="padding:6px 8px;color:var(--muted)">${r.zona}</td>
+      <td style="padding:6px 8px;color:var(--muted)">${r.sitiosList?.length||0}</td>
+      <td style="padding:6px 8px"><span class="badge ${r.gpsSitios?.length>0?'badge-verde':'badge-gris'}">${r.gpsSitios?.length||0} puntos</span></td>
+    </tr>`).join('')}</tbody>
+  </table>`;
+  document.getElementById('csv-tabla').innerHTML = tabla;
+}
+
+function limpiarCSV() {
+  rutasCSV = [];
+  document.getElementById('csv-preview').style.display = 'none';
+  document.getElementById('csv-input').value = '';
+}
+
+async function subirCSVaFirestore() {
+  if (!rutasCSV.length) return;
+  if (!confirm(`¿Subir ${rutasCSV.length} ruta(s) a Firestore? Esta acción no se puede deshacer.`)) return;
+  const btn = document.querySelector('[onclick="subirCSVaFirestore()"]');
+  btn.textContent = '⏳ Subiendo...';
+  btn.disabled = true;
+  let ok = 0, err = 0;
+  for (const ruta of rutasCSV) {
+    try {
+      await db.collection('rutas').add(ruta);
+      ok++;
+    } catch(e) { err++; }
+  }
+  btn.textContent = '🚀 Subir a Firestore';
+  btn.disabled = false;
+  alert(`✅ ${ok} ruta(s) subidas${err>0?' | ❌ '+err+' error(es)':''}`);
+  limpiarCSV();
+  loadRutas();
+  showTab('rutas', document.querySelector('[onclick*="rutas"]'));
+}
+
+// ── JSON DIRECTO (Método B) — soporta objeto o array ────────────────────────
+let rutaJSONDirecto = null;
+let rutasBatchJSON = null;
+
+function previewJSONDirecto() {
+  const raw = document.getElementById('json-directo-input').value.trim();
+  const status = document.getElementById('json-directo-status');
+  const previewEl = document.getElementById('json-directo-preview');
+  if (!raw) { status.textContent = '⚠️ Pegá el JSON primero'; return; }
+  try {
+    const parsed = JSON.parse(raw);
+    // Detect: single object or array
+    const isArray = Array.isArray(parsed);
+    const rutas = isArray ? parsed : [parsed];
+    rutasBatchJSON = rutas;
+    rutaJSONDirecto = isArray ? null : parsed;
+
+    let html = '';
+    rutas.forEach((ruta, idx) => {
+      if (!ruta.nombre) throw new Error(`Ruta ${idx+1}: falta campo "nombre"`);
+      // Auto-sync
+      if (ruta.sitiosDetalle?.length) {
+        if (!ruta.sitiosList || !ruta.sitiosList.length)
+          ruta.sitiosList = ruta.sitiosDetalle.map(s => s.nombre);
+        ruta.sitios = ruta.sitiosDetalle.length;
+        if (!ruta.gpsSitios || !ruta.gpsSitios.length)
+          ruta.gpsSitios = ruta.sitiosDetalle
+            .filter(s => s.lat && s.lng)
+            .map(s => ({ nombre: s.nombre, lat: s.lat, lng: s.lng }));
+      }
+      const nSitios = ruta.sitiosDetalle?.length || ruta.sitiosList?.length || 0;
+      const tieneDetalle = ruta.sitiosDetalle?.length > 0;
+      html += `
+        <div style="background:rgba(255,255,255,0.04);border-radius:12px;padding:14px;margin-bottom:10px;border-left:3px solid ${ruta.acento||'var(--oro)'}">
+          <div style="display:flex;gap:12px;align-items:center">
+            <span style="font-size:28px">${ruta.emoji||'🗺️'}</span>
+            <div style="flex:1">
+              <div style="font-weight:700;font-size:14px;color:var(--oro)">${isArray ? (idx+1)+'. ' : ''}${ruta.nombre}</div>
+              <div style="font-size:11px;color:var(--muted)">${ruta.nombreEN||''}</div>
+            </div>
+            <div style="display:flex;gap:6px;flex-wrap:wrap">
+              <span class="badge badge-verde">${ruta.ciudad||'—'}</span>
+              <span class="badge badge-gris">${ruta.zona||'—'}</span>
+              <span class="badge badge-oro">📍 ${nSitios}${tieneDetalle ? ' ✨' : ''}</span>
+            </div>
+          </div>
+          ${ruta.hook ? `<div style="font-size:11px;font-style:italic;color:var(--texto);margin-top:6px">"${ruta.hook}"</div>` : ''}
+        </div>`;
+    });
+
+    previewEl.innerHTML = html;
+    if (isArray) {
+      document.getElementById('btn-json-subir').disabled = true;
+      document.getElementById('btn-json-batch').style.display = 'inline-block';
+      status.textContent = `✅ ${rutas.length} rutas detectadas — listas para subir en batch`;
+    } else {
+      document.getElementById('btn-json-subir').disabled = false;
+      document.getElementById('btn-json-batch').style.display = 'none';
+      status.textContent = `✅ 1 ruta válida — lista para subir`;
+    }
+    status.style.color = 'var(--verde)';
+  } catch(e) {
+    previewEl.innerHTML = '';
+    rutaJSONDirecto = null;
+    rutasBatchJSON = null;
+    document.getElementById('btn-json-subir').disabled = true;
+    document.getElementById('btn-json-batch').style.display = 'none';
+    status.textContent = '❌ ' + e.message;
+    status.style.color = 'var(--peligro)';
+  }
+}
+
+async function subirJSONDirecto() {
+  if (!rutaJSONDirecto) return;
+  const n = rutaJSONDirecto.sitiosDetalle?.length || rutaJSONDirecto.sitiosList?.length || 0;
+  if (!confirm(`¿Subir "${rutaJSONDirecto.nombre}" a Firestore?\n\n📍 ${n} sitios · ${rutaJSONDirecto.ciudad||''} · ${rutaJSONDirecto.zona||''}`)) return;
+  try {
+    rutaJSONDirecto.fechaCreacion = firebase.firestore.FieldValue.serverTimestamp();
+    await db.collection('rutas').add(rutaJSONDirecto);
+    alert(`✅ Ruta "${rutaJSONDirecto.nombre}" subida con ${n} sitios`);
+    rutaJSONDirecto = null;
+    document.getElementById('json-directo-input').value = '';
+    document.getElementById('json-directo-preview').innerHTML = '';
+    document.getElementById('btn-json-subir').disabled = true;
+    document.getElementById('json-directo-status').textContent = '';
+    loadRutas();
+    showTab('rutas', document.querySelector('[onclick*="showTab(\'rutas\'"]'));
+  } catch(e) {
+    alert('Error: ' + e.message);
+  }
+}
+
+async function subirBatchJSONDirecto() {
+  if (!rutasBatchJSON || !rutasBatchJSON.length) return;
+  const nombres = rutasBatchJSON.map(r => r.nombre).join('\n• ');
+  if (!confirm(`¿Subir ${rutasBatchJSON.length} rutas a Firestore?\n\n• ${nombres}`)) return;
+  const status = document.getElementById('json-directo-status');
+  let ok = 0, fail = 0;
+  for (let i = 0; i < rutasBatchJSON.length; i++) {
+    const ruta = rutasBatchJSON[i];
+    status.textContent = `⏳ Subiendo ${i+1}/${rutasBatchJSON.length}: ${ruta.nombre}...`;
+    try {
+      ruta.fechaCreacion = firebase.firestore.FieldValue.serverTimestamp();
+      await db.collection('rutas').add(ruta);
+      ok++;
+    } catch(e) {
+      fail++;
+      console.error(`Error subiendo ${ruta.nombre}:`, e);
+    }
+  }
+  alert(`✅ Batch completo: ${ok} rutas subidas${fail ? `, ${fail} fallaron` : ''}`);
+  rutasBatchJSON = null;
+  document.getElementById('json-directo-input').value = '';
+  document.getElementById('json-directo-preview').innerHTML = '';
+  document.getElementById('btn-json-subir').disabled = true;
+  document.getElementById('btn-json-batch').style.display = 'none';
+  status.textContent = `✅ ${ok} rutas subidas exitosamente`;
+  loadRutas();
+  showTab('rutas', document.querySelector('[onclick*="showTab(\'rutas\'"]'));
+}
+
+// ── Método D — Importar Capa del Mapa (capas_mapa) ──────────────────────────
+let capaJSONData = null;
+
+function previewCapaJSON() {
+  const raw = document.getElementById('capa-json-input').value.trim();
+  const status = document.getElementById('capa-status');
+  const preview = document.getElementById('capa-preview');
+  const btnSubir = document.getElementById('btn-capa-subir');
+  if (!raw) { status.textContent = '⚠️ Pegá un JSON primero'; return; }
+  try {
+    capaJSONData = JSON.parse(raw);
+    if (!capaJSONData.capaId) {
+      status.textContent = '❌ El JSON debe tener el campo "capaId"';
+      btnSubir.disabled = true;
+      return;
+    }
+    const totalEstaciones = capaJSONData.estaciones?.length ?? capaJSONData.puntos?.length ?? '?';
+    preview.innerHTML = `
+      <div style="padding:16px;background:rgba(46,204,113,0.08);border:1px solid rgba(46,204,113,0.2);border-radius:12px">
+        <div style="font-weight:700;color:var(--verde);margin-bottom:8px">✅ JSON válido</div>
+        <div style="font-size:13px;color:var(--texto);line-height:1.8">
+          <div>📌 <strong>capaId:</strong> ${capaJSONData.capaId}</div>
+          <div>🗺️ <strong>nombre:</strong> ${capaJSONData.nombre ?? '—'}</div>
+          <div>📍 <strong>puntos:</strong> ${totalEstaciones}</div>
+          <div>🏷️ <strong>tipo:</strong> ${capaJSONData.tipo ?? '—'}</div>
+        </div>
+      </div>`;
+    status.textContent = `✅ Capa lista — ID: ${capaJSONData.capaId}`;
+    btnSubir.disabled = false;
+  } catch(e) {
+    status.textContent = '❌ JSON inválido: ' + e.message;
+    btnSubir.disabled = true;
+    capaJSONData = null;
+  }
+}
+
+async function subirCapaJSON() {
+  if (!capaJSONData) return;
+  const capaId = capaJSONData.capaId;
+  if (!confirm(`¿Subir capa "${capaId}" a la colección capas_mapa?\n\nSi ya existe, será reemplazada.`)) return;
+  const status = document.getElementById('capa-status');
+  status.textContent = '⏳ Subiendo...';
+  try {
+    await db.collection('capas_mapa').doc(capaId).set({
+      ...capaJSONData,
+      fechaActualizacion: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    status.textContent = `✅ Capa "${capaId}" subida exitosamente`;
+    document.getElementById('btn-capa-subir').disabled = true;
+    document.getElementById('capa-preview').innerHTML += `
+      <div style="margin-top:8px;padding:10px 14px;background:rgba(46,204,113,0.1);border-radius:8px;font-size:12px;color:var(--verde)">
+        🎉 Disponible en Firestore → capas_mapa → ${capaId}
+      </div>`;
+  } catch(e) {
+    status.textContent = '❌ Error: ' + e.message;
+    console.error('Error subiendo capa:', e);
+  }
+}
+
+function limpiarCapaJSON() {
+  capaJSONData = null;
+  document.getElementById('capa-json-input').value = '';
+  document.getElementById('capa-preview').innerHTML = '';
+  document.getElementById('btn-capa-subir').disabled = true;
+  document.getElementById('capa-status').textContent = '';
+}
+
+// ── Método E — Importar Colección Genérica ───────────────────────────────────
+let coleccionJSONData = null;
+
+function previewColeccionJSON() {
+  const raw = document.getElementById('coleccion-json-input').value.trim();
+  const status = document.getElementById('coleccion-status');
+  const preview = document.getElementById('coleccion-preview');
+  const btnSubir = document.getElementById('btn-coleccion-subir');
+  if (!raw) { status.textContent = '⚠️ Pegá el JSON primero'; return; }
+  try {
+    const parsed = JSON.parse(raw);
+    if (!parsed.coleccion) throw new Error('Falta el campo "coleccion"');
+    if (!Array.isArray(parsed.documentos)) throw new Error('Falta el array "documentos"');
+    if (parsed.documentos.length === 0) throw new Error('El array "documentos" está vacío');
+    const sinNombre = parsed.documentos.findIndex(d => !d.nombre);
+    if (sinNombre >= 0) throw new Error(`Documento ${sinNombre + 1}: falta campo "nombre"`);
+    coleccionJSONData = parsed;
+
+    // Mostrar muestra de los primeros 3 docs
+    const muestra = parsed.documentos.slice(0, 3);
+    const campos = Object.keys(parsed.documentos[0]).filter(k => k !== 'nombre').join(', ');
+    preview.innerHTML = `
+      <div style="padding:16px;background:rgba(46,204,113,0.08);border:1px solid rgba(46,204,113,0.2);border-radius:12px">
+        <div style="font-weight:700;color:var(--verde);margin-bottom:8px">✅ JSON válido</div>
+        <div style="font-size:13px;color:var(--texto);line-height:1.8;margin-bottom:10px">
+          <div>📂 <strong>Colección:</strong> ${parsed.coleccion}</div>
+          <div>📄 <strong>Documentos:</strong> ${parsed.documentos.length}</div>
+          <div>🔑 <strong>Campos por doc:</strong> nombre, ${campos}</div>
+        </div>
+        <div style="font-size:11px;color:var(--muted);margin-bottom:6px">Muestra (primeros 3):</div>
+        ${muestra.map(d => `
+          <div style="background:rgba(255,255,255,0.04);border-radius:8px;padding:8px 10px;margin-bottom:6px;font-size:11px">
+            <span style="color:var(--oro);font-weight:700">${d.nombre}</span>
+            ${d.es ? `<div style="color:var(--muted);margin-top:2px">ES: ${d.es.substring(0, 80)}${d.es.length > 80 ? '…' : ''}</div>` : ''}
+            ${d.en ? `<div style="color:var(--muted)">EN: ${d.en.substring(0, 80)}${d.en.length > 80 ? '…' : ''}</div>` : ''}
+          </div>`).join('')}
+      </div>`;
+    status.textContent = `✅ ${parsed.documentos.length} docs → ${parsed.coleccion}`;
+    status.style.color = 'var(--verde)';
+    btnSubir.disabled = false;
+  } catch(e) {
+    preview.innerHTML = '';
+    coleccionJSONData = null;
+    btnSubir.disabled = true;
+    status.textContent = '❌ ' + e.message;
+    status.style.color = 'var(--peligro)';
+  }
+}
+
+async function subirColeccionJSON() {
+  if (!coleccionJSONData) return;
+  const { coleccion, documentos } = coleccionJSONData;
+  if (!confirm(`¿Subir ${documentos.length} documentos a la colección "${coleccion}"?\n\nCada doc usa el campo "nombre" como ID. Si ya existe, será reemplazado.`)) return;
+  const status = document.getElementById('coleccion-status');
+  const preview = document.getElementById('coleccion-preview');
+  status.textContent = '⏳ Subiendo...';
+  status.style.color = 'var(--muted)';
+
+  const BATCH_SIZE = 400; // Firestore límite 500 ops por batch
+  let subidos = 0;
+  let errores = 0;
+
+  try {
+    for (let i = 0; i < documentos.length; i += BATCH_SIZE) {
+      const chunk = documentos.slice(i, i + BATCH_SIZE);
+      const batch = db.batch();
+      chunk.forEach(doc => {
+        const { nombre, ...resto } = doc;
+        const ref = db.collection(coleccion).doc(nombre);
+        batch.set(ref, { nombre, ...resto, fechaActualizacion: firebase.firestore.FieldValue.serverTimestamp() });
+      });
+      await batch.commit();
+      subidos += chunk.length;
+      status.textContent = `⏳ Subidos ${subidos}/${documentos.length}...`;
+    }
+    status.textContent = `✅ ${subidos} docs subidos a "${coleccion}"`;
+    status.style.color = 'var(--verde)';
+    preview.innerHTML += `
+      <div style="margin-top:10px;padding:10px 14px;background:rgba(46,204,113,0.1);border-radius:8px;font-size:12px;color:var(--verde)">
+        🎉 ${subidos} documentos disponibles en Firestore → ${coleccion}
+      </div>`;
+    document.getElementById('btn-coleccion-subir').disabled = true;
+    coleccionJSONData = null;
+  } catch(e) {
+    status.textContent = `❌ Error tras ${subidos} docs: ` + e.message;
+    status.style.color = 'var(--peligro)';
+    console.error('Error Método E:', e);
+  }
+}
+
+function limpiarColeccionJSON() {
+  coleccionJSONData = null;
+  document.getElementById('coleccion-json-input').value = '';
+  document.getElementById('coleccion-preview').innerHTML = '';
+  document.getElementById('btn-coleccion-subir').disabled = true;
+  document.getElementById('coleccion-status').textContent = '';
+}
+
+// ── IA (Claude) v2 — con sitiosDetalle ──────────────────────────────────────
+let rutaIAGenerada = null;
+
+async function generarRutaConIA() {
+  const prompt = document.getElementById('ia-prompt').value.trim();
+  if (!prompt) { alert('Describe la ruta primero'); return; }
+  const soloSitios = document.getElementById('ia-solo-sitios').checked;
+
+  const btn = document.getElementById('btn-ia-generar');
+  const status = document.getElementById('ia-status');
+  btn.disabled = true;
+  btn.textContent = '⏳ Generando...';
+  status.textContent = soloSitios
+    ? 'Claude genera sitiosDetalle (ruta se mantiene)...'
+    : 'Claude genera ruta completa + sitios detallados...';
+  document.getElementById('ia-resultado').style.display = 'none';
+
+  const systemPrompt = `Eres un asistente especializado en Rutero MDE, una app de turismo gamificado de Colombia.
+Tu tarea es generar el JSON completo de una ruta turística CON DETALLE POR SITIO.
+Responde ÚNICAMENTE con un objeto JSON válido, sin texto adicional, sin markdown, sin backticks.
+
+REGLAS PARA sitiosDetalle:
+- Cada sitio DEBE tener: nombre, nombreEN, emoji, orden (1,2,3...), lat, lng
+- horario: horario real del lugar (ej: "Mar-Dom 9:00am-5:00pm", "24 horas", "Lun-Sáb 8am-6pm")
+- tip: consejo LOCAL práctico de alguien que conoce el lugar (1-2 frases, con emoji al inicio)
+- tipEN: misma info en inglés natural
+- curiosidad: dato histórico, cultural o curioso real del sitio (1-2 frases, con emoji)
+- curiosidadEN: misma info en inglés
+- reto: reto gamificado específico para ese sitio (acción concreta que el viajero puede hacer)
+- retoEN: misma info en inglés
+- puntosReto: puntos que da completar el reto (50-200, proporcional a dificultad)
+
+REGLAS PARA tips y curiosidades:
+- Deben ser ESPECÍFICOS de ese sitio, no genéricos
+- Tips: info práctica (mejor hora, qué evitar, qué pedir, dónde sentarse, truco local)
+- Curiosidades: datos reales, verificables, sorprendentes
+- Retos: acciones concretas verificables (tomar foto de X, encontrar Y, contar Z)
+
+${soloSitios ? `MODO SOLO SITIOS: Genera ÚNICAMENTE el array "sitiosDetalle". NO generes la ruta completa.
+Responde con: { "sitiosDetalle": [...] }` : `
+El JSON debe tener EXACTAMENTE esta estructura:
+{
+  "nombre": "NOMBRE EN MAYÚSCULAS",
+  "nombreEN": "NAME IN ENGLISH UPPERCASE",
+  "emoji": "🗺️",
+  "zona": "Ciudad|Alrededores|Temporada|Comida Urbana|Eventos",
+  "ciudad": "Medellín|Bogotá|Popayán|etc",
+  "pais": "Colombia",
+  "subtitulo": "Sitio 1 · Sitio 2 · Tema",
+  "subtituloEN": "Site 1 · Site 2 · Theme",
+  "tag": "🏛️ Etiqueta corta",
+  "tiempo": "3-4h",
+  "dificultad": "FÁCIL|MEDIO|DIFÍCIL",
+  "transporte": "🚶 Caminata · descripción",
+  "mejorHora": "9:00 am – 2:00 pm",
+  "tipoExperiencia": "Patrimonio & Historia",
+  "tipoExperienciaEN": "Heritage & History",
+  "hook": "Frase de enganche impactante en español (max 2 líneas)",
+  "hookEN": "Impactful hook phrase in English",
+  "descripcion": "Descripción de 3-4 líneas en español",
+  "descripcionEN": "3-4 line description in English",
+  "momentoClave": "El sitio o momento más memorable de la ruta",
+  "momentoClaveEN": "The most memorable moment of the route",
+  "misionEpica": "El reto gamificado global de la ruta",
+  "misionEpicaEN": "The gamified global challenge of the route",
+  "sitiosList": ["Sitio 1", "Sitio 2", "Sitio 3"],
+  "sitiosDetalle": [
+    {
+      "nombre": "Sitio 1",
+      "nombreEN": "Site 1",
+      "emoji": "📍",
+      "orden": 1,
+      "lat": 6.2442,
+      "lng": -75.5812,
+      "horario": "Lun-Sáb 9am-5pm",
+      "tip": "🎒 Tip local práctico específico",
+      "tipEN": "🎒 Practical local tip",
+      "curiosidad": "🧠 Dato curioso real del sitio",
+      "curiosidadEN": "🧠 Real fun fact about this site",
+      "reto": "🎯 Reto gamificado concreto",
+      "retoEN": "🎯 Specific gamified challenge",
+      "puntosReto": 100
+    }
+  ],
+  "consejos": ["🎒 Consejo general 1", "📸 Consejo 2", "🕐 Consejo 3"],
+  "consejosEN": ["🎒 General tip 1", "📸 Tip 2", "🕐 Tip 3"],
+  "gpsSitios": [],
+  "insignia": "Nombre de la insignia",
+  "premio": "Insignia Nombre",
+  "personaje": "🦉",
+  "imagen": "assets/images/rutas/ruta_nombre.jpg",
+  "insigniaImg": "assets/images/insignias/insignia_nombre.png",
+  "color1": "#0F0F0A",
+  "color2": "#1A1A10",
+  "acento": "#D4AF7A",
+  "tagPausada": "",
+  "activa": true
+}`}`;
+
+  try {
+    const apiKey = document.getElementById('ia-api-key').value.trim() || sessionStorage.getItem('rutero_claude_key') || '';
+    if (!apiKey) { 
+      status.textContent = '❌ Ingresa tu API Key de Anthropic arriba';
+      btn.disabled = false;
+      btn.textContent = '✨ Generar ruta completa';
+      return;
+    }
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true'
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-6',
+        max_tokens: 4096,
+        system: systemPrompt,
+        messages: [{ role: 'user', content: prompt }]
+      })
+    });
+    const data = await response.json();
+    if (data.error) throw new Error(data.error.message || JSON.stringify(data.error));
+    const texto = data.content?.[0]?.text || '';
+    const jsonLimpio = texto.replace(/```json|```/g, '').trim();
+    const parsed = JSON.parse(jsonLimpio);
+
+    if (soloSitios && rutaIAGenerada) {
+      // Merge: keep existing route, replace sitiosDetalle
+      rutaIAGenerada.sitiosDetalle = parsed.sitiosDetalle || parsed;
+      rutaIAGenerada.sitiosList = (rutaIAGenerada.sitiosDetalle || []).map(s => s.nombre);
+      rutaIAGenerada.sitios = rutaIAGenerada.sitiosList.length;
+    } else {
+      rutaIAGenerada = parsed;
+      // Auto-sync sitiosList from sitiosDetalle if present
+      if (rutaIAGenerada.sitiosDetalle?.length && (!rutaIAGenerada.sitiosList || !rutaIAGenerada.sitiosList.length)) {
+        rutaIAGenerada.sitiosList = rutaIAGenerada.sitiosDetalle.map(s => s.nombre);
+      }
+      rutaIAGenerada.sitios = rutaIAGenerada.sitiosList?.length || 0;
+    }
+    rutaIAGenerada.fechaCreacion = firebase.firestore.FieldValue.serverTimestamp();
+    mostrarPreviewIA(rutaIAGenerada);
+    const nSitios = rutaIAGenerada.sitiosDetalle?.length || 0;
+    status.textContent = `✅ Ruta generada — ${nSitios} sitios con detalle — revisa y sube`;
+  } catch(e) {
+    status.textContent = '❌ Error: ' + e.message;
+    console.error('IA error:', e);
+  }
+  btn.disabled = false;
+  btn.textContent = '✨ Generar ruta completa';
+}
+
+function mostrarPreviewIA(ruta) {
+  document.getElementById('ia-resultado').style.display = 'block';
+  document.getElementById('ia-json-container').style.display = 'none';
+  // Remove serverTimestamp for JSON display (not serializable)
+  const rutaParaJSON = {...ruta};
+  delete rutaParaJSON.fechaCreacion;
+  document.getElementById('ia-json-editor').value = JSON.stringify(rutaParaJSON, null, 2);
+
+  // Header card
+  document.getElementById('ia-card-preview').innerHTML = `
+    <div style="display:flex;gap:16px;align-items:flex-start">
+      <div style="font-size:36px">${ruta.emoji||'🗺️'}</div>
+      <div style="flex:1">
+        <div style="font-weight:700;font-size:16px;color:var(--oro);letter-spacing:1px;margin-bottom:4px">${ruta.nombre||'SIN NOMBRE'}</div>
+        <div style="font-size:11px;color:var(--muted);margin-bottom:2px">${ruta.nombreEN||''}</div>
+        <div style="font-size:12px;color:var(--muted);margin-bottom:8px">${ruta.subtitulo||''}</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">
+          <span class="badge badge-verde">${ruta.ciudad||'—'}</span>
+          <span class="badge badge-gris">${ruta.zona||'—'}</span>
+          <span class="badge badge-gris">${ruta.dificultad||'—'}</span>
+          <span class="badge badge-gris">⏱️ ${ruta.tiempo||'—'}</span>
+          <span class="badge badge-oro">📍 ${ruta.sitiosDetalle?.length||ruta.sitiosList?.length||0} sitios</span>
+        </div>
+        <div style="font-size:12px;font-style:italic;color:var(--texto);margin-bottom:6px">"${ruta.hook||''}"</div>
+        <div style="font-size:12px;color:var(--muted)">${ruta.descripcion||''}</div>
+        ${ruta.misionEpica ? `<div style="margin-top:8px;padding:8px 12px;background:rgba(201,168,76,0.1);border-radius:8px;font-size:12px"><strong style="color:var(--oro)">🎯 Misión:</strong> ${ruta.misionEpica}</div>` : ''}
+        ${ruta.consejos?.length ? `<div style="margin-top:8px;font-size:11px;color:var(--muted)">${ruta.consejos.join(' · ')}</div>` : ''}
+      </div>
+    </div>`;
+
+  // Sitios detallados
+  const sitios = ruta.sitiosDetalle || [];
+  if (sitios.length) {
+    let sitiosHTML = `
+      <div style="border:1px solid rgba(201,168,76,0.2);border-radius:12px;overflow:hidden">
+        <div style="padding:12px 16px;background:rgba(201,168,76,0.08);display:flex;justify-content:space-between;align-items:center;cursor:pointer"
+             onclick="this.parentElement.querySelector('.sitios-body').classList.toggle('collapsed')">
+          <span style="font-weight:600;font-size:13px;color:var(--oro)">📍 ${sitios.length} Sitios Detallados</span>
+          <span style="font-size:11px;color:var(--muted)">▼ clic para expandir/colapsar</span>
+        </div>
+        <div class="sitios-body">`;
+    sitios.forEach((s, i) => {
+      sitiosHTML += `
+        <div style="padding:14px 16px;border-top:1px solid rgba(255,255,255,0.04);${i%2===0?'background:rgba(0,0,0,0.15)':''}">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">
+            <div>
+              <span style="font-weight:700;color:var(--texto)">${s.emoji||'📍'} ${s.orden||i+1}. ${s.nombre}</span>
+              <span style="font-size:11px;color:var(--muted);margin-left:8px">${s.nombreEN||''}</span>
+            </div>
+            <div style="display:flex;gap:6px;align-items:center">
+              ${s.puntosReto ? `<span class="badge badge-verde">🎯 ${s.puntosReto} pts</span>` : ''}
+              ${s.horario ? `<span class="badge badge-gris">🕐 ${s.horario}</span>` : ''}
+            </div>
+          </div>
+          ${s.lat && s.lng ? `<div style="font-size:10px;color:var(--muted);margin-bottom:6px">📌 ${s.lat}, ${s.lng}</div>` : ''}
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:12px">
+            <div style="padding:8px;background:rgba(91,173,111,0.08);border-radius:8px">
+              <div style="font-size:10px;color:var(--verde);letter-spacing:1px;margin-bottom:4px">💡 TIP</div>
+              <div>${s.tip||'—'}</div>
+              <div style="color:var(--muted);font-size:11px;margin-top:4px">${s.tipEN||''}</div>
+            </div>
+            <div style="padding:8px;background:rgba(201,168,76,0.08);border-radius:8px">
+              <div style="font-size:10px;color:var(--oro);letter-spacing:1px;margin-bottom:4px">🧠 CURIOSIDAD</div>
+              <div>${s.curiosidad||'—'}</div>
+              <div style="color:var(--muted);font-size:11px;margin-top:4px">${s.curiosidadEN||''}</div>
+            </div>
+          </div>
+          <div style="margin-top:8px;padding:8px;background:rgba(232,93,38,0.08);border-radius:8px;font-size:12px">
+            <div style="font-size:10px;color:var(--acento);letter-spacing:1px;margin-bottom:4px">🎯 RETO</div>
+            <div>${s.reto||'—'}</div>
+            <div style="color:var(--muted);font-size:11px;margin-top:4px">${s.retoEN||''}</div>
+          </div>
+        </div>`;
+    });
+    sitiosHTML += '</div></div>';
+    document.getElementById('ia-sitios-preview').innerHTML = sitiosHTML;
+  } else {
+    document.getElementById('ia-sitios-preview').innerHTML = '<div class="empty-state">⚠️ Sin sitiosDetalle — la IA no generó detalles por sitio</div>';
+  }
+}
+
+function editarJSONGenerado() {
+  const container = document.getElementById('ia-json-container');
+  container.style.display = container.style.display === 'none' ? 'block' : 'none';
+}
+
+function copiarJSONGenerado() {
+  const txt = document.getElementById('ia-json-editor').value;
+  navigator.clipboard.writeText(txt).then(() => {
+    const status = document.getElementById('ia-status');
+    status.textContent = '📋 JSON copiado al portapapeles';
+    setTimeout(() => { status.textContent = ''; }, 2000);
+  });
+}
+
+function recargarPreviewDesdeJSON() {
+  try {
+    const edited = JSON.parse(document.getElementById('ia-json-editor').value);
+    rutaIAGenerada = edited;
+    rutaIAGenerada.fechaCreacion = firebase.firestore.FieldValue.serverTimestamp();
+    mostrarPreviewIA(rutaIAGenerada);
+    document.getElementById('ia-status').textContent = '🔄 Preview recargado desde JSON editado';
+  } catch(e) {
+    alert('Error en el JSON: ' + e.message);
+  }
+}
+
+async function subirRutaIAaFirestore() {
+  if (!rutaIAGenerada) return;
+  // Re-read from editor in case it was edited
+  try {
+    const jsonEditado = document.getElementById('ia-json-editor').value;
+    rutaIAGenerada = JSON.parse(jsonEditado);
+    rutaIAGenerada.fechaCreacion = firebase.firestore.FieldValue.serverTimestamp();
+    // Ensure sitios count is synced
+    if (rutaIAGenerada.sitiosDetalle?.length) {
+      rutaIAGenerada.sitios = rutaIAGenerada.sitiosDetalle.length;
+      rutaIAGenerada.sitiosList = rutaIAGenerada.sitiosDetalle.map(s => s.nombre);
+      // Sync gpsSitios from sitiosDetalle for backward compatibility
+      rutaIAGenerada.gpsSitios = rutaIAGenerada.sitiosDetalle
+        .filter(s => s.lat && s.lng)
+        .map(s => ({ nombre: s.nombre, lat: s.lat, lng: s.lng }));
+    }
+  } catch(e) {
+    alert('El JSON tiene errores: ' + e.message); return;
+  }
+  const nSitios = rutaIAGenerada.sitiosDetalle?.length || 0;
+  if (!confirm(`¿Subir "${rutaIAGenerada.nombre}" a Firestore?\n\n📍 ${nSitios} sitios con detalle\n🗺️ ${rutaIAGenerada.ciudad} · ${rutaIAGenerada.zona}`)) return;
+  try {
+    await db.collection('rutas').add(rutaIAGenerada);
+    alert(`✅ Ruta subida con ${nSitios} sitios detallados`);
+    rutaIAGenerada = null;
+    document.getElementById('ia-resultado').style.display = 'none';
+    document.getElementById('ia-prompt').value = '';
+    document.getElementById('ia-status').textContent = '';
+    loadRutas();
+    showTab('rutas', document.querySelector('[onclick*="showTab(\'rutas\'"]'));
+  } catch(e) {
+    alert('Error subiendo la ruta: ' + e.message);
+  }
+}
+
+// ─── USUARIOS ───
+let todosUsuarios = [];
+async function loadUsuarios() {
+  try {
+    const snap = await db.collection('usuarios').orderBy('fechaRegistro','desc').get();
+    todosUsuarios = []; snap.forEach(d => todosUsuarios.push({id:d.id,...d.data()}));
+    document.getElementById('count-usuarios').textContent = `${todosUsuarios.length} usuarios`;
+    renderUsuarios(todosUsuarios);
+  } catch(e) { document.getElementById('tabla-usuarios').innerHTML = '<div class="empty-state">Sin usuarios aún</div>'; }
+}
+function filtrarUsuarios() {
+  const q = document.getElementById('search-usuarios').value.toLowerCase();
+  renderUsuarios(todosUsuarios.filter(u => (u.nombre||'').toLowerCase().includes(q)||(u.email||'').toLowerCase().includes(q)));
+}
+function renderUsuarios(usuarios) {
+  if (!usuarios.length) { document.getElementById('tabla-usuarios').innerHTML = '<div class="empty-state">Sin usuarios registrados aún</div>'; return; }
+  let h = '<table><tr><th>Nombre</th><th>Email</th><th>Rutas</th><th>Puntos</th><th>Registro</th></tr>';
+  usuarios.forEach(u => {
+    const f = u.fechaRegistro ? new Date(u.fechaRegistro.seconds*1000).toLocaleDateString('es-CO') : '—';
+    h += `<tr><td>👤 <strong>${u.nombre||'Sin nombre'}</strong></td><td style="color:var(--muted)">${u.email||'—'}</td><td><span class="badge badge-verde">${u.rutasCompletadas||0}</span></td><td style="color:var(--oro);font-weight:700">${u.puntosTotal||0} pts</td><td style="color:var(--muted);font-size:12px">${f}</td></tr>`;
+  });
+  document.getElementById('tabla-usuarios').innerHTML = h + '</table>';
+}
+
+// ─── ALIADOS ───
+let todosAliados = [];
+async function loadAliados() {
+  try {
+    const snap = await db.collection('aliados').get();
+    todosAliados = []; snap.forEach(d => todosAliados.push({id:d.id,...d.data()}));
+    renderAliados(todosAliados);
+  } catch(e) { document.getElementById('tabla-aliados').innerHTML = '<div class="empty-state">Sin aliados aún</div>'; }
+}
+function renderAliados(aliados) {
+  if (!aliados.length) { document.getElementById('tabla-aliados').innerHTML = '<div class="empty-state">Sin aliados registrados.<br><br><button class="btn-sm btn-verde" onclick="abrirModalAliado()">+ Agregar primer aliado</button></div>'; return; }
+  let h = '<table><tr><th></th><th>Establecimiento</th><th>Tipo</th><th>Beneficio</th><th>Comisión</th><th>Contacto</th><th>Estado</th><th>Acciones</th></tr>';
+  aliados.forEach(a => {
+    const activo = a.activo !== false;
+    h += `<tr style="opacity:${activo?1:0.55}">
+    <td style="font-size:20px">${a.emoji||'🤝'}</td>
+    <td><strong>${a.nombre}</strong><br><span style="font-size:11px;color:var(--muted)">${a.direccion||'—'}</span></td>
+    <td><span class="badge badge-gris">${a.tipo||'—'}</span></td>
+    <td style="color:var(--verde);font-size:12px">${a.beneficio||'—'}</td>
+    <td style="color:var(--oro);font-weight:700;text-align:center">${a.comision||'—'}%</td>
+    <td style="font-size:12px;color:var(--muted)">${a.whatsapp||a.contacto||'—'}</td>
+    <td><span class="badge ${activo?'badge-verde':'badge-gris'}">${activo?'🟢 Activo':'⏸️ Inactivo'}</span></td>
+    <td><button class="btn-sm btn-ghost" onclick="editarAliado('${a.id}')">✏️</button></td></tr>`;
+  });
+  document.getElementById('tabla-aliados').innerHTML = h + '</table>';
+}
+function abrirModalAliado() {
+  document.getElementById('aliado-id').value = '';
+  document.getElementById('modal-aliado-title').textContent = '🤝 Nuevo aliado';
+  document.getElementById('btn-eliminar-aliado').style.display = 'none';
+  ['nombre','emoji','direccion','contacto','whatsapp','beneficio','rutas','sitio','notas','comision'].forEach(f => { const el = document.getElementById('aliado-'+f); if(el) el.value=''; });
+  document.getElementById('aliado-tipo').value = 'Café';
+  document.getElementById('aliado-activo').value = 'true';
+  document.getElementById('aliado-ciudad').value = 'Medellín';
+  document.getElementById('modal-aliado').classList.add('open');
+}
+function editarAliado(id) {
+  const a = todosAliados.find(a => a.id===id); if(!a) return;
+  document.getElementById('aliado-id').value = id;
+  document.getElementById('modal-aliado-title').textContent = '✏️ Editar aliado';
+  document.getElementById('btn-eliminar-aliado').style.display = 'inline-flex';
+  document.getElementById('aliado-nombre').value = a.nombre||'';
+  document.getElementById('aliado-tipo').value = a.tipo||'Café';
+  document.getElementById('aliado-emoji').value = a.emoji||'';
+  document.getElementById('aliado-ciudad').value = a.ciudad||'Medellín';
+  document.getElementById('aliado-direccion').value = a.direccion||'';
+  document.getElementById('aliado-whatsapp').value = a.whatsapp||'';
+  document.getElementById('aliado-contacto').value = a.contacto||'';
+  document.getElementById('aliado-beneficio').value = a.beneficio||'';
+  document.getElementById('aliado-comision').value = a.comision||'';
+  document.getElementById('aliado-rutas').value = (a.rutas||[]).join(', ');
+  document.getElementById('aliado-sitio').value = a.sitio||'';
+  document.getElementById('aliado-notas').value = a.notas||'';
+  document.getElementById('aliado-activo').value = String(a.activo !== false);
+  document.getElementById('modal-aliado').classList.add('open');
+}
+async function eliminarAliadoActual() {
+  const id = document.getElementById('aliado-id').value; if(!id) return;
+  const a = todosAliados.find(a => a.id===id);
+  if (!confirm(`¿Eliminar el aliado "${a?.nombre||id}"?`)) return;
+  try { await db.collection('aliados').doc(id).delete(); cerrarModal('modal-aliado'); loadAliados(); alert('🗑️ Aliado eliminado'); }
+  catch(e) { alert('Error: '+e.message); }
+}
+async function guardarAliado() {
+  const nombre = document.getElementById('aliado-nombre').value.trim();
+  if (!nombre) { alert('El nombre del aliado es requerido'); return; }
+  const datos = {
+    nombre,
+    tipo: document.getElementById('aliado-tipo').value,
+    emoji: document.getElementById('aliado-emoji').value,
+    ciudad: document.getElementById('aliado-ciudad').value || 'Medellín',
+    direccion: document.getElementById('aliado-direccion').value,
+    whatsapp: document.getElementById('aliado-whatsapp').value,
+    contacto: document.getElementById('aliado-contacto').value,
+    beneficio: document.getElementById('aliado-beneficio').value,
+    comision: parseInt(document.getElementById('aliado-comision').value)||0,
+    rutas: document.getElementById('aliado-rutas').value.split(',').map(s=>s.trim()).filter(s=>s),
+    sitio: document.getElementById('aliado-sitio').value.trim(),
+    notas: document.getElementById('aliado-notas').value,
+    activo: document.getElementById('aliado-activo').value === 'true'
+  };
+  const id = document.getElementById('aliado-id').value;
+  try {
+    if(id){ await db.collection('aliados').doc(id).update({...datos, fechaActualizacion: firebase.firestore.FieldValue.serverTimestamp()}); }
+    else { await db.collection('aliados').add({...datos, fechaCreacion: firebase.firestore.FieldValue.serverTimestamp()}); }
+    cerrarModal('modal-aliado'); loadAliados(); alert('✅ Aliado guardado');
+  } catch(e) { alert('Error: '+e.message); }
+}
+
+// ─── PREMIOS ───
+let todosPremios = [];
+async function loadPremios() {
+  try {
+    const snap = await db.collectionGroup('premios').orderBy('fecha','desc').limit(100).get();
+    todosPremios = []; snap.forEach(d => todosPremios.push({id:d.id,ref:d.ref,...d.data()}));
+    renderPremios(todosPremios);
+  } catch(e) { document.getElementById('tabla-premios').innerHTML = '<div class="empty-state">Sin premios aún</div>'; }
+}
+function filtrarPremios() {
+  const q = document.getElementById('search-premios').value.toLowerCase();
+  const estado = document.getElementById('filtro-estado-premio').value;
+  renderPremios(todosPremios.filter(p => {
+    const mq = (p.codigo||'').toLowerCase().includes(q)||(p.rutaNombre||'').toLowerCase().includes(q);
+    const me = estado===''||String(p.canjeado)===estado;
+    return mq && me;
+  }));
+}
+function renderPremios(premios) {
+  if (!premios.length) { document.getElementById('tabla-premios').innerHTML = '<div class="empty-state">Sin premios generados aún</div>'; return; }
+  let h = '<table><tr><th>Código</th><th>Ruta</th><th>Insignia</th><th>Estado</th><th>Fecha</th><th>Acción</th></tr>';
+  premios.forEach(p => {
+    const f = p.fecha ? new Date(p.fecha.seconds*1000).toLocaleDateString('es-CO') : '—';
+    h += `<tr><td style="font-weight:900;color:var(--oro);letter-spacing:2px;font-size:12px">${p.codigo||'—'}</td><td>${p.emoji||''} ${p.rutaNombre||'—'}</td><td style="color:var(--muted);font-size:12px">${p.insignia||'—'}</td><td><span class="badge ${p.canjeado?'badge-gris':'badge-verde'}">${p.canjeado?'Canjeado':'Disponible'}</span></td><td style="color:var(--muted);font-size:12px">${f}</td><td>${!p.canjeado?`<button class="btn-sm btn-oro" onclick="canjearDesdeTabla('${p.id}')">✅ Canjear</button>`:'—'}</td></tr>`;
+  });
+  document.getElementById('tabla-premios').innerHTML = h + '</table>';
+}
+async function canjearDesdeTabla(id) {
+  const p = todosPremios.find(p => p.id===id); if(!p) return;
+  if (!confirm(`¿Marcar el código ${p.codigo} como canjeado?`)) return;
+  await p.ref.update({canjeado:true,fechaCanje:firebase.firestore.FieldValue.serverTimestamp()});
+  loadPremios(); loadDashboard();
+}
+
+// ─── EVENTOS ───
+let todosEventos = [];
+async function loadEventos() {
+  try {
+    const snap = await db.collection('eventos').orderBy('fechaInicio','asc').get();
+    todosEventos = []; snap.forEach(d => todosEventos.push({id:d.id,...d.data()}));
+    actualizarStatsEventos(todosEventos); renderEventos(todosEventos);
+  } catch(e) { loadDemoEventos(); }
+}
+function loadDemoEventos() {
+  todosEventos = [
+    {id:'e1',emoji:'🎤',nombre:'Morat — Tour 2026',categoria:'Concierto',lugar:'Movistar Arena Medellín',fechaInicio:'2026-05-15',hora:'20:00',precio:'Desde $180.000',artistas:'Morat',estado:'proximo'},
+    {id:'e2',emoji:'🌹',nombre:'Feria de las Flores 2026',categoria:'Festival',lugar:'Medellín (varios escenarios)',fechaInicio:'2026-08-01',fechaFin:'2026-08-10',hora:'Todo el día',precio:'Gratis',artistas:'Silleteros',estado:'proximo'},
+    {id:'e3',emoji:'🎷',nombre:'MedeJazz 2026',categoria:'Festival',lugar:'Jardín Botánico',fechaInicio:'2026-09-10',hora:'18:00',precio:'Gratis · VIP $50.000',artistas:'Artistas internacionales',estado:'proximo'},
+  ];
+  actualizarStatsEventos(todosEventos); renderEventos(todosEventos);
+}
+function actualizarStatsEventos(eventos) {
+  const hoy = new Date(); hoy.setHours(0,0,0,0);
+  const en30 = new Date(hoy); en30.setDate(en30.getDate()+30);
+  let activos = 0, proximos = 0;
+  eventos.forEach(e => {
+    if(e.estado==='activo') activos++;
+    else if(e.estado==='proximo'){const fi=e.fechaInicio?new Date(e.fechaInicio):null;if(fi&&fi<=en30)proximos++;}
+  });
+  document.getElementById('stat-total-eventos').textContent = eventos.length;
+  document.getElementById('stat-eventos-activos').textContent = activos;
+  document.getElementById('stat-eventos-proximos').textContent = proximos;
+}
+function filtrarEventos() {
+  const q = (document.getElementById('search-eventos').value||'').toLowerCase();
+  const cat = document.getElementById('filtro-cat-evento').value||'';
+  const estado = document.getElementById('filtro-estado-evento').value||'';
+  const filtrados = todosEventos.filter(e => {
+    const mq = (e.nombre||'').toLowerCase().includes(q)||(e.lugar||'').toLowerCase().includes(q)||(e.artistas||'').toLowerCase().includes(q);
+    return mq && (!cat||e.categoria===cat) && (!estado||e.estado===estado);
+  });
+  document.getElementById('count-eventos').textContent = `${filtrados.length} eventos`;
+  renderEventos(filtrados);
+}
+function catClass(cat){const m={'Concierto':'cat-concierto','Festival':'cat-festival','Deporte':'cat-deporte','Cultura':'cat-cultura','Gastronomía':'cat-gastronomia','Moda':'cat-moda','Arte':'cat-arte'};return m[cat]||'cat-otro';}
+function formatFecha(f){if(!f)return'—';try{const p=f.split('-');return`${p[2]}/${p[1]}/${p[0]}`;}catch{return f;}}
+function renderEventos(eventos) {
+  if (!eventos.length) { document.getElementById('tabla-eventos').innerHTML = '<div class="empty-state">Sin eventos.<br><br><button class="btn-sm btn-verde" onclick="abrirModalEvento()">+ Crear evento</button></div>'; return; }
+  document.getElementById('count-eventos').textContent = `${eventos.length} eventos`;
+  let h = '<table><tr><th></th><th>Evento</th><th>Categoría</th><th>Fecha</th><th>Lugar</th><th>Precio</th><th>Estado</th><th>Acciones</th></tr>';
+  eventos.forEach(e => {
+    const fechaStr = e.fechaInicio ? formatFecha(e.fechaInicio)+(e.fechaFin&&e.fechaFin!==e.fechaInicio?' → '+formatFecha(e.fechaFin):'') : '—';
+    const estadoBadge = e.estado==='activo'?'badge-verde':e.estado==='proximo'?'badge-oro':'badge-gris';
+    const estadoLabel = e.estado==='activo'?'🟢 Activo':e.estado==='proximo'?'🟡 Próximo':'⚫ Finalizado';
+    h += `<tr class="${e.estado==='finalizado'?'evento-finalizado':''}">
+      <td style="font-size:22px">${e.emoji||'🎪'}</td>
+      <td><strong>${e.nombre}</strong>${e.artistas&&e.artistas!=='—'?`<div style="font-size:11px;color:var(--muted);margin-top:2px">${e.artistas}</div>`:''}</td>
+      <td><span class="cat-badge ${catClass(e.categoria)}">${e.categoria||'Otro'}</span></td>
+      <td style="font-size:12px;color:var(--muted)">${fechaStr}${e.hora?'<br>'+e.hora:''}</td>
+      <td style="font-size:12px;color:var(--muted)">${e.lugar||'—'}</td>
+      <td style="color:var(--oro);font-size:12px;font-weight:700">${e.precio||'—'}</td>
+      <td><span class="badge ${estadoBadge}">${estadoLabel}</span></td>
+      <td><button class="btn-sm btn-ghost" onclick="editarEvento('${e.id}')">✏️</button>${e.link?`<a href="${e.link}" target="_blank" class="btn-sm btn-ghost" style="margin-left:4px;text-decoration:none;display:inline-block">🔗</a>`:''}</td>
+    </tr>`;
+  });
+  document.getElementById('tabla-eventos').innerHTML = h + '</table>';
+}
+function abrirModalEvento() {
+  document.getElementById('modal-evento-title').textContent = '🎪 Nuevo evento';
+  document.getElementById('evento-id').value = '';
+  ['nombre','emoji','lugar','fecha-inicio','fecha-fin','hora','precio','artistas','descripcion','link'].forEach(f=>{const el=document.getElementById('evento-'+f);if(el)el.value='';});
+  document.getElementById('evento-categoria').value = 'Concierto';
+  document.getElementById('evento-estado').value = 'proximo';
+  document.getElementById('btn-eliminar-evento').style.display = 'none';
+  document.getElementById('modal-evento').classList.add('open');
+}
+function editarEvento(id) {
+  const e = todosEventos.find(e => e.id===id); if(!e) return;
+  document.getElementById('modal-evento-title').textContent = '✏️ Editar evento';
+  document.getElementById('evento-id').value = id;
+  document.getElementById('evento-nombre').value = e.nombre||'';
+  document.getElementById('evento-emoji').value = e.emoji||'';
+  document.getElementById('evento-categoria').value = e.categoria||'Concierto';
+  document.getElementById('evento-lugar').value = e.lugar||'';
+  document.getElementById('evento-fecha-inicio').value = e.fechaInicio||'';
+  document.getElementById('evento-fecha-fin').value = e.fechaFin||'';
+  document.getElementById('evento-hora').value = e.hora||'';
+  document.getElementById('evento-precio').value = e.precio||'';
+  document.getElementById('evento-artistas').value = e.artistas||'';
+  document.getElementById('evento-descripcion').value = e.descripcion||'';
+  document.getElementById('evento-link').value = e.link||'';
+  document.getElementById('evento-estado').value = e.estado||'proximo';
+  document.getElementById('btn-eliminar-evento').style.display = 'inline-block';
+  document.getElementById('modal-evento').classList.add('open');
+}
+async function guardarEvento() {
+  const nombre = document.getElementById('evento-nombre').value.trim();
+  if (!nombre) { alert('El nombre es obligatorio'); return; }
+  const datos = {nombre,emoji:document.getElementById('evento-emoji').value,categoria:document.getElementById('evento-categoria').value,lugar:document.getElementById('evento-lugar').value,fechaInicio:document.getElementById('evento-fecha-inicio').value,fechaFin:document.getElementById('evento-fecha-fin').value,hora:document.getElementById('evento-hora').value,precio:document.getElementById('evento-precio').value,artistas:document.getElementById('evento-artistas').value,descripcion:document.getElementById('evento-descripcion').value,link:document.getElementById('evento-link').value,estado:document.getElementById('evento-estado').value,fechaActualizacion:firebase.firestore.FieldValue.serverTimestamp()};
+  const id = document.getElementById('evento-id').value;
+  try {
+    if(id){await db.collection('eventos').doc(id).update(datos);}
+    else{datos.fechaCreacion=firebase.firestore.FieldValue.serverTimestamp();await db.collection('eventos').add(datos);}
+    cerrarModal('modal-evento'); loadEventos(); alert('✅ Evento guardado');
+  } catch(e) { alert('Error: '+e.message); }
+}
+async function eliminarEventoActual() {
+  const id = document.getElementById('evento-id').value; if(!id) return;
+  const nombre = document.getElementById('evento-nombre').value;
+  if (!confirm(`¿Eliminar "${nombre}"?`)) return;
+  try { await db.collection('eventos').doc(id).delete(); cerrarModal('modal-evento'); loadEventos(); alert('🗑️ Evento eliminado'); }
+  catch(e) { alert('Error: '+e.message); }
+}
+
+// ─── VALIDAR CÓDIGO — mejorado con QR + estadísticas ───
+
+// Detectar código desde URL (cuando llega desde QR escaneado)
+function detectarCodigoDesdeURL() {
+  const params = new URLSearchParams(window.location.search);
+  const codigoUrl = params.get('codigo');
+  if (codigoUrl) {
+    document.getElementById('codigo-validar').value = codigoUrl.toUpperCase();
+    const banner = document.getElementById('banner-qr');
+    if (banner) { banner.style.display = 'flex'; }
+    // Auto-verificar después de 800ms para que se vea el banner
+    setTimeout(() => validarCodigo(), 800);
+    // Limpiar URL para no revelar el código en historial
+    window.history.replaceState({}, '', window.location.pathname);
+  }
+}
+
+async function validarCodigo() {
+  const codigo = document.getElementById('codigo-validar').value.trim().toUpperCase();
+  const res = document.getElementById('resultado-validacion');
+  if (!codigo) { alert('Ingresa un codigo'); return; }
+  res.style.display = 'block';
+  res.className = 'resultado-validacion';
+  res.innerHTML = '<div class="spinner"></div> Verificando...';
+
+  try {
+    // Buscar en premios (tipo ruta completa)
+    let docEncontrado = null;
+    let datosEncontrados = null;
+    let coleccionOrigen = '';
+
+    const snapPremios = await db.collectionGroup('premios').where('codigo','==',codigo).get();
+    if (!snapPremios.empty) {
+      docEncontrado = snapPremios.docs[0];
+      datosEncontrados = docEncontrado.data();
+      coleccionOrigen = 'premios';
+    }
+
+    // Si no está en premios, buscar en consumos_aliados (tipo aliado QR)
+    if (!docEncontrado) {
+      const snapAliados = await db.collection('consumos_aliados').where('codigo','==',codigo).get();
+      if (!snapAliados.empty) {
+        docEncontrado = snapAliados.docs[0];
+        datosEncontrados = docEncontrado.data();
+        coleccionOrigen = 'consumos_aliados';
+      }
+    }
+
+    if (!docEncontrado) {
+      res.className = 'resultado-validacion resultado-err';
+      res.innerHTML = `<div style="font-size:32px">❌</div><div style="font-size:16px;font-weight:700;margin:8px 0">Codigo no encontrado</div><div style="color:var(--muted);font-size:13px">"${codigo}" no existe en el sistema</div>`;
+      return;
+    }
+
+    const data = datosEncontrados;
+
+    // Ya canjeado
+    if (data.canjeado) {
+      const fc = data.fechaCanje ? new Date(data.fechaCanje.seconds*1000).toLocaleString('es-CO') : '—';
+      res.className = 'resultado-validacion resultado-err';
+      res.innerHTML = `<div style="font-size:32px">⚠️</div><div style="font-size:16px;font-weight:700;margin:8px 0">Codigo ya canjeado</div><div style="color:var(--muted);font-size:13px">Canjeado el ${fc}</div>`;
+      return;
+    }
+
+    // Válido — mostrar info completa
+    const ruta     = data.rutaNombre || data.ruta || '—';
+    const aliado   = data.aliado || data.aliadoNombre || '—';
+    const beneficio = data.beneficio || data.premio || '—';
+    const emoji    = data.emoji || data.rutaEmoji || '🏆';
+    const insignia = data.insignia || '';
+
+    res.className = 'resultado-validacion resultado-ok';
+    res.innerHTML = `
+      <div style="font-size:40px">${emoji}</div>
+      <div style="font-size:18px;font-weight:900;color:var(--verde);margin:8px 0">✅ CODIGO VALIDO</div>
+      <div style="font-size:20px;font-weight:900;color:var(--oro);letter-spacing:3px;margin:8px 0">${codigo}</div>
+      <div style="background:rgba(0,0,0,0.3);border-radius:10px;padding:14px;margin:12px 0;text-align:left">
+        <div style="display:flex;justify-content:space-between;margin-bottom:8px">
+          <span style="font-size:10px;color:var(--muted);letter-spacing:1px">RUTA</span>
+          <span style="font-size:13px;font-weight:700;color:var(--texto)">${ruta}</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;margin-bottom:8px">
+          <span style="font-size:10px;color:var(--muted);letter-spacing:1px">ALIADO</span>
+          <span style="font-size:13px;font-weight:700;color:var(--verde)">${aliado}</span>
+        </div>
+        <div style="display:flex;justify-content:space-between">
+          <span style="font-size:10px;color:var(--muted);letter-spacing:1px">BENEFICIO</span>
+          <span style="font-size:13px;font-weight:700;color:var(--oro)">${beneficio}</span>
+        </div>
+      </div>
+      ${insignia ? `<div style="color:var(--verde);font-size:12px;margin-bottom:12px">🏅 Insignia: ${insignia}</div>` : ''}
+      <button class="btn-sm btn-verde" style="padding:14px 28px;font-size:14px;width:100%" onclick="confirmarCanje('${docEncontrado.id}','${coleccionOrigen}',this)">✅ MARCAR COMO CANJEADO</button>
+    `;
+
+  } catch(e) {
+    res.className = 'resultado-validacion resultado-err';
+    res.innerHTML = `<div style="font-size:32px">⚠️</div><div style="font-size:16px;font-weight:700;margin:8px 0">Error al verificar</div><div style="color:var(--muted);font-size:13px">${e.message}</div>`;
+  }
+}
+
+async function confirmarCanje(docId, coleccion, btn) {
+  btn.textContent = 'Confirmando...';
+  btn.disabled = true;
+
+  try {
+    const codigo = document.getElementById('codigo-validar').value.trim().toUpperCase();
+
+    // Marcar como canjeado en la colección correcta
+    if (coleccion === 'premios') {
+      const snap = await db.collectionGroup('premios').where('codigo','==',codigo).get();
+      if (!snap.empty) {
+        await snap.docs[0].ref.update({
+          canjeado: true,
+          fechaCanje: firebase.firestore.FieldValue.serverTimestamp(),
+          confirmadoPor: 'admin_web',
+        });
+      }
+    } else {
+      await db.collection('consumos_aliados').doc(docId).update({
+        canjeado: true,
+        fechaCanje: firebase.firestore.FieldValue.serverTimestamp(),
+        confirmadoPor: 'admin_web',
+      });
+    }
+
+    // Registrar en estadisticas_canjes
+    try {
+      await db.collection('estadisticas_canjes').add({
+        codigo,
+        origen: 'admin_web',
+        fecha: firebase.firestore.FieldValue.serverTimestamp(),
+        coleccion,
+      });
+    } catch(_) {}
+
+    btn.textContent = '✅ ¡Canjeado exitosamente!';
+    btn.style.background = 'var(--muted)';
+    loadDashboard();
+    loadPremios();
+    loadEstadisticasCanjes();
+
+  } catch(e) {
+    btn.textContent = '✅ MARCAR COMO CANJEADO';
+    btn.disabled = false;
+    alert('Error al confirmar: ' + e.message);
+  }
+}
+
+async function loadEstadisticasCanjes() {
+  const el = document.getElementById('tabla-canjes-recientes');
+  if (!el) return;
+  el.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+  try {
+    const snap = await db.collection('estadisticas_canjes').orderBy('fecha','desc').limit(20).get();
+    if (snap.empty) {
+      el.innerHTML = '<div class="empty-state">Sin canjes registrados aún</div>';
+      return;
+    }
+    let h = '<table><tr><th>Código</th><th>Aliado</th><th>Ruta</th><th>Origen</th><th>Fecha</th></tr>';
+    snap.forEach(d => {
+      const data = d.data();
+      const f = data.fecha ? new Date(data.fecha.seconds*1000).toLocaleString('es-CO') : '—';
+      const origen = data.origen === 'web_qr' ? '<span class="badge badge-verde">📷 QR</span>' : '<span class="badge badge-gris">⌨️ Manual</span>';
+      h += `<tr>
+        <td style="font-weight:700;color:var(--oro);letter-spacing:1px;font-size:11px">${data.codigo||'—'}</td>
+        <td style="font-size:12px">${data.aliado||'—'}</td>
+        <td style="font-size:12px;color:var(--muted)">${data.ruta||'—'}</td>
+        <td>${origen}</td>
+        <td style="font-size:11px;color:var(--muted)">${f}</td>
+      </tr>`;
+    });
+    el.innerHTML = h + '</table>';
+  } catch(e) {
+    el.innerHTML = '<div class="empty-state">Error cargando canjes</div>';
+  }
+}
+
+// ─── SINCRONIZAR RUTAS ───
+// RUTAS_COMPLETAS eliminado — todo desde Firestore
+const RUTAS_COMPLETAS = [];
+async function sincronizarRutas() {
+  if (!confirm('¿Subir rutas a Firestore? Esto reemplazará los datos existentes.')) return;
+  const btn = document.getElementById('btn-sincronizar');
+  btn.textContent = '⏳ Sincronizando...'; btn.disabled = true;
+  let ok = 0, err = 0;
+  try {
+    const batch = db.batch();
+    if (RUTAS_COMPLETAS.length === 0) { alert('No hay rutas en RUTAS_COMPLETAS — todo se gestiona desde Firestore directamente.'); return; }
+    RUTAS_COMPLETAS.forEach(r => {
+      const ref = db.collection('rutas').doc(r.id);
+      const data = {...r};
+      delete data.id;
+      data.fechaActualizacion = firebase.firestore.FieldValue.serverTimestamp();
+      batch.set(ref, data);
+    });
+    await batch.commit();
+    ok = RUTAS_COMPLETAS.length;
+    btn.textContent = '✅ ' + ok + ' rutas sincronizadas';
+    btn.style.background = 'var(--verde)';
+    loadRutas();
+    setTimeout(() => { btn.textContent = '🔄 Sincronizar rutas'; btn.disabled = false; btn.style.background = ''; }, 3000);
+  } catch(e) {
+    btn.textContent = '❌ Error: ' + e.message;
+    btn.disabled = false;
+    console.error(e);
+  }
+}
+
+
+// ─── SONDEO ALIADOS ───
+let todasRespuestas = [];
+
+async function loadSondeo() {
+  try {
+    const snap = await db.collection('sondeo_aliados').orderBy('fecha_envio','desc').get();
+    todasRespuestas = [];
+    snap.forEach(d => todasRespuestas.push({id:d.id,...d.data()}));
+    actualizarStatsSondeo(todasRespuestas);
+    renderSondeo(todasRespuestas);
+  } catch(e) {
+    console.error('Error loadSondeo:', e);
+    document.getElementById('tabla-sondeo').innerHTML = '<div class="empty-state">Sin respuestas aún. Comparte el link del sondeo con los aliados.</div>';
+    document.getElementById('stat-sondeo-total').textContent = '0';
+    document.getElementById('stat-sondeo-interesados').textContent = '0';
+    document.getElementById('stat-sondeo-dispuestos').textContent = '0';
+    document.getElementById('stat-sondeo-internet').textContent = '0';
+  }
+}
+
+function actualizarStatsSondeo(resp) {
+  const total = resp.length;
+  // 🔥 Muy interesados = nivel alto
+  const interesados = resp.filter(r => r.interes === 'alto').length;
+  // Reciben turistas internacionales (muchos o algunos)
+  const dispuestos = resp.filter(r => r.turistas_actuales === 'muchos' || r.turistas_actuales === 'algunos').length;
+  // Hablan inglés (fluido o básico)
+  const internet = resp.filter(r => r.ingles === 'fluido' || r.ingles === 'basico').length;
+  document.getElementById('stat-sondeo-total').textContent = total;
+  document.getElementById('stat-sondeo-interesados').textContent = interesados;
+  document.getElementById('stat-sondeo-dispuestos').textContent = dispuestos;
+  document.getElementById('stat-sondeo-internet').textContent = internet;
+  document.getElementById('count-sondeo').textContent = `${total} respuestas`;
+}
+
+function filtrarSondeo() {
+  const q = document.getElementById('search-sondeo').value.toLowerCase();
+  const tipo = document.getElementById('filtro-tipo-negocio').value;
+  const interes = document.getElementById('filtro-interes').value;
+  const filtradas = todasRespuestas.filter(r => {
+    const mq = (r.nombre_negocio||'').toLowerCase().includes(q) || (r.ubicacion||'').toLowerCase().includes(q);
+    const mt = !tipo || r.tipo_negocio === tipo;
+    const mi = !interes || r.interes === interes;
+    return mq && mt && mi;
+  });
+  renderSondeo(filtradas);
+}
+
+function renderSondeo(resp) {
+  if (!resp.length) {
+    document.getElementById('tabla-sondeo').innerHTML = '<div class="empty-state">Sin respuestas que coincidan</div>';
+    return;
+  }
+  document.getElementById('count-sondeo').textContent = `${resp.length} respuestas`;
+
+  // Badge de nivel de interés
+  const interesBadge = v => {
+    if (v === 'alto') return '<span class="badge badge-verde">🔥 Muy interesado</span>';
+    if (v === 'medio') return '<span class="badge badge-oro">👍 Interesado</span>';
+    if (v === 'curioso') return '<span class="badge" style="background:rgba(184,92,174,0.15);color:#B85CAE">🤔 Curioso</span>';
+    if (v === 'no_aun') return '<span class="badge badge-gris">⏸️ No por ahora</span>';
+    return '<span class="badge badge-gris">—</span>';
+  };
+
+  // Badge de tipo de negocio (legible)
+  const tipoLabel = v => {
+    const map = {
+      'restaurante': '🍽️ Restaurante',
+      'hospedaje': '🏨 Hospedaje',
+      'museo_atraccion': '🏛️ Museo',
+      'tienda_artesania': '🎨 Tienda',
+      'tour_experiencia': '🚶 Tour',
+      'transporte': '🚗 Transporte',
+      'spa_bienestar': '💆 Spa',
+      'otro': '✨ Otro'
+    };
+    return map[v] || v || '—';
+  };
+
+  // Badge turistas
+  const turistasLabel = v => {
+    const map = {
+      'muchos': '🌍 Muchos',
+      'algunos': '✈️ Algunos',
+      'pocos': '🤷 Pocos',
+      'ninguno': '🇨🇴 Ninguno'
+    };
+    return map[v] || '—';
+  };
+
+  // Badge inglés
+  const inglesLabel = v => {
+    const map = {
+      'fluido': '🇬🇧 Fluido',
+      'basico': '🗣️ Básico',
+      'no_pero_queremos': '📚 Quiere aprender',
+      'no': '🇨🇴 No'
+    };
+    return map[v] || '—';
+  };
+
+  // Beneficios ofrecidos (array)
+  const beneficiosLabel = arr => {
+    if (!arr || !Array.isArray(arr) || arr.length === 0) return '—';
+    const map = {
+      'descuento': '🏷️', 'producto_gratis': '🎁', 'bebida_postre': '🥤',
+      'experiencia': '✨', 'combo': '📦', 'ninguno': '🚫', 'no_seguro': '🤔'
+    };
+    return arr.map(b => map[b] || b).join(' ');
+  };
+
+  let h = `<table><tr>
+    <th>Negocio</th><th>Ubicación</th><th>Tipo</th><th>Contacto</th>
+    <th>Turistas</th><th>Inglés</th><th>Beneficios</th>
+    <th>Interés</th><th>Fecha</th>
+  </tr>`;
+  resp.forEach(r => {
+    let fechaTxt = '—';
+    if (r.fecha_envio) {
+      if (r.fecha_envio.seconds) fechaTxt = new Date(r.fecha_envio.seconds*1000).toLocaleDateString('es-CO');
+      else if (r.fecha_envio.toDate) fechaTxt = r.fecha_envio.toDate().toLocaleDateString('es-CO');
+    }
+    const wa = (r.contacto_whatsapp||'').replace(/[^0-9]/g,'');
+    h += `<tr>
+      <td><strong>${r.nombre_negocio||'—'}</strong>${r.observaciones?`<div style="font-size:11px;color:var(--muted);margin-top:2px;font-style:italic">"${r.observaciones}"</div>`:''}</td>
+      <td style="color:var(--muted)">${r.ubicacion||'—'}</td>
+      <td><span class="badge badge-gris">${tipoLabel(r.tipo_negocio)}</span></td>
+      <td>
+        <div style="font-size:12px">${r.contacto_nombre||'—'}</div>
+        ${wa ? `<a href="https://wa.me/57${wa}" target="_blank" style="color:var(--verde);font-size:11px">📱 ${r.contacto_whatsapp}</a>` : '<span style="color:var(--muted);font-size:11px">Sin WhatsApp</span>'}
+      </td>
+      <td style="font-size:12px">${turistasLabel(r.turistas_actuales)}</td>
+      <td style="font-size:12px">${inglesLabel(r.ingles)}</td>
+      <td style="font-size:14px" title="${(r.beneficio||[]).join(', ')}">${beneficiosLabel(r.beneficio)}</td>
+      <td>${interesBadge(r.interes)}</td>
+      <td style="color:var(--muted);font-size:11px">${fechaTxt}</td>
+    </tr>`;
+  });
+  document.getElementById('tabla-sondeo').innerHTML = h + '</table>';
+}
+
+function exportarSondeoCSV() {
+  if (!todasRespuestas.length) { alert('Sin respuestas para exportar'); return; }
+  const cols = ['nombre_negocio','tipo_negocio','ubicacion','tiempo_operacion','turistas_actuales','beneficio','metodo_validacion','ingles','interes','contacto_nombre','contacto_whatsapp','contacto_email','observaciones'];
+  const headers = ['Negocio','Tipo','Ubicación','Tiempo operando','Turistas internac.','Beneficios','Validación','Inglés','Interés','Contacto','WhatsApp','Email','Observaciones','Fecha'];
+  let csv = headers.join(',') + String.fromCharCode(10);
+  todasRespuestas.forEach(function(r) {
+    let fechaTxt = '';
+    if (r.fecha_envio && r.fecha_envio.seconds) fechaTxt = new Date(r.fecha_envio.seconds*1000).toLocaleDateString('es-CO');
+    const row = cols.map(function(c) {
+      let v = r[c];
+      if (Array.isArray(v)) v = v.join('; ');
+      return '"' + (v||'').toString().replace(/"/g,'""') + '"';
+    });
+    row.push('"' + fechaTxt + '"');
+    csv += row.join(',') + String.fromCharCode(10);
+  });
+  const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'sondeo_aliados_rutero.csv';
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+// ═══════════════════════════════════════════════════════════
+//  PIPELINE CRM — Gestión de aliados
+// ═══════════════════════════════════════════════════════════
+
+let todosPipeline = [];
+
+async function loadPipeline() {
+  try {
+    const snap = await db.collection('pipeline_aliados').orderBy('fechaCreacion','desc').get();
+    todosPipeline = [];
+    snap.forEach(d => todosPipeline.push({id:d.id,...d.data()}));
+    // Si está vacío, sembrar los 7 iniciales automáticamente
+    if (todosPipeline.length === 0) {
+      await sembrarPipelineInicial();
+      return;
+    }
+    actualizarStatsPipe(todosPipeline);
+    renderPipeline(todosPipeline);
+  } catch(e) {
+    console.error('Error loadPipeline:', e);
+    document.getElementById('tabla-pipeline').innerHTML = '<div class="empty-state" style="padding:40px;text-align:center;color:var(--muted)">Sin aliados en el pipeline todavía.<br><br><button class="btn-sm btn-verde" onclick="sembrarPipelineInicial()">🌱 Sembrar los 7 aliados iniciales</button></div>';
+  }
+}
+
+async function sembrarPipelineInicial() {
+  const seeds = [
+    {nombre:'Artesanías de mi Pueblo', contacto:'', categoria:'tienda_artesania', ubicacion:'Réplica Viejo Peñol, Guatapé', tier:'tier1', estado:'mensaje_enviado', whatsapp:'', revenue:null, fuente:'campo', notas:'💰 REVENUE VALIDADO — Me transfirió comisión por Nequi/Bancolombia tras llegar con turistas. Validación comercial del modelo.'},
+    {nombre:'El Balcón Paisa', contacto:'', categoria:'restaurante', ubicacion:'Guatapé pueblo', tier:'tier1', estado:'mensaje_enviado', whatsapp:'', revenue:0, fuente:'campo', notas:'🤝 TRUST VALIDADO — Me ofrecieron almuerzo y comisión; declinamos la comisión para construir confianza primero. Lazo comercial sólido.'},
+    {nombre:'Nautik Pro', contacto:'', categoria:'transporte', ubicacion:'Malecón, Guatapé', tier:'tier1', estado:'sondeo_llenado', whatsapp:'', revenue:0, fuente:'sondeo', notas:'✅ Primero en responder el sondeo inicial. Alquiler de lanchas. Competidor de Aquaxtreme.'},
+    {nombre:'Aquaxtreme', contacto:'Felipe', categoria:'tour_experiencia', ubicacion:'Malecón, Guatapé', tier:'tier2', estado:'mensaje_enviado', whatsapp:'', revenue:0, fuente:'campo', notas:'Jet skis y experiencias acuáticas en el embalse. Marca con estructura operativa.'},
+    {nombre:'Museo de Pablo Escobar', contacto:'', categoria:'museo_atraccion', ubicacion:'Piedra del Peñol', tier:'tier2', estado:'mensaje_enviado', whatsapp:'', revenue:0, fuente:'campo', notas:'Sobrino de Pablo Escobar dirige. Narrativa sensible — tratar con respeto. Atractivo para turismo internacional.'},
+    {nombre:'El Alto del Chocho', contacto:'', categoria:'restaurante', ubicacion:'Peñol (sitio 1 de ruta)', tier:'tier2', estado:'mensaje_enviado', whatsapp:'', revenue:0, fuente:'campo', notas:'Restaurante + mirador. Ampliaron las instalaciones — requiere radio GPS 100m para validar en app.'},
+    {nombre:'Gimnasio de Boxeo (nombre por confirmar)', contacto:'Laura', categoria:'spa_bienestar', ubicacion:'El Poblado', tier:'tier2', estado:'mensaje_enviado', whatsapp:'', revenue:0, fuente:'uber', notas:'Laura trabaja en recepción. La conocí como conductor de Uber. Reciben turistas para entrenar y para campeonatos. NUEVA CATEGORÍA: deporte/fitness turístico.'},
+    {nombre:'Restaurante Peruano San Fernando Plaza', contacto:'', categoria:'restaurante', ubicacion:'CC San Fernando Plaza, El Poblado', tier:'sponsor', estado:'por_contactar', whatsapp:'', revenue:0, fuente:'uber', notas:'🏆 SPONSOR POTENCIAL — Manifestó interés en PATROCINAR el proyecto. Pidió que lo contactara cuando la app esté en uso. Contactar ~Julio 2026 con MVP listo.'}
+  ];
+  for (const s of seeds) {
+    await db.collection('pipeline_aliados').add({...s, fechaCreacion: firebase.firestore.FieldValue.serverTimestamp()});
+  }
+  loadPipeline();
+}
+
+async function sembrarHostales() {
+  if (!confirm('¿Agregar los 21 hostales/hoteles al Pipeline CRM?\n\nSolo se agregarán los que no existan ya (por nombre).')) return;
+  const hostales = [
+    // 🔥 Prioridad Alta
+    {nombre:'Los Patios Hostel Boutique', contacto:'', categoria:'hospedaje', ubicacion:'Medellín', tier:'tier2', estado:'mensaje_enviado', whatsapp:'+57 305 323 9897', revenue:0, fuente:'redes', notas:'🔥 Prioridad Alta — turistas internacionales. Mensaje enviado 8 jun 2026.'},
+    {nombre:'Masaya Medellin', contacto:'', categoria:'hospedaje', ubicacion:'Medellín', tier:'tier2', estado:'mensaje_enviado', whatsapp:'+57 311 275 7688', revenue:0, fuente:'redes', notas:'🔥 Prioridad Alta — hostal internacional referente. Mensaje enviado 8 jun 2026.'},
+    {nombre:'Socialtel Provenza Medellin', contacto:'', categoria:'hospedaje', ubicacion:'El Poblado', tier:'tier2', estado:'por_contactar', whatsapp:'+57 350 271 7217', revenue:0, fuente:'redes', notas:'🔥 Prioridad Alta — turistas internacionales.'},
+    {nombre:'Medellín Vibes Hostel', contacto:'', categoria:'hospedaje', ubicacion:'Medellín', tier:'tier2', estado:'por_contactar', whatsapp:'+57 301 444 9490', revenue:0, fuente:'redes', notas:'🔥 Prioridad Alta — turistas internacionales.'},
+    {nombre:'The Click Clack Hotel Medellín', contacto:'', categoria:'hospedaje', ubicacion:'Medellín', tier:'tier2', estado:'por_contactar', whatsapp:'+57 604 604 3232', revenue:0, fuente:'redes', notas:'🔥 Prioridad Alta — hotel con perfil viajero.'},
+    {nombre:'Landmark Hotel Medellin', contacto:'', categoria:'hospedaje', ubicacion:'Medellín', tier:'tier2', estado:'por_contactar', whatsapp:'+57 304 234 3158', revenue:0, fuente:'redes', notas:'🔥 Prioridad Alta — segmento alto.'},
+    {nombre:'Los Patios Suite Hostel', contacto:'', categoria:'hospedaje', ubicacion:'Medellín', tier:'tier2', estado:'por_contactar', whatsapp:'+57 301 232 1530', revenue:0, fuente:'redes', notas:'🔥 Prioridad Alta — complementa Los Patios Boutique.'},
+    // 🟡 Prioridad Media
+    {nombre:'Rock Hostel Medellín', contacto:'', categoria:'hospedaje', ubicacion:'Medellín', tier:'tier2', estado:'por_contactar', whatsapp:'+57 324 616 9807', revenue:0, fuente:'redes', notas:'🟡 Prioridad Media — mochileros turismo independiente.'},
+    {nombre:'Centro Hostel Medellín', contacto:'', categoria:'hospedaje', ubicacion:'Centro, Medellín', tier:'tier2', estado:'por_contactar', whatsapp:'+57 314 812 0739', revenue:0, fuente:'redes', notas:'🟡 Prioridad Media — mochileros.'},
+    {nombre:'Hostel Metro Floresta', contacto:'', categoria:'hospedaje', ubicacion:'Floresta, Medellín', tier:'tier2', estado:'por_contactar', whatsapp:'+57 314 622 6559', revenue:0, fuente:'redes', notas:'🟡 Prioridad Media — turismo independiente.'},
+    {nombre:'Hostal Medellín - Paisa Hostel', contacto:'', categoria:'hospedaje', ubicacion:'Medellín', tier:'tier2', estado:'por_contactar', whatsapp:'+57 333 222 6493', revenue:0, fuente:'redes', notas:'🟡 Prioridad Media — perfil paisa/mochilero.'},
+    {nombre:'ibis Medellin', contacto:'', categoria:'hospedaje', ubicacion:'Medellín', tier:'tier2', estado:'por_contactar', whatsapp:'+57 350 213 8586', revenue:0, fuente:'redes', notas:'🟡 Prioridad Media — cadena internacional.'},
+    {nombre:'Medellin Hostel Irban City', contacto:'', categoria:'hospedaje', ubicacion:'Medellín', tier:'tier2', estado:'por_contactar', whatsapp:'+57 316 626 9905', revenue:0, fuente:'redes', notas:'🟡 Prioridad Media — turismo urbano.'},
+    {nombre:'Spring Hostel Medellin', contacto:'', categoria:'hospedaje', ubicacion:'Medellín', tier:'tier2', estado:'por_contactar', whatsapp:'+57 333 640 7371', revenue:0, fuente:'redes', notas:'🟡 Prioridad Media — mochileros.'},
+    {nombre:'Gastón Coliving', contacto:'', categoria:'hospedaje', ubicacion:'Medellín', tier:'tier2', estado:'por_contactar', whatsapp:'+57 350 462 9505', revenue:0, fuente:'redes', notas:'🟡 Prioridad Media — coliving, perfil nómada digital.'},
+    // 🟢 Prioridad Baja
+    {nombre:'Hotel Dann Carlton Medellin', contacto:'', categoria:'hospedaje', ubicacion:'Medellín', tier:'tier2', estado:'por_contactar', whatsapp:'+57 604 444 5151', revenue:0, fuente:'redes', notas:'🟢 Prioridad Baja — hotel tradicional.'},
+    {nombre:'Hotel Poblado Plaza', contacto:'', categoria:'hospedaje', ubicacion:'El Poblado, Medellín', tier:'tier2', estado:'por_contactar', whatsapp:'+57 604 604 0872', revenue:0, fuente:'redes', notas:'🟢 Prioridad Baja — hotel tradicional El Poblado.'},
+    {nombre:'Hotel Nutibara', contacto:'', categoria:'hospedaje', ubicacion:'Centro, Medellín', tier:'tier2', estado:'por_contactar', whatsapp:'+57 312 866 7881', revenue:0, fuente:'redes', notas:'🟢 Prioridad Baja — hotel histórico tradicional.'},
+    {nombre:'Gran Hotel Medellín', contacto:'', categoria:'hospedaje', ubicacion:'Medellín', tier:'tier2', estado:'por_contactar', whatsapp:'+57 316 482 4343', revenue:0, fuente:'redes', notas:'🟢 Prioridad Baja — hotel tradicional.'},
+    {nombre:'Hotel 47 Medellin Street', contacto:'', categoria:'hospedaje', ubicacion:'Medellín', tier:'tier2', estado:'por_contactar', whatsapp:'+57 302 482 1498', revenue:0, fuente:'redes', notas:'🟢 Prioridad Baja — hotel boutique.'},
+    {nombre:'La Quinta by Wyndham Medellin', contacto:'', categoria:'hospedaje', ubicacion:'Medellín', tier:'tier2', estado:'por_contactar', whatsapp:'+57 604 5188', revenue:0, fuente:'redes', notas:'🟢 Prioridad Baja — cadena Wyndham.'},
+  ];
+
+  // Evitar duplicados por nombre
+  const nombresExistentes = new Set(todosPipeline.map(x => x.nombre.toLowerCase()));
+  const nuevos = hostales.filter(h => !nombresExistentes.has(h.nombre.toLowerCase()));
+
+  if (nuevos.length === 0) {
+    alert('✅ Todos los hostales ya están en el pipeline.');
+    return;
+  }
+
+  const btn = event.target;
+  btn.textContent = '⏳ Cargando...'; btn.disabled = true;
+
+  try {
+    for (const h of nuevos) {
+      await db.collection('pipeline_aliados').add({...h, fechaCreacion: firebase.firestore.FieldValue.serverTimestamp()});
+    }
+    alert(`✅ ${nuevos.length} hostales agregados al pipeline.`);
+    loadPipeline();
+  } catch(e) {
+    alert('❌ Error: ' + e.message);
+    console.error(e);
+  } finally {
+    btn.textContent = '🏨 Cargar 21 Hostales'; btn.disabled = false;
+  }
+}
+
+function actualizarStatsPipe(arr) {
+  document.getElementById('stat-pipe-total').textContent = arr.length;
+  document.getElementById('stat-pipe-tier1').textContent = arr.filter(x => x.tier === 'tier1').length;
+  document.getElementById('stat-pipe-revenue').textContent = arr.filter(x => x.revenue && x.revenue > 0).length;
+  document.getElementById('stat-pipe-sponsors').textContent = arr.filter(x => x.tier === 'sponsor').length;
+  document.getElementById('count-pipe').textContent = `${arr.length} aliados`;
+}
+
+function filtrarPipeline() {
+  const q = document.getElementById('search-pipe').value.toLowerCase();
+  const tier = document.getElementById('filtro-tier').value;
+  const estado = document.getElementById('filtro-estado').value;
+  const f = todosPipeline.filter(r => {
+    const mq = !q || (r.nombre||'').toLowerCase().includes(q) || (r.ubicacion||'').toLowerCase().includes(q) || (r.contacto||'').toLowerCase().includes(q);
+    const mt = !tier || r.tier === tier;
+    const me = !estado || r.estado === estado;
+    return mq && mt && me;
+  });
+  renderPipeline(f);
+}
+
+function renderPipeline(arr) {
+  if (!arr.length) {
+    document.getElementById('tabla-pipeline').innerHTML = '<div class="empty-state" style="padding:40px;text-align:center;color:var(--muted)">Sin aliados que coincidan</div>';
+    return;
+  }
+  document.getElementById('count-pipe').textContent = `${arr.length} aliados`;
+
+  const tierBadge = v => {
+    if (v === 'tier1') return '<span class="badge badge-verde">🥇 Tier 1</span>';
+    if (v === 'tier2') return '<span class="badge badge-oro">🥈 Tier 2</span>';
+    if (v === 'sponsor') return '<span class="badge" style="background:rgba(184,92,174,0.2);color:#B85CAE">🏆 Sponsor</span>';
+    return '<span class="badge badge-gris">—</span>';
+  };
+  const estadoBadge = v => {
+    const map = {
+      'por_contactar': {t:'🟣 Por contactar', c:'badge-gris'},
+      'mensaje_enviado': {t:'📤 Enviado', c:'badge-oro'},
+      'sondeo_llenado': {t:'📝 Sondeo', c:'badge-verde'},
+      'conversacion': {t:'📞 En conversación', c:'badge-verde'},
+      'alianza_activa': {t:'🤝 Activa', c:'badge-verde'},
+      'descartado': {t:'❌ Descartado', c:'badge-rojo'}
+    };
+    const m = map[v] || {t:'—', c:'badge-gris'};
+    return `<span class="badge ${m.c}">${m.t}</span>`;
+  };
+  const catLabel = v => {
+    const map = {
+      'restaurante':'🍽️ Restaurante', 'hospedaje':'🏨 Hospedaje',
+      'museo_atraccion':'🏛️ Museo', 'tienda_artesania':'🎨 Tienda',
+      'tour_experiencia':'🚶 Tour', 'transporte':'🚗 Transporte',
+      'spa_bienestar':'💆 Deporte', 'otro':'✨ Otro'
+    };
+    return map[v] || '—';
+  };
+  const fuenteLabel = v => {
+    const map = {
+      'campo':'📍 Campo', 'sondeo':'📋 Sondeo', 'uber':'🚗 Uber',
+      'referido':'🤝 Referido', 'redes':'📱 Redes', 'otro':'✨ Otro'
+    };
+    return map[v] || '—';
+  };
+
+  let h = `<table><tr>
+    <th>Aliado</th><th>Categoría</th><th>Ubicación</th>
+    <th>Tier</th><th>Estado</th><th>Revenue</th><th>Fuente</th><th></th>
+  </tr>`;
+  arr.forEach(r => {
+    const rev = r.revenue && r.revenue > 0 ? `<strong style="color:var(--verde)">$${Number(r.revenue).toLocaleString('es-CO')}</strong>` : '<span style="color:var(--muted)">—</span>';
+    const wa = (r.whatsapp||'').replace(/[^0-9]/g,'');
+    h += `<tr>
+      <td>
+        <strong>${r.nombre||'—'}</strong>
+        ${r.contacto?`<div style="font-size:11px;color:var(--muted)">👤 ${r.contacto}</div>`:''}
+        ${r.notas?`<div style="font-size:11px;color:var(--muted);margin-top:4px;font-style:italic">${r.notas.substring(0,80)}${r.notas.length>80?'...':''}</div>`:''}
+      </td>
+      <td><span class="badge badge-gris">${catLabel(r.categoria)}</span></td>
+      <td style="color:var(--muted);font-size:12px">${r.ubicacion||'—'}</td>
+      <td>${tierBadge(r.tier)}</td>
+      <td>${estadoBadge(r.estado)}</td>
+      <td>${rev}</td>
+      <td style="font-size:11px;color:var(--muted)">${fuenteLabel(r.fuente)}${wa?`<br><a href="https://wa.me/57${wa}" target="_blank" style="color:var(--verde);font-size:10px">📱 WhatsApp</a>`:''}</td>
+      <td><button class="btn-sm btn-ghost" onclick="editarPipe('${r.id}')">✏️</button></td>
+    </tr>`;
+  });
+  document.getElementById('tabla-pipeline').innerHTML = h + '</table>';
+}
+
+function nuevoAliado() {
+  document.getElementById('modal-pipe-title').textContent = '➕ Nuevo aliado al pipeline';
+  document.getElementById('pipe-id').value = '';
+  ['nombre','contacto','ubicacion','whatsapp','notas'].forEach(f => document.getElementById('pipe-'+f).value = '');
+  document.getElementById('pipe-revenue').value = '';
+  document.getElementById('pipe-categoria').value = 'restaurante';
+  document.getElementById('pipe-tier').value = 'tier2';
+  document.getElementById('pipe-estado').value = 'por_contactar';
+  document.getElementById('pipe-fuente').value = 'campo';
+  document.getElementById('btn-pipe-delete').style.display = 'none';
+  document.getElementById('modal-pipe').classList.add('open');
+}
+
+function editarPipe(id) {
+  const r = todosPipeline.find(x => x.id === id);
+  if (!r) return;
+  document.getElementById('modal-pipe-title').textContent = '✏️ Editar aliado';
+  document.getElementById('pipe-id').value = id;
+  document.getElementById('pipe-nombre').value = r.nombre || '';
+  document.getElementById('pipe-contacto').value = r.contacto || '';
+  document.getElementById('pipe-categoria').value = r.categoria || 'restaurante';
+  document.getElementById('pipe-ubicacion').value = r.ubicacion || '';
+  document.getElementById('pipe-tier').value = r.tier || 'tier2';
+  document.getElementById('pipe-estado').value = r.estado || 'por_contactar';
+  document.getElementById('pipe-whatsapp').value = r.whatsapp || '';
+  document.getElementById('pipe-revenue').value = r.revenue || '';
+  document.getElementById('pipe-fuente').value = r.fuente || 'campo';
+  document.getElementById('pipe-notas').value = r.notas || '';
+  document.getElementById('btn-pipe-delete').style.display = 'inline-block';
+  document.getElementById('modal-pipe').classList.add('open');
+}
+
+function cerrarModal(id) {
+  document.getElementById(id).classList.remove('open');
+}
+
+function cerrarModalPipe() {
+  document.getElementById('modal-pipe').classList.remove('open');
+}
+
+async function guardarPipe() {
+  const id = document.getElementById('pipe-id').value;
+  const datos = {
+    nombre: document.getElementById('pipe-nombre').value.trim(),
+    contacto: document.getElementById('pipe-contacto').value.trim(),
+    categoria: document.getElementById('pipe-categoria').value,
+    ubicacion: document.getElementById('pipe-ubicacion').value.trim(),
+    tier: document.getElementById('pipe-tier').value,
+    estado: document.getElementById('pipe-estado').value,
+    whatsapp: document.getElementById('pipe-whatsapp').value.trim(),
+    revenue: parseInt(document.getElementById('pipe-revenue').value) || 0,
+    fuente: document.getElementById('pipe-fuente').value,
+    notas: document.getElementById('pipe-notas').value.trim()
+  };
+  if (!datos.nombre) { alert('El nombre del aliado es obligatorio'); return; }
+  try {
+    if (id) {
+      await db.collection('pipeline_aliados').doc(id).update({...datos, fechaActualizacion: firebase.firestore.FieldValue.serverTimestamp()});
+    } else {
+      await db.collection('pipeline_aliados').add({...datos, fechaCreacion: firebase.firestore.FieldValue.serverTimestamp()});
+    }
+    cerrarModalPipe();
+    loadPipeline();
+  } catch(e) {
+    alert('Error: ' + e.message);
+  }
+}
+
+async function eliminarPipe() {
+  if (!confirm('¿Eliminar este aliado del pipeline? Esta acción no se puede deshacer.')) return;
+  const id = document.getElementById('pipe-id').value;
+  try {
+    await db.collection('pipeline_aliados').doc(id).delete();
+    cerrarModalPipe();
+    loadPipeline();
+  } catch(e) {
+    alert('Error eliminando: ' + e.message);
+  }
+}
+
+// ═══════════════════════════════════════════
+// 🎬 COLABORADORES
+// ═══════════════════════════════════════════
+
+</script>
+</body>
+</html>
