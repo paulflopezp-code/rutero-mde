@@ -1373,6 +1373,7 @@ String _filtroLabel(String f) {
     // ── Medellín ──
     'RUTA TRANSFORMACIÓN URBANA':               ['Transformación Urbana',          'Urban Transformation'],
     'VIVE MANRIQUE':                            ['Vive Manrique',                   'Experience Manrique'],
+    'MANRIQUE CULTURA Y VIDA':                  ['Manrique Cultura y Vida',          'Manrique Culture & Life'],
     // [eliminado] VIVE EL CENTRO — sitios redistribuidos en otras rutas
     'FINCAS SILLETERAS':                        ['Fincas Silleteras',               'Silletera Farms'],
     'FINCAS AGROTURÍSTICAS':                    ['Fincas Agroturísticas',           'Agrotourism Farms'],
@@ -4223,308 +4224,443 @@ class _OnboardingScreenState extends State<OnboardingScreen>
     with TickerProviderStateMixin {
   final PageController _pageCtrl = PageController();
   int _paginaActual = 0;
-  late AnimationController _floatCtrl;
-  late AnimationController _pulseCtrl;
-  late AnimationController _slideCtrl;
-  late Animation<double> _floatAnim;
-  late Animation<double> _pulseAnim;
-  late Animation<double> _slideAnim;
-  late Animation<double> _fadeAnim;
 
-  final List<Map<String, dynamic>> _slides = [
-    {
-      'emoji': '🗺️',
-      'emojisBg': ['🏙️', '🌳', '🚇', '🎨', '📍'],
-      'titulo': 'Explora Medellín\ncomo nunca antes',
-      'tituloEN': 'Explore Medellín\nlike never before',
-      'desc': 'Más de 40 rutas gamificadas por la ciudad de la eterna primavera. Cada sitio tiene su historia — tú la descubres.',
-      'descEN': 'Over 40 gamified routes through the city of eternal spring. Every spot has its story — you discover it.',
-      'color1': 0xFF5BAD6F,
-      'color2': 0xFF1B5E3A,
-      'imagen': 'assets/images/onboarding_explora.png',
-      'tag1': '40+ rutas', 'tag1EN': '40+ routes',
-      'tag2': '155+ sitios', 'tag2EN': '155+ spots',
-    },
-    {
-      'emoji': '📸',
-      'emojisBg': ['✨', '📍', '🎯', '🔓', '⭐'],
-      'titulo': 'Valida tu visita\ncon una foto',
-      'tituloEN': 'Validate your visit\nwith a photo',
-      'desc': 'Llega al sitio, toma la foto y gana puntos reales. El GPS confirma que estás ahí — cero trampa, pura aventura.',
-      'descEN': 'Get to the spot, take the photo and earn real points. GPS confirms you are there — no cheating, pure adventure.',
-      'color1': 0xFFE9B949,
-      'color2': 0xFF8B6914,
-      'imagen': 'assets/images/onboarding_valida.png',
-      'tag1': 'GPS verificado', 'tag1EN': 'GPS verified',
-      'tag2': '+30 puntos', 'tag2EN': '+30 points',
-    },
-    {
-      'emoji': '🏆',
-      'emojisBg': ['🎖️', '💎', '🎁', '🌟', '👑'],
-      'titulo': 'Gana insignias\ny premios reales',
-      'tituloEN': 'Earn badges\nand real rewards',
-      'desc': 'Desbloquea insignias coleccionables, descuentos en aliados y experiencias exclusivas en Medellín.',
-      'descEN': 'Unlock collectible badges, discounts at partners and exclusive experiences in Medellín.',
-      'color1': 0xFFB85CAE,
-      'color2': 0xFF5A1B55,
-      'imagen': 'assets/images/onboarding_gana.png',
-      'tag1': 'Insignias', 'tag1EN': 'Badges',
-      'tag2': 'Descuentos', 'tag2EN': 'Discounts',
-    },
-  ];
+  // Animaciones
+  late AnimationController _fadeCtrl;
+  late AnimationController _pinCtrl;
+  late AnimationController _scaleCtrl;
+  late Animation<double> _fadeAnim;
+  late Animation<double> _pinAnim;
+  late Animation<double> _scaleAnim;
 
   @override
   void initState() {
     super.initState();
-    _floatCtrl = AnimationController(
-      vsync: this, duration: const Duration(milliseconds: 3000))..repeat(reverse: true);
-    _pulseCtrl = AnimationController(
-      vsync: this, duration: const Duration(milliseconds: 1400))..repeat(reverse: true);
-    _slideCtrl = AnimationController(
-      vsync: this, duration: const Duration(milliseconds: 600));
-    _floatAnim = Tween<double>(begin: -8.0, end: 8.0)
-      .animate(CurvedAnimation(parent: _floatCtrl, curve: Curves.easeInOut));
-    _pulseAnim = Tween<double>(begin: 0.95, end: 1.08)
-      .animate(CurvedAnimation(parent: _pulseCtrl, curve: Curves.easeInOut));
-    _slideAnim = Tween<double>(begin: 40.0, end: 0.0)
-      .animate(CurvedAnimation(parent: _slideCtrl, curve: Curves.easeOutCubic));
-    _fadeAnim = Tween<double>(begin: 0.0, end: 1.0)
-      .animate(CurvedAnimation(parent: _slideCtrl, curve: Curves.easeOut));
-    _slideCtrl.forward();
-  }
+    _fadeCtrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 600));
+    _pinCtrl  = AnimationController(vsync: this, duration: const Duration(milliseconds: 800));
+    _scaleCtrl= AnimationController(vsync: this, duration: const Duration(milliseconds: 400));
 
-  void _siguiente() {
-    if (_paginaActual < _slides.length - 1) {
-      _pageCtrl.nextPage(
-        duration: const Duration(milliseconds: 500),
-        curve: Curves.easeInOutCubic);
-    } else {
-      _terminar();
-    }
-  }
+    _fadeAnim  = CurvedAnimation(parent: _fadeCtrl,  curve: Curves.easeIn);
+    _pinAnim   = CurvedAnimation(parent: _pinCtrl,   curve: Curves.elasticOut);
+    _scaleAnim = Tween<double>(begin: 0.8, end: 1.0)
+        .animate(CurvedAnimation(parent: _scaleCtrl, curve: Curves.easeOut));
 
-  void _terminar() {
-    _marcarOnboardingVisto();
-    if (!mounted) return;
-    // FIX 30/06/2026: se elimina BetaWelcomeScreen del flujo — va directo a login.
-    Navigator.of(context).pushReplacement(PageRouteBuilder(
-      pageBuilder: (_, __, ___) => const WelcomeScreen(),
-      transitionsBuilder: (_, anim, __, child) =>
-          FadeTransition(opacity: anim, child: child),
-      transitionDuration: const Duration(milliseconds: 500),
-    ));
+    _fadeCtrl.forward();
+    _scaleCtrl.forward();
   }
 
   @override
   void dispose() {
-    _pageCtrl.dispose();
-    _floatCtrl.dispose();
-    _pulseCtrl.dispose();
-    _slideCtrl.dispose();
+    _fadeCtrl.dispose();
+    _pinCtrl.dispose();
+    _scaleCtrl.dispose();
     super.dispose();
+  }
+
+  void _siguiente() {
+    if (_paginaActual < 3) {
+      _pageCtrl.nextPage(
+        duration: const Duration(milliseconds: 350),
+        curve: Curves.easeInOut,
+      );
+    } else {
+      _irARegistro();
+    }
+  }
+
+  void _irARegistro() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('onboarding_visto', true);
+    if (!mounted) return;
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute(builder: (_) => const WelcomeScreen()));
+  }
+
+  void _onPageChanged(int idx) {
+    setState(() => _paginaActual = idx);
+    // Animar pin en pantalla 2
+    if (idx == 1) {
+      _pinCtrl.forward(from: 0);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    final slide = _slides[_paginaActual];
-    final Color color1 = Color((slide['color1'] as int?) ?? 0);
-    final Color color2 = Color((slide['color2'] as int?) ?? 0);
-
+    final bool esUltima = _paginaActual == 3;
     return Scaffold(
-      body: AnimatedContainer(
-        duration: const Duration(milliseconds: 600),
-        curve: Curves.easeInOut,
-        decoration: const BoxDecoration(color: Colors.black),
-        child: Stack(children: [
-          // Imagen de fondo
-          Positioned.fill(
-            child: AnimatedSwitcher(
-              duration: const Duration(milliseconds: 600),
-              child: Image.asset(
-                slide['imagen']?.toString() ?? '',
-                key: ValueKey(slide['imagen']),
-                fit: BoxFit.cover,
-                errorBuilder: (_, __, ___) =>
-                  CustomPaint(painter: _LeafPatternPainter())))),
-          // Overlay
-          Positioned.fill(child: Container(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter, end: Alignment.bottomCenter,
-                stops: const [0.0, 0.4, 0.75, 1.0],
-                colors: [
-                  Colors.black.withOpacity(0.30),
-                  Colors.black.withOpacity(0.10),
-                  Colors.black.withOpacity(0.50),
-                  Colors.black.withOpacity(0.92),
-                ])))),
+      backgroundColor: const Color(0xFF0A080F),
+      body: Stack(children: [
+        // ── Páginas ──────────────────────────────────────────────────────
+        PageView(
+          controller: _pageCtrl,
+          onPageChanged: _onPageChanged,
+          children: [
+            const _Pagina1(),
+            _Pagina2(pinAnim: _pinAnim),
+            const _Pagina3(),
+            _Pagina4(onRegistro: _irARegistro),
+          ],
+        ),
 
-          // Emojis flotantes
-          ...List.generate(5, (i) {
-            final emojisBg = slide['emojisBg'] as List;
-            return AnimatedBuilder(
-              animation: _floatAnim,
-              builder: (_, __) {
-                final posX = [0.1, 0.8, 0.15, 0.75, 0.5][i];
-                final posY = [0.15, 0.25, 0.55, 0.6, 0.35][i];
-                return Positioned(
-                  left: MediaQuery.of(context).size.width * posX,
-                  top: MediaQuery.of(context).size.height * posY +
-                    _floatAnim.value * (i.isEven ? 1 : -1),
-                  child: Opacity(opacity: 0.07,
-                    child: Text(emojisBg[i % emojisBg.length],
-                      style: const TextStyle(fontSize: 38))));
-              });
-          }),
-
-          SafeArea(child: Column(children: [
-            // Header: indicadores + skip
-            Padding(
-              padding: const EdgeInsets.fromLTRB(24, 16, 20, 0),
-              child: Row(children: [
-                Expanded(child: Row(children: List.generate(_slides.length, (i) {
-                  final activo = i == _paginaActual;
-                  return AnimatedContainer(
-                    duration: const Duration(milliseconds: 400),
-                    margin: const EdgeInsets.only(right: 6),
-                    height: 6, width: activo ? 36 : 6,
-                    decoration: BoxDecoration(
-                      color: activo ? Colors.white : Colors.white.withOpacity(0.25),
-                      borderRadius: BorderRadius.circular(3),
-                      boxShadow: activo ? [BoxShadow(
-                        color: Colors.white.withOpacity(0.5), blurRadius: 8)] : null));
-                }))),
-                GestureDetector(
-                  onTap: _terminar,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.12),
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: Colors.white.withOpacity(0.2))),
-                    child: Text(t('Saltar', 'Skip'),
-                      style: const TextStyle(color: Colors.white,
-                        fontSize: 12, fontWeight: FontWeight.w600)))),
-              ])),
-
-            // Slides
-            Expanded(child: PageView.builder(
-              controller: _pageCtrl,
-              onPageChanged: (i) {
-                setState(() => _paginaActual = i);
-                _slideCtrl.reset();
-                _slideCtrl.forward();
-              },
-              itemCount: _slides.length,
-              itemBuilder: (_, i) {
-                final s = _slides[i];
-                final Color c1 = Color((s['color1'] as int?) ?? 0);
-                return Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 24),
-                  child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-                    // Emoji con halo pulsante
-                    AnimatedBuilder(
-                      animation: _pulseAnim,
-                      builder: (_, __) => Transform.scale(
-                        scale: i == _paginaActual ? _pulseAnim.value : 1.0,
-                        child: Container(width: 160, height: 160,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            gradient: RadialGradient(colors: [
-                              c1.withOpacity(0.4),
-                              c1.withOpacity(0.15),
-                              Colors.transparent,
-                            ]),
-                            boxShadow: [BoxShadow(color: c1.withOpacity(0.5),
-                              blurRadius: 50, spreadRadius: 10)]),
-                          child: Center(child: Text(s['emoji']?.toString() ?? '',
-                            style: const TextStyle(fontSize: 84)))))),
-                    const SizedBox(height: 36),
-
-                    // Card con animación fade+slide
-                    AnimatedBuilder(
-                      animation: _slideCtrl,
-                      builder: (_, child) => i == _paginaActual
-                        ? Transform.translate(
-                            offset: Offset(0, _slideAnim.value),
-                            child: Opacity(opacity: _fadeAnim.value, child: child))
-                        : child!,
-                      child: Container(
-                        padding: const EdgeInsets.all(24),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.07),
-                          borderRadius: BorderRadius.circular(24),
-                          border: Border.all(
-                            color: Colors.white.withOpacity(0.15), width: 1.5),
-                          boxShadow: [BoxShadow(
-                            color: c1.withOpacity(0.2),
-                            blurRadius: 30, offset: const Offset(0, 10))]),
-                        child: Column(children: [
-                          // Título en PlayfairDisplay
-                          Text(
-                            kLang == 'en' ? s['tituloEN']?.toString() ?? '' : s['titulo']?.toString() ?? '',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              fontFamily: 'PlayfairDisplay',
-                              fontSize: 26, fontWeight: FontWeight.w900,
-                              color: Colors.white, height: 1.2,
-                              shadows: [Shadow(color: c1.withOpacity(0.8),
-                                blurRadius: 20)])),
-                          const SizedBox(height: 14),
-                          Text(
-                            kLang == 'en' ? s['descEN']?.toString() ?? '' : s['desc']?.toString() ?? '',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              fontFamily: 'Inter',
-                              fontSize: 14,
-                              color: Colors.white.withOpacity(0.85),
-                              height: 1.6)),
-                          const SizedBox(height: 18),
-                          Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-                            _OnbTag(label: kLang == 'en'
-                              ? s['tag1EN']?.toString() ?? '' : s['tag1']?.toString() ?? '', color: c1),
-                            const SizedBox(width: 10),
-                            _OnbTag(label: kLang == 'en'
-                              ? s['tag2EN']?.toString() ?? '' : s['tag2']?.toString() ?? '', color: c1),
-                          ]),
-                        ])),
-                    ),
-                  ]));
-              })),
-
-            // Botón
-            Padding(
-              padding: const EdgeInsets.fromLTRB(24, 0, 24, 32),
-              child: GestureDetector(
-                onTap: _siguiente,
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 400),
-                  width: double.infinity,
-                  padding: const EdgeInsets.symmetric(vertical: 18),
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(colors: [color1, color2]),
-                    borderRadius: BorderRadius.circular(18),
-                    boxShadow: [BoxShadow(
-                      color: color1.withOpacity(0.55),
-                      blurRadius: 25, offset: const Offset(0, 10))]),
-                  child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-                    Text(
-                      _paginaActual < _slides.length - 1
-                        ? t('SIGUIENTE', 'NEXT')
-                        : t('¡EMPEZAR A EXPLORAR!', 'START EXPLORING!'),
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(
-                        fontFamily: 'Inter',
-                        fontSize: 15, fontWeight: FontWeight.w900,
-                        color: Colors.white, letterSpacing: 1.5)),
-                    const SizedBox(width: 8),
-                    Text(_paginaActual < _slides.length - 1 ? '→' : '🚀',
-                      style: const TextStyle(fontSize: 18, color: Colors.white)),
-                  ])))),
+        // ── Indicadores de página ─────────────────────────────────────────
+        Positioned(
+          bottom: 110, left: 0, right: 0,
+          child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+            for (int i = 0; i < 4; i++)
+              AnimatedContainer(
+                duration: const Duration(milliseconds: 300),
+                margin: const EdgeInsets.symmetric(horizontal: 4),
+                width: _paginaActual == i ? 24 : 8,
+                height: 8,
+                decoration: BoxDecoration(
+                  color: _paginaActual == i ? kGold : Colors.white.withOpacity(0.3),
+                  borderRadius: BorderRadius.circular(4))),
           ])),
-        ])),
+
+        // ── Botón principal ───────────────────────────────────────────────
+        if (_paginaActual < 3)
+          Positioned(
+            bottom: 36, left: 24, right: 24,
+            child: _GoldButton(
+              label: t('Siguiente →', 'Next →'),
+              onTap: _siguiente,
+            )),
+
+        // ── Skip ─────────────────────────────────────────────────────────
+        if (_paginaActual < 3)
+          Positioned(
+            top: MediaQuery.of(context).padding.top + 16,
+            right: 20,
+            child: GestureDetector(
+              onTap: _irARegistro,
+              child: Text(t('Saltar', 'Skip'),
+                style: TextStyle(
+                  color: Colors.white.withOpacity(0.5),
+                  fontSize: 14, fontWeight: FontWeight.w500)))),
+      ]),
     );
   }
+}
+
+// ── Pantalla 1 — Vende la experiencia ────────────────────────────────────────
+class _Pagina1 extends StatelessWidget {
+  const _Pagina1();
+  @override
+  Widget build(BuildContext context) {
+    return Stack(fit: StackFit.expand, children: [
+      // Imagen de fondo cinematográfica
+      Image.asset('assets/images/rutas/ruta_02b_republicano.jpg',
+        fit: BoxFit.cover,
+        errorBuilder: (_, __, ___) => Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter, end: Alignment.bottomCenter,
+              colors: [Color(0xFF1A0A2E), Color(0xFF0A080F)])))),
+
+      // Gradiente sobre imagen
+      Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter, end: Alignment.bottomCenter,
+            colors: [
+              Colors.transparent,
+              const Color(0xFF0A080F).withOpacity(0.4),
+              const Color(0xFF0A080F).withOpacity(0.9),
+              const Color(0xFF0A080F),
+            ],
+            stops: const [0.0, 0.4, 0.7, 1.0]))),
+
+      // Contenido
+      Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 28),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.end,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Badge
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: kGold.withOpacity(0.15),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: kGold.withOpacity(0.4))),
+              child: Text('🌹 ${t("Medellín", "Medellín")}',
+                style: const TextStyle(
+                  color: kGold, fontSize: 12, fontWeight: FontWeight.w700,
+                  letterSpacing: 0.5))),
+            const SizedBox(height: 16),
+            // Título
+            Text(t('Medellín sin guía de turismo.', 'Medellín without a tour guide.'),
+              style: const TextStyle(
+                color: Colors.white, fontSize: 36,
+                fontWeight: FontWeight.w900, height: 1.1,
+                fontFamily: 'SpaceGrotesk',
+                letterSpacing: -0.5)),
+            const SizedBox(height: 16),
+            // Descripción
+            Text(
+              t('Explorá la ciudad como local. Validá tus visitas y ganá premios reales.',
+                'Explore the city like a local. Validate your visits and win real prizes.'),
+              style: TextStyle(
+                color: Colors.white.withOpacity(0.75),
+                fontSize: 16, height: 1.5)),
+            const SizedBox(height: 160),
+          ])),
+    ]);
+  }
+}
+
+// ── Pantalla 2 — Cómo funciona ───────────────────────────────────────────────
+class _Pagina2 extends StatelessWidget {
+  final Animation<double> pinAnim;
+  const _Pagina2({required this.pinAnim});
+
+  @override
+  Widget build(BuildContext context) {
+    final pasos = [
+      {'emoji': '🗺️', 'es': 'Elegí una ruta',     'en': 'Choose a route'},
+      {'emoji': '📍', 'es': 'Llegá al lugar',      'en': 'Get to the spot'},
+      {'emoji': '📸', 'es': 'Tomá tu foto',        'en': 'Take your photo'},
+      {'emoji': '🏆', 'es': 'Ganás puntos',         'en': 'Earn points'},
+    ];
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 28),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const SizedBox(height: 80),
+          Text(t('Así de simple.', 'This simple.'),
+            style: const TextStyle(
+              color: Colors.white, fontSize: 36,
+              fontWeight: FontWeight.w900, fontFamily: 'SpaceGrotesk',
+              letterSpacing: -0.5, height: 1.1)),
+          const SizedBox(height: 8),
+          Text(t('Explorá Medellín y conseguí recompensas reales.',
+                 'Explore Medellín and get real rewards.'),
+            style: TextStyle(color: Colors.white.withOpacity(0.6), fontSize: 15)),
+          const SizedBox(height: 48),
+          ...pasos.asMap().entries.map((e) {
+            final idx   = e.key;
+            final paso  = e.value;
+            final esPin = idx == 1;
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 20),
+              child: Row(children: [
+                // Ícono con animación en el paso 2
+                AnimatedBuilder(
+                  animation: pinAnim,
+                  builder: (_, child) => Transform.scale(
+                    scale: esPin ? pinAnim.value.clamp(0.0, 1.2) : 1.0,
+                    child: child),
+                  child: Container(
+                    width: 52, height: 52,
+                    decoration: BoxDecoration(
+                      color: esPin ? kGold.withOpacity(0.15) : Colors.white.withOpacity(0.06),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(
+                        color: esPin ? kGold.withOpacity(0.5) : Colors.white.withOpacity(0.1))),
+                    child: Center(child: Text(paso['emoji']!,
+                      style: const TextStyle(fontSize: 22))))),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Text(kLang == 'en' ? paso['en']! : paso['es']!,
+                    style: TextStyle(
+                      color: esPin ? Colors.white : Colors.white.withOpacity(0.8),
+                      fontSize: esPin ? 18 : 16,
+                      fontWeight: esPin ? FontWeight.w800 : FontWeight.w500))),
+                if (esPin)
+                  AnimatedBuilder(
+                    animation: pinAnim,
+                    builder: (_, __) => Opacity(
+                      opacity: pinAnim.value.clamp(0.0, 1.0),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: kGreen.withOpacity(0.15),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(color: kGreen.withOpacity(0.4))),
+                        child: Text(t('✓ Validado', '✓ Validated'),
+                          style: const TextStyle(
+                            color: kGreen, fontSize: 11,
+                            fontWeight: FontWeight.w700))))),
+              ]));
+          }),
+          const SizedBox(height: 100),
+        ]));
+  }
+}
+
+// ── Pantalla 3 — Recompensas ─────────────────────────────────────────────────
+class _Pagina3 extends StatelessWidget {
+  const _Pagina3();
+  @override
+  Widget build(BuildContext context) {
+    final insignias = [
+      'assets/images/insignias/insignia_feria_clasica.png',
+      'assets/images/insignias/insignia_guardian_silletero.png',
+      'assets/images/insignias/insignia_huellas_vivas.png',
+      'assets/images/insignias/insignia_paladar_paisa.png',
+      'assets/images/insignias/insignia_explorador_45.png',
+      'assets/images/insignias/insignia_noctambulo_paisa.png',
+    ];
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 28),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const SizedBox(height: 80),
+          Text(t('Explorá. Ganá. Disfrutá.', 'Explore. Earn. Enjoy.'),
+            style: const TextStyle(
+              color: Colors.white, fontSize: 34,
+              fontWeight: FontWeight.w900, fontFamily: 'SpaceGrotesk',
+              letterSpacing: -0.5, height: 1.1)),
+          const SizedBox(height: 8),
+          Text(
+            t('Insignias, descuentos y experiencias exclusivas te esperan.',
+              'Badges, discounts and exclusive experiences await you.'),
+            style: TextStyle(color: Colors.white.withOpacity(0.6), fontSize: 15)),
+          const SizedBox(height: 36),
+          // Grid de insignias
+          GridView.count(
+            crossAxisCount: 3, shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            mainAxisSpacing: 16, crossAxisSpacing: 16,
+            children: insignias.map((path) => Container(
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.04),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: Colors.white.withOpacity(0.08))),
+              padding: const EdgeInsets.all(12),
+              child: Image.asset(path, fit: BoxFit.contain,
+                errorBuilder: (_, __, ___) =>
+                  const Icon(Icons.emoji_events, color: kGold, size: 32)))).toList()),
+          const SizedBox(height: 28),
+          // Beneficios
+          Row(children: [
+            _BeneficioChip(emoji: '🏅', label: t('Insignias', 'Badges')),
+            const SizedBox(width: 8),
+            _BeneficioChip(emoji: '💸', label: t('Descuentos', 'Discounts')),
+            const SizedBox(width: 8),
+            _BeneficioChip(emoji: '🥇', label: t('Ranking', 'Ranking')),
+          ]),
+          const SizedBox(height: 100),
+        ]));
+  }
+}
+
+class _BeneficioChip extends StatelessWidget {
+  final String emoji, label;
+  const _BeneficioChip({required this.emoji, required this.label});
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+    decoration: BoxDecoration(
+      color: Colors.white.withOpacity(0.06),
+      borderRadius: BorderRadius.circular(20),
+      border: Border.all(color: Colors.white.withOpacity(0.12))),
+    child: Text('$emoji $label',
+      style: const TextStyle(color: Colors.white, fontSize: 12,
+        fontWeight: FontWeight.w600)));
+}
+
+// ── Pantalla 4 — Registro ─────────────────────────────────────────────────────
+class _Pagina4 extends StatelessWidget {
+  final VoidCallback onRegistro;
+  const _Pagina4({required this.onRegistro});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.fromLTRB(28, MediaQuery.of(context).padding.top + 60, 28, 0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Logo
+          Row(children: [
+            Image.asset('assets/images/rutero_logo.png', height: 36,
+              errorBuilder: (_, __, ___) => const Text('🌹',
+                style: TextStyle(fontSize: 32))),
+            const SizedBox(width: 10),
+            const Text('Rutero MDE',
+              style: TextStyle(color: Colors.white, fontSize: 18,
+                fontWeight: FontWeight.w800, fontFamily: 'SpaceGrotesk')),
+          ]),
+          const Spacer(),
+          Text(t('Tu aventura
+empieza aquí.', 'Your adventure
+starts here.'),
+            style: const TextStyle(
+              color: Colors.white, fontSize: 38,
+              fontWeight: FontWeight.w900, fontFamily: 'SpaceGrotesk',
+              height: 1.05, letterSpacing: -0.5)),
+          const SizedBox(height: 12),
+          Text(t('Gratis · Sin spam · Cancelá cuando quieras.',
+                 'Free · No spam · Cancel anytime.'),
+            style: TextStyle(color: Colors.white.withOpacity(0.55), fontSize: 14)),
+          const SizedBox(height: 40),
+          // Botón Google
+          _AuthButton(
+            icon: '🔵',
+            label: t('Continuar con Google', 'Continue with Google'),
+            color: Colors.white,
+            textColor: const Color(0xFF0A080F),
+            onTap: onRegistro,
+          ),
+          const SizedBox(height: 12),
+          // Botón email
+          _AuthButton(
+            icon: '✉️',
+            label: t('Continuar con email', 'Continue with email'),
+            color: Colors.white.withOpacity(0.08),
+            textColor: Colors.white,
+            onTap: onRegistro,
+            border: true,
+          ),
+          const SizedBox(height: 24),
+          Center(
+            child: GestureDetector(
+              onTap: onRegistro,
+              child: Text(t('¿Ya tenés cuenta? Iniciá sesión',
+                           'Already have an account? Sign in'),
+                style: TextStyle(
+                  color: kGold, fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  decoration: TextDecoration.underline,
+                  decorationColor: kGold)))),
+          const SizedBox(height: 60),
+        ]));
+  }
+}
+
+class _AuthButton extends StatelessWidget {
+  final String icon, label;
+  final Color color, textColor;
+  final bool border;
+  final VoidCallback onTap;
+  const _AuthButton({
+    required this.icon, required this.label,
+    required this.color, required this.textColor,
+    required this.onTap, this.border = false});
+
+  @override
+  Widget build(BuildContext context) => GestureDetector(
+    onTap: onTap,
+    child: Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(vertical: 16),
+      decoration: BoxDecoration(
+        color: color,
+        borderRadius: BorderRadius.circular(16),
+        border: border ? Border.all(color: Colors.white.withOpacity(0.2)) : null),
+      child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+        Text(icon, style: const TextStyle(fontSize: 18)),
+        const SizedBox(width: 10),
+        Text(label, style: TextStyle(
+          color: textColor, fontSize: 15,
+          fontWeight: FontWeight.w700)),
+      ])));
 }
 
 class _OnbTag extends StatelessWidget {
@@ -8410,6 +8546,8 @@ const Set<String> kRutasPausadas = {
 const Map<String, String> kComoLlegarPorRuta = {
   'VIVE MANRIQUE':
     '🚇 Metro L.A → Est. Acevedo\n🚌 Buseta hacia Calle 45\n🕐 ~20 min desde el centro',
+  'MANRIQUE CULTURA Y VIDA':
+    '🚇 Metro L.A → Est. Acevedo\n🚌 Buseta hacia Manrique · UVA de la Armonía\n🕐 ~25 min desde el centro',
   'VIVE EL POBLADO':
     '🚇 Metro L.A → Est. Poblado\n🚶 5 min caminando al Parque El Poblado\n🚕 Taxi desde cualquier punto',
   'HUELLAS VIVAS DE EL POBLADO':
@@ -8485,6 +8623,7 @@ const Map<String, String> kComoLlegarPorRuta = {
 const Map<String, String> kZonaPorRuta = {
   // Ciudad
   'VIVE MANRIQUE':                        'Ciudad',
+  'MANRIQUE CULTURA Y VIDA':              'Ciudad',
   'HUELLAS VIVAS DE EL POBLADO':          'Ciudad',
   'EL POBLADO VERDE':                     'Ciudad',
   'EL POBLADO CREATIVO':                  'Ciudad',
@@ -8558,6 +8697,7 @@ const Map<String, String> kImagenPorRuta = {
   'FERIA CLÁSICA': 'assets/images/rutas/ruta_feria_clasica.jpg',
   // [eliminado] 'RUTA SILLETERA': 'assets/images/rutas/ruta_silletera.jpg',
   'VIVE MANRIQUE': 'assets/images/rutas/ruta_corredor_45.jpg',
+  'MANRIQUE CULTURA Y VIDA': 'assets/images/rutas/ruta_corredor_45.jpg',
   // ── Rutas Secretaría de Turismo (Firestore) — imágenes reutilizadas ──
   // [eliminado] VIVE EL CENTRO
   'FINCAS SILLETERAS':               'assets/images/rutas/ruta_silletera.jpg',
@@ -8617,6 +8757,7 @@ const Map<String, String> kInsigniaPorRuta = {
   // ── Temporada ──
   // ── Otras ciudades ──
   'VIVE MANRIQUE':                               'assets/images/insignias/insignia_explorador_45.png',
+  'MANRIQUE CULTURA Y VIDA':                     'assets/images/insignias/insignia_explorador_45.png',
   // ── Rutas Secretaría de Turismo (Firestore) ──
   // [eliminado] VIVE EL CENTRO
   'FINCAS SILLETERAS':                           'assets/images/insignias/insignia_guardian_silletero.png',
@@ -8981,6 +9122,7 @@ class RutasService {
       'CENTRO PATRIMONIAL',
       'RUTA GUATAPÉ & LA PIEDRA',
       'VIVE MANRIQUE',
+      'MANRIQUE CULTURA Y VIDA',
       'CENTRO ALTERNATIVO',
       'RINCONES ESCONDIDOS DE EL POBLADO',
       // ── Rutas en Firestore Y en kRutasData → usar versión Firestore ──
@@ -13598,7 +13740,7 @@ class _InsigniaDetalleSheet extends StatelessWidget {
               fontWeight: FontWeight.w700))),
         if (ruta['descripcion'] != null) ...[
           const SizedBox(height: 16),
-          Text(ruta['descripcion'].toString(),
+          Text((kLang == 'en' ? (ruta['descripcionEN'] ?? ruta['descripcion']) : ruta['descripcion']).toString(),
             style: const TextStyle(color: kTextMuted, fontSize: 12, height: 1.5),
             textAlign: TextAlign.center,
             maxLines: 3, overflow: TextOverflow.ellipsis),
@@ -17475,7 +17617,9 @@ class _AntesDeSalirCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final antesDeSalir = ruta['antesDeSalir']?.toString() ?? '';
+    final antesDeSalir = (kLang == 'en'
+        ? (ruta['antesDeSalirEN'] ?? ruta['antesDeSalir'])
+        : ruta['antesDeSalir'])?.toString() ?? '';
     if (antesDeSalir.isEmpty) return const SizedBox.shrink();
 
     return Container(
