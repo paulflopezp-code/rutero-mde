@@ -4588,9 +4588,8 @@ class _Pagina4 extends StatelessWidget {
                 fontWeight: FontWeight.w800, fontFamily: 'SpaceGrotesk')),
           ]),
           const Spacer(),
-          Text(t('Tu aventura
-empieza aquí.', 'Your adventure
-starts here.'),
+          Text(
+            kLang == 'en' ? 'Your adventure\nstarts here.' : 'Tu aventura\nempieza aqui.',
             style: const TextStyle(
               color: Colors.white, fontSize: 38,
               fontWeight: FontWeight.w900, fontFamily: 'SpaceGrotesk',
