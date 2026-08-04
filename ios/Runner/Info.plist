@@ -38,19 +38,15 @@
 		<false/>
 		<key>UISceneConfigurations</key>
 		<dict>
-			<key>UIWindowSceneSessionRoleApplication</key>
-			<array>
-				<dict>
-					<key>UISceneClassName</key>
-					<string>UIWindowScene</string>
-					<key>UISceneConfigurationName</key>
-					<string>flutter</string>
-					<key>UISceneDelegateClassName</key>
-					<string>$(PRODUCT_MODULE_NAME).SceneDelegate</string>
-					<key>UISceneStoryboardFile</key>
-					<string>Main</string>
-				</dict>
-			</array>
+			<key>CFBundleURLTypes</key>
+<array>
+	<dict>
+		<key>CFBundleURLSchemes</key>
+		<array>
+			<string>com.googleusercontent.apps.300771058852-ea6r1gjc59rskb69jba2uhpoa94k8duv</string>
+		</array>
+	</dict>
+</array>
 		</dict>
 	</dict>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
