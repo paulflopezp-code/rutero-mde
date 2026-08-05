@@ -3,7 +3,6 @@
 import 'package:firebase_core/firebase_core.dart' show FirebaseOptions;
 import 'package:flutter/foundation.dart'
     show defaultTargetPlatform, kIsWeb, TargetPlatform;
-
 /// Default [FirebaseOptions] for use with your Firebase apps.
 ///
 /// Example:
@@ -39,7 +38,6 @@ class DefaultFirebaseOptions {
         );
     }
   }
-
   static const FirebaseOptions web = FirebaseOptions(
     apiKey: 'AIzaSyBaC-aTKIUg_gYEE7QDcb2_-d5uZrhePsI',
     appId: '1:300771058852:web:1b21fe476d0268defc3231',
@@ -48,7 +46,6 @@ class DefaultFirebaseOptions {
     authDomain: 'rutero-mde.firebaseapp.com',
     storageBucket: 'rutero-mde.firebasestorage.app',
   );
-
   static const FirebaseOptions android = FirebaseOptions(
     apiKey: 'AIzaSyA37snNyEz7h-mOXcar1pnsNnzBntSbFTg',
     appId: '1:300771058852:android:d89b55f65692168bfc3231',
@@ -56,29 +53,26 @@ class DefaultFirebaseOptions {
     projectId: 'rutero-mde',
     storageBucket: 'rutero-mde.firebasestorage.app',
   );
-
   static const FirebaseOptions ios = FirebaseOptions(
     apiKey: 'AIzaSyC4D3nwkeJqNr8jof0l7gB__1GNs1OKe80',
-    appId: '1:300771058852:ios:25061151515af895fc3231',
+    appId: '1:300771058852:ios:16dd3a6e39468f25fc3231',
     messagingSenderId: '300771058852',
     projectId: 'rutero-mde',
     storageBucket: 'rutero-mde.firebasestorage.app',
     androidClientId: '300771058852-876d0uftjrbbji94k1b0u1j79ebac3k3.apps.googleusercontent.com',
-    iosClientId: '300771058852-nlj5rrvtbvi70fk2lpi8r8qjqbigh87t.apps.googleusercontent.com',
-    iosBundleId: 'com.example.ruteroMde',
+    iosClientId: '300771058852-ea6r1gjc59rskb69jba2uhpoa94k8duv.apps.googleusercontent.com',
+    iosBundleId: 'com.ruteromde.app',
   );
-
   static const FirebaseOptions macos = FirebaseOptions(
     apiKey: 'AIzaSyC4D3nwkeJqNr8jof0l7gB__1GNs1OKe80',
-    appId: '1:300771058852:ios:25061151515af895fc3231',
+    appId: '1:300771058852:ios:16dd3a6e39468f25fc3231',
     messagingSenderId: '300771058852',
     projectId: 'rutero-mde',
     storageBucket: 'rutero-mde.firebasestorage.app',
     androidClientId: '300771058852-876d0uftjrbbji94k1b0u1j79ebac3k3.apps.googleusercontent.com',
-    iosClientId: '300771058852-nlj5rrvtbvi70fk2lpi8r8qjqbigh87t.apps.googleusercontent.com',
-    iosBundleId: 'com.example.ruteroMde',
+    iosClientId: '300771058852-ea6r1gjc59rskb69jba2uhpoa94k8duv.apps.googleusercontent.com',
+    iosBundleId: 'com.ruteromde.app',
   );
-
   static const FirebaseOptions windows = FirebaseOptions(
     apiKey: 'AIzaSyBaC-aTKIUg_gYEE7QDcb2_-d5uZrhePsI',
     appId: '1:300771058852:web:c79fd3c73915a90ffc3231',
