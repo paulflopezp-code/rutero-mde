@@ -2,10 +2,10 @@
 const { onRequest } = require("firebase-functions/v2/https");
 const https = require("https");
 
-const API_KEY = "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";
+const API_KEY = process.env.ANTHROPIC_API_KEY;
 
 exports.plannerIAv2 = onRequest(
-  { region: "us-central1" },
+  { region: "us-central1", secrets: ["ANTHROPIC_API_KEY"] },
   async (req, res) => {
     res.set("Access-Control-Allow-Origin", "*");
     res.set("Access-Control-Allow-Methods", "POST, OPTIONS");
