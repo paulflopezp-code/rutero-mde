@@ -53,6 +53,7 @@ import 'package:app_links/app_links.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:timezone/timezone.dart' as tz;
 import 'package:timezone/data/latest.dart' as tzdata;
+import 'design_system_rutero.dart';
 
 // ─── GOOGLE PLACES PHOTO — eliminado 21/05/2026 ────────────────
 // Las fotos de referencia de sitios fueron removidas intencionalmente.
@@ -646,7 +647,7 @@ class LogroPublicoScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: kDark2,
+      backgroundColor: RDSColor.base,
       body: SafeArea(child: SingleChildScrollView(
         padding: const EdgeInsets.all(24),
         child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
@@ -672,7 +673,7 @@ class LogroPublicoScreen extends StatelessWidget {
                 colors: [kGold.withOpacity(0.2), kOrchid.withOpacity(0.1)],
                 begin: Alignment.topLeft, end: Alignment.bottomRight),
               borderRadius: BorderRadius.circular(24),
-              border: Border.all(color: kGold.withOpacity(0.3), width: 2)),
+              border: Border.all(color: RDSColor.gold.withOpacity(0.3), width: 2)),
             child: Column(children: [
               const Text('🏆', style: TextStyle(fontSize: 72)),
               const SizedBox(height: 16),
@@ -685,9 +686,9 @@ class LogroPublicoScreen extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
                 decoration: BoxDecoration(
-                  color: kGold.withOpacity(0.15),
+                  color: RDSColor.gold.withOpacity(0.15),
                   borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: kGold.withOpacity(0.5))),
+                  border: Border.all(color: RDSColor.gold.withOpacity(0.5))),
                 child: Text('✨ $insignia ✨',
                   style: const TextStyle(color: kGold, fontSize: 16, fontWeight: FontWeight.w800))),
             ])),
@@ -710,7 +711,7 @@ class LogroPublicoScreen extends StatelessWidget {
             child: Container(
               padding: const EdgeInsets.symmetric(vertical: 16),
               decoration: BoxDecoration(
-                gradient: LinearGradient(colors: [kGreen, kGreen.withOpacity(0.7)]),
+                gradient: LinearGradient(colors: [RDSColor.green, kGreen.withOpacity(0.7)]),
                 borderRadius: BorderRadius.circular(14)),
               child: Text(t('EXPLORAR RUTAS', 'EXPLORE ROUTES'),
                 textAlign: TextAlign.center,
@@ -731,7 +732,7 @@ class PerfilPublicoScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: kDark2,
+      backgroundColor: RDSColor.base,
       body: SafeArea(child: SingleChildScrollView(
         padding: const EdgeInsets.all(24),
         child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
@@ -749,8 +750,8 @@ class PerfilPublicoScreen extends StatelessWidget {
             width: 90, height: 90,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              gradient: LinearGradient(colors: [kGreen, kOrchid]),
-              boxShadow: [BoxShadow(color: kGreen.withOpacity(0.4), blurRadius: 20)]),
+              gradient: LinearGradient(colors: [RDSColor.green, kOrchid]),
+              boxShadow: [BoxShadow(color: RDSColor.green.withOpacity(0.4), blurRadius: 20)]),
             child: Center(child: Text(
               usuario.isNotEmpty ? usuario[0].toUpperCase() : '?',
               style: const TextStyle(color: Colors.white, fontSize: 42, fontWeight: FontWeight.w900))))),
@@ -801,8 +802,8 @@ class PerfilPublicoScreen extends StatelessWidget {
                     return Container(
                       padding: const EdgeInsets.all(10),
                       decoration: BoxDecoration(
-                        color: kCard, borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: kGold.withOpacity(0.3))),
+                        color: RDSColor.card, borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: RDSColor.gold.withOpacity(0.3))),
                       child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
                         const Text('🏅', style: TextStyle(fontSize: 32)),
                         const SizedBox(height: 6),
@@ -2422,18 +2423,18 @@ class _RuteroAppState extends State<RuteroApp> {
           scaffoldBackgroundColor: kDark2,
           fontFamily: 'Inter',
           textTheme: const TextTheme(
-            displayLarge:  TextStyle(fontFamily: 'PlayfairDisplay', fontWeight: FontWeight.w900, color: kText, fontSize: 36, letterSpacing: -0.5),
-            displayMedium: TextStyle(fontFamily: 'PlayfairDisplay', fontWeight: FontWeight.w900, color: kText, fontSize: 28, letterSpacing: -0.3),
-            displaySmall:  TextStyle(fontFamily: 'PlayfairDisplay', fontWeight: FontWeight.w700, color: kText, fontSize: 22),
-            headlineLarge: TextStyle(fontFamily: 'PlayfairDisplay', fontWeight: FontWeight.w700, color: kText, fontSize: 20),
-            headlineMedium:TextStyle(fontFamily: 'Inter',           fontWeight: FontWeight.w700, color: kText, fontSize: 17),
-            headlineSmall: TextStyle(fontFamily: 'Inter',           fontWeight: FontWeight.w600, color: kText, fontSize: 15),
-            bodyLarge:     TextStyle(fontFamily: 'Inter',           fontWeight: FontWeight.w400, color: kText,     fontSize: 15, height: 1.6),
-            bodyMedium:    TextStyle(fontFamily: 'Inter',           fontWeight: FontWeight.w400, color: kTextMuted, fontSize: 13, height: 1.5),
-            bodySmall:     TextStyle(fontFamily: 'Inter',           fontWeight: FontWeight.w400, color: kTextMuted, fontSize: 11),
-            labelLarge:    TextStyle(fontFamily: 'SpaceGrotesk',    fontWeight: FontWeight.w700, color: kGold, fontSize: 18, letterSpacing: 0.5),
-            labelMedium:   TextStyle(fontFamily: 'SpaceGrotesk',    fontWeight: FontWeight.w600, color: kGold, fontSize: 14),
-            labelSmall:    TextStyle(fontFamily: 'SpaceGrotesk',    fontWeight: FontWeight.w500, color: kTextMuted, fontSize: 11, letterSpacing: 0.3),
+            displayLarge:  TextStyle(fontFamily: 'PlayfairDisplay', fontWeight: FontWeight.w900, color: RDSColor.textPrimary, fontSize: 36, letterSpacing: -0.5),
+            displayMedium: TextStyle(fontFamily: 'PlayfairDisplay', fontWeight: FontWeight.w900, color: RDSColor.textPrimary, fontSize: 28, letterSpacing: -0.3),
+            displaySmall:  TextStyle(fontFamily: 'PlayfairDisplay', fontWeight: FontWeight.w700, color: RDSColor.textPrimary, fontSize: 22),
+            headlineLarge: TextStyle(fontFamily: 'PlayfairDisplay', fontWeight: FontWeight.w700, color: RDSColor.textPrimary, fontSize: 20),
+            headlineMedium:TextStyle(fontFamily: 'Inter',           fontWeight: FontWeight.w700, color: RDSColor.textPrimary, fontSize: 17),
+            headlineSmall: TextStyle(fontFamily: 'Inter',           fontWeight: FontWeight.w600, color: RDSColor.textPrimary, fontSize: 15),
+            bodyLarge:     TextStyle(fontFamily: 'Inter',           fontWeight: FontWeight.w400, color: RDSColor.textPrimary,     fontSize: 15, height: 1.6),
+            bodyMedium:    TextStyle(fontFamily: 'Inter',           fontWeight: FontWeight.w400, color: RDSColor.textMuted, fontSize: 13, height: 1.5),
+            bodySmall:     TextStyle(fontFamily: 'Inter',           fontWeight: FontWeight.w400, color: RDSColor.textMuted, fontSize: 11),
+            labelLarge:    TextStyle(fontFamily: 'SpaceGrotesk',    fontWeight: FontWeight.w700, color: RDSColor.gold, fontSize: 18, letterSpacing: 0.5),
+            labelMedium:   TextStyle(fontFamily: 'SpaceGrotesk',    fontWeight: FontWeight.w600, color: RDSColor.gold, fontSize: 14),
+            labelSmall:    TextStyle(fontFamily: 'SpaceGrotesk',    fontWeight: FontWeight.w500, color: RDSColor.textMuted, fontSize: 11, letterSpacing: 0.3),
           ),
         ),
         home: const SplashScreen(),
@@ -2661,17 +2662,17 @@ class _AudioFloatingButtonState extends State<_AudioFloatingButton> {
   void _mostrarControl(BuildContext context) {
     showModalBottomSheet(
       context: context,
-      backgroundColor: kCard,
+      backgroundColor: RDSColor.card,
       isScrollControlled: true,
       useSafeArea: true,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(RDSRadius.xl))),
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setS) => Padding(
           padding: const EdgeInsets.fromLTRB(24, 20, 24, 28),
           child: Column(mainAxisSize: MainAxisSize.min, children: [
             Container(width: 40, height: 4, margin: const EdgeInsets.only(bottom: 20),
-              decoration: BoxDecoration(color: kTextMuted.withOpacity(0.3), borderRadius: BorderRadius.circular(2))),
+              decoration: BoxDecoration(color: RDSColor.textMuted.withOpacity(0.3), borderRadius: BorderRadius.circular(2))),
 
             Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
               Text(t('Música de fondo', 'Background music'),
@@ -2702,7 +2703,7 @@ class _AudioFloatingButtonState extends State<_AudioFloatingButton> {
             const SizedBox(height: 20),
 
             Row(children: [
-              Icon(Icons.volume_mute_rounded, color: kTextMuted, size: 18),
+              Icon(Icons.volume_mute_rounded, color: RDSColor.textMuted, size: 18),
               Expanded(
                 child: Slider(
                   value: AudioManager().volumenMusica,
@@ -2715,7 +2716,7 @@ class _AudioFloatingButtonState extends State<_AudioFloatingButton> {
                     setState(() {});
                   },
                 )),
-              Icon(Icons.volume_up_rounded, color: kTextMuted, size: 18),
+              Icon(Icons.volume_up_rounded, color: RDSColor.textMuted, size: 18),
               const SizedBox(width: 8),
               Text('${(AudioManager().volumenMusica * 100).toInt()}%',
                 style: const TextStyle(color: kTextMuted, fontSize: 12)),
@@ -2756,16 +2757,16 @@ class _SOSFloatingButton extends StatelessWidget {
   void _mostrarMenu(BuildContext context) {
     showModalBottomSheet(
       context: context,
-      backgroundColor: kDark2,
+      backgroundColor: RDSColor.base,
       isScrollControlled: true,
       useSafeArea: true,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(RDSRadius.xl))),
       builder: (ctx) => SingleChildScrollView(
         padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
         child: Column(mainAxisSize: MainAxisSize.min, children: [
           Container(width: 40, height: 4, margin: const EdgeInsets.only(bottom: 16),
-            decoration: BoxDecoration(color: kTextMuted.withOpacity(0.3), borderRadius: BorderRadius.circular(2))),
+            decoration: BoxDecoration(color: RDSColor.textMuted.withOpacity(0.3), borderRadius: BorderRadius.circular(2))),
           Text(t('¿Qué necesitas?', 'What do you need?'),
             style: const TextStyle(color: kText, fontSize: 16, fontWeight: FontWeight.w800)),
           const SizedBox(height: 16),
@@ -2823,7 +2824,7 @@ class _MenuOpcion extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
-          color: kCard, borderRadius: BorderRadius.circular(14),
+          color: RDSColor.card, borderRadius: BorderRadius.circular(14),
           border: Border.all(color: color.withOpacity(0.3))),
         child: Row(children: [
           Container(width: 42, height: 42,
@@ -2833,12 +2834,353 @@ class _MenuOpcion extends StatelessWidget {
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text(titulo, style: TextStyle(color: color, fontSize: 14, fontWeight: FontWeight.w800)),
             const SizedBox(height: 2),
-            Text(subtitulo, style: TextStyle(color: kTextMuted.withOpacity(0.8), fontSize: 11)),
+            Text(subtitulo, style: TextStyle(color: RDSColor.textMuted.withOpacity(0.8), fontSize: 11)),
           ])),
           Icon(Icons.arrow_forward_ios, color: color.withOpacity(0.5), size: 14),
         ])));
   }
 }
+
+// ════════════════════════════════════════════════════════════════════════════
+//  FASE 2 — COMPONENTES RESTANTES (FAB, Inputs, Empty States, Skeletons,
+//  Dialogs, MenuOpcion migrado)
+//  Todos usan tokens RDS. Los widgets legacy se mantienen como aliases.
+// ════════════════════════════════════════════════════════════════════════════
+
+// ── FAB — Botón flotante SOS migrado ─────────────────────────────────────
+// _SOSFloatingButton sigue existiendo (arriba). Este wrapper aplica tokens
+// al decorado del botón y migra el emoji 🆘 → ícono RDSIcons.sos.
+// En Fase 3 reemplazar _SOSFloatingButton directamente.
+class _RDSFab extends StatelessWidget {
+  final IconData icon;
+  final Color color;
+  final VoidCallback onTap;
+  final double size;
+  final String? tooltip;
+
+  const _RDSFab({
+    required this.icon,
+    required this.color,
+    required this.onTap,
+    this.size = 46,
+    this.tooltip,
+  });
+
+  @override
+  Widget build(BuildContext context) => Tooltip(
+    message: tooltip ?? '',
+    child: GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: size, height: size,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: color.withOpacity(0.92),
+          boxShadow: RDSElevation.glow(color: color, opacity: 0.40)),
+        child: Center(
+          child: Icon(icon, color: Colors.white, size: size * 0.45)))));
+}
+
+// ── _MenuOpcion migrada ───────────────────────────────────────────────────
+// Reemplaza el emoji de ícono por IconData cuando se disponga.
+// Por ahora acepta ambos para migración gradual.
+class _RDSMenuOpcion extends StatelessWidget {
+  final IconData? icon;
+  final String? emoji;          // Mantener para los casos actuales (📸 🚨 🛎️ 📱)
+  final String titulo;
+  final String subtitulo;
+  final Color color;
+  final VoidCallback onTap;
+
+  const _RDSMenuOpcion({
+    this.icon,
+    this.emoji,
+    required this.titulo,
+    required this.subtitulo,
+    required this.color,
+    required this.onTap,
+  }) : assert(icon != null || emoji != null);
+
+  @override
+  Widget build(BuildContext context) => GestureDetector(
+    onTap: onTap,
+    child: Container(
+      padding: const EdgeInsets.all(RDSSpace.md),
+      decoration: BoxDecoration(
+        color: RDSColor.card,
+        borderRadius: RDSRadius.bMd,                    // circular(14) → token
+        border: Border.all(color: color.withOpacity(0.30))),
+      child: Row(children: [
+        Container(
+          width: 42, height: 42,
+          decoration: BoxDecoration(
+            color: color.withOpacity(0.12), shape: BoxShape.circle),
+          child: Center(
+            child: icon != null
+                ? Icon(icon, size: 20, color: color)
+                : Text(emoji!, style: const TextStyle(fontSize: 20)))),
+        const SizedBox(width: RDSSpace.md - 4),
+        Expanded(child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(titulo,
+            style: RDSType.headlineMd.copyWith(color: color)),
+          const SizedBox(height: 2),
+          Text(subtitulo,
+            style: RDSType.caption.copyWith(
+              color: RDSColor.textMuted.withOpacity(0.8))),
+        ])),
+        Icon(RDSIcons.actionExplore,                   // Icons.arrow_forward_ios → token
+          color: color.withOpacity(0.50), size: 14),
+      ])));
+}
+
+// ── INPUT — Campo de texto estándar ──────────────────────────────────────
+// Patrón unificado. Reemplaza los TextField inline en cada pantalla.
+// En Fase 3, cada pantalla que use TextField migra a _RDSInput.
+class _RDSInput extends StatelessWidget {
+  final TextEditingController? controller;
+  final String hint;
+  final int maxLines;
+  final TextInputType? keyboardType;
+  final bool obscureText;
+  final Widget? suffixIcon;
+  final Widget? prefixIcon;
+  final void Function(String)? onChanged;
+  final Color? accentColor;       // Color de borde activo; default RDSColor.green
+  final bool readOnly;
+
+  const _RDSInput({
+    this.controller,
+    required this.hint,
+    this.maxLines = 1,
+    this.keyboardType,
+    this.obscureText = false,
+    this.suffixIcon,
+    this.prefixIcon,
+    this.onChanged,
+    this.accentColor,
+    this.readOnly = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final Color accent = accentColor ?? RDSColor.green;
+    return TextField(
+      controller: controller,
+      maxLines: maxLines,
+      keyboardType: keyboardType,
+      obscureText: obscureText,
+      readOnly: readOnly,
+      onChanged: onChanged,
+      style: RDSType.bodyMd.copyWith(color: RDSColor.textPrimary),
+      decoration: InputDecoration(
+        hintText: hint,
+        hintStyle: RDSType.bodyMd,                     // kTextMuted ya en token
+        filled: true,
+        fillColor: RDSColor.base,                       // kDark2 → token
+        prefixIcon: prefixIcon,
+        suffixIcon: suffixIcon,
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: RDSSpace.md, vertical: RDSSpace.md - 4),
+        border: OutlineInputBorder(
+          borderRadius: RDSRadius.bMd,                  // circular(12) → token
+          borderSide: BorderSide(color: accent.withOpacity(0.20))),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: RDSRadius.bMd,
+          borderSide: BorderSide(color: accent.withOpacity(0.20))),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: RDSRadius.bMd,
+          borderSide: BorderSide(color: accent, width: 1.5)),
+        errorBorder: OutlineInputBorder(
+          borderRadius: RDSRadius.bMd,
+          borderSide: BorderSide(color: RDSColor.accent, width: 1.5)),
+      ));
+  }
+}
+
+// ── EMPTY STATE ───────────────────────────────────────────────────────────
+// Para listas vacías, búsquedas sin resultado, logros sin desbloquear.
+// Lucide Icons (trazo fino) — no compiten con el contenido.
+class _RDSEmptyState extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String? subtitle;
+  final Widget? action;           // Botón CTA opcional
+
+  const _RDSEmptyState({
+    required this.icon,
+    required this.title,
+    this.subtitle,
+    this.action,
+  });
+
+  @override
+  Widget build(BuildContext context) => Center(
+    child: Padding(
+      padding: const EdgeInsets.all(RDSSpace.xl),
+      child: Column(mainAxisSize: MainAxisSize.min, children: [
+        Icon(icon, size: 56, color: RDSColor.textMuted.withOpacity(0.40)),
+        const SizedBox(height: RDSSpace.md),
+        Text(title,
+          textAlign: TextAlign.center,
+          style: RDSType.headlineMd.copyWith(color: RDSColor.textMuted)),
+        if (subtitle != null) ...[
+          const SizedBox(height: RDSSpace.sm),
+          Text(subtitle!,
+            textAlign: TextAlign.center,
+            style: RDSType.bodySm),
+        ],
+        if (action != null) ...[
+          const SizedBox(height: RDSSpace.lg),
+          action!,
+        ],
+      ])));
+}
+
+// ── SKELETON — Placeholder de carga ──────────────────────────────────────
+// Animación shimmer simple sin dependencia externa (no hay shimmer package).
+// Usa AnimatedOpacity para pulso suave. En Fase 3, reemplazar spinners
+// inline por _RDSSkeleton mientras carga Firestore.
+class _RDSSkeleton extends StatefulWidget {
+  final double width;
+  final double height;
+  final BorderRadius? borderRadius;
+
+  const _RDSSkeleton({
+    required this.width,
+    required this.height,
+    this.borderRadius,
+  });
+
+  // Preset: esqueleto de RouteCard
+  const _RDSSkeleton.card()
+      : width = double.infinity,
+        height = 0,           // AspectRatio maneja el alto
+        borderRadius = null;
+
+  @override
+  State<_RDSSkeleton> createState() => _RDSSkeletonState();
+}
+
+class _RDSSkeletonState extends State<_RDSSkeleton>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _ctrl;
+  late Animation<double> _anim;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+      vsync: this, duration: const Duration(milliseconds: 900))
+      ..repeat(reverse: true);
+    _anim = Tween<double>(begin: 0.3, end: 0.7)
+        .animate(CurvedAnimation(parent: _ctrl, curve: Curves.easeInOut));
+  }
+
+  @override
+  void dispose() { _ctrl.dispose(); super.dispose(); }
+
+  @override
+  Widget build(BuildContext context) => AnimatedBuilder(
+    animation: _anim,
+    builder: (_, __) => Opacity(
+      opacity: _anim.value,
+      child: Container(
+        width: widget.width == 0 ? double.infinity : widget.width,
+        height: widget.height == 0 ? null : widget.height,
+        decoration: BoxDecoration(
+          color: RDSColor.card,
+          borderRadius: widget.borderRadius ?? RDSRadius.bMd))));
+}
+
+// ── DIALOG — Diálogo estándar del sistema ────────────────────────────────
+// Reemplaza los AlertDialog inline. Úsalo con showRDSDialog().
+// En Fase 3 migrar todos los showDialog() a showRDSDialog().
+class _RDSDialog extends StatelessWidget {
+  final String title;
+  final String? message;
+  final Widget? content;          // Contenido custom (alternativo a message)
+  final List<_RDSDialogAction> actions;
+
+  const _RDSDialog({
+    required this.title,
+    this.message,
+    this.content,
+    required this.actions,
+  });
+
+  @override
+  Widget build(BuildContext context) => AlertDialog(
+    backgroundColor: RDSColor.card,                    // kCard → token
+    surfaceTintColor: Colors.transparent,
+    shape: RoundedRectangleBorder(
+      borderRadius: RDSRadius.bLg,                     // circular(16) → token
+      side: BorderSide(color: RDSColor.borderSubtle)),
+    title: Text(title,
+      style: RDSType.headlineLg.copyWith(color: RDSColor.gold)),
+    content: content ??
+        (message != null
+            ? Text(message!, style: RDSType.bodyMd)
+            : null),
+    actionsPadding: const EdgeInsets.fromLTRB(
+      RDSSpace.md, 0, RDSSpace.md, RDSSpace.md),
+    actions: actions.map((a) => TextButton(
+      onPressed: a.onTap,
+      child: Text(a.label,
+        style: RDSType.labelMd.copyWith(
+          color: a.isPrimary ? RDSColor.green : RDSColor.textMuted)))).toList());
+}
+
+class _RDSDialogAction {
+  final String label;
+  final VoidCallback onTap;
+  final bool isPrimary;
+  const _RDSDialogAction({
+    required this.label,
+    required this.onTap,
+    this.isPrimary = false,
+  });
+}
+
+// Helper global — reemplaza showDialog() inline
+Future<void> showRDSDialog({
+  required BuildContext context,
+  required String title,
+  String? message,
+  Widget? content,
+  required List<_RDSDialogAction> actions,
+}) => showDialog(
+  context: context,
+  builder: (_) => _RDSDialog(
+    title: title,
+    message: message,
+    content: content,
+    actions: actions));
+
+// ── Bottom Sheet estándar ────────────────────────────────────────────────
+// Reemplaza los showModalBottomSheet inline (SOS, filtros, etc.)
+Future<T?> showRDSSheet<T>({
+  required BuildContext context,
+  required Widget child,
+  bool isScrollControlled = true,
+}) => showModalBottomSheet<T>(
+  context: context,
+  backgroundColor: RDSColor.card,                     // kDark2 → RDSColor.card
+  isScrollControlled: isScrollControlled,
+  useSafeArea: true,
+  shape: const RoundedRectangleBorder(
+    borderRadius: BorderRadius.vertical(
+      top: Radius.circular(RDSRadius.xl))),            // circular(20) → token
+  builder: (_) => Column(mainAxisSize: MainAxisSize.min, children: [
+    // Drag handle
+    Container(
+      width: 40, height: 4,
+      margin: const EdgeInsets.symmetric(vertical: RDSSpace.md),
+      decoration: BoxDecoration(
+        color: RDSColor.textMuted.withOpacity(0.30),
+        borderRadius: RDSRadius.bFull)),
+    child,
+  ]));
 
 // ─────────────────────────────────────────
 //  SPLASH SCREEN — ESTILO PAISA
@@ -2905,7 +3247,7 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
         decoration: const BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topLeft, end: Alignment.bottomRight,
-            colors: [Color(0xFF060A04), Color(0xFF0F1A0A), Color(0xFF060A04)],
+            colors: [Color(0xFF060A04), RDSColor.base, Color(0xFF060A04)],
           ),
         ),
         child: Stack(children: [
@@ -2914,7 +3256,7 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
           Positioned.fill(child: Image.asset(
             'assets/images/splash_bg.png',
             fit: BoxFit.cover,
-            errorBuilder: (_, __, ___) => Container(color: kDark))),
+            errorBuilder: (_, __, ___) => Container(color: RDSColor.overlay))),
 
           // Overlay degradado — refuerza el negro inferior para logo y barra legibles
           Positioned.fill(child: Container(
@@ -2945,8 +3287,8 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
                         boxShadow: [
-                          BoxShadow(color: kGreen.withOpacity(0.35), blurRadius: 40, spreadRadius: 8),
-                          BoxShadow(color: kGold.withOpacity(0.2), blurRadius: 25),
+                          BoxShadow(color: RDSColor.green.withOpacity(0.35), blurRadius: 40, spreadRadius: 8),
+                          BoxShadow(color: RDSColor.gold.withOpacity(0.2), blurRadius: 25),
                         ]),
                       child: ClipRRect(
                         borderRadius: BorderRadius.circular(140),
@@ -2959,7 +3301,7 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
                 // ── Título editorial ──
                 ShaderMask(
                   shaderCallback: (b) => const LinearGradient(
-                    colors: [kGold, kGoldLight, Color(0xFFF5E4A0), kGold],
+                    colors: [RDSColor.gold, kGoldLight, Color(0xFFF5E4A0), kGold],
                   ).createShader(b),
                   child: const Text('RUTERO',
                     textAlign: TextAlign.center,
@@ -2999,9 +3341,9 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
                   decoration: BoxDecoration(
-                    color: kGold.withOpacity(0.08),
+                    color: RDSColor.gold.withOpacity(0.08),
                     borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: kGold.withOpacity(0.25))),
+                    border: Border.all(color: RDSColor.gold.withOpacity(0.25))),
                   child: Row(mainAxisSize: MainAxisSize.min, children: [
                     const Text('🌺', style: TextStyle(fontSize: 13)),
                     const SizedBox(width: 6),
@@ -3028,10 +3370,10 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
                         alignment: Alignment.centerLeft,
                         child: Container(
                           decoration: BoxDecoration(
-                            gradient: const LinearGradient(colors: [kGreen, kGold]),
+                            gradient: const LinearGradient(colors: [RDSColor.green, kGold]),
                             borderRadius: BorderRadius.circular(2),
                             boxShadow: [BoxShadow(
-                              color: kGold.withOpacity(0.5), blurRadius: 6)])))),
+                              color: RDSColor.gold.withOpacity(0.5), blurRadius: 6)])))),
                     const SizedBox(height: 10),
                     Text('${(_progressAnim.value * 100).toInt()}%',
                       style: const TextStyle(
@@ -3073,7 +3415,7 @@ class MisPremiosScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final user = AuthService.currentUser;
     return Scaffold(
-      backgroundColor: kDark2,
+      backgroundColor: RDSColor.base,
       body: Column(children: [
         // Header
         Container(
@@ -3097,7 +3439,7 @@ class MisPremiosScreen extends StatelessWidget {
                 Text(tMisPremiosTitle, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900,
                   color: kGold, letterSpacing: 2)),
                 Text(tCodigosGanados,
-                  style: const TextStyle(fontSize: 11, color: kTextMuted)),
+                  style: const TextStyle(fontSize: 11, color: RDSColor.textMuted)),
               ]),
             ]))),
         ),
@@ -3147,7 +3489,7 @@ class MisPremiosScreen extends StatelessWidget {
                         margin: const EdgeInsets.only(bottom: 12),
                         padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(
-                          color: kCard,
+                          color: RDSColor.card,
                           borderRadius: BorderRadius.circular(16),
                           border: Border.all(color: canjeado
                             ? Colors.white.withOpacity(0.06)
@@ -3171,7 +3513,7 @@ class MisPremiosScreen extends StatelessWidget {
                               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                               decoration: BoxDecoration(
                                 color: canjeado ? kTextMuted.withOpacity(0.1) : kGreen.withOpacity(0.15),
-                                borderRadius: BorderRadius.circular(20)),
+                                borderRadius: BorderRadius.circular(RDSRadius.xl)),
                               child: Text(canjeado ? 'Canjeado' : 'Disponible',
                                 style: TextStyle(color: canjeado ? kTextMuted : kGreen,
                                   fontSize: 10, fontWeight: FontWeight.w700))),
@@ -3182,9 +3524,9 @@ class MisPremiosScreen extends StatelessWidget {
                             width: double.infinity,
                             padding: const EdgeInsets.all(12),
                             decoration: BoxDecoration(
-                              color: kDark3,
+                              color: RDSColor.surface,
                               borderRadius: BorderRadius.circular(10),
-                              border: Border.all(color: kGold.withOpacity(0.2))),
+                              border: Border.all(color: RDSColor.gold.withOpacity(0.2))),
                             child: Column(children: [
                               Text(data['codigo'] ?? '',
                                 style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900,
@@ -3311,7 +3653,7 @@ class _CompraScreenState extends State<CompraScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Error al procesar pago: $e'),
-            backgroundColor: kAccent));
+            backgroundColor: RDSColor.accent));
       }
     }
   }
@@ -3322,8 +3664,8 @@ class _CompraScreenState extends State<CompraScreen> {
       context: context,
       barrierDismissible: false,
       builder: (_) => Dialog(
-        backgroundColor: kCard,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        backgroundColor: RDSColor.card,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(RDSRadius.xl)),
         child: Padding(
           padding: const EdgeInsets.all(28),
           child: Column(mainAxisSize: MainAxisSize.min, children: [
@@ -3405,7 +3747,7 @@ class _CompraScreenState extends State<CompraScreen> {
           showDialog(
             context: context,
             builder: (_) => AlertDialog(
-              backgroundColor: kCard,
+              backgroundColor: RDSColor.card,
               title: Text(t('Pago pendiente', 'Payment pending'),
                 style: const TextStyle(color: kGold)),
               content: Text(
@@ -3432,7 +3774,7 @@ class _CompraScreenState extends State<CompraScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Error verificando pago: $e'),
-            backgroundColor: kAccent));
+            backgroundColor: RDSColor.accent));
       }
     }
   }
@@ -3457,7 +3799,7 @@ class _CompraScreenState extends State<CompraScreen> {
     final String personaje = widget.ruta['personaje']?.toString() ?? emoji;
 
     return Scaffold(
-      backgroundColor: kDark2,
+      backgroundColor: RDSColor.base,
       body: Column(children: [
         // Header con imagen de la ruta
         Builder(builder: (_) {
@@ -3493,7 +3835,7 @@ class _CompraScreenState extends State<CompraScreen> {
                 Positioned(bottom: 20, left: 20, right: 20,
                   child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                     Text(tComprarRutaTitle, style: TextStyle(
-                      color: kText.withOpacity(0.7), fontSize: 10, letterSpacing: 2)),
+                      color: RDSColor.textPrimary.withOpacity(0.7), fontSize: 10, letterSpacing: 2)),
                     const SizedBox(height: 4),
                     Text(nombre, textAlign: TextAlign.left,
                       style: const TextStyle(color: kText, fontSize: 18,
@@ -3501,7 +3843,7 @@ class _CompraScreenState extends State<CompraScreen> {
                         shadows: [Shadow(color: Colors.black87, blurRadius: 8)])),
                     if (subtitulo.isNotEmpty)
                       Text(subtitulo, style: TextStyle(
-                        color: kText.withOpacity(0.65), fontSize: 11)),
+                        color: RDSColor.textPrimary.withOpacity(0.65), fontSize: 11)),
                   ])),
               ])),
             ]));
@@ -3512,14 +3854,14 @@ class _CompraScreenState extends State<CompraScreen> {
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             // Info de la ruta
             Container(padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(color: kCard, borderRadius: BorderRadius.circular(16),
+              decoration: BoxDecoration(color: RDSColor.card, borderRadius: BorderRadius.circular(16),
                 border: Border.all(color: acento.withOpacity(0.2))),
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Text(nombre,
-                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: kText)),
+                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: RDSColor.textPrimary)),
                 if (subtitulo.isNotEmpty) ...[
                   const SizedBox(height: 4),
-                  Text(subtitulo, style: const TextStyle(fontSize: 12, color: kTextMuted)),
+                  Text(subtitulo, style: const TextStyle(fontSize: 12, color: RDSColor.textMuted)),
                 ],
                 if (sitios > 0 || tiempo.isNotEmpty) ...[
                   const SizedBox(height: 12),
@@ -3545,8 +3887,8 @@ class _CompraScreenState extends State<CompraScreen> {
 
             // Precio
             Container(padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(color: kCard, borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: kGold.withOpacity(0.3))),
+              decoration: BoxDecoration(color: RDSColor.card, borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: RDSColor.gold.withOpacity(0.3))),
               child: Row(children: [
                 Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   Text(tPrecioRuta, style: const TextStyle(color: kTextMuted, fontSize: 10, letterSpacing: 2)),
@@ -3554,7 +3896,7 @@ class _CompraScreenState extends State<CompraScreen> {
                   Text(tAccesoCompleto, style: const TextStyle(color: kTextMuted, fontSize: 11)),
                 ])),
                 Text(precio,
-                  style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w900, color: kGold)),
+                  style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w900, color: RDSColor.gold)),
               ])),
             const SizedBox(height: 16),
             Text(tMetodoPagoTitle,
@@ -3593,16 +3935,16 @@ class _CompraScreenState extends State<CompraScreen> {
             // Nota sandbox — solo visible en modo pruebas
             if (kWompiSandbox)
               Container(padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(color: kGold.withOpacity(0.08),
+                decoration: BoxDecoration(color: RDSColor.gold.withOpacity(0.08),
                   borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: kGold.withOpacity(0.25))),
+                  border: Border.all(color: RDSColor.gold.withOpacity(0.25))),
                 child: Row(children: [
                   const Text('🧪', style: TextStyle(fontSize: 14)),
                   const SizedBox(width: 8),
                   Expanded(child: Text(
                     t('Modo sandbox — usa tarjeta 4242 4242 4242 4242 para probar.',
                       'Sandbox mode — use card 4242 4242 4242 4242 to test.'),
-                    style: TextStyle(color: kGold.withOpacity(0.8), fontSize: 11))),
+                    style: TextStyle(color: RDSColor.gold.withOpacity(0.8), fontSize: 11))),
                 ])),
             const SizedBox(height: 24),
 
@@ -3645,8 +3987,8 @@ class _DialogCompraExitosa extends StatelessWidget {
   Widget build(BuildContext context) {
     final Color acento = kRutaColor(ruta['acento'], kGreen);
     return Dialog(
-      backgroundColor: kCard,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+      backgroundColor: RDSColor.card,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(RDSRadius.xl)),
       child: Padding(
         padding: const EdgeInsets.all(28),
         child: Column(mainAxisSize: MainAxisSize.min, children: [
@@ -3661,7 +4003,7 @@ class _DialogCompraExitosa extends StatelessWidget {
             style: const TextStyle(color: kTextMuted, fontSize: 13)),
           const SizedBox(height: 20),
           Container(padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(color: kDark3, borderRadius: BorderRadius.circular(12)),
+            decoration: BoxDecoration(color: RDSColor.surface, borderRadius: BorderRadius.circular(12)),
             child: Row(children: [
               Text(ruta['personaje'] ?? '🏅', style: const TextStyle(fontSize: 24)),
               const SizedBox(width: 10),
@@ -3739,7 +4081,7 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: kDark2,
+      backgroundColor: RDSColor.base,
       body: Container(
         decoration: const BoxDecoration(
           gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter,
@@ -3760,7 +4102,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   'assets/images/rutas/ruta_17_feria_flores.jpg',
                 ].map((img) => Image.asset(img, fit: BoxFit.cover,
                   cacheWidth: 300,
-                  errorBuilder: (_, __, ___) => Container(color: kDark3))).toList()),
+                  errorBuilder: (_, __, ___) => Container(color: RDSColor.surface))).toList()),
               // Overlay gradiente
               Positioned.fill(child: Container(
                 decoration: BoxDecoration(
@@ -3773,17 +4115,17 @@ class _LoginScreenState extends State<LoginScreen> {
                   Container(width: 70, height: 70,
                     decoration: BoxDecoration(shape: BoxShape.circle,
                       border: Border.all(color: kGold, width: 2),
-                      boxShadow: [BoxShadow(color: kGreen.withOpacity(0.4), blurRadius: 16)]),
+                      boxShadow: [BoxShadow(color: RDSColor.green.withOpacity(0.4), blurRadius: 16)]),
                     child: ClipRRect(borderRadius: BorderRadius.circular(70),
                       child: Image.asset('assets/images/logo_splash.png',
                         fit: BoxFit.cover,
                         errorBuilder: (_, __, ___) => const Text('🗺️', style: TextStyle(fontSize: 32))))),
                   const SizedBox(height: 8),
                   const Text('RUTERO MDE', style: TextStyle(
-                    fontSize: 24, fontWeight: FontWeight.w900, color: kText, letterSpacing: 4)),
+                    fontSize: 24, fontWeight: FontWeight.w900, color: RDSColor.textPrimary, letterSpacing: 4)),
                   const SizedBox(height: 2),
                   Text(tTaglineLogin,
-                    style: TextStyle(fontSize: 12, color: kTextMuted)),
+                    style: TextStyle(fontSize: 12, color: RDSColor.textMuted)),
                 ])),
             ])),
             const SizedBox(height: 28),
@@ -3809,9 +4151,9 @@ class _LoginScreenState extends State<LoginScreen> {
                 width: double.infinity,
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: kAccent.withOpacity(0.1),
+                  color: RDSColor.accent.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: kAccent.withOpacity(0.3))),
+                  border: Border.all(color: RDSColor.accent.withOpacity(0.3))),
                 child: Text(_error, style: const TextStyle(color: kAccent, fontSize: 12))),
             const SizedBox(height: 20),
 
@@ -3836,7 +4178,7 @@ class _LoginScreenState extends State<LoginScreen> {
               child: Container(width: double.infinity,
                 padding: const EdgeInsets.symmetric(vertical: 14),
                 decoration: BoxDecoration(
-                  color: kCard,
+                  color: RDSColor.card,
                   borderRadius: BorderRadius.circular(14),
                   border: Border.all(color: Colors.white.withOpacity(0.1))),
                 child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
@@ -3844,7 +4186,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     color: Color(0xFF4285F4))),
                   const SizedBox(width: 10),
                   Text(tContinuarGoogleUp,
-                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: kText, letterSpacing: 1)),
+                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: RDSColor.textPrimary, letterSpacing: 1)),
                 ]))),
             const SizedBox(height: 24),
 
@@ -3924,7 +4266,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: kDark2,
+      backgroundColor: RDSColor.base,
       body: Container(
         decoration: const BoxDecoration(
           gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter,
@@ -3934,14 +4276,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             GestureDetector(onTap: () => Navigator.pop(context),
               child: Container(width: 36, height: 36,
-                decoration: BoxDecoration(color: kCard, shape: BoxShape.circle),
+                decoration: BoxDecoration(color: RDSColor.card, shape: BoxShape.circle),
                 child: const Center(child: Text('←', style: TextStyle(color: kText, fontSize: 16))))),
             const SizedBox(height: 24),
             Text(tCrearCuenta,
-              style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w900, color: kText)),
+              style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w900, color: RDSColor.textPrimary)),
             const SizedBox(height: 4),
             Text(tUneteRuteros,
-              style: const TextStyle(fontSize: 13, color: kTextMuted)),
+              style: const TextStyle(fontSize: 13, color: RDSColor.textMuted)),
             const SizedBox(height: 32),
 
             _InputField(ctrl: _nombreCtrl, hint: 'Nombre completo', emoji: '👤'),
@@ -3961,9 +4303,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 width: double.infinity,
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: kAccent.withOpacity(0.1),
+                  color: RDSColor.accent.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: kAccent.withOpacity(0.3))),
+                  border: Border.all(color: RDSColor.accent.withOpacity(0.3))),
                 child: Text(_error, style: const TextStyle(color: kAccent, fontSize: 12))),
             const SizedBox(height: 20),
 
@@ -4017,9 +4359,9 @@ Future<bool?> mostrarBottomSheetConversion(BuildContext context) async {
             width: double.infinity,
             padding: const EdgeInsets.symmetric(vertical: 16),
             decoration: BoxDecoration(
-              gradient: const LinearGradient(colors: [kGreen, Color(0xFF3D8B55)]),
+              gradient: const LinearGradient(colors: [RDSColor.green, Color(0xFF3D8B55)]),
               borderRadius: BorderRadius.circular(14),
-              boxShadow: [BoxShadow(color: kGreen.withOpacity(0.35), blurRadius: 20, offset: const Offset(0, 8))]),
+              boxShadow: [BoxShadow(color: RDSColor.green.withOpacity(0.35), blurRadius: 20, offset: const Offset(0, 8))]),
             child: Text(
               t('🌿  CREAR CUENTA GRATIS', '🌿  CREATE FREE ACCOUNT'),
               textAlign: TextAlign.center,
@@ -4045,7 +4387,7 @@ Future<bool?> mostrarBottomSheetConversion(BuildContext context) async {
           child: Text(
             t('Continuar sin guardar →', 'Continue without saving →'),
             style: TextStyle(
-              color: kTextMuted.withOpacity(0.5),
+              color: RDSColor.textMuted.withOpacity(0.5),
               fontSize: 12,
               decoration: TextDecoration.underline))),
       ]),
@@ -4064,7 +4406,7 @@ class _InputField extends StatelessWidget {
     this.obscure = false, this.keyboardType, this.suffix});
   @override
   Widget build(BuildContext context) => Container(
-    decoration: BoxDecoration(color: kCard, borderRadius: BorderRadius.circular(14),
+    decoration: BoxDecoration(color: RDSColor.card, borderRadius: BorderRadius.circular(14),
       border: Border.all(color: Colors.white.withOpacity(0.08))),
     child: TextField(
       controller: ctrl, obscureText: obscure, keyboardType: keyboardType,
@@ -4111,25 +4453,25 @@ class _LangSelectScreenState extends State<LangSelectScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: kDark2,
+      backgroundColor: RDSColor.base,
       body: Container(
         decoration: const BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topLeft, end: Alignment.bottomRight,
-            colors: [Color(0xFF060A04), Color(0xFF0F1A0A), Color(0xFF060A04)])),
+            colors: [Color(0xFF060A04), RDSColor.base, Color(0xFF060A04)])),
         child: SafeArea(child: Padding(
           padding: const EdgeInsets.all(32),
           child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
             // Logo
             Container(width: 90, height: 90,
               decoration: BoxDecoration(shape: BoxShape.circle,
-                boxShadow: [BoxShadow(color: kGreen.withOpacity(0.3), blurRadius: 30)]),
+                boxShadow: [BoxShadow(color: RDSColor.green.withOpacity(0.3), blurRadius: 30)]),
               child: ClipRRect(borderRadius: BorderRadius.circular(90),
                 child: Image.asset('assets/images/logo_splash.png', fit: BoxFit.cover,
                   errorBuilder: (_, __, ___) => const Text('🌿', style: TextStyle(fontSize: 36))))),
             const SizedBox(height: 24),
             const Text('RUTERO MDE', style: TextStyle(
-              fontSize: 28, fontWeight: FontWeight.w900, color: kText, letterSpacing: 6)),
+              fontSize: 28, fontWeight: FontWeight.w900, color: RDSColor.textPrimary, letterSpacing: 6)),
             const SizedBox(height: 8),
             const Text('🌐  Choose your language / Elige tu idioma',
               style: TextStyle(color: kTextMuted, fontSize: 13), textAlign: TextAlign.center),
@@ -4157,7 +4499,7 @@ class _LangSelectScreenState extends State<LangSelectScreen> {
                   ])),
                   if (_selected == 'es')
                     Container(width: 24, height: 24,
-                      decoration: const BoxDecoration(shape: BoxShape.circle, color: kGreen),
+                      decoration: const BoxDecoration(shape: BoxShape.circle, color: RDSColor.green),
                       child: const Center(child: Text('✓', style: TextStyle(color: Colors.white, fontSize: 14)))),
                 ]))),
             // Opción English
@@ -4193,9 +4535,9 @@ class _LangSelectScreenState extends State<LangSelectScreen> {
                 width: double.infinity,
                 padding: const EdgeInsets.symmetric(vertical: 16),
                 decoration: BoxDecoration(
-                  gradient: LinearGradient(colors: [kGreen, kGreen.withOpacity(0.7)]),
+                  gradient: LinearGradient(colors: [RDSColor.green, kGreen.withOpacity(0.7)]),
                   borderRadius: BorderRadius.circular(14),
-                  boxShadow: [BoxShadow(color: kGreen.withOpacity(0.3), blurRadius: 20, offset: const Offset(0, 8))]),
+                  boxShadow: [BoxShadow(color: RDSColor.green.withOpacity(0.3), blurRadius: 20, offset: const Offset(0, 8))]),
                 child: Text(
                   _selected == 'es' ? 'CONTINUAR  →' : 'CONTINUE  →',
                   textAlign: TextAlign.center,
@@ -4288,7 +4630,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
   Widget build(BuildContext context) {
     final bool esUltima = _paginaActual == 3;
     return Scaffold(
-      backgroundColor: const Color(0xFF0A080F),
+      backgroundColor: RDSColor.base,
       body: Stack(children: [
         // ── Páginas ──────────────────────────────────────────────────────
         PageView(
@@ -4355,7 +4697,7 @@ class _Pagina1 extends StatelessWidget {
           decoration: const BoxDecoration(
             gradient: LinearGradient(
               begin: Alignment.topCenter, end: Alignment.bottomCenter,
-              colors: [Color(0xFF1A0A2E), Color(0xFF0A080F)])))),
+              colors: [Color(0xFF1A0A2E), RDSColor.base])))),
 
       // Gradiente sobre imagen
       Container(
@@ -4364,9 +4706,9 @@ class _Pagina1 extends StatelessWidget {
             begin: Alignment.topCenter, end: Alignment.bottomCenter,
             colors: [
               Colors.transparent,
-              const Color(0xFF0A080F).withOpacity(0.4),
-              const Color(0xFF0A080F).withOpacity(0.9),
-              const Color(0xFF0A080F),
+              RDSColor.base.withOpacity(0.4),
+              RDSColor.base.withOpacity(0.9),
+              RDSColor.base,
             ],
             stops: const [0.0, 0.4, 0.7, 1.0]))),
 
@@ -4381,9 +4723,9 @@ class _Pagina1 extends StatelessWidget {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
               decoration: BoxDecoration(
-                color: kGold.withOpacity(0.15),
+                color: RDSColor.gold.withOpacity(0.15),
                 borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: kGold.withOpacity(0.4))),
+                border: Border.all(color: RDSColor.gold.withOpacity(0.4))),
               child: Text('🌹 ${t("Medellín", "Medellín")}',
                 style: const TextStyle(
                   color: kGold, fontSize: 12, fontWeight: FontWeight.w700,
@@ -4477,9 +4819,9 @@ class _Pagina2 extends StatelessWidget {
                       child: Container(
                         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                         decoration: BoxDecoration(
-                          color: kGreen.withOpacity(0.15),
+                          color: RDSColor.green.withOpacity(0.15),
                           borderRadius: BorderRadius.circular(20),
-                          border: Border.all(color: kGreen.withOpacity(0.4))),
+                          border: Border.all(color: RDSColor.green.withOpacity(0.4))),
                         child: Text(t('✓ Validado', '✓ Validated'),
                           style: const TextStyle(
                             color: kGreen, fontSize: 11,
@@ -4535,7 +4877,7 @@ class _Pagina3 extends StatelessWidget {
               padding: const EdgeInsets.all(12),
               child: Image.asset(path, fit: BoxFit.contain,
                 errorBuilder: (_, __, ___) =>
-                  const Icon(Icons.emoji_events, color: kGold, size: 32)))).toList()),
+                  const Icon(Icons.emoji_events, color: RDSColor.gold, size: 32)))).toList()),
           const SizedBox(height: 28),
           // Beneficios
           Row(children: [
@@ -4604,7 +4946,7 @@ class _Pagina4 extends StatelessWidget {
             icon: '🔵',
             label: t('Continuar con Google', 'Continue with Google'),
             color: Colors.white,
-            textColor: const Color(0xFF0A080F),
+            textColor: RDSColor.base,
             onTap: onRegistro,
           ),
           const SizedBox(height: 12),
@@ -4724,7 +5066,7 @@ class _BetaWelcomeScreenState extends State<BetaWelcomeScreen>
     final double paddingInferiorSeguro = (insetInferior < 32 ? 32 : insetInferior) + 24;
 
     return Scaffold(
-    backgroundColor: kDark,
+    backgroundColor: RDSColor.overlay,
     body: FadeTransition(opacity: _fadeAnim, child: SafeArea(
       child: SingleChildScrollView(
         padding: EdgeInsets.fromLTRB(28, 24, 28, paddingInferiorSeguro),
@@ -4732,8 +5074,8 @@ class _BetaWelcomeScreenState extends State<BetaWelcomeScreen>
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
             decoration: BoxDecoration(
-              color: kGold.withOpacity(0.12), borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: kGold.withOpacity(0.4))),
+              color: RDSColor.gold.withOpacity(0.12), borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: RDSColor.gold.withOpacity(0.4))),
             child: Text(t('🌿 ACCESO GRATUITO · Lanzamiento oficial', '🌿 FREE ACCESS · Official launch'),
               style: TextStyle(color: kGold, fontSize: 11, fontWeight: FontWeight.w700, letterSpacing: 1))),
           const SizedBox(height: 32),
@@ -4763,7 +5105,7 @@ class _BetaWelcomeScreenState extends State<BetaWelcomeScreen>
               width: double.infinity,
               padding: const EdgeInsets.symmetric(vertical: 16),
               decoration: BoxDecoration(
-                gradient: LinearGradient(colors: [kGreen, kGreen.withOpacity(0.7)]),
+                gradient: LinearGradient(colors: [RDSColor.green, kGreen.withOpacity(0.7)]),
                 borderRadius: BorderRadius.circular(16)),
               child: Text(t('¡Empezar a explorar!', 'Start exploring!'),
                 style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w900),
@@ -4827,8 +5169,8 @@ class _BetaChip extends StatelessWidget {
     width: double.infinity,
     padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
     decoration: BoxDecoration(
-      color: kDark2, borderRadius: BorderRadius.circular(12),
-      border: Border.all(color: kGreen.withOpacity(0.2))),
+      color: RDSColor.base, borderRadius: BorderRadius.circular(12),
+      border: Border.all(color: RDSColor.green.withOpacity(0.2))),
     child: Row(children: [
       Text(emoji, style: const TextStyle(fontSize: 16)),
       const SizedBox(width: 10),
@@ -5137,7 +5479,7 @@ class ServiciosScreen extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 14),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: kCard, borderRadius: BorderRadius.circular(16),
+        color: RDSColor.card, borderRadius: BorderRadius.circular(16),
         border: Border.all(color: color.withOpacity(0.25))),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(children: [
@@ -5169,7 +5511,7 @@ class ServiciosScreen extends StatelessWidget {
             child: Text(idiomas, style: TextStyle(color: color, fontSize: 11, fontWeight: FontWeight.w700))),
         const SizedBox(height: 10),
         if (descripcion.isNotEmpty)
-          Text(descripcion, style: TextStyle(color: kTextMuted.withOpacity(0.85), fontSize: 12, height: 1.5)),
+          Text(descripcion, style: TextStyle(color: RDSColor.textMuted.withOpacity(0.85), fontSize: 12, height: 1.5)),
         const SizedBox(height: 14),
         if (whatsapp.isNotEmpty)
           GestureDetector(
@@ -5214,12 +5556,12 @@ class ServiciosScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: kDark2,
+      backgroundColor: RDSColor.base,
       body: Column(children: [
         Container(
           decoration: BoxDecoration(
-            color: kDark2,
-            border: Border(bottom: BorderSide(color: kGold.withOpacity(0.1)))),
+            color: RDSColor.base,
+            border: Border(bottom: BorderSide(color: RDSColor.gold.withOpacity(0.1)))),
           child: SafeArea(bottom: false, child: Padding(
             padding: const EdgeInsets.fromLTRB(20, 12, 20, 18),
             child: Row(children: [
@@ -5227,12 +5569,12 @@ class ServiciosScreen extends StatelessWidget {
                 child: Container(width: 36, height: 36,
                   decoration: BoxDecoration(
                     color: Colors.white.withOpacity(0.06), shape: BoxShape.circle,
-                    border: Border.all(color: kGold.withOpacity(0.2))),
+                    border: Border.all(color: RDSColor.gold.withOpacity(0.2))),
                   child: const Center(child: Text('←', style: TextStyle(color: kText, fontSize: 16))))),
               const SizedBox(width: 12),
               Expanded(child: Text(t('Servicios para viajeros', 'Traveler services'),
                 style: const TextStyle(fontFamily: 'PlayfairDisplay',
-                  fontSize: 18, fontWeight: FontWeight.w900, color: kText))),
+                  fontSize: 18, fontWeight: FontWeight.w900, color: RDSColor.textPrimary))),
               const Text('🛎️', style: TextStyle(fontSize: 20)),
             ])))),
         Expanded(child: ListView(
@@ -5244,7 +5586,7 @@ class ServiciosScreen extends StatelessWidget {
             const SizedBox(height: 4),
             Text(t('Contacta directamente por WhatsApp — di que vienes de Rutero MDE',
                 'Contact directly via WhatsApp — mention you come from Rutero MDE'),
-              style: TextStyle(color: kTextMuted.withOpacity(0.6), fontSize: 11)),
+              style: TextStyle(color: RDSColor.textMuted.withOpacity(0.6), fontSize: 11)),
             const SizedBox(height: 16),
             // Leer de Firestore, con fallback a datos hardcodeados
             StreamBuilder<QuerySnapshot>(
@@ -5286,9 +5628,9 @@ class ServiciosScreen extends StatelessWidget {
                 width: double.infinity,
                 padding: const EdgeInsets.all(18),
                 decoration: BoxDecoration(
-                  color: kCard,
+                  color: RDSColor.card,
                   borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: kGold.withOpacity(0.35)),
+                  border: Border.all(color: RDSColor.gold.withOpacity(0.35)),
                   gradient: LinearGradient(
                     colors: [kGold.withOpacity(0.06), kCard],
                     begin: Alignment.topLeft, end: Alignment.bottomRight)),
@@ -5304,15 +5646,15 @@ class ServiciosScreen extends StatelessWidget {
                   Text(
                     t('Si ofrecés transporte, guías, hospedaje u otros servicios para turistas en Medellín, contáctanos. Queremos conectarte con viajeros de todo el mundo.',
                       'If you offer transport, guides, accommodation or other traveler services in Medellín, reach out. We want to connect you with travelers from around the world.'),
-                    style: TextStyle(color: kTextMuted.withOpacity(0.8), fontSize: 12, height: 1.5)),
+                    style: TextStyle(color: RDSColor.textMuted.withOpacity(0.8), fontSize: 12, height: 1.5)),
                   const SizedBox(height: 12),
                   Container(
                     width: double.infinity,
                     padding: const EdgeInsets.symmetric(vertical: 11),
                     decoration: BoxDecoration(
-                      color: kGold.withOpacity(0.12),
+                      color: RDSColor.gold.withOpacity(0.12),
                       borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: kGold.withOpacity(0.4))),
+                      border: Border.all(color: RDSColor.gold.withOpacity(0.4))),
                     child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
                       const Text('✉️', style: TextStyle(fontSize: 15)),
                       const SizedBox(width: 8),
@@ -5368,39 +5710,53 @@ class PlannerScreen extends StatefulWidget {
 }
 
 class _PlannerScreenState extends State<PlannerScreen> {
-  int _paso = 0;  // 0=duración, 1=fechas+zona, 2=intereses+perfil
+  // ── Estado del formulario ──────────────────────────────────────────
+  int _paso = 0;  // 0-3 = form, 4 = resumen
 
-  // Datos del formulario
+  // Paso 0 — Cuándo y cuánto
   int _dias = 1;
   DateTime _llegada = DateTime.now();
-  DateTime _salida = DateTime.now().add(const Duration(days: 1));
-  String _zonaHotel = 'El Poblado';
-  final Set<String> _intereses = {};
-  String _compania = 'Solo';
-  String _presupuesto = 'Medio';
-  String _horaLlegada = 'Mañana';      // Mañana / Tarde / Noche
-  String _horaSalida  = 'No sé aún';  // hora de salida del último día
-  String _alojamiento = 'Hotel';       // Hotel / Airbnb / Hostal / Casa de familiar
-  bool _primeraVez = true;             // Primera vez en Medellín
+  DateTime _salida  = DateTime.now().add(const Duration(days: 1));
+  String _horaLlegada = 'Mañana';
+  String _horaSalida  = 'No sé aún';
 
+  // Paso 1 — Dónde y cómo te movés
+  String _zonaHotel   = 'El Poblado';
+  String _alojamiento = 'Hotel';
+  String _transporte  = 'Mix';
+  String _ritmo       = 'Moderado';
+
+  // Paso 2 — Qué querés vivir
+  final Set<String> _intereses = {};
+  String _tipoExperiencia  = 'Turista clásico';
+  String _horarioPreferido = 'Mañanero';
+
+  // Paso 3 — Quién sos como viajero
+  String _compania    = 'Solo';
+  String _presupuesto = 'Medio';
+  bool   _primeraVez  = true;
+  String _descuento   = 'Ninguno';
+
+  // ── Opciones ───────────────────────────────────────────────────────
   final List<String> _zonasHotel = ['El Poblado', 'Laureles', 'Centro', 'Otro'];
+
   final List<Map<String, String>> _interesesOpts = [
-    {'emoji': '🏛️', 'label': 'Cultura', 'labelEN': 'Culture'},
-    {'emoji': '🍽️', 'label': 'Gastronomía', 'labelEN': 'Food'},
-    {'emoji': '🌿', 'label': 'Naturaleza', 'labelEN': 'Nature'},
-    {'emoji': '🎨', 'label': 'Arte', 'labelEN': 'Art'},
-    {'emoji': '🌙', 'label': 'Vida nocturna', 'labelEN': 'Nightlife'},
-    {'emoji': '⚡', 'label': 'Aventura', 'labelEN': 'Adventure'},
-    {'emoji': '📸', 'label': 'Fotografía', 'labelEN': 'Photography'},
-    {'emoji': '🛍️', 'label': 'Compras', 'labelEN': 'Shopping'},
+    {'emoji': '🏛️', 'label': 'Cultura',       'labelEN': 'Culture'},
+    {'emoji': '🍽️', 'label': 'Gastronomía',   'labelEN': 'Food'},
+    {'emoji': '🌿', 'label': 'Naturaleza',     'labelEN': 'Nature'},
+    {'emoji': '🎨', 'label': 'Arte',           'labelEN': 'Art'},
+    {'emoji': '🌙', 'label': 'Vida nocturna',  'labelEN': 'Nightlife'},
+    {'emoji': '⚡', 'label': 'Aventura',       'labelEN': 'Adventure'},
+    {'emoji': '📸', 'label': 'Fotografía',     'labelEN': 'Photography'},
+    {'emoji': '🛍️', 'label': 'Compras',        'labelEN': 'Shopping'},
   ];
 
+  // ── Helpers ────────────────────────────────────────────────────────
   bool get _esFeria {
-    final ahora = _llegada;
     final inicio = DateTime(kFeriaAno, 7, 31);
-    final fin = DateTime(kFeriaAno, 8, 9, 23, 59);
-    return ahora.isAfter(inicio.subtract(const Duration(days: 1))) &&
-           ahora.isBefore(fin);
+    final fin    = DateTime(kFeriaAno, 8, 9, 23, 59);
+    return _llegada.isAfter(inicio.subtract(const Duration(days: 1))) &&
+           _llegada.isBefore(fin);
   }
 
   String _formatFecha(DateTime d) {
@@ -5410,154 +5766,100 @@ class _PlannerScreenState extends State<PlannerScreen> {
     return '${d.day} ${meses[d.month - 1]}';
   }
 
-  void _siguientePaso() {
-    if (_paso < 2) {
-      setState(() => _paso++);
-    } else {
-      _generarItinerario();
-    }
-  }
+  int get _totalPasos => 5;
 
-  Future<void> _generarItinerario() async {
-    // Validar intereses
-    if (_intereses.isEmpty) {
+  void _siguiente() {
+    if (_paso == 2 && _intereses.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
         content: Text(t('Elegí al menos un interés', 'Choose at least one interest')),
-        backgroundColor: kAccent));
+        backgroundColor: RDSColor.accent));
       return;
     }
+    if (_paso < 4) setState(() => _paso++);
+    else _generarItinerario();
+  }
 
-    // ── Guardar métricas en Firestore (async — no bloquea el flujo) ──
+  void _anterior() {
+    if (_paso > 0) setState(() => _paso--);
+    else Navigator.pop(context);
+  }
+
+  // ── Generación ─────────────────────────────────────────────────────
+  Future<void> _generarItinerario() async {
     Future.microtask(() async {
       try {
-        final uid = FirebaseAuth.instance.currentUser?.uid ?? 'anonimo';
+        final uid    = FirebaseAuth.instance.currentUser?.uid ?? 'anonimo';
         final nombre = FirebaseAuth.instance.currentUser?.displayName ?? 'Viajero';
         await FirebaseFirestore.instance.collection('planner_metricas').add({
-          'uid': uid,
-          'nombre': nombre,
+          'uid': uid, 'nombre': nombre,
           'timestamp': FieldValue.serverTimestamp(),
           'dias': _dias,
-          'llegada': _formatFecha(_llegada),
-          'salida': _formatFecha(_salida),
-          'horaLlegada': _horaLlegada,
-          'horaSalida': _horaSalida,
-          'zonaHotel': _zonaHotel,
-          'alojamiento': _alojamiento,
+          'llegada': _formatFecha(_llegada), 'salida': _formatFecha(_salida),
+          'horaLlegada': _horaLlegada,       'horaSalida': _horaSalida,
+          'zonaHotel': _zonaHotel,           'alojamiento': _alojamiento,
+          'transporte': _transporte,          'ritmo': _ritmo,
           'intereses': _intereses.toList(),
-          'compania': _compania,
-          'presupuesto': _presupuesto,
-          'primeraVez': _primeraVez,
-          'idioma': kLang,
-          'esFeria': _esFeria,
+          'tipoExperiencia': _tipoExperiencia,
+          'horarioPreferido': _horarioPreferido,
+          'compania': _compania,              'presupuesto': _presupuesto,
+          'primeraVez': _primeraVez,          'descuento': _descuento,
+          'idioma': kLang,                    'esFeria': _esFeria,
         });
-      } catch (_) {
-        // Silencioso
-      }
+      } catch (_) {}
     });
 
-    // Armar prompt para Claude
     final rutasDisponibles = RutasService().rutas
       .where((r) => r['activa'] != false && r['pausada'] != true)
       .map((r) => '- ${r['nombre']}: ${r['subtitulo'] ?? ''} (${r['tiempo'] ?? ''}, ${r['zona'] ?? ''})')
-      .take(30)
-      .join('\n');
+      .take(30).join('\n');
 
-    final interesesStr = _intereses.join(', ');
-    final feriaStr = _esFeria ? '\n- Las fechas coinciden con la Feria de las Flores 2026 (31 jul – 9 ago). Incluir eventos de Feria relevantes.' : '';
+    final interesesStr   = _intereses.join(', ');
+    final feriaStr       = _esFeria ? '\n- Las fechas coinciden con la Feria de las Flores 2026 (31 jul – 9 ago). Incluir eventos de Feria relevantes.' : '';
+    final descuentoStr   = _descuento != 'Ninguno' ? '\n- Descuento aplicable: $_descuento.' : '';
+    final horarioStr     = '\n- Horario preferido: $_horarioPreferido.';
+    final ritmoStr       = '\n- Ritmo: $_ritmo. ${_ritmo == 'Relajado' ? 'Máx 2 actividades/día.' : _ritmo == 'Intenso' ? 'Aprovechar cada franja.' : 'Balance actividad-pausa.'}';
+    final transporteStr  = '\n- Transporte preferido: $_transporte.';
+    final experienciaStr = '\n- Tipo de experiencia: $_tipoExperiencia.';
 
-    final prompt = kLang == 'en' ? """
+    final promptES = '''
+Sos Rutero MDE, la IA de turismo de Medellín, Colombia.
+Creá un itinerario personalizado de $_dias día(s) (versión GRATUITA: máximo 2 días) para un viajero con estos datos:
+- Llegada: ${_formatFecha(_llegada)}, Salida: ${_formatFecha(_salida)}, Hora llegada: $_horaLlegada, Hora salida último día: $_horaSalida
+- Zona alojamiento: $_zonaHotel, Tipo: $_alojamiento
+- Intereses: $interesesStr
+- Viaja: $_compania
+- Presupuesto: $_presupuesto (${_presupuesto == 'Bajo' ? r'$40K-120K COP/día' : _presupuesto == 'Medio' ? r'$120K-320K COP/día' : r'+$320K COP/día'})
+- Primera vez en Medellín: ${_primeraVez ? 'SÍ' : 'NO'}$feriaStr$descuentoStr$horarioStr$ritmoStr$transporteStr$experienciaStr
+${_horaSalida != 'No sé aún' ? '- Hora salida último día: $_horaSalida. Ajustá actividades para llegar a tiempo.' : ''}
+${_primeraVez ? '\nIMPORTANTE: incluir íconos de Medellín mapeados a rutas Rutero: Provenza=HUELLAS VIVAS DE EL POBLADO, Pueblito Paisa=DEL ORIGEN PAISA A LA MEDELLIN MODERNA, Escaleras=RUTA TRANSFORMACION URBANA, Botero=DEL ORIGEN PAISA A LA MEDELLIN MODERNA. Si 2+ días incluir RUTA GUATAPE.' : ''}
+
+Rutas disponibles:
+$rutasDisponibles
+
+Respondé SOLO con JSON válido (sin markdown):
+{"saludo":"...","dias":[{"numero":1,"fecha":"...","esFeria":false,"bloques":[{"periodo":"Mañana","periodoEN":"Morning","emoji":"🌅","rutaNombre":"NOMBRE EXACTO","descripcion":"...","duracion":"2-3 horas","precio":"Gratis","transporte":"Metro L.A → Est. Acevedo"}]}],"resumen":{"rutas":3,"horasTotales":"6-8 horas","costoEstimado":"~40.000 COP","puntosPosibles":350,"insignias":["Explorador Urbano"]},"tip":"..."}
+''';
+
+    final promptEN = '''
 You are Rutero MDE, a tourism AI for Medellín, Colombia.
-Create a personalized ${_dias}-day itinerary (FREE version: max 2 days) for a traveler with these details:
-- Arrival: ${_formatFecha(_llegada)}, Departure: ${_formatFecha(_salida)}, Arrival time: $_horaLlegada, Departure time (last day): $_horaSalida
+Create a personalized ${_dias}-day itinerary (FREE version: max 2 days) for a traveler:
+- Arrival: ${_formatFecha(_llegada)}, Departure: ${_formatFecha(_salida)}, Arrival time: $_horaLlegada, Departure time last day: $_horaSalida
 - Accommodation zone: $_zonaHotel, Type: $_alojamiento
 - Interests: $interesesStr
 - Traveling: $_compania
-- Budget: $_presupuesto (${ _presupuesto == 'Bajo' ? 'USD 10-30/day (~\$40,000-120,000 COP)' : _presupuesto == 'Medio' ? 'USD 30-80/day (~\$120,000-320,000 COP)' : 'over USD 80/day (~\$320,000+ COP)'})
-- First time in Medellín: ${_primeraVez ? 'YES — wants to see the city icons' : 'NO — already knows the basics, looking for different experiences'}$feriaStr
-${_horaSalida != 'No sé aún' ? '- Departure time on last day: $_horaSalida. Adjust the last day so all activities finish before that time, leaving enough margin to reach the airport or bus terminal.' : ''}
-${_primeraVez ? "\nIMPORTANT - First time: must include Medellin icons mapped to Rutero MDE routes: Provenza/Parque Lleras=HUELLAS VIVAS DE EL POBLADO, Pueblito Paisa=DEL ORIGEN PAISA A LA MEDELLIN MODERNA, Electric Stairs Comuna 13=RUTA TRANSFORMACION URBANA, Plaza Botero=DEL ORIGEN PAISA A LA MEDELLIN MODERNA. If 2+ days add RUTA GUATAPE. Never invent standalone sites." : ""}
+- Budget: $_presupuesto (${_presupuesto == 'Bajo' ? r'USD 10-30/day' : _presupuesto == 'Medio' ? r'USD 30-80/day' : r'over USD 80/day'})
+- First time in Medellín: ${_primeraVez ? 'YES' : 'NO'}$feriaStr$descuentoStr$horarioStr$ritmoStr$transporteStr$experienciaStr
+${_horaSalida != 'No sé aún' ? '- Departure time last day: $_horaSalida. Adjust activities accordingly.' : ''}
+${_primeraVez ? '\nIMPORTANT: include Medellín icons mapped to routes: Provenza=HUELLAS VIVAS DE EL POBLADO, Pueblito Paisa=DEL ORIGEN PAISA A LA MEDELLIN MODERNA, Comuna 13=RUTA TRANSFORMACION URBANA, Botero=DEL ORIGEN PAISA A LA MEDELLIN MODERNA. If 2+ days add RUTA GUATAPE.' : ''}
 
-Available routes in Rutero MDE:
+Available routes:
 $rutasDisponibles
 
-Respond ONLY with valid JSON (no markdown, no explanation):
-{
-  "saludo": "short personalized greeting in English",
-  "dias": [
-    {
-      "numero": 1,
-      "fecha": "date label",
-      "esFeria": false,
-      "bloques": [
-        {
-          "periodo": "Morning",
-          "periodoEN": "Morning",
-          "emoji": "🌅",
-          "rutaNombre": "EXACT route name from the list above",
-          "descripcion": "why this route fits their interests (1-2 sentences)",
-          "duracion": "2-3 hours",
-          "precio": "Gratis / ~20,000 COP",
-          "transporte": "Metro L.A → Est. Acevedo"
-        }
-      ]
-    }
-  ],
-  "resumen": {
-    "rutas": 3,
-    "horasTotales": "6-8 horas",
-    "costoEstimado": "~40,000 COP",
-    "puntosPosibles": 350,
-    "insignias": ["Explorador Urbano", "Guardián Silletero"]
-  },
-  "tip": "one final practical tip for this specific traveler"
-}
-""" : """
-Sos Rutero MDE, la IA de turismo de Medellín, Colombia.
-Creá un itinerario personalizado de $_dias día(s) (versión GRATUITA: máximo 2 días) para un viajero con estos datos:
-- Llegada: ${_formatFecha(_llegada)}, Salida: ${_formatFecha(_salida)}, Hora de llegada: $_horaLlegada, Hora de salida (último día): $_horaSalida
-- Zona del alojamiento: $_zonaHotel, Tipo: $_alojamiento
-- Intereses: $interesesStr
-- Viaja: $_compania
-- Presupuesto: $_presupuesto (${ _presupuesto == 'Bajo' ? 'USD 10-30/día (~\$40.000-120.000 COP)' : _presupuesto == 'Medio' ? 'USD 30-80/día (~\$120.000-320.000 COP)' : 'más de USD 80/día (~\$320.000+ COP)'})
-- Primera vez en Medellín: ${_primeraVez ? 'SÍ — quiere ver los íconos de la ciudad' : 'NO — ya conoce lo básico, busca experiencias diferentes'}$feriaStr
-${_horaSalida != 'No sé aún' ? '- Hora de salida el último día: $_horaSalida. Ajustá ese día para que todas las actividades terminen antes de esa hora, dejando margen para llegar al aeropuerto o terminal de buses.' : ''}
-${_primeraVez ? "\nIMPORTANTE - Primera vez: incluir iconos de Medellin mapeados a rutas Rutero: Provenza/Parque Lleras=HUELLAS VIVAS DE EL POBLADO, Pueblito Paisa=DEL ORIGEN PAISA A LA MEDELLIN MODERNA, Escaleras Electricas Comuna13=RUTA TRANSFORMACION URBANA, Plaza Botero=DEL ORIGEN PAISA A LA MEDELLIN MODERNA. Si 2+ dias incluir RUTA GUATAPE. No inventar sitios sueltos." : ""}
+Respond ONLY with valid JSON (no markdown):
+{"saludo":"...","dias":[{"numero":1,"fecha":"...","esFeria":false,"bloques":[{"periodo":"Morning","periodoEN":"Morning","emoji":"🌅","rutaNombre":"EXACT NAME","descripcion":"...","duracion":"2-3 hours","precio":"Free","transporte":"Metro L.A → Est. Acevedo"}]}],"resumen":{"rutas":3,"horasTotales":"6-8 hours","costoEstimado":"~40,000 COP","puntosPosibles":350,"insignias":["Urban Explorer"]},"tip":"..."}
+''';
 
-Rutas disponibles en Rutero MDE:
-$rutasDisponibles
-
-Respondé SOLO con JSON válido (sin markdown, sin explicación):
-{
-  "saludo": "saludo corto y personalizado",
-  "dias": [
-    {
-      "numero": 1,
-      "fecha": "etiqueta de fecha",
-      "esFeria": false,
-      "bloques": [
-        {
-          "periodo": "Mañana",
-          "periodoEN": "Morning",
-          "emoji": "🌅",
-          "rutaNombre": "NOMBRE EXACTO de la ruta de la lista de arriba",
-          "descripcion": "por qué esta ruta encaja con sus intereses (1-2 frases)",
-          "duracion": "2-3 horas",
-          "precio": "Gratis / ~20.000 COP",
-          "transporte": "Metro L.A → Est. Acevedo"
-        }
-      ]
-    }
-  ],
-  "resumen": {
-    "rutas": 3,
-    "horasTotales": "6-8 horas",
-    "costoEstimado": "~40.000 COP",
-    "puntosPosibles": 350,
-    "insignias": ["Explorador Urbano", "Guardián Silletero"]
-  },
-  "tip": "un consejo final práctico para este viajero específico"
-}
-""";
+    final prompt = kLang == 'en' ? promptEN : promptES;
 
     if (!mounted) return;
     final result = await Navigator.of(context).push<Map<String, dynamic>?>(
@@ -5569,224 +5871,183 @@ Respondé SOLO con JSON válido (sin markdown, sin explicación):
     }
   }
 
+  // ── Build principal ────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
+    final pasoLabels = [
+      t('Cuándo', 'When'), t('Cómo', 'How'), t('Qué', 'What'),
+      t('Quién', 'Who'), t('Resumen', 'Summary'),
+    ];
+
     return Scaffold(
-      backgroundColor: kDark2,
+      backgroundColor: RDSColor.base,
       body: Column(children: [
         // Header
         Container(
           decoration: BoxDecoration(
-            color: kDark2,
-            border: Border(bottom: BorderSide(color: kGold.withOpacity(0.1)))),
+            color: RDSColor.base,
+            border: Border(bottom: BorderSide(color: RDSColor.gold.withOpacity(0.1)))),
           child: SafeArea(bottom: false, child: Padding(
             padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
             child: Column(children: [
               Row(children: [
                 GestureDetector(
-                  onTap: () => _paso > 0 ? setState(() => _paso--) : Navigator.pop(context),
+                  onTap: _anterior,
                   child: Container(width: 36, height: 36,
                     decoration: BoxDecoration(
                       color: Colors.white.withOpacity(0.06), shape: BoxShape.circle,
-                      border: Border.all(color: kGold.withOpacity(0.2))),
-                    child: const Center(child: Text('←', style: TextStyle(color: kText, fontSize: 16))))),
+                      border: Border.all(color: RDSColor.gold.withOpacity(0.2))),
+                    child: const Center(
+                      child: Icon(RDSIcons.back, color: RDSColor.textPrimary, size: 18)))),
                 const SizedBox(width: 12),
                 Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   Text(t('RUTERO PLANNER', 'RUTERO PLANNER'),
-                    style: const TextStyle(fontFamily: 'PlayfairDisplay',
-                      fontSize: 18, fontWeight: FontWeight.w900, color: kGold)),
+                    style: RDSType.displaySm.copyWith(color: RDSColor.gold)),
                   Text(t('Tu itinerario personalizado con IA', 'Your AI-powered itinerary'),
-                    style: const TextStyle(fontSize: 11, color: kTextMuted)),
+                    style: RDSType.caption),
                 ])),
-                const Text('🗓️', style: TextStyle(fontSize: 22)),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: RDSColor.gold.withOpacity(0.12),
+                    borderRadius: RDSRadius.bFull,
+                    border: Border.all(color: RDSColor.gold.withOpacity(0.3))),
+                  child: Text('${_paso + 1} / $_totalPasos',
+                    style: RDSType.labelSm.copyWith(color: RDSColor.gold))),
               ]),
               const SizedBox(height: 12),
-              // Barra de progreso de pasos
-              Row(children: List.generate(3, (i) => Expanded(child: Container(
-                height: 3,
-                margin: EdgeInsets.only(right: i < 2 ? 4 : 0),
+              Row(children: List.generate(_totalPasos, (i) => Expanded(child: AnimatedContainer(
+                duration: RDSDuration.fast, height: 3,
+                margin: EdgeInsets.only(right: i < _totalPasos - 1 ? 4 : 0),
                 decoration: BoxDecoration(
-                  color: i <= _paso ? kGold : Colors.white.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(2)))))),
+                  color: i <= _paso ? RDSColor.gold : Colors.white.withOpacity(0.1),
+                  borderRadius: RDSRadius.bFull))))),
+              const SizedBox(height: 6),
+              Row(children: List.generate(_totalPasos, (i) => Expanded(
+                child: Text(pasoLabels[i], textAlign: TextAlign.center,
+                  style: RDSType.caption.copyWith(
+                    color: i == _paso ? RDSColor.gold : RDSColor.textMuted.withOpacity(0.5),
+                    fontWeight: i == _paso ? FontWeight.w700 : FontWeight.w400,
+                    fontSize: 9))))),
             ])))),
-        // Contenido del paso
+
         Expanded(child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
+          padding: const EdgeInsets.all(RDSSpace.lg),
           child: AnimatedSwitcher(
-            duration: const Duration(milliseconds: 250),
+            duration: RDSDuration.fast,
             child: _paso == 0 ? _buildPaso0() :
-                   _paso == 1 ? _buildPaso1() : _buildPaso2(),
-          ))),
-        // Botón siguiente
+                   _paso == 1 ? _buildPaso1() :
+                   _paso == 2 ? _buildPaso2() :
+                   _paso == 3 ? _buildPaso3() : _buildResumen()))),
+
         Container(
           padding: const EdgeInsets.fromLTRB(24, 12, 24, 32),
           decoration: BoxDecoration(
-            color: kDark2,
+            color: RDSColor.base,
             border: Border(top: BorderSide(color: Colors.white.withOpacity(0.06)))),
-          child: GestureDetector(
-            onTap: _siguientePaso,
-            child: Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(vertical: 16),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(colors: [kGold, kGold.withOpacity(0.8)]),
-                borderRadius: BorderRadius.circular(14),
-                boxShadow: [BoxShadow(color: kGold.withOpacity(0.3), blurRadius: 16, offset: const Offset(0, 4))]),
-              child: Center(child: Text(
-                _paso < 2
-                  ? t('SIGUIENTE →', 'NEXT →')
-                  : t('GENERAR MI ITINERARIO ✨', 'GENERATE MY ITINERARY ✨'),
-                style: const TextStyle(
-                  color: Colors.black, fontSize: 14,
-                  fontWeight: FontWeight.w900, letterSpacing: 1.5)))))),
+          child: _RDSButtonPrimary(
+            label: _paso < 3 ? t('SIGUIENTE', 'NEXT') :
+                   _paso == 3 ? t('VER RESUMEN', 'SEE SUMMARY') :
+                   t('GENERAR MI ITINERARIO', 'GENERATE MY ITINERARY'),
+            onTap: _siguiente)),
       ]),
     );
   }
 
+  // ── PASO 0 — Cuándo y cuánto ────────────────────────────────────
   Widget _buildPaso0() {
+    final horasLlegada = [
+      {'valor': 'Mañana', 'emoji': '🌅', 'label': 'Mañana',  'labelEN': 'Morning',   'sub': 'Antes del mediodía', 'subEN': 'Before noon'},
+      {'valor': 'Tarde',  'emoji': '☀️', 'label': 'Tarde',   'labelEN': 'Afternoon', 'sub': '12pm – 6pm',         'subEN': '12pm – 6pm'},
+      {'valor': 'Noche',  'emoji': '🌙', 'label': 'Noche',   'labelEN': 'Evening',   'sub': 'Después de las 6pm', 'subEN': 'After 6pm'},
+    ];
     return Column(key: const ValueKey(0), crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Text(t('¿Cuántos días tenés en Medellín?', 'How many days do you have in Medellín?'),
-        style: const TextStyle(fontFamily: 'PlayfairDisplay',
-          fontSize: 22, fontWeight: FontWeight.w900, color: kText)),
-      const SizedBox(height: 8),
+      Text(t('¿Cuándo y cuánto tiempo?', 'When and for how long?'), style: RDSType.displayMd),
+      const SizedBox(height: RDSSpace.sm),
       Text(t('Versión gratuita: hasta 2 días', 'Free version: up to 2 days'),
-        style: TextStyle(fontSize: 12, color: kGold.withOpacity(0.8))),
-      const SizedBox(height: 32),
+        style: RDSType.caption.copyWith(color: RDSColor.gold)),
+      const SizedBox(height: RDSSpace.xl),
+      Text(t('¿Cuántos días tenés en Medellín?', 'How many days do you have?'), style: RDSType.headlineMd),
+      const SizedBox(height: RDSSpace.md),
       ...List.generate(4, (i) {
-        final n = i + 1;
-        final sel = _dias == n;
+        final n = i + 1; final sel = _dias == n;
         return GestureDetector(
-          onTap: () => setState(() {
-            _dias = n;
-            // Ajustar salida automáticamente
-            _salida = _llegada.add(Duration(days: n));
-          }),
+          onTap: () => setState(() { _dias = n; _salida = _llegada.add(Duration(days: n)); }),
           child: AnimatedContainer(
-            duration: const Duration(milliseconds: 200),
-            margin: const EdgeInsets.only(bottom: 12),
+            duration: RDSDuration.fast,
+            margin: const EdgeInsets.only(bottom: RDSSpace.sm),
             padding: const EdgeInsets.all(18),
             decoration: BoxDecoration(
-              color: sel ? kGold.withOpacity(0.12) : kCard,
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(
-                color: sel ? kGold : Colors.white.withOpacity(0.06),
-                width: sel ? 1.5 : 1)),
+              color: sel ? RDSColor.gold.withOpacity(0.12) : RDSColor.card,
+              borderRadius: RDSRadius.bMd,
+              border: Border.all(color: sel ? RDSColor.gold : Colors.white.withOpacity(0.06), width: sel ? 1.5 : 1)),
             child: Row(children: [
               Text(n == 1 ? '☀️' : n == 2 ? '🌅🌅' : n == 3 ? '🌄🌄🌄' : '🗓️',
                 style: const TextStyle(fontSize: 24)),
               const SizedBox(width: 14),
               Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text(
-                  n == 1 ? t('1 día', '1 day') :
-                  n == 2 ? t('2 días', '2 days') :
-                  n == 3 ? t('3 días', '3 days') :
-                           t('4 días', '4 days'),
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800,
-                    color: sel ? kGold : kText)),
-                Text(
-                  n == 1 ? t('Un día perfecto en Medellín', 'A perfect day in Medellín') :
-                  n == 2 ? t('El clásico fin de semana', 'The classic weekend') :
-                  n == 3 ? t('Explorá lo mejor de la ciudad', 'Explore the city\'s best') :
-                           t('Experiencia completa Medellín', 'Full Medellín experience'),
-                  style: const TextStyle(fontSize: 12, color: kTextMuted)),
+                Text(n == 1 ? t('1 día','1 day') : n == 2 ? t('2 días','2 days') :
+                     n == 3 ? t('3 días','3 days') : t('4 días','4 days'),
+                  style: RDSType.headlineMd.copyWith(color: sel ? RDSColor.gold : RDSColor.textPrimary)),
+                Text(n == 1 ? t('Un día perfecto en Medellín','A perfect day') :
+                     n == 2 ? t('El clásico fin de semana','The classic weekend') :
+                     n == 3 ? t('Explorá lo mejor','Explore the best') :
+                              t('Experiencia completa','Full experience'),
+                  style: RDSType.bodySm),
               ])),
-              if (n > 2)
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: kOrchid.withOpacity(0.15),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: kOrchid.withOpacity(0.4))),
-                  child: Text(t('Premium', 'Premium'),
-                    style: const TextStyle(color: kOrchid, fontSize: 10, fontWeight: FontWeight.w700))),
+              if (n > 2) _RDSBadge(label: t('Premium','Premium'),
+                color: RDSColor.orchid.withOpacity(0.15), textColor: RDSColor.orchid),
               if (sel) ...[
                 const SizedBox(width: 8),
                 Container(width: 22, height: 22,
-                  decoration: BoxDecoration(color: kGold, shape: BoxShape.circle),
+                  decoration: const BoxDecoration(color: RDSColor.gold, shape: BoxShape.circle),
                   child: const Center(child: Text('✓',
                     style: TextStyle(color: Colors.black, fontSize: 12, fontWeight: FontWeight.w900)))),
               ],
             ])));
       }),
-    ]);
-  }
-
-  Widget _buildPaso1() {
-    final horasOpts = [
-      {'valor': 'Mañana',  'emoji': '🌅', 'label': 'Mañana',  'labelEN': 'Morning',   'sub': 'Antes del mediodía',     'subEN': 'Before noon'},
-      {'valor': 'Tarde',   'emoji': '☀️', 'label': 'Tarde',   'labelEN': 'Afternoon', 'sub': '12pm – 6pm',             'subEN': '12pm – 6pm'},
-      {'valor': 'Noche',   'emoji': '🌙', 'label': 'Noche',   'labelEN': 'Evening',   'sub': 'Después de las 6pm',     'subEN': 'After 6pm'},
-    ];
-    final alojOpts = [
-      {'valor': 'Hotel',             'emoji': '🏨'},
-      {'valor': 'Airbnb',            'emoji': '🏠'},
-      {'valor': 'Hostal',            'emoji': '🛏️'},
-      {'valor': 'Casa de familiar',  'emoji': '👨‍👩‍👧'},
-    ];
-    return Column(key: const ValueKey(1), crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Text(t('¿Cuándo llegás?', 'When do you arrive?'),
-        style: const TextStyle(fontFamily: 'PlayfairDisplay',
-          fontSize: 22, fontWeight: FontWeight.w900, color: kText)),
-      const SizedBox(height: 28),
-      _DateSelector(
-        label: t('Llegada', 'Arrival'),
-        emoji: '✈️',
-        fecha: _llegada,
-        onChanged: (d) => setState(() {
-          _llegada = d;
-          _salida = d.add(Duration(days: _dias));
-        }),
-      ),
-      const SizedBox(height: 12),
-      _DateSelector(
-        label: t('Salida', 'Departure'),
-        emoji: '🏠',
-        fecha: _salida,
-        onChanged: (d) => setState(() => _salida = d),
-      ),
-      // ── Hora de llegada ──────────────────────────────────────────────
-      const SizedBox(height: 28),
-      Text(t('¿A qué hora llegás a Medellín?', 'What time do you arrive in Medellín?'),
-        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: kText)),
-      const SizedBox(height: 14),
-      Row(children: horasOpts.map((h) {
+      const SizedBox(height: RDSSpace.xl),
+      Text(t('¿Cuándo llegás?', 'When do you arrive?'), style: RDSType.headlineMd),
+      const SizedBox(height: RDSSpace.md),
+      _DateSelector(label: t('Llegada','Arrival'), emoji: '✈️', fecha: _llegada,
+        onChanged: (d) => setState(() { _llegada = d; _salida = d.add(Duration(days: _dias)); })),
+      const SizedBox(height: RDSSpace.sm),
+      _DateSelector(label: t('Salida','Departure'), emoji: '🏠', fecha: _salida,
+        onChanged: (d) => setState(() => _salida = d)),
+      const SizedBox(height: RDSSpace.xl),
+      Text(t('¿A qué hora llegás?', 'What time do you arrive?'), style: RDSType.headlineMd),
+      const SizedBox(height: RDSSpace.md),
+      Row(children: horasLlegada.map((h) {
         final sel = _horaLlegada == h['valor'];
         return Expanded(child: GestureDetector(
           onTap: () => setState(() => _horaLlegada = h['valor']!),
           child: AnimatedContainer(
-            duration: const Duration(milliseconds: 180),
+            duration: RDSDuration.fast,
             margin: EdgeInsets.only(right: h['valor'] != 'Noche' ? 8 : 0),
             padding: const EdgeInsets.symmetric(vertical: 14),
             decoration: BoxDecoration(
-              color: sel ? kGold.withOpacity(0.12) : kCard,
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(
-                color: sel ? kGold : Colors.white.withOpacity(0.08),
-                width: sel ? 1.5 : 1)),
+              color: sel ? RDSColor.gold.withOpacity(0.12) : RDSColor.card,
+              borderRadius: RDSRadius.bMd,
+              border: Border.all(color: sel ? RDSColor.gold : Colors.white.withOpacity(0.08), width: sel ? 1.5 : 1)),
             child: Column(children: [
               Text(h['emoji']!, style: const TextStyle(fontSize: 22)),
               const SizedBox(height: 6),
               Text(t(h['label']!, h['labelEN']!),
-                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700,
-                  color: sel ? kGold : kText)),
+                style: RDSType.labelSm.copyWith(color: sel ? RDSColor.gold : RDSColor.textPrimary)),
               const SizedBox(height: 2),
-              Text(t(h['sub']!, h['subEN']!),
-                textAlign: TextAlign.center,
-                style: const TextStyle(fontSize: 9, color: kTextMuted)),
+              Text(t(h['sub']!, h['subEN']!), textAlign: TextAlign.center, style: RDSType.caption),
             ]))));
       }).toList()),
-      // ── Hora de salida ───────────────────────────────────────────────
-      const SizedBox(height: 28),
-      Text(t('¿A qué hora salís de Medellín el último día?', 'What time do you leave Medellín on your last day?'),
-        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: kText)),
-      const SizedBox(height: 6),
-      Text(t('El planner ajusta las actividades para que llegués a tiempo', 'The planner adjusts activities so you make it on time'),
-        style: const TextStyle(fontSize: 11, color: kTextMuted)),
-      const SizedBox(height: 14),
+      const SizedBox(height: RDSSpace.xl),
+      Text(t('¿A qué hora salís el último día?', 'What time do you leave on your last day?'), style: RDSType.headlineMd),
+      const SizedBox(height: RDSSpace.xs),
+      Text(t('El planner ajusta las actividades para que llegués a tiempo',
+             'The planner adjusts activities so you make it on time'), style: RDSType.bodySm),
+      const SizedBox(height: RDSSpace.md),
       Wrap(spacing: 10, runSpacing: 10, children: [
         {'valor': 'Antes de las 10am', 'emoji': '🌅', 'es': 'Antes 10am',  'en': 'Before 10am'},
-        {'valor': 'Entre 10am y 2pm',  'emoji': '☀️', 'es': '10am – 2pm', 'en': '10am – 2pm'},
-        {'valor': 'Entre 2pm y 6pm',   'emoji': '🌤️', 'es': '2pm – 6pm',  'en': '2pm – 6pm'},
+        {'valor': 'Entre 10am y 2pm',  'emoji': '☀️', 'es': '10am–2pm',   'en': '10am–2pm'},
+        {'valor': 'Entre 2pm y 6pm',   'emoji': '🌤️', 'es': '2pm–6pm',    'en': '2pm–6pm'},
         {'valor': 'Después de las 6pm','emoji': '🌙', 'es': 'Después 6pm', 'en': 'After 6pm'},
         {'valor': 'No sé aún',         'emoji': '❓', 'es': 'No sé aún',   'en': 'Not sure yet'},
       ].map((op) {
@@ -5794,238 +6055,465 @@ Respondé SOLO con JSON válido (sin markdown, sin explicación):
         return GestureDetector(
           onTap: () => setState(() => _horaSalida = op['valor']!),
           child: AnimatedContainer(
-            duration: const Duration(milliseconds: 180),
+            duration: RDSDuration.fast,
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
             decoration: BoxDecoration(
-              color: sel ? kAccent.withOpacity(0.15) : kCard,
-              borderRadius: BorderRadius.circular(24),
-              border: Border.all(
-                color: sel ? kAccent : Colors.white.withOpacity(0.08),
-                width: sel ? 1.5 : 1)),
+              color: sel ? RDSColor.accent.withOpacity(0.15) : RDSColor.card,
+              borderRadius: RDSRadius.bFull,
+              border: Border.all(color: sel ? RDSColor.accent : Colors.white.withOpacity(0.08), width: sel ? 1.5 : 1)),
             child: Row(mainAxisSize: MainAxisSize.min, children: [
               Text(op['emoji']!, style: const TextStyle(fontSize: 14)),
               const SizedBox(width: 6),
               Text(kLang == 'en' ? op['en']! : op['es']!,
-                style: TextStyle(fontSize: 13,
-                  fontWeight: sel ? FontWeight.w700 : FontWeight.w500,
-                  color: sel ? kAccent : kText)),
+                style: RDSType.bodySm.copyWith(
+                  color: sel ? RDSColor.accent : RDSColor.textPrimary,
+                  fontWeight: sel ? FontWeight.w700 : FontWeight.w500)),
             ])));
       }).toList()),
-      // ── Zona hotel ───────────────────────────────────────────────────
-      const SizedBox(height: 28),
-      Text(t('¿En qué zona está tu alojamiento?', 'What zone is your accommodation in?'),
-        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: kText)),
-      const SizedBox(height: 14),
-      Wrap(spacing: 10, runSpacing: 10, children: _zonasHotel.map((zona) {
-        final sel = _zonaHotel == zona;
-        return GestureDetector(
-          onTap: () => setState(() => _zonaHotel = zona),
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 180),
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-            decoration: BoxDecoration(
-              color: sel ? kGreen.withOpacity(0.15) : kCard,
-              borderRadius: BorderRadius.circular(24),
-              border: Border.all(
-                color: sel ? kGreen : Colors.white.withOpacity(0.08),
-                width: sel ? 1.5 : 1)),
-            child: Row(mainAxisSize: MainAxisSize.min, children: [
-              Text(zona == 'El Poblado' ? '🌴' : zona == 'Laureles' ? '🏟️' :
-                   zona == 'Centro' ? '🏛️' : '📍',
-                style: const TextStyle(fontSize: 14)),
-              const SizedBox(width: 6),
-              Text(zona, style: TextStyle(
-                fontSize: 13, fontWeight: sel ? FontWeight.w700 : FontWeight.w500,
-                color: sel ? kGreen : kText)),
-            ])));
-      }).toList()),
-      // ── Tipo de alojamiento ──────────────────────────────────────────
-      const SizedBox(height: 28),
-      Text(t('¿Qué tipo de alojamiento tenés?', 'What type of accommodation do you have?'),
-        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: kText)),
-      const SizedBox(height: 14),
-      Wrap(spacing: 10, runSpacing: 10, children: alojOpts.map((a) {
-        final sel = _alojamiento == a['valor'];
-        return GestureDetector(
-          onTap: () => setState(() => _alojamiento = a['valor']!),
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 180),
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-            decoration: BoxDecoration(
-              color: sel ? kOrchid.withOpacity(0.12) : kCard,
-              borderRadius: BorderRadius.circular(24),
-              border: Border.all(
-                color: sel ? kOrchid : Colors.white.withOpacity(0.08),
-                width: sel ? 1.5 : 1)),
-            child: Row(mainAxisSize: MainAxisSize.min, children: [
-              Text(a['emoji']!, style: const TextStyle(fontSize: 14)),
-              const SizedBox(width: 6),
-              Text(a['valor']!, style: TextStyle(
-                fontSize: 13, fontWeight: sel ? FontWeight.w700 : FontWeight.w500,
-                color: sel ? kOrchid : kText)),
-            ])));
-      }).toList()),
-      // ── Feria banner ─────────────────────────────────────────────────
       if (_esFeria) ...[
-        const SizedBox(height: 24),
+        const SizedBox(height: RDSSpace.lg),
         Container(
-          padding: const EdgeInsets.all(14),
+          padding: const EdgeInsets.all(RDSSpace.md),
           decoration: BoxDecoration(
-            color: kFeriaRojo.withOpacity(0.1),
-            borderRadius: BorderRadius.circular(12),
+            color: kFeriaRojo.withOpacity(0.1), borderRadius: RDSRadius.bMd,
             border: Border.all(color: kFeriaRojo.withOpacity(0.4))),
           child: Row(children: [
             const Text('🌹', style: TextStyle(fontSize: 20)),
             const SizedBox(width: 10),
             Expanded(child: Text(
-              t('¡Tu visita coincide con la Feria de las Flores! El planner incluirá eventos especiales.',
-                'Your visit coincides with Feria de las Flores! The planner will include special events.'),
-              style: const TextStyle(fontSize: 12, color: kText, height: 1.4))),
+              t('¡Tu visita coincide con la Feria de las Flores!',
+                'Your visit coincides with Feria de las Flores!'),
+              style: RDSType.bodySm.copyWith(color: RDSColor.textPrimary))),
           ])),
       ],
     ]);
   }
 
+  // ── PASO 1 — Dónde y cómo te movés ─────────────────────────────
+  Widget _buildPaso1() {
+    final alojOpts = [
+      {'valor': 'Hotel',            'emoji': '🏨'},
+      {'valor': 'Airbnb',           'emoji': '🏠'},
+      {'valor': 'Hostal',           'emoji': '🛏️'},
+      {'valor': 'Casa de familiar', 'emoji': '👨‍👩‍👧'},
+    ];
+    final transporteOpts = [
+      {'valor': 'Metro',     'emoji': '🚇', 'es': 'Metro',     'en': 'Metro',    'sub': 'Rápido y económico',       'subEN': 'Fast & affordable'},
+      {'valor': 'Uber/Taxi', 'emoji': '🚗', 'es': 'Uber/Taxi', 'en': 'Uber/Taxi','sub': 'Puerta a puerta',          'subEN': 'Door-to-door'},
+      {'valor': 'A pie',     'emoji': '🚶', 'es': 'A pie',     'en': 'Walking',  'sub': 'Explorás cada detalle',    'subEN': 'Explore every detail'},
+      {'valor': 'Mix',       'emoji': '🔀', 'es': 'Mix',       'en': 'Mix',      'sub': 'Combino según necesite',   'subEN': 'Mix as needed'},
+    ];
+    final ritmoOpts = [
+      {'valor': 'Relajado', 'emoji': '🌊', 'es': 'Relajado', 'en': 'Relaxed',  'sub': 'Máx 2 actividades/día', 'subEN': 'Max 2 activities/day'},
+      {'valor': 'Moderado', 'emoji': '🚶', 'es': 'Moderado', 'en': 'Moderate', 'sub': 'Balance actividad-pausa','subEN': 'Activity-rest balance'},
+      {'valor': 'Intenso',  'emoji': '⚡', 'es': 'Intenso',  'en': 'Intense',  'sub': 'Aprovechar cada hora',  'subEN': 'Make the most of every hour'},
+    ];
+
+    return Column(key: const ValueKey(1), crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Text(t('¿Dónde y cómo te movés?', 'Where are you staying and how do you move?'), style: RDSType.displayMd),
+      const SizedBox(height: RDSSpace.xl),
+      Text(t('¿En qué zona está tu alojamiento?', 'What zone is your accommodation in?'), style: RDSType.headlineMd),
+      const SizedBox(height: RDSSpace.md),
+      Wrap(spacing: 10, runSpacing: 10, children: _zonasHotel.map((zona) {
+        final sel = _zonaHotel == zona;
+        return GestureDetector(
+          onTap: () => setState(() => _zonaHotel = zona),
+          child: AnimatedContainer(
+            duration: RDSDuration.fast,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            decoration: BoxDecoration(
+              color: sel ? RDSColor.green.withOpacity(0.15) : RDSColor.card,
+              borderRadius: RDSRadius.bFull,
+              border: Border.all(color: sel ? RDSColor.green : Colors.white.withOpacity(0.08), width: sel ? 1.5 : 1)),
+            child: Row(mainAxisSize: MainAxisSize.min, children: [
+              Text(zona == 'El Poblado' ? '🌴' : zona == 'Laureles' ? '🏟️' :
+                   zona == 'Centro' ? '🏛️' : '📍', style: const TextStyle(fontSize: 14)),
+              const SizedBox(width: 6),
+              Text(zona, style: RDSType.bodySm.copyWith(
+                color: sel ? RDSColor.green : RDSColor.textPrimary,
+                fontWeight: sel ? FontWeight.w700 : FontWeight.w500)),
+            ])));
+      }).toList()),
+      const SizedBox(height: RDSSpace.xl),
+      Text(t('¿Qué tipo de alojamiento tenés?', 'What type of accommodation do you have?'), style: RDSType.headlineMd),
+      const SizedBox(height: RDSSpace.md),
+      Wrap(spacing: 10, runSpacing: 10, children: alojOpts.map((a) {
+        final sel = _alojamiento == a['valor'];
+        return GestureDetector(
+          onTap: () => setState(() => _alojamiento = a['valor']!),
+          child: AnimatedContainer(
+            duration: RDSDuration.fast,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            decoration: BoxDecoration(
+              color: sel ? RDSColor.orchid.withOpacity(0.12) : RDSColor.card,
+              borderRadius: RDSRadius.bFull,
+              border: Border.all(color: sel ? RDSColor.orchid : Colors.white.withOpacity(0.08), width: sel ? 1.5 : 1)),
+            child: Row(mainAxisSize: MainAxisSize.min, children: [
+              Text(a['emoji']!, style: const TextStyle(fontSize: 14)),
+              const SizedBox(width: 6),
+              Text(a['valor']!, style: RDSType.bodySm.copyWith(
+                color: sel ? RDSColor.orchid : RDSColor.textPrimary,
+                fontWeight: sel ? FontWeight.w700 : FontWeight.w500)),
+            ])));
+      }).toList()),
+      const SizedBox(height: RDSSpace.xl),
+      Text(t('¿Cómo preferís moverte?', 'How do you prefer to get around?'), style: RDSType.headlineMd),
+      const SizedBox(height: RDSSpace.md),
+      GridView.count(
+        crossAxisCount: 2, shrinkWrap: true, physics: const NeverScrollableScrollPhysics(),
+        crossAxisSpacing: 10, mainAxisSpacing: 10, childAspectRatio: 2.4,
+        children: transporteOpts.map((op) {
+          final sel = _transporte == op['valor'];
+          return GestureDetector(
+            onTap: () => setState(() => _transporte = op['valor']!),
+            child: AnimatedContainer(
+              duration: RDSDuration.fast,
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              decoration: BoxDecoration(
+                color: sel ? RDSColor.gold.withOpacity(0.12) : RDSColor.card,
+                borderRadius: RDSRadius.bMd,
+                border: Border.all(color: sel ? RDSColor.gold : Colors.white.withOpacity(0.08), width: sel ? 1.5 : 1)),
+              child: Row(children: [
+                Text(op['emoji']!, style: const TextStyle(fontSize: 18)),
+                const SizedBox(width: 8),
+                Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.center, children: [
+                  Text(t(op['es']!, op['en']!),
+                    style: RDSType.labelSm.copyWith(color: sel ? RDSColor.gold : RDSColor.textPrimary)),
+                  Text(t(op['sub']!, op['subEN']!),
+                    style: const TextStyle(fontSize: 9, color: RDSColor.textMuted)),
+                ])),
+              ])));
+        }).toList()),
+      const SizedBox(height: RDSSpace.xl),
+      Text(t('¿A qué ritmo viajás?', 'What\'s your travel pace?'), style: RDSType.headlineMd),
+      const SizedBox(height: RDSSpace.md),
+      Row(children: ritmoOpts.map((op) {
+        final sel = _ritmo == op['valor'];
+        return Expanded(child: GestureDetector(
+          onTap: () => setState(() => _ritmo = op['valor']!),
+          child: AnimatedContainer(
+            duration: RDSDuration.fast,
+            margin: EdgeInsets.only(right: op['valor'] != 'Intenso' ? 8 : 0),
+            padding: const EdgeInsets.symmetric(vertical: 14),
+            decoration: BoxDecoration(
+              color: sel ? RDSColor.green.withOpacity(0.12) : RDSColor.card,
+              borderRadius: RDSRadius.bMd,
+              border: Border.all(color: sel ? RDSColor.green : Colors.white.withOpacity(0.08), width: sel ? 1.5 : 1)),
+            child: Column(children: [
+              Text(op['emoji']!, style: const TextStyle(fontSize: 22)),
+              const SizedBox(height: 6),
+              Text(t(op['es']!, op['en']!),
+                style: RDSType.labelSm.copyWith(color: sel ? RDSColor.green : RDSColor.textPrimary)),
+              const SizedBox(height: 2),
+              Text(t(op['sub']!, op['subEN']!), textAlign: TextAlign.center, style: RDSType.caption),
+            ]))));
+      }).toList()),
+    ]);
+  }
+
+  // ── PASO 2 — Qué querés vivir ────────────────────────────────────
   Widget _buildPaso2() {
+    final tipoExpOpts = [
+      {'valor': 'Turista clásico',  'emoji': '🗺️', 'es': 'Turista clásico',  'en': 'Classic tourist',    'sub': 'Los imperdibles de Medellín',  'subEN': 'Medellín must-sees'},
+      {'valor': 'Off-the-beaten',   'emoji': '🔭', 'es': 'Off-the-beaten',   'en': 'Off-the-beaten',     'sub': 'Lugares que no conoce nadie',  'subEN': 'Hidden gems'},
+      {'valor': 'Gastrónomo',       'emoji': '🍽️', 'es': 'Gastrónomo',       'en': 'Food lover',         'sub': 'Comer bien es el plan',        'subEN': 'Eating well is the plan'},
+      {'valor': 'Fotógrafo urbano', 'emoji': '📸', 'es': 'Fotógrafo urbano', 'en': 'Urban photographer', 'sub': 'Cada rincón es una foto',      'subEN': 'Every corner is a shot'},
+    ];
+    final horarioOpts = [
+      {'valor': 'Mañanero',   'emoji': '🌅', 'es': 'Mañanero',   'en': 'Early bird', 'sub': '7am – 2pm',       'subEN': '7am – 2pm'},
+      {'valor': 'Tardero',    'emoji': '☀️', 'es': 'Tardero',    'en': 'Afternoon',  'sub': '12pm – 8pm',      'subEN': '12pm – 8pm'},
+      {'valor': 'Noctámbulo', 'emoji': '🌙', 'es': 'Noctámbulo', 'en': 'Night owl',  'sub': '4pm en adelante', 'subEN': '4pm onwards'},
+    ];
+
     return Column(key: const ValueKey(2), crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Text(t('¿Qué te interesa?', 'What are you into?'),
-        style: const TextStyle(fontFamily: 'PlayfairDisplay',
-          fontSize: 22, fontWeight: FontWeight.w900, color: kText)),
-      Text(t('Elegí todos los que quieras', 'Choose as many as you like'),
-        style: const TextStyle(fontSize: 12, color: kTextMuted)),
-      const SizedBox(height: 20),
+      Text(t('¿Qué querés vivir?', 'What do you want to experience?'), style: RDSType.displayMd),
+      const SizedBox(height: RDSSpace.xl),
+      Text(t('¿Qué te interesa?', 'What are you into?'), style: RDSType.headlineMd),
+      Text(t('Elegí todos los que quieras', 'Choose as many as you like'), style: RDSType.bodySm),
+      const SizedBox(height: RDSSpace.md),
       Wrap(spacing: 10, runSpacing: 10, children: _interesesOpts.map((op) {
         final label = kLang == 'en' ? op['labelEN']! : op['label']!;
         final sel = _intereses.contains(op['label']);
         return GestureDetector(
-          onTap: () => setState(() =>
-            sel ? _intereses.remove(op['label']) : _intereses.add(op['label']!)),
+          onTap: () => setState(() => sel ? _intereses.remove(op['label']) : _intereses.add(op['label']!)),
           child: AnimatedContainer(
-            duration: const Duration(milliseconds: 180),
+            duration: RDSDuration.fast,
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
             decoration: BoxDecoration(
-              color: sel ? kGold.withOpacity(0.15) : kCard,
-              borderRadius: BorderRadius.circular(24),
-              border: Border.all(
-                color: sel ? kGold : Colors.white.withOpacity(0.08),
-                width: sel ? 1.5 : 1)),
+              color: sel ? RDSColor.gold.withOpacity(0.15) : RDSColor.card,
+              borderRadius: RDSRadius.bFull,
+              border: Border.all(color: sel ? RDSColor.gold : Colors.white.withOpacity(0.08), width: sel ? 1.5 : 1)),
             child: Row(mainAxisSize: MainAxisSize.min, children: [
               Text(op['emoji']!, style: const TextStyle(fontSize: 16)),
               const SizedBox(width: 6),
-              Text(label, style: TextStyle(
-                fontSize: 13, fontWeight: sel ? FontWeight.w700 : FontWeight.w500,
-                color: sel ? kGold : kText)),
+              Text(label, style: RDSType.bodySm.copyWith(
+                color: sel ? RDSColor.gold : RDSColor.textPrimary,
+                fontWeight: sel ? FontWeight.w700 : FontWeight.w500)),
             ])));
       }).toList()),
-      const SizedBox(height: 28),
-      Text(t('¿Con quién viajás?', 'Who are you traveling with?'),
-        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: kText)),
-      const SizedBox(height: 12),
+      const SizedBox(height: RDSSpace.xl),
+      Text(t('¿Qué tipo de viajero sos?', 'What type of traveler are you?'), style: RDSType.headlineMd),
+      const SizedBox(height: RDSSpace.md),
+      ...tipoExpOpts.map((op) {
+        final sel = _tipoExperiencia == op['valor'];
+        return GestureDetector(
+          onTap: () => setState(() => _tipoExperiencia = op['valor']!),
+          child: AnimatedContainer(
+            duration: RDSDuration.fast,
+            margin: const EdgeInsets.only(bottom: RDSSpace.sm),
+            padding: const EdgeInsets.all(RDSSpace.md),
+            decoration: BoxDecoration(
+              color: sel ? RDSColor.green.withOpacity(0.12) : RDSColor.card,
+              borderRadius: RDSRadius.bMd,
+              border: Border.all(color: sel ? RDSColor.green : Colors.white.withOpacity(0.06), width: sel ? 1.5 : 1)),
+            child: Row(children: [
+              Text(op['emoji']!, style: const TextStyle(fontSize: 22)),
+              const SizedBox(width: RDSSpace.md),
+              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text(t(op['es']!, op['en']!),
+                  style: RDSType.headlineMd.copyWith(color: sel ? RDSColor.green : RDSColor.textPrimary)),
+                Text(t(op['sub']!, op['subEN']!), style: RDSType.bodySm),
+              ])),
+              if (sel) const Icon(RDSIcons.check, color: RDSColor.green, size: 18),
+            ])));
+      }),
+      const SizedBox(height: RDSSpace.xl),
+      Text(t('¿En qué horario preferís salir?', 'When do you prefer to go out?'), style: RDSType.headlineMd),
+      const SizedBox(height: RDSSpace.md),
+      Row(children: horarioOpts.map((op) {
+        final sel = _horarioPreferido == op['valor'];
+        return Expanded(child: GestureDetector(
+          onTap: () => setState(() => _horarioPreferido = op['valor']!),
+          child: AnimatedContainer(
+            duration: RDSDuration.fast,
+            margin: EdgeInsets.only(right: op['valor'] != 'Noctámbulo' ? 8 : 0),
+            padding: const EdgeInsets.symmetric(vertical: 14),
+            decoration: BoxDecoration(
+              color: sel ? RDSColor.accent.withOpacity(0.12) : RDSColor.card,
+              borderRadius: RDSRadius.bMd,
+              border: Border.all(color: sel ? RDSColor.accent : Colors.white.withOpacity(0.08), width: sel ? 1.5 : 1)),
+            child: Column(children: [
+              Text(op['emoji']!, style: const TextStyle(fontSize: 22)),
+              const SizedBox(height: 6),
+              Text(t(op['es']!, op['en']!),
+                style: RDSType.labelSm.copyWith(color: sel ? RDSColor.accent : RDSColor.textPrimary)),
+              const SizedBox(height: 2),
+              Text(t(op['sub']!, op['subEN']!), textAlign: TextAlign.center, style: RDSType.caption),
+            ]))));
+      }).toList()),
+    ]);
+  }
+
+  // ── PASO 3 — Quién sos como viajero ─────────────────────────────
+  Widget _buildPaso3() {
+    final descuentoOpts = [
+      {'valor': 'Ninguno',      'emoji': '👤', 'es': 'Ninguno',      'en': 'None'},
+      {'valor': 'Estudiante',   'emoji': '🎓', 'es': 'Estudiante',   'en': 'Student'},
+      {'valor': 'Adulto mayor', 'emoji': '🌿', 'es': 'Adulto mayor', 'en': 'Senior'},
+    ];
+    return Column(key: const ValueKey(3), crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Text(t('¿Quién sos como viajero?', 'Who are you as a traveler?'), style: RDSType.displayMd),
+      const SizedBox(height: RDSSpace.xl),
+      Text(t('¿Con quién viajás?', 'Who are you traveling with?'), style: RDSType.headlineMd),
+      const SizedBox(height: RDSSpace.md),
       Row(children: [
-        {'v': 'Solo', 'e': '🧍', 'es': 'Solo/a', 'en': 'Solo'},
-        {'v': 'Pareja', 'e': '👫', 'es': 'Pareja', 'en': 'Couple'},
-        {'v': 'Familia', 'e': '👨‍👩‍👧', 'es': 'Familia', 'en': 'Family'},
-        {'v': 'Grupo', 'e': '👥', 'es': 'Grupo', 'en': 'Group'},
+        {'v': 'Solo',   'e': '🧍', 'es': 'Solo/a',  'en': 'Solo'},
+        {'v': 'Pareja', 'e': '👫', 'es': 'Pareja',  'en': 'Couple'},
+        {'v': 'Familia','e': '👨‍👩‍👧','es': 'Familia','en': 'Family'},
+        {'v': 'Grupo',  'e': '👥', 'es': 'Grupo',   'en': 'Group'},
       ].map((op) {
         final sel = _compania == op['v'];
         return Expanded(child: GestureDetector(
           onTap: () => setState(() => _compania = op['v']!),
           child: AnimatedContainer(
-            duration: const Duration(milliseconds: 180),
+            duration: RDSDuration.fast,
             margin: const EdgeInsets.only(right: 8),
             padding: const EdgeInsets.symmetric(vertical: 12),
             decoration: BoxDecoration(
-              color: sel ? kGreen.withOpacity(0.15) : kCard,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                color: sel ? kGreen : Colors.white.withOpacity(0.06),
-                width: sel ? 1.5 : 1)),
+              color: sel ? RDSColor.green.withOpacity(0.15) : RDSColor.card,
+              borderRadius: RDSRadius.bMd,
+              border: Border.all(color: sel ? RDSColor.green : Colors.white.withOpacity(0.06), width: sel ? 1.5 : 1)),
             child: Column(children: [
               Text(op['e']!, style: const TextStyle(fontSize: 20)),
               const SizedBox(height: 4),
               Text(kLang == 'en' ? op['en']! : op['es']!,
-                style: TextStyle(fontSize: 10,
-                  color: sel ? kGreen : kTextMuted,
+                style: RDSType.caption.copyWith(
+                  color: sel ? RDSColor.green : RDSColor.textMuted,
                   fontWeight: sel ? FontWeight.w700 : FontWeight.w400)),
             ]))));
       }).toList()),
-      const SizedBox(height: 24),
-      Text(kLang == 'en' ? 'Daily budget (USD)' : 'Presupuesto diario (COP)',
-        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: kText)),
-      const SizedBox(height: 4),
-      Text(kLang == 'en' ? 'Includes meals, transport and entry fees' : 'Incluye comidas, transporte y entradas',
-        style: const TextStyle(fontSize: 11, color: kTextMuted)),
-      const SizedBox(height: 12),
+      const SizedBox(height: RDSSpace.xl),
+      Text(kLang == 'en' ? 'Daily budget (USD)' : 'Presupuesto diario', style: RDSType.headlineMd),
+      const SizedBox(height: RDSSpace.xs),
+      Text(kLang == 'en' ? 'Includes meals, transport and entry fees' :
+           'Incluye comidas, transporte y entradas', style: RDSType.bodySm),
+      const SizedBox(height: RDSSpace.md),
       Row(children: [
         {'v': 'Bajo',  'es': 'Mochilero', 'en': 'Budget',  'subEN': r'$10-30 USD', 'subES': r'$40K-120K', 'c': '🟢'},
-        {'v': 'Medio', 'es': 'Confort',   'en': 'Mid',     'subEN': r'$30-80 USD', 'subES': r'$120K-320K', 'c': '🟡'},
-        {'v': 'Alto',  'es': 'Premium',   'en': 'Premium', 'subEN': r'+$80 USD',   'subES': r'+$320K', 'c': '🟠'},
+        {'v': 'Medio', 'es': 'Confort',   'en': 'Mid',     'subEN': r'$30-80 USD', 'subES': r'$120K-320K','c': '🟡'},
+        {'v': 'Alto',  'es': 'Premium',   'en': 'Premium', 'subEN': r'+$80 USD',   'subES': r'+$320K',     'c': '🟠'},
       ].map((op) {
         final sel = _presupuesto == op['v'];
         return Expanded(child: GestureDetector(
           onTap: () => setState(() => _presupuesto = op['v']!),
           child: AnimatedContainer(
-            duration: const Duration(milliseconds: 180),
+            duration: RDSDuration.fast,
             margin: const EdgeInsets.only(right: 8),
             padding: const EdgeInsets.symmetric(vertical: 12),
             decoration: BoxDecoration(
-              color: sel ? kGold.withOpacity(0.12) : kCard,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                color: sel ? kGold : Colors.white.withOpacity(0.06),
-                width: sel ? 1.5 : 1)),
+              color: sel ? RDSColor.gold.withOpacity(0.12) : RDSColor.card,
+              borderRadius: RDSRadius.bMd,
+              border: Border.all(color: sel ? RDSColor.gold : Colors.white.withOpacity(0.06), width: sel ? 1.5 : 1)),
             child: Column(children: [
               Text(op['c']!, style: const TextStyle(fontSize: 18)),
               const SizedBox(height: 4),
               Text(kLang == 'en' ? op['en']! : op['es']!,
-                style: TextStyle(fontSize: 11,
-                  color: sel ? kGold : kText,
-                  fontWeight: sel ? FontWeight.w700 : FontWeight.w500)),
-              Text(kLang == 'en' ? op['subEN']! : op['subES']!,
-                style: const TextStyle(fontSize: 9, color: kTextMuted)),
+                style: RDSType.labelSm.copyWith(color: sel ? RDSColor.gold : RDSColor.textPrimary)),
+              Text(kLang == 'en' ? op['subEN']! : op['subES']!, style: RDSType.caption),
             ]))));
       }).toList()),
-      // ── Primera vez en Medellín ──────────────────────────────────────
-      const SizedBox(height: 28),
-      Text(t('¿Es tu primera vez en Medellín?', 'Is this your first time in Medellín?'),
-        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: kText)),
-      const SizedBox(height: 12),
+      const SizedBox(height: RDSSpace.xl),
+      Text(t('¿Es tu primera vez en Medellín?', 'Is this your first time in Medellín?'), style: RDSType.headlineMd),
+      const SizedBox(height: RDSSpace.md),
       Row(children: [
-        {'val': true,  'emoji': '🌟', 'es': 'Primera vez',  'en': 'First time',
-         'sub': 'Quiero ver los clásicos', 'subEN': 'I want the classics'},
-        {'val': false, 'emoji': '🔁', 'es': 'Ya la conozco', 'en': 'Been here before',
-         'sub': 'Busco algo diferente',    'subEN': 'Looking for something new'},
+        {'val': true,  'emoji': '🌟', 'es': 'Primera vez',   'en': 'First time',       'sub': 'Quiero ver los clásicos', 'subEN': 'I want the classics'},
+        {'val': false, 'emoji': '🔁', 'es': 'Ya la conozco', 'en': 'Been here before', 'sub': 'Busco algo diferente',    'subEN': 'Looking for something new'},
       ].map((op) {
         final sel = _primeraVez == (op['val'] as bool);
         return Expanded(child: GestureDetector(
           onTap: () => setState(() => _primeraVez = op['val'] as bool),
           child: AnimatedContainer(
-            duration: const Duration(milliseconds: 180),
+            duration: RDSDuration.fast,
             margin: EdgeInsets.only(right: op['val'] == true ? 8 : 0),
             padding: const EdgeInsets.symmetric(vertical: 14),
             decoration: BoxDecoration(
-              color: sel ? kGreen.withOpacity(0.12) : kCard,
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(
-                color: sel ? kGreen : Colors.white.withOpacity(0.06),
-                width: sel ? 1.5 : 1)),
+              color: sel ? RDSColor.green.withOpacity(0.12) : RDSColor.card,
+              borderRadius: RDSRadius.bMd,
+              border: Border.all(color: sel ? RDSColor.green : Colors.white.withOpacity(0.06), width: sel ? 1.5 : 1)),
             child: Column(children: [
               Text(op['emoji'] as String, style: const TextStyle(fontSize: 22)),
               const SizedBox(height: 6),
               Text(kLang == 'en' ? op['en'] as String : op['es'] as String,
-                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700,
-                  color: sel ? kGreen : kText)),
+                style: RDSType.labelSm.copyWith(color: sel ? RDSColor.green : RDSColor.textPrimary)),
               const SizedBox(height: 2),
               Text(kLang == 'en' ? op['subEN'] as String : op['sub'] as String,
-                textAlign: TextAlign.center,
-                style: const TextStyle(fontSize: 9, color: kTextMuted)),
+                textAlign: TextAlign.center, style: RDSType.caption),
+            ]))));
+      }).toList()),
+      const SizedBox(height: RDSSpace.xl),
+      Text(t('¿Tenés algún descuento especial?', 'Do you have any special discount?'), style: RDSType.headlineMd),
+      const SizedBox(height: RDSSpace.xs),
+      Text(t('Te buscamos tarifas diferenciales en museos y atracciones',
+             'We\'ll find differential rates at museums and attractions'), style: RDSType.bodySm),
+      const SizedBox(height: RDSSpace.md),
+      Row(children: descuentoOpts.map((op) {
+        final sel = _descuento == op['valor'];
+        return Expanded(child: GestureDetector(
+          onTap: () => setState(() => _descuento = op['valor']!),
+          child: AnimatedContainer(
+            duration: RDSDuration.fast,
+            margin: EdgeInsets.only(right: op['valor'] != 'Adulto mayor' ? 8 : 0),
+            padding: const EdgeInsets.symmetric(vertical: 12),
+            decoration: BoxDecoration(
+              color: sel ? RDSColor.orchid.withOpacity(0.12) : RDSColor.card,
+              borderRadius: RDSRadius.bMd,
+              border: Border.all(color: sel ? RDSColor.orchid : Colors.white.withOpacity(0.06), width: sel ? 1.5 : 1)),
+            child: Column(children: [
+              Text(op['emoji']!, style: const TextStyle(fontSize: 20)),
+              const SizedBox(height: 4),
+              Text(t(op['es']!, op['en']!),
+                style: RDSType.caption.copyWith(
+                  color: sel ? RDSColor.orchid : RDSColor.textMuted,
+                  fontWeight: sel ? FontWeight.w700 : FontWeight.w400)),
             ]))));
       }).toList()),
     ]);
   }
+
+  // ── PASO 4 — Resumen ─────────────────────────────────────────────
+  Widget _buildResumen() {
+    Widget fila(String emoji, String label, String valor, Color color) =>
+      Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        child: Row(children: [
+          Text(emoji, style: const TextStyle(fontSize: 16)),
+          const SizedBox(width: 10),
+          Expanded(child: Text(label, style: RDSType.bodySm)),
+          Text(valor, style: RDSType.labelSm.copyWith(color: color)),
+        ]));
+
+    return Column(key: const ValueKey(4), crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Text(t('¿Todo listo?', 'Ready to go?'), style: RDSType.displayMd),
+      const SizedBox(height: RDSSpace.xs),
+      Text(t('Revisá tu itinerario antes de generarlo', 'Review your itinerary before generating it'),
+        style: RDSType.bodySm),
+      const SizedBox(height: RDSSpace.xl),
+      Container(
+        padding: const EdgeInsets.all(RDSSpace.lg),
+        decoration: BoxDecoration(
+          color: RDSColor.card,
+          borderRadius: RDSRadius.bLg,
+          border: Border.all(color: RDSColor.gold.withOpacity(0.25))),
+        child: Column(children: [
+          Row(children: [
+            const Text('✨', style: TextStyle(fontSize: 24)),
+            const SizedBox(width: 10),
+            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(t('Tu itinerario', 'Your itinerary'),
+                style: RDSType.headlineLg.copyWith(color: RDSColor.gold)),
+              Text('$_dias ${t(_dias == 1 ? "día en Medellín" : "días en Medellín", _dias == 1 ? "day in Medellín" : "days in Medellín")}',
+                style: RDSType.bodySm),
+            ])),
+          ]),
+          Divider(height: 24, color: RDSColor.borderSubtle),
+          fila('📅', t('Fechas','Dates'), '${_formatFecha(_llegada)} → ${_formatFecha(_salida)}', RDSColor.textPrimary),
+          fila('🕐', t('Llegada','Arrival'), _horaLlegada, RDSColor.textPrimary),
+          fila('🕐', t('Salida','Departure'), _horaSalida, RDSColor.textPrimary),
+          fila('📍', t('Zona','Zone'), '$_zonaHotel · $_alojamiento', RDSColor.green),
+          fila('🚇', t('Transporte','Transport'), _transporte, RDSColor.gold),
+          fila('⚡', t('Ritmo','Pace'), _ritmo, RDSColor.gold),
+          fila('🎯', t('Experiencia','Experience'), _tipoExperiencia, RDSColor.orchid),
+          fila('🕐', t('Horario','Schedule'), _horarioPreferido, RDSColor.orchid),
+          fila('👤', t('Viaja','Traveling'), _compania, RDSColor.textPrimary),
+          fila('💰', t('Presupuesto','Budget'), _presupuesto, RDSColor.gold),
+          fila('🌟', t('Primera vez','First time'), _primeraVez ? t('Sí','Yes') : t('No','No'), RDSColor.green),
+          if (_descuento != 'Ninguno')
+            fila('🎓', t('Descuento','Discount'), _descuento, RDSColor.orchid),
+          if (_intereses.isNotEmpty) ...[
+            Divider(height: 24, color: RDSColor.borderSubtle),
+            Align(alignment: Alignment.centerLeft,
+              child: Text(t('Intereses','Interests'), style: RDSType.bodySm)),
+            const SizedBox(height: 8),
+            Wrap(spacing: 8, runSpacing: 8, children: _intereses.map((i) =>
+              _RDSBadge(label: i, color: RDSColor.gold.withOpacity(0.12), textColor: RDSColor.gold)
+            ).toList()),
+          ],
+        ])),
+      if (_esFeria) ...[
+        const SizedBox(height: RDSSpace.md),
+        Container(
+          padding: const EdgeInsets.all(RDSSpace.md),
+          decoration: BoxDecoration(
+            color: kFeriaRojo.withOpacity(0.1), borderRadius: RDSRadius.bMd,
+            border: Border.all(color: kFeriaRojo.withOpacity(0.4))),
+          child: Row(children: [
+            const Text('🌹', style: TextStyle(fontSize: 20)),
+            const SizedBox(width: 10),
+            Expanded(child: Text(
+              t('¡Tu visita incluye la Feria de las Flores!', 'Your visit includes Feria de las Flores!'),
+              style: RDSType.bodySm.copyWith(color: RDSColor.textPrimary))),
+          ])),
+      ],
+      const SizedBox(height: RDSSpace.md),
+      Center(child: _RDSButtonTertiary(
+        label: t('Editar algo', 'Edit something'),
+        onTap: () => setState(() => _paso = 0),
+        color: RDSColor.textMuted)),
+    ]);
+  }
 }
 
-// ── Selector de fecha rápido ──────────────────────────────────────────────
 class _DateSelector extends StatelessWidget {
   final String label;
   final String emoji;
@@ -6055,19 +6543,19 @@ class _DateSelector extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: kCard, borderRadius: BorderRadius.circular(12),
+          color: RDSColor.card, borderRadius: BorderRadius.circular(12),
           border: Border.all(color: Colors.white.withOpacity(0.08))),
         child: Row(children: [
           Text(emoji, style: const TextStyle(fontSize: 22)),
           const SizedBox(width: 12),
           Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(label, style: const TextStyle(fontSize: 10, color: kTextMuted, letterSpacing: 1)),
+            Text(label, style: const TextStyle(fontSize: 10, color: RDSColor.textMuted, letterSpacing: 1)),
             Text(
               '${fecha.day}/${fecha.month}/${fecha.year}',
-              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: kText)),
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: RDSColor.textPrimary)),
           ]),
           const Spacer(),
-          Icon(Icons.calendar_today_outlined, color: kGold.withOpacity(0.7), size: 18),
+          Icon(Icons.calendar_today_outlined, color: RDSColor.gold.withOpacity(0.7), size: 18),
         ])));
   }
 }
@@ -6158,7 +6646,7 @@ class _PlannerLoadingScreenState extends State<_PlannerLoadingScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: kDark2,
+      backgroundColor: RDSColor.base,
       body: Center(child: Padding(
         padding: const EdgeInsets.all(40),
         child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
@@ -6169,16 +6657,16 @@ class _PlannerLoadingScreenState extends State<_PlannerLoadingScreen>
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 border: Border.all(color: kGold, width: 2),
-                boxShadow: [BoxShadow(color: kGold.withOpacity(0.3), blurRadius: 20)]),
+                boxShadow: [BoxShadow(color: RDSColor.gold.withOpacity(0.3), blurRadius: 20)]),
               child: const Center(child: Text('🗓️', style: TextStyle(fontSize: 36)))))),
           const SizedBox(height: 40),
           Text(t('ARMANDO TU ITINERARIO', 'BUILDING YOUR ITINERARY'),
             style: const TextStyle(fontFamily: 'PlayfairDisplay',
-              fontSize: 20, fontWeight: FontWeight.w900, color: kGold,
+              fontSize: 20, fontWeight: FontWeight.w900, color: RDSColor.gold,
               letterSpacing: 1)),
           const SizedBox(height: 8),
           Text(t('con inteligencia artificial', 'with artificial intelligence'),
-            style: const TextStyle(fontSize: 12, color: kTextMuted)),
+            style: const TextStyle(fontSize: 12, color: RDSColor.textMuted)),
           const SizedBox(height: 40),
           AnimatedSwitcher(
             duration: const Duration(milliseconds: 400),
@@ -6186,7 +6674,7 @@ class _PlannerLoadingScreenState extends State<_PlannerLoadingScreen>
               kLang == 'en' ? _msgsEN[_msgIdx] : _msgs[_msgIdx],
               key: ValueKey(_msgIdx),
               textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 14, color: kText, height: 1.5))),
+              style: const TextStyle(fontSize: 14, color: RDSColor.textPrimary, height: 1.5))),
           const SizedBox(height: 32),
           // Barra de progreso indeterminada
           ClipRRect(
@@ -6213,7 +6701,7 @@ class _PlannerResultScreen extends StatelessWidget {
     final tip = data['tip']?.toString() ?? '';
 
     return Scaffold(
-      backgroundColor: kDark2,
+      backgroundColor: RDSColor.base,
       body: Column(children: [
         // Header resultado
         Container(
@@ -6221,7 +6709,7 @@ class _PlannerResultScreen extends StatelessWidget {
             gradient: const LinearGradient(
               colors: [Color(0xFF0A1A08), Color(0xFF0F2010)],
               begin: Alignment.topLeft, end: Alignment.bottomRight),
-            border: Border(bottom: BorderSide(color: kGold.withOpacity(0.2)))),
+            border: Border(bottom: BorderSide(color: RDSColor.gold.withOpacity(0.2)))),
           child: SafeArea(bottom: false, child: Padding(
             padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -6231,13 +6719,13 @@ class _PlannerResultScreen extends StatelessWidget {
                   child: Container(width: 36, height: 36,
                     decoration: BoxDecoration(
                       color: Colors.white.withOpacity(0.06), shape: BoxShape.circle,
-                      border: Border.all(color: kGold.withOpacity(0.2))),
+                      border: Border.all(color: RDSColor.gold.withOpacity(0.2))),
                     child: const Center(child: Text('←',
                       style: TextStyle(color: kText, fontSize: 16))))),
                 const SizedBox(width: 12),
                 Expanded(child: Text(t('TU ITINERARIO', 'YOUR ITINERARY'),
                   style: const TextStyle(fontFamily: 'PlayfairDisplay',
-                    fontSize: 18, fontWeight: FontWeight.w900, color: kGold))),
+                    fontSize: 18, fontWeight: FontWeight.w900, color: RDSColor.gold))),
                 GestureDetector(
                   onTap: () {
                     final texto = '🗓️ ${t("Mi itinerario en Medellín", "My Medellín itinerary")}\n\n'
@@ -6252,11 +6740,11 @@ class _PlannerResultScreen extends StatelessWidget {
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
                     decoration: BoxDecoration(
-                      color: kGold.withOpacity(0.1),
+                      color: RDSColor.gold.withOpacity(0.1),
                       borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: kGold.withOpacity(0.4))),
+                      border: Border.all(color: RDSColor.gold.withOpacity(0.4))),
                     child: Row(mainAxisSize: MainAxisSize.min, children: [
-                      const Icon(Icons.share_outlined, color: kGold, size: 14),
+                      const Icon(Icons.share_outlined, color: RDSColor.gold, size: 14),
                       const SizedBox(width: 5),
                       Text(t('Compartir', 'Share'),
                         style: const TextStyle(color: kGold, fontSize: 12,
@@ -6266,7 +6754,7 @@ class _PlannerResultScreen extends StatelessWidget {
               if (saludo.isNotEmpty) ...[
                 const SizedBox(height: 12),
                 Text(saludo,
-                  style: const TextStyle(fontSize: 13, color: kText, height: 1.4)),
+                  style: const TextStyle(fontSize: 13, color: RDSColor.textPrimary, height: 1.4)),
               ],
             ])))),
         // Lista de días
@@ -6280,7 +6768,7 @@ class _PlannerResultScreen extends StatelessWidget {
               return Container(
                 margin: const EdgeInsets.only(bottom: 20),
                 decoration: BoxDecoration(
-                  color: kCard,
+                  color: RDSColor.card,
                   borderRadius: BorderRadius.circular(16),
                   border: Border.all(
                     color: esFeria ? kFeriaRojo.withOpacity(0.4) : kGold.withOpacity(0.15))),
@@ -6300,7 +6788,7 @@ class _PlannerResultScreen extends StatelessWidget {
                           style: TextStyle(fontSize: 10, color: esFeria ? kFeriaRojo : kGold,
                             fontWeight: FontWeight.w800, letterSpacing: 1.5)),
                         Text(dia['fecha']?.toString() ?? '',
-                          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: kText)),
+                          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: RDSColor.textPrimary)),
                       ])),
                       if (esFeria)
                         Container(
@@ -6348,7 +6836,7 @@ class _PlannerResultScreen extends StatelessWidget {
                                   t(b['periodo']?.toString() ?? '',
                                     b['periodoEN']?.toString() ?? b['periodo']?.toString() ?? ''),
                                   textAlign: TextAlign.center,
-                                  style: const TextStyle(fontSize: 8, color: kTextMuted, height: 1.2)),
+                                  style: const TextStyle(fontSize: 8, color: RDSColor.textMuted, height: 1.2)),
                               ])),
                             const SizedBox(width: 12),
                             Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -6357,7 +6845,7 @@ class _PlannerResultScreen extends StatelessWidget {
                                   color: kText)),
                               const SizedBox(height: 4),
                               Text(b['descripcion']?.toString() ?? '',
-                                style: const TextStyle(fontSize: 12, color: kTextMuted, height: 1.4)),
+                                style: const TextStyle(fontSize: 12, color: RDSColor.textMuted, height: 1.4)),
                               const SizedBox(height: 8),
                               Wrap(
                                 spacing: 6,
@@ -6372,14 +6860,14 @@ class _PlannerResultScreen extends StatelessWidget {
                                 Row(children: [
                                   const Text('🚇 ', style: TextStyle(fontSize: 11)),
                                   Expanded(child: Text(b['transporte']!,
-                                    style: const TextStyle(fontSize: 11, color: kTextMuted))),
+                                    style: const TextStyle(fontSize: 11, color: RDSColor.textMuted))),
                                 ]),
                               ],
                               if (rutaReal.isNotEmpty)
                                 Padding(
                                   padding: const EdgeInsets.only(top: 8),
                                   child: Text(t('→ Iniciar ruta', '→ Start route'),
-                                    style: const TextStyle(fontSize: 11, color: kGreen,
+                                    style: const TextStyle(fontSize: 11, color: RDSColor.green,
                                       fontWeight: FontWeight.w700))),
                             ])),
                           ]))),
@@ -6402,7 +6890,7 @@ class _PlannerResultScreen extends StatelessWidget {
                   gradient: LinearGradient(
                     colors: [kGold.withOpacity(0.1), kGreen.withOpacity(0.08)]),
                   borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: kGold.withOpacity(0.3))),
+                  border: Border.all(color: RDSColor.gold.withOpacity(0.3))),
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   Text(t('RESUMEN DE TU VIAJE', 'TRIP SUMMARY'),
                     style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w900,
@@ -6421,11 +6909,11 @@ class _PlannerResultScreen extends StatelessWidget {
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                           decoration: BoxDecoration(
-                            color: kGold.withOpacity(0.12),
+                            color: RDSColor.gold.withOpacity(0.12),
                             borderRadius: BorderRadius.circular(20),
-                            border: Border.all(color: kGold.withOpacity(0.4))),
+                            border: Border.all(color: RDSColor.gold.withOpacity(0.4))),
                           child: Text('🏅 $ins',
-                            style: const TextStyle(fontSize: 11, color: kGold,
+                            style: const TextStyle(fontSize: 11, color: RDSColor.gold,
                               fontWeight: FontWeight.w700)))).toList()),
                   ],
                 ])),
@@ -6436,17 +6924,17 @@ class _PlannerResultScreen extends StatelessWidget {
                 padding: const EdgeInsets.all(16),
                 margin: const EdgeInsets.only(bottom: 16),
                 decoration: BoxDecoration(
-                  color: kCard, borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: kGreen.withOpacity(0.3))),
+                  color: RDSColor.card, borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: RDSColor.green.withOpacity(0.3))),
                 child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   const Text('💡', style: TextStyle(fontSize: 20)),
                   const SizedBox(width: 10),
                   Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                     Text(t('Consejo de Rutero', 'Rutero Tip'),
-                      style: const TextStyle(fontSize: 10, color: kGreen,
+                      style: const TextStyle(fontSize: 10, color: RDSColor.green,
                         fontWeight: FontWeight.w800, letterSpacing: 1.2)),
                     const SizedBox(height: 4),
-                    Text(tip, style: const TextStyle(fontSize: 13, color: kText, height: 1.4)),
+                    Text(tip, style: const TextStyle(fontSize: 13, color: RDSColor.textPrimary, height: 1.4)),
                   ])),
                 ])),
 
@@ -6457,8 +6945,8 @@ class _PlannerResultScreen extends StatelessWidget {
                 width: double.infinity,
                 padding: const EdgeInsets.symmetric(vertical: 14),
                 decoration: BoxDecoration(
-                  color: kCard, borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: kGold.withOpacity(0.3))),
+                  color: RDSColor.card, borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: RDSColor.gold.withOpacity(0.3))),
                 child: Center(child: Text(
                   t('✏️ Ajustar itinerario', '✏️ Adjust itinerary'),
                   style: const TextStyle(color: kGold, fontSize: 13,
@@ -6495,8 +6983,8 @@ class _ResumenStat extends StatelessWidget {
   Widget build(BuildContext context) => Expanded(child: Column(children: [
     Text(emoji, style: const TextStyle(fontSize: 18)),
     const SizedBox(height: 4),
-    Text(valor, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: kText)),
-    Text(label, style: const TextStyle(fontSize: 9, color: kTextMuted)),
+    Text(valor, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: RDSColor.textPrimary)),
+    Text(label, style: const TextStyle(fontSize: 9, color: RDSColor.textMuted)),
   ]));
 }
 
@@ -6563,12 +7051,12 @@ class ColaboradoresScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: kDark2,
+      backgroundColor: RDSColor.base,
       body: Column(children: [
         Container(
           decoration: BoxDecoration(
-            color: kDark2,
-            border: Border(bottom: BorderSide(color: kGold.withOpacity(0.1)))),
+            color: RDSColor.base,
+            border: Border(bottom: BorderSide(color: RDSColor.gold.withOpacity(0.1)))),
           child: SafeArea(bottom: false, child: Padding(
             padding: const EdgeInsets.fromLTRB(20, 12, 20, 18),
             child: Row(children: [
@@ -6576,13 +7064,13 @@ class ColaboradoresScreen extends StatelessWidget {
                 child: Container(width: 36, height: 36,
                   decoration: BoxDecoration(
                     color: Colors.white.withOpacity(0.06), shape: BoxShape.circle,
-                    border: Border.all(color: kGold.withOpacity(0.2))),
+                    border: Border.all(color: RDSColor.gold.withOpacity(0.2))),
                   child: const Center(child: Text('←',
                     style: TextStyle(color: kText, fontSize: 16))))),
               const SizedBox(width: 12),
               Expanded(child: Text(t('Colaboradores', 'Collaborators'),
                 style: const TextStyle(fontFamily: 'PlayfairDisplay',
-                  fontSize: 19, fontWeight: FontWeight.w900, color: kText))),
+                  fontSize: 19, fontWeight: FontWeight.w900, color: RDSColor.textPrimary))),
               const Text('🎬', style: TextStyle(fontSize: 20)),
             ])))),
         Expanded(child: ListView(
@@ -6594,7 +7082,7 @@ class ColaboradoresScreen extends StatelessWidget {
             const SizedBox(height: 4),
             Text(t('Personas reales que muestran Medellín en terreno — con cámara, con moto, con pasión.',
                 'Real people showing Medellín in the field — with camera, with motorcycle, with passion.'),
-              style: TextStyle(color: kTextMuted.withOpacity(0.6), fontSize: 11, height: 1.4)),
+              style: TextStyle(color: RDSColor.textMuted.withOpacity(0.6), fontSize: 11, height: 1.4)),
             const SizedBox(height: 16),
 
             // Leer colaboradores de Firestore con fallback a hardcodeados
@@ -6634,18 +7122,18 @@ class ColaboradoresScreen extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
-                color: kCard, borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: kGold.withOpacity(0.15), style: BorderStyle.solid)),
+                color: RDSColor.card, borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: RDSColor.gold.withOpacity(0.15), style: BorderStyle.solid)),
               child: Column(children: [
-                Text('🎥', style: TextStyle(fontSize: 28, color: kTextMuted.withOpacity(0.3))),
+                Text('🎥', style: TextStyle(fontSize: 28, color: RDSColor.textMuted.withOpacity(0.3))),
                 const SizedBox(height: 8),
                 Text(t('¿Eres creador de contenido?', 'Are you a content creator?'),
-                  style: TextStyle(color: kTextMuted.withOpacity(0.5),
+                  style: TextStyle(color: RDSColor.textMuted.withOpacity(0.5),
                     fontSize: 13, fontWeight: FontWeight.w700)),
                 const SizedBox(height: 4),
                 Text(t('Escríbenos a paulflopezp@gmail.com',
                     'Write us at paulflopezp@gmail.com'),
-                  style: TextStyle(color: kTextMuted.withOpacity(0.4), fontSize: 11)),
+                  style: TextStyle(color: RDSColor.textMuted.withOpacity(0.4), fontSize: 11)),
               ])),
           ])),
       ]));
@@ -6663,14 +7151,14 @@ class _ColaboradorCard extends StatelessWidget {
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
-        color: kCard, borderRadius: BorderRadius.circular(16),
+        color: RDSColor.card, borderRadius: BorderRadius.circular(16),
         border: Border.all(color: c.color.withOpacity(0.25))),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         // Banner superior
         Container(
           height: 80,
           decoration: BoxDecoration(
-            color: kDark3,
+            color: RDSColor.surface,
             borderRadius: const BorderRadius.vertical(top: Radius.circular(15)),
             gradient: LinearGradient(
               colors: [c.color.withOpacity(0.3), kDark3],
@@ -6687,7 +7175,7 @@ class _ColaboradorCard extends StatelessWidget {
                 child: Text('COLABORADOR', style: TextStyle(
                   color: c.color, fontSize: 9, fontWeight: FontWeight.w900, letterSpacing: 1))),
               const Spacer(),
-              Text(c.plataforma, style: TextStyle(color: kTextMuted.withOpacity(0.5), fontSize: 11)),
+              Text(c.plataforma, style: TextStyle(color: RDSColor.textMuted.withOpacity(0.5), fontSize: 11)),
             ]))),
         // Contenido
         Padding(
@@ -6712,13 +7200,13 @@ class _ColaboradorCard extends StatelessWidget {
             ]),
             const SizedBox(height: 12),
             Text(t(c.descripcion, c.descripcionEN),
-              style: TextStyle(color: kTextMuted.withOpacity(0.85), fontSize: 12, height: 1.5)),
+              style: TextStyle(color: RDSColor.textMuted.withOpacity(0.85), fontSize: 12, height: 1.5)),
             const SizedBox(height: 12),
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: kDark3, borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: kGold.withOpacity(0.2))),
+                color: RDSColor.surface, borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: RDSColor.gold.withOpacity(0.2))),
               child: Row(children: [
                 const Text('🗺️', style: TextStyle(fontSize: 16)),
                 const SizedBox(width: 10),
@@ -6962,7 +7450,7 @@ class _CapturasDeCampoScreenState extends State<CapturasDeCampoScreen> {
 
     if (mounted && guardadaEnGaleria) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        backgroundColor: kGreen,
+        backgroundColor: RDSColor.green,
         content: Text(t(
           '📸 Foto guardada en álbum "Rutero MDE" con datos del sitio',
           '📸 Photo saved to "Rutero MDE" album with site data'))));
@@ -6973,19 +7461,19 @@ class _CapturasDeCampoScreenState extends State<CapturasDeCampoScreen> {
   Widget build(BuildContext context) {
     if (!_esAdmin) {
       return Scaffold(
-        backgroundColor: kDark,
-        appBar: AppBar(backgroundColor: kDark, title: Text(t('Captura de campo', 'Field capture'))),
+        backgroundColor: RDSColor.overlay,
+        appBar: AppBar(backgroundColor: RDSColor.overlay, title: Text(t('Captura de campo', 'Field capture'))),
         body: Center(child: Text(t('Solo disponible para administradores', 'Only available for admins'),
           style: const TextStyle(color: kTextMuted))));
     }
 
     return Scaffold(
-      backgroundColor: kDark,
+      backgroundColor: RDSColor.overlay,
       appBar: AppBar(
-        backgroundColor: kCard,
+        backgroundColor: RDSColor.card,
         title: Text(t('📸 Captura de campo', '📸 Field capture'),
           style: const TextStyle(color: kText, fontWeight: FontWeight.w800)),
-        leading: IconButton(icon: const Icon(Icons.arrow_back, color: kText), onPressed: () => Navigator.pop(context)),
+        leading: IconButton(icon: const Icon(RDSIcons.back, color: RDSColor.textPrimary), onPressed: () => Navigator.pop(context)),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
@@ -6993,8 +7481,8 @@ class _CapturasDeCampoScreenState extends State<CapturasDeCampoScreen> {
           // Info
           Container(
             padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(color: kGreen.withOpacity(0.08), borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: kGreen.withOpacity(0.25))),
+            decoration: BoxDecoration(color: RDSColor.green.withOpacity(0.08), borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: RDSColor.green.withOpacity(0.25))),
             child: Text(
               t('Detecta tu ubicación → la app identifica el sitio más cercano (máx. 800m) → toma la foto → queda registrada con el nombre del sitio y la ruta.',
                 'Detect your location → the app identifies the nearest site (max. 800m) → take the photo → saved with site name and route.'),
@@ -7006,8 +7494,8 @@ class _CapturasDeCampoScreenState extends State<CapturasDeCampoScreen> {
           if (_sitioDetectado.isNotEmpty) ...[
             Container(
               padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(color: kCard, borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: kGreen.withOpacity(0.4))),
+              decoration: BoxDecoration(color: RDSColor.card, borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: RDSColor.green.withOpacity(0.4))),
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Text('📍 $_sitioDetectado',
                   style: const TextStyle(color: kText, fontSize: 15, fontWeight: FontWeight.w800)),
@@ -7030,10 +7518,10 @@ class _CapturasDeCampoScreenState extends State<CapturasDeCampoScreen> {
               child: Container(
                 padding: const EdgeInsets.symmetric(vertical: 14),
                 decoration: BoxDecoration(
-                  color: kCard, borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: kGreen.withOpacity(0.4))),
+                  color: RDSColor.card, borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: RDSColor.green.withOpacity(0.4))),
                 child: Center(child: _buscandoGPS
-                  ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: kGreen))
+                  ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: RDSColor.green))
                   : Text(t('📍 Detectar sitio', '📍 Detect site'),
                     style: const TextStyle(color: kGreen, fontWeight: FontWeight.w700)))))),
             const SizedBox(width: 12),
@@ -7042,7 +7530,7 @@ class _CapturasDeCampoScreenState extends State<CapturasDeCampoScreen> {
               child: Container(
                 padding: const EdgeInsets.symmetric(vertical: 14),
                 decoration: BoxDecoration(
-                  gradient: LinearGradient(colors: [kGreen, kGreen.withOpacity(0.7)]),
+                  gradient: LinearGradient(colors: [RDSColor.green, kGreen.withOpacity(0.7)]),
                   borderRadius: BorderRadius.circular(12)),
                 child: Center(child: Text(t('📸 Tomar foto', '📸 Take photo'),
                   style: const TextStyle(color: Colors.black, fontWeight: FontWeight.w800)))))),
@@ -7058,14 +7546,14 @@ class _CapturasDeCampoScreenState extends State<CapturasDeCampoScreen> {
             ..._capturas.map((c) => Container(
               margin: const EdgeInsets.only(bottom: 10),
               padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(color: kCard, borderRadius: BorderRadius.circular(12)),
+              decoration: BoxDecoration(color: RDSColor.card, borderRadius: BorderRadius.circular(12)),
               child: Row(children: [
                 ClipRRect(
                   borderRadius: BorderRadius.circular(8),
                   child: Image.file(File(c['path']?.toString() ?? ''),
                     width: 60, height: 60, fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => Container(width: 60, height: 60, color: kGreen.withOpacity(0.2),
-                      child: const Icon(Icons.image, color: kGreen)))),
+                    errorBuilder: (_, __, ___) => Container(width: 60, height: 60, color: RDSColor.green.withOpacity(0.2),
+                      child: const Icon(Icons.image, color: RDSColor.green)))),
                 const SizedBox(width: 12),
                 Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   Text(c['sitio']?.toString() ?? '', style: const TextStyle(color: kText, fontSize: 13, fontWeight: FontWeight.w700)),
@@ -7098,12 +7586,12 @@ class EmergenciaScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: kDark2,
+      backgroundColor: RDSColor.base,
       body: Column(children: [
         Container(
           decoration: BoxDecoration(
-            color: kDark2,
-            border: Border(bottom: BorderSide(color: kGold.withOpacity(0.1)))),
+            color: RDSColor.base,
+            border: Border(bottom: BorderSide(color: RDSColor.gold.withOpacity(0.1)))),
           child: SafeArea(bottom: false, child: Padding(
             padding: const EdgeInsets.fromLTRB(20, 12, 20, 18),
             child: Row(children: [
@@ -7112,7 +7600,7 @@ class EmergenciaScreen extends StatelessWidget {
                   decoration: BoxDecoration(
                     color: Colors.white.withOpacity(0.06),
                     shape: BoxShape.circle,
-                    border: Border.all(color: kGold.withOpacity(0.2))),
+                    border: Border.all(color: RDSColor.gold.withOpacity(0.2))),
                   child: const Center(child: Text('←',
                     style: TextStyle(color: kText, fontSize: 16))))),
               const SizedBox(width: 12),
@@ -7142,7 +7630,7 @@ class EmergenciaScreen extends StatelessWidget {
                 ...cat.contactos.map((c) => Container(
                   margin: const EdgeInsets.only(bottom: 8),
                   padding: const EdgeInsets.all(14),
-                  decoration: BoxDecoration(color: kCard, borderRadius: BorderRadius.circular(14),
+                  decoration: BoxDecoration(color: RDSColor.card, borderRadius: BorderRadius.circular(14),
                     border: Border.all(color: Colors.white.withOpacity(0.08))),
                   child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
                     Text(c.emoji, style: const TextStyle(fontSize: 20)),
@@ -7152,7 +7640,7 @@ class EmergenciaScreen extends StatelessWidget {
                         style: const TextStyle(color: kText, fontSize: 13, fontWeight: FontWeight.w700)),
                       const SizedBox(height: 3),
                       Text(t(c.detalle, c.detalleEN),
-                        style: TextStyle(color: kTextMuted.withOpacity(0.85), fontSize: 11.5, height: 1.4)),
+                        style: TextStyle(color: RDSColor.textMuted.withOpacity(0.85), fontSize: 11.5, height: 1.4)),
                       if (c.telefono.isNotEmpty || c.direccionMaps != null) ...[
                         const SizedBox(height: 8),
                         Wrap(spacing: 8, runSpacing: 8, children: [
@@ -7162,9 +7650,9 @@ class EmergenciaScreen extends StatelessWidget {
                               child: Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                                 decoration: BoxDecoration(
-                                  color: kGreen.withOpacity(0.12),
+                                  color: RDSColor.green.withOpacity(0.12),
                                   borderRadius: BorderRadius.circular(8),
-                                  border: Border.all(color: kGreen.withOpacity(0.3))),
+                                  border: Border.all(color: RDSColor.green.withOpacity(0.3))),
                                 child: Row(mainAxisSize: MainAxisSize.min, children: [
                                   const Text('📞', style: TextStyle(fontSize: 12)),
                                   const SizedBox(width: 6),
@@ -7177,9 +7665,9 @@ class EmergenciaScreen extends StatelessWidget {
                               child: Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                                 decoration: BoxDecoration(
-                                  color: kGold.withOpacity(0.12),
+                                  color: RDSColor.gold.withOpacity(0.12),
                                   borderRadius: BorderRadius.circular(8),
-                                  border: Border.all(color: kGold.withOpacity(0.3))),
+                                  border: Border.all(color: RDSColor.gold.withOpacity(0.3))),
                                 child: Row(mainAxisSize: MainAxisSize.min, children: [
                                   const Text('🧭', style: TextStyle(fontSize: 12)),
                                   const SizedBox(width: 6),
@@ -7358,12 +7846,12 @@ class _MonedaYJergaScreenState extends State<MonedaYJergaScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: kDark2,
+      backgroundColor: RDSColor.base,
       body: Column(children: [
         Container(
           decoration: BoxDecoration(
-            color: kDark2,
-            border: Border(bottom: BorderSide(color: kGold.withOpacity(0.1)))),
+            color: RDSColor.base,
+            border: Border(bottom: BorderSide(color: RDSColor.gold.withOpacity(0.1)))),
           child: SafeArea(bottom: false, child: Padding(
             padding: const EdgeInsets.fromLTRB(20, 12, 20, 18),
             child: Row(children: [
@@ -7372,7 +7860,7 @@ class _MonedaYJergaScreenState extends State<MonedaYJergaScreen> {
                   decoration: BoxDecoration(
                     color: Colors.white.withOpacity(0.06),
                     shape: BoxShape.circle,
-                    border: Border.all(color: kGold.withOpacity(0.2))),
+                    border: Border.all(color: RDSColor.gold.withOpacity(0.2))),
                   child: const Center(child: Text('←',
                     style: TextStyle(color: kText, fontSize: 16))))),
               const SizedBox(width: 12),
@@ -7392,8 +7880,8 @@ class _MonedaYJergaScreenState extends State<MonedaYJergaScreen> {
             const SizedBox(height: 12),
             Container(
               padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(color: kCard, borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: kGold.withOpacity(0.25))),
+              decoration: BoxDecoration(color: RDSColor.card, borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: RDSColor.gold.withOpacity(0.25))),
               child: _cargando
                 ? const Center(child: Padding(
                     padding: EdgeInsets.symmetric(vertical: 12),
@@ -7424,7 +7912,7 @@ class _MonedaYJergaScreenState extends State<MonedaYJergaScreen> {
                     if (_tasaUsdCop != null)
                       Row(children: [
                         Text('1 USD ≈ ${_formatoCop(_tasaUsdCop!)} COP',
-                          style: TextStyle(color: kTextMuted.withOpacity(0.7), fontSize: 11)),
+                          style: TextStyle(color: RDSColor.textMuted.withOpacity(0.7), fontSize: 11)),
                         const Spacer(),
                         if (_esOffline)
                           Container(
@@ -7452,7 +7940,7 @@ class _MonedaYJergaScreenState extends State<MonedaYJergaScreen> {
             ]),
             const SizedBox(height: 4),
             Text(t('Toca una palabra para marcarla como aprendida','Tap a word to mark it as learned'),
-              style: TextStyle(color: kTextMuted.withOpacity(0.6), fontSize: 11)),
+              style: TextStyle(color: RDSColor.textMuted.withOpacity(0.6), fontSize: 11)),
             const SizedBox(height: 16),
 
             // ── Palabra del día ──
@@ -7466,7 +7954,7 @@ class _MonedaYJergaScreenState extends State<MonedaYJergaScreen> {
                 decoration: BoxDecoration(
                   gradient: LinearGradient(colors: [kGold.withOpacity(0.15), kGold.withOpacity(0.05)]),
                   borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: kGold.withOpacity(0.4))),
+                  border: Border.all(color: RDSColor.gold.withOpacity(0.4))),
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   Row(children: [
                     const Text('⭐', style: TextStyle(fontSize: 14)),
@@ -7477,9 +7965,9 @@ class _MonedaYJergaScreenState extends State<MonedaYJergaScreen> {
                   const SizedBox(height: 8),
                   Text(p.palabra, style: const TextStyle(color: kGold, fontSize: 22, fontWeight: FontWeight.w900, letterSpacing: 1)),
                   const SizedBox(height: 4),
-                  Text(t(p.significado, p.significadoEN), style: TextStyle(color: kTextMuted.withOpacity(0.9), fontSize: 13, height: 1.4)),
+                  Text(t(p.significado, p.significadoEN), style: TextStyle(color: RDSColor.textMuted.withOpacity(0.9), fontSize: 13, height: 1.4)),
                   const SizedBox(height: 6),
-                  Text(t(p.ejemplo, p.ejemploEN), style: TextStyle(color: kTextMuted.withOpacity(0.6), fontSize: 11, fontStyle: FontStyle.italic)),
+                  Text(t(p.ejemplo, p.ejemploEN), style: TextStyle(color: RDSColor.textMuted.withOpacity(0.6), fontSize: 11, fontStyle: FontStyle.italic)),
                 ]));
             }),
 
@@ -7492,7 +7980,7 @@ class _MonedaYJergaScreenState extends State<MonedaYJergaScreen> {
                   margin: const EdgeInsets.only(bottom: 10),
                   padding: const EdgeInsets.all(14),
                   decoration: BoxDecoration(
-                    color: kCard, borderRadius: BorderRadius.circular(14),
+                    color: RDSColor.card, borderRadius: BorderRadius.circular(14),
                     border: Border.all(
                       color: aprendida ? kGold.withOpacity(0.4) : Colors.white.withOpacity(0.08))),
                   child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -7508,10 +7996,10 @@ class _MonedaYJergaScreenState extends State<MonedaYJergaScreen> {
                           fontSize: 14, fontWeight: FontWeight.w800, letterSpacing: 0.5)),
                       const SizedBox(height: 4),
                       Text(t(p.significado, p.significadoEN),
-                        style: TextStyle(color: kTextMuted.withOpacity(0.9), fontSize: 12, height: 1.4)),
+                        style: TextStyle(color: RDSColor.textMuted.withOpacity(0.9), fontSize: 12, height: 1.4)),
                       const SizedBox(height: 6),
                       Text(t(p.ejemplo, p.ejemploEN),
-                        style: TextStyle(color: kTextMuted.withOpacity(0.6), fontSize: 11,
+                        style: TextStyle(color: RDSColor.textMuted.withOpacity(0.6), fontSize: 11,
                           fontStyle: FontStyle.italic, height: 1.4)),
                     ])),
                   ])));
@@ -7575,7 +8063,7 @@ class _SOSConfigScreenState extends State<SOSConfigScreen> {
       setState(() => _guardando = false);
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
         content: Text(t('✅ Contacto de emergencia guardado','✅ Emergency contact saved')),
-        backgroundColor: kGreen));
+        backgroundColor: RDSColor.green));
     }
   }
 
@@ -7641,12 +8129,12 @@ class _SOSConfigScreenState extends State<SOSConfigScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: kDark2,
+      backgroundColor: RDSColor.base,
       body: Column(children: [
         Container(
           decoration: BoxDecoration(
-            color: kDark2,
-            border: Border(bottom: BorderSide(color: kGold.withOpacity(0.1)))),
+            color: RDSColor.base,
+            border: Border(bottom: BorderSide(color: RDSColor.gold.withOpacity(0.1)))),
           child: SafeArea(bottom: false, child: Padding(
             padding: const EdgeInsets.fromLTRB(20, 12, 20, 18),
             child: Row(children: [
@@ -7655,7 +8143,7 @@ class _SOSConfigScreenState extends State<SOSConfigScreen> {
                   decoration: BoxDecoration(
                     color: Colors.white.withOpacity(0.06),
                     shape: BoxShape.circle,
-                    border: Border.all(color: kGold.withOpacity(0.2))),
+                    border: Border.all(color: RDSColor.gold.withOpacity(0.2))),
                   child: const Center(child: Text('←',
                     style: TextStyle(color: kText, fontSize: 16))))),
               const SizedBox(width: 12),
@@ -7701,11 +8189,11 @@ class _SOSConfigScreenState extends State<SOSConfigScreen> {
                 const SizedBox(height: 4),
                 Text(t('Se usará para enviar tu ubicación cuando presiones SOS',
                     'Used to send your location when you press SOS'),
-                  style: TextStyle(color: kTextMuted.withOpacity(0.6), fontSize: 11)),
+                  style: TextStyle(color: RDSColor.textMuted.withOpacity(0.6), fontSize: 11)),
                 const SizedBox(height: 14),
 
                 Container(
-                  decoration: BoxDecoration(color: kDark3, borderRadius: BorderRadius.circular(12),
+                  decoration: BoxDecoration(color: RDSColor.surface, borderRadius: BorderRadius.circular(12),
                     border: Border.all(color: Colors.white.withOpacity(0.1))),
                   child: TextField(
                     controller: _nombreCtrl,
@@ -7721,7 +8209,7 @@ class _SOSConfigScreenState extends State<SOSConfigScreen> {
                 const SizedBox(height: 10),
 
                 Container(
-                  decoration: BoxDecoration(color: kDark3, borderRadius: BorderRadius.circular(12),
+                  decoration: BoxDecoration(color: RDSColor.surface, borderRadius: BorderRadius.circular(12),
                     border: Border.all(color: Colors.white.withOpacity(0.1))),
                   child: TextField(
                     controller: _numeroCtrl,
@@ -7748,16 +8236,16 @@ class _SOSConfigScreenState extends State<SOSConfigScreen> {
                 Container(
                   padding: const EdgeInsets.all(14),
                   decoration: BoxDecoration(
-                    color: kGold.withOpacity(0.06),
+                    color: RDSColor.gold.withOpacity(0.06),
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: kGold.withOpacity(0.15))),
+                    border: Border.all(color: RDSColor.gold.withOpacity(0.15))),
                   child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
                     const Text('💡', style: TextStyle(fontSize: 16)),
                     const SizedBox(width: 10),
                     Expanded(child: Text(
                       t('El botón SOS abre WhatsApp con tu ubicación exacta lista para enviar a tu contacto de confianza.',
                         'The SOS button opens WhatsApp with your exact location ready to send to your trusted contact.'),
-                      style: TextStyle(color: kTextMuted.withOpacity(0.8), fontSize: 11.5, height: 1.4))),
+                      style: TextStyle(color: RDSColor.textMuted.withOpacity(0.8), fontSize: 11.5, height: 1.4))),
                   ])),
               ])),
       ]));
@@ -7824,13 +8312,13 @@ class _FeedbackBetaScreenState extends State<FeedbackBetaScreen> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    backgroundColor: kDark,
+    backgroundColor: RDSColor.overlay,
     appBar: AppBar(
-      backgroundColor: kDark2,
+      backgroundColor: RDSColor.base,
       title: Text(t('Tu opinión', 'Your feedback'),
         style: const TextStyle(color: kText, fontWeight: FontWeight.w800)),
       leading: IconButton(
-        icon: const Icon(Icons.arrow_back, color: kText),
+        icon: const Icon(RDSIcons.back, color: RDSColor.textPrimary),
         onPressed: () => Navigator.pop(context))),
     body: _enviado ? _PantallaEnviada() : SingleChildScrollView(
       padding: const EdgeInsets.all(24),
@@ -7838,8 +8326,8 @@ class _FeedbackBetaScreenState extends State<FeedbackBetaScreen> {
         Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: kGreen.withOpacity(0.08), borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: kGreen.withOpacity(0.25))),
+            color: RDSColor.green.withOpacity(0.08), borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: RDSColor.green.withOpacity(0.25))),
           child: Row(children: [
             const Text('🧪', style: TextStyle(fontSize: 20)),
             const SizedBox(width: 10),
@@ -7906,9 +8394,9 @@ class _FeedbackBetaScreenState extends State<FeedbackBetaScreen> {
       hintText: hint, hintStyle: const TextStyle(color: kTextMuted),
       filled: true, fillColor: kDark2,
       border: OutlineInputBorder(borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide(color: kGreen.withOpacity(0.2))),
+        borderSide: BorderSide(color: RDSColor.green.withOpacity(0.2))),
       enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide(color: kGreen.withOpacity(0.2))),
+        borderSide: BorderSide(color: RDSColor.green.withOpacity(0.2))),
       focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12),
         borderSide: BorderSide(color: kGreen))));
 }
@@ -8068,7 +8556,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> with SingleTickerProvider
               'assets/images/rutas/ruta_15_alumbrado.jpg',
             ].map((img) => Image.asset(img, fit: BoxFit.cover,
               cacheWidth: 300,
-              errorBuilder: (_, __, ___) => Container(color: kDark3))).toList())),
+              errorBuilder: (_, __, ___) => Container(color: RDSColor.surface))).toList())),
           // Overlay degradado oscuro para legibilidad
           Positioned.fill(child: Container(
             decoration: const BoxDecoration(
@@ -8090,8 +8578,8 @@ class _WelcomeScreenState extends State<WelcomeScreen> with SingleTickerProvider
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     boxShadow: [
-                      BoxShadow(color: kGreen.withOpacity(0.35), blurRadius: 40, spreadRadius: 8),
-                      BoxShadow(color: kGold.withOpacity(0.2), blurRadius: 20),
+                      BoxShadow(color: RDSColor.green.withOpacity(0.35), blurRadius: 40, spreadRadius: 8),
+                      BoxShadow(color: RDSColor.gold.withOpacity(0.2), blurRadius: 20),
                     ]),
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(150),
@@ -8114,7 +8602,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> with SingleTickerProvider
                     t('Rutas gamificadas por la ciudad\nmás hermosa de Colombia ☁️',
                       'Gamified routes through the\nmost beautiful city in Colombia ☁️'),
                     textAlign: TextAlign.center,
-                    style: TextStyle(fontSize: 13, color: kText.withOpacity(0.45), height: 1.55))),
+                    style: TextStyle(fontSize: 13, color: RDSColor.textPrimary.withOpacity(0.45), height: 1.55))),
 
                 const SizedBox(height: 20),
 
@@ -8136,7 +8624,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> with SingleTickerProvider
                 const SizedBox(height: 10),
                 _cargandoGoogle
                   ? Container(width: double.infinity, padding: const EdgeInsets.symmetric(vertical: 14),
-                      decoration: BoxDecoration(color: kCard, borderRadius: BorderRadius.circular(14),
+                      decoration: BoxDecoration(color: RDSColor.card, borderRadius: BorderRadius.circular(14),
                         border: Border.all(color: Colors.white.withOpacity(0.1))),
                       child: const Center(child: SizedBox(width: 20, height: 20,
                         child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF4285F4)))))
@@ -8144,7 +8632,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> with SingleTickerProvider
                 const SizedBox(height: 16),
                 GestureDetector(onTap: _goToHome,
                   child: Text(tExplorarSinReg,
-                    style: TextStyle(fontSize: 12, color: kText.withOpacity(0.3), letterSpacing: 0.5))),
+                    style: TextStyle(fontSize: 12, color: RDSColor.textPrimary.withOpacity(0.3), letterSpacing: 0.5))),
               ])),
 
               const SizedBox(height: 12),
@@ -8183,7 +8671,7 @@ class _BannerPanoramico extends StatelessWidget {
       height: altura,
       child: Stack(fit: StackFit.expand, children: [
         Image.asset(imagePath, fit: BoxFit.cover,
-          errorBuilder: (_, __, ___) => Container(color: kDark)),
+          errorBuilder: (_, __, ___) => Container(color: RDSColor.overlay)),
         // Fade oscuro en los bordes
         Container(decoration: const BoxDecoration(
           gradient: LinearGradient(
@@ -8235,7 +8723,7 @@ class _BannerAliadosState extends State<_BannerAliados> {
     final aliado = _aliados[_indice];
     final h = MediaQuery.of(context).size.height / 4;
     return AnimatedSwitcher(
-      duration: const Duration(milliseconds: 500),
+      duration: RDSDuration.normal,
       transitionBuilder: (child, anim) => FadeTransition(opacity: anim, child: child),
       child: Container(
         key: ValueKey(_indice),
@@ -8243,7 +8731,7 @@ class _BannerAliadosState extends State<_BannerAliados> {
         decoration: BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topCenter, end: Alignment.bottomCenter,
-            colors: [kCard, kDark])),
+            colors: [RDSColor.card, RDSColor.overlay])),
         child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
           Text(aliado['emoji']!, style: const TextStyle(fontSize: 36)),
           const SizedBox(height: 8),
@@ -8252,16 +8740,16 @@ class _BannerAliadosState extends State<_BannerAliados> {
               color: kText, letterSpacing: 0.5)),
           const SizedBox(height: 4),
           Text(aliado['desc']!,
-            style: const TextStyle(fontSize: 12, color: kTextMuted)),
+            style: const TextStyle(fontSize: 12, color: RDSColor.textMuted)),
           const SizedBox(height: 10),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
             decoration: BoxDecoration(
-              color: kGreen.withOpacity(0.15),
+              color: RDSColor.green.withOpacity(0.15),
               borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: kGreen.withOpacity(0.3))),
+              border: Border.all(color: RDSColor.green.withOpacity(0.3))),
             child: Text(aliado['tag']!,
-              style: const TextStyle(fontSize: 10, color: kGreen, fontWeight: FontWeight.w500))),
+              style: const TextStyle(fontSize: 10, color: RDSColor.green, fontWeight: FontWeight.w500))),
           const SizedBox(height: 10),
           Row(mainAxisAlignment: MainAxisAlignment.center,
             children: List.generate(_aliados.length, (i) =>
@@ -9609,7 +10097,7 @@ class _HomeBodyState extends State<HomeBody> {
   @override
   Widget build(BuildContext context) {
     return Container(
-      color: kDark2,
+      color: RDSColor.base,
       child: Column(children: [
         // Header paisa con imagen de fondo integrada
         Container(
@@ -9638,14 +10126,14 @@ class _HomeBodyState extends State<HomeBody> {
                   Expanded(child: GestureDetector(
                     onTap: () => showModalBottomSheet(
                       context: context,
-                      backgroundColor: kCard,
+                      backgroundColor: RDSColor.card,
                       shape: const RoundedRectangleBorder(
-                        borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+                        borderRadius: BorderRadius.vertical(top: Radius.circular(RDSRadius.xl))),
                       builder: (_) => Padding(
                         padding: const EdgeInsets.all(20),
                         child: Column(mainAxisSize: MainAxisSize.min, children: [
                           Text(t('¿Dónde estás?', 'Where are you?'),
-                            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: kText)),
+                            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: RDSColor.textPrimary)),
                           const SizedBox(height: 16),
                           ...kCiudadesRegistradas.map((c) => ListTile(
                             leading: Text(c.pais == 'Colombia' ? '🇨🇴' : '🌎',
@@ -9653,7 +10141,7 @@ class _HomeBodyState extends State<HomeBody> {
                             title: Text('${c.ciudad}, ${c.pais}',
                               style: const TextStyle(color: kText, fontSize: 14)),
                             trailing: _ciudadDetectada?.ciudad == c.ciudad
-                              ? const Icon(Icons.check_circle, color: kGreen, size: 20)
+                              ? const Icon(Icons.check_circle, color: RDSColor.green, size: 20)
                               : null,
                             onTap: () {
                               setState(() { _ciudadDetectada = c; _filtroActivo = 'Ciudad'; });
@@ -9670,7 +10158,7 @@ class _HomeBodyState extends State<HomeBody> {
                         ]))),
                     child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                       Text(_saludoHora(), style: TextStyle(
-                        fontSize: 10, color: kGold.withOpacity(0.8),
+                        fontSize: 10, color: RDSColor.gold.withOpacity(0.8),
                         fontWeight: FontWeight.w600, letterSpacing: 1.5)),
                       const SizedBox(height: 2),
                       Row(children: [
@@ -9685,14 +10173,14 @@ class _HomeBodyState extends State<HomeBody> {
                         Text(_ciudadDetectada?.emoji ?? '🌸',
                           style: const TextStyle(fontSize: 15)),
                         const SizedBox(width: 2),
-                        const Icon(Icons.keyboard_arrow_down, color: kGold, size: 15),
+                        const Icon(Icons.keyboard_arrow_down, color: RDSColor.gold, size: 15),
                       ]),
                       const SizedBox(height: 2),
                       Text(
                         kLang == 'en'
                           ? (_ciudadDetectada?.taglineEN ?? tTaglineHome)
                           : (_ciudadDetectada?.taglineES ?? tTaglineHome),
-                        style: const TextStyle(fontSize: 10, letterSpacing: 0.8, color: kTextMuted)),
+                        style: const TextStyle(fontSize: 10, letterSpacing: 0.8, color: RDSColor.textMuted)),
                     ]))),
                   const SizedBox(width: 12),
                   GestureDetector(
@@ -9724,13 +10212,13 @@ class _HomeBodyState extends State<HomeBody> {
                     colors: [Color(0xFF0D2010), Color(0xFF142A18)],
                     begin: Alignment.topLeft, end: Alignment.bottomRight),
                   borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: kGold.withOpacity(0.35))),
+                  border: Border.all(color: RDSColor.gold.withOpacity(0.35))),
                 child: Row(children: [
                   Container(width: 48, height: 48,
                     decoration: BoxDecoration(
-                      color: kGold.withOpacity(0.15),
+                      color: RDSColor.gold.withOpacity(0.15),
                       shape: BoxShape.circle,
-                      border: Border.all(color: kGold.withOpacity(0.4))),
+                      border: Border.all(color: RDSColor.gold.withOpacity(0.4))),
                     child: const Center(child: Text('🗓️', style: TextStyle(fontSize: 22)))),
                   const SizedBox(width: 14),
                   Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -9741,14 +10229,14 @@ class _HomeBodyState extends State<HomeBody> {
                     Text(
                       t('Decinos cuándo llegás — nosotros te decimos qué hacer',
                         'Tell us when you arrive — we tell you what to do'),
-                      style: TextStyle(fontSize: 11, color: kTextMuted.withOpacity(0.85), height: 1.3)),
+                      style: TextStyle(fontSize: 11, color: RDSColor.textMuted.withOpacity(0.85), height: 1.3)),
                   ])),
                   const SizedBox(width: 8),
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                     decoration: BoxDecoration(
                       color: kGold,
-                      borderRadius: BorderRadius.circular(20)),
+                      borderRadius: BorderRadius.circular(RDSRadius.xl)),
                     child: Text(t('Probar', 'Try it'),
                       style: const TextStyle(color: Colors.black, fontSize: 11,
                         fontWeight: FontWeight.w900))),
@@ -9761,7 +10249,7 @@ class _HomeBodyState extends State<HomeBody> {
               GestureDetector(
                 onTap: () => tabNotifier.value = 1,
                 child: Row(children: [
-                  Text(tVerMapa, style: const TextStyle(fontSize: 11, color: kGold,
+                  Text(tVerMapa, style: const TextStyle(fontSize: 11, color: RDSColor.gold,
                     fontWeight: FontWeight.w700)),
                   const SizedBox(width: 4),
                   const Text('🗺️', style: TextStyle(fontSize: 12)),
@@ -9771,7 +10259,7 @@ class _HomeBodyState extends State<HomeBody> {
 
             // Buscador
             Container(height: 42,
-              decoration: BoxDecoration(color: kCard, borderRadius: BorderRadius.circular(12),
+              decoration: BoxDecoration(color: RDSColor.card, borderRadius: BorderRadius.circular(12),
                 border: Border.all(color: Colors.white.withOpacity(0.08))),
               child: TextField(
                 controller: _searchCtrl,
@@ -9780,11 +10268,11 @@ class _HomeBodyState extends State<HomeBody> {
                 decoration: InputDecoration(
                   hintText: t('Buscar ruta o sitio...','Search route or spot...'),
                   hintStyle: const TextStyle(color: kTextMuted, fontSize: 13),
-                  prefixIcon: const Icon(Icons.search, color: kTextMuted, size: 18),
+                  prefixIcon: const Icon(Icons.search, color: RDSColor.textMuted, size: 18),
                   suffixIcon: _busqueda.isNotEmpty
                     ? GestureDetector(
                         onTap: () { _searchCtrl.clear(); setState(() => _busqueda = ''); },
-                        child: const Icon(Icons.close, color: kTextMuted, size: 16))
+                        child: const Icon(Icons.close, color: RDSColor.textMuted, size: 16))
                     : null,
                   border: InputBorder.none,
                   contentPadding: const EdgeInsets.symmetric(vertical: 12)))),
@@ -10019,7 +10507,7 @@ class _HomeBodyState extends State<HomeBody> {
                         margin: const EdgeInsets.only(bottom: 12),
                         padding: const EdgeInsets.all(14),
                         decoration: BoxDecoration(
-                          color: kCard, borderRadius: BorderRadius.circular(14),
+                          color: RDSColor.card, borderRadius: BorderRadius.circular(14),
                           border: Border.all(color: c.color.withOpacity(0.3))),
                         child: Row(children: [
                           Container(width: 52, height: 52,
@@ -10033,7 +10521,7 @@ class _HomeBodyState extends State<HomeBody> {
                             Text(c.nombre, style: const TextStyle(color: kText, fontSize: 14, fontWeight: FontWeight.w800)),
                             Text(c.handle, style: TextStyle(color: c.color, fontSize: 11, fontWeight: FontWeight.w600)),
                             const SizedBox(height: 4),
-                            Text(c.plataforma, style: TextStyle(color: kTextMuted.withOpacity(0.6), fontSize: 10)),
+                            Text(c.plataforma, style: TextStyle(color: RDSColor.textMuted.withOpacity(0.6), fontSize: 10)),
                           ])),
                           Icon(Icons.arrow_forward_ios, color: c.color.withOpacity(0.5), size: 14),
                         ])))),
@@ -10055,21 +10543,21 @@ class _HomeBodyState extends State<HomeBody> {
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                   decoration: BoxDecoration(
-                    color: kOrchid.withOpacity(0.07),
+                    color: RDSColor.orchid.withOpacity(0.07),
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: kOrchid.withOpacity(0.25))),
+                    border: Border.all(color: RDSColor.orchid.withOpacity(0.25))),
                   child: Row(children: [
                     const Text('🧪', style: TextStyle(fontSize: 14)),
                     const SizedBox(width: 10),
                     Expanded(child: Text(
                       t('¿Qué te parece Rutero MDE? Cuéntanos', 'How do you like Rutero MDE? Tell us'),
-                      style: const TextStyle(fontSize: 11, color: kTextMuted))),
+                      style: const TextStyle(fontSize: 11, color: RDSColor.textMuted))),
                     const SizedBox(width: 6),
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                       decoration: BoxDecoration(
-                        color: kOrchid.withOpacity(0.15),
-                        borderRadius: BorderRadius.circular(20)),
+                        color: RDSColor.orchid.withOpacity(0.15),
+                        borderRadius: BorderRadius.circular(RDSRadius.xl)),
                       child: Text(t('Opinar', 'Share'),
                         style: const TextStyle(fontSize: 10, color: kOrchid, fontWeight: FontWeight.w700))),
                   ]))),
@@ -10478,7 +10966,7 @@ class _RouteDetailScreenState extends State<RouteDetailScreen> {
     final bool rutaCompleta = completados >= totalSitios;
 
     return Scaffold(
-      backgroundColor: kDark2,
+      backgroundColor: RDSColor.base,
       body: Column(children: [
         // ── HERO CINEMATOGRÁFICO ────────────────────────────────────────────
         Stack(children: [
@@ -10521,9 +11009,9 @@ class _RouteDetailScreenState extends State<RouteDetailScreen> {
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                 decoration: BoxDecoration(
-                  color: kGold.withOpacity(0.15),
+                  color: RDSColor.gold.withOpacity(0.15),
                   borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: kGold.withOpacity(0.5))),
+                  border: Border.all(color: RDSColor.gold.withOpacity(0.5))),
                 child: Text('+${totalSitios * 30} pts',
                   style: const TextStyle(
                     fontFamily: 'SpaceGrotesk',
@@ -10552,7 +11040,7 @@ class _RouteDetailScreenState extends State<RouteDetailScreen> {
                     color: kText, letterSpacing: 0, height: 1.1)),
                 const SizedBox(height: 3),
                 Text(rSubtitulo(widget.ruta),
-                  style: TextStyle(fontSize: 11, color: kText.withOpacity(0.75))),
+                  style: TextStyle(fontSize: 11, color: RDSColor.textPrimary.withOpacity(0.75))),
                 const SizedBox(height: 10),
                 // Barra de progreso integrada en el hero
                 ClipRRect(borderRadius: BorderRadius.circular(4),
@@ -10563,7 +11051,7 @@ class _RouteDetailScreenState extends State<RouteDetailScreen> {
                     minHeight: 4)),
                 const SizedBox(height: 4),
                 Text('$completados ${t("de","of")} $totalSitios ${t("sitios","spots")}',
-                  style: TextStyle(fontSize: 9, color: kText.withOpacity(0.6))),
+                  style: TextStyle(fontSize: 9, color: RDSColor.textPrimary.withOpacity(0.6))),
               ])),
           ]))),
         ]),
@@ -10631,7 +11119,7 @@ class _RouteDetailScreenState extends State<RouteDetailScreen> {
 
           // Progreso detallado — complementa la barra del hero
           Container(padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(color: kCard, borderRadius: BorderRadius.circular(14),
+            decoration: BoxDecoration(color: RDSColor.card, borderRadius: BorderRadius.circular(14),
               border: Border.all(color: acento.withOpacity(0.2))),
             child: Row(children: [
               // Círculo de progreso visual
@@ -10663,9 +11151,9 @@ class _RouteDetailScreenState extends State<RouteDetailScreen> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                 decoration: BoxDecoration(
-                  color: kGold.withOpacity(0.1),
+                  color: RDSColor.gold.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: kGold.withOpacity(0.3))),
+                  border: Border.all(color: RDSColor.gold.withOpacity(0.3))),
                 child: Column(children: [
                   Text('+${totalSitios * 30}',
                     style: const TextStyle(
@@ -10692,12 +11180,12 @@ class _RouteDetailScreenState extends State<RouteDetailScreen> {
 
           // Premio — con insignia ilustrada
           Container(padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(color: kCard, borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: kGold.withOpacity(0.25))),
+            decoration: BoxDecoration(color: RDSColor.card, borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: RDSColor.gold.withOpacity(0.25))),
             child: Row(children: [
               Container(width: 56, height: 56,
                 decoration: BoxDecoration(shape: BoxShape.circle,
-                  color: kGold.withOpacity(0.1), border: Border.all(color: kGold.withOpacity(0.4))),
+                  color: RDSColor.gold.withOpacity(0.1), border: Border.all(color: RDSColor.gold.withOpacity(0.4))),
                 child: widget.ruta['insigniaImg'] != null
                   ? ClipOval(child: Image.asset(widget.ruta['insigniaImg'], width: 56, height: 56, fit: BoxFit.cover,
                       errorBuilder: (_, __, ___) => const Center(child: Text('🏆', style: TextStyle(fontSize: 22)))))
@@ -10743,7 +11231,7 @@ class _RouteDetailScreenState extends State<RouteDetailScreen> {
           const SizedBox(height: 20),
 
           Text(tSitiosDeRuta,
-            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w900, color: kTextMuted, letterSpacing: 2)),
+            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w900, color: RDSColor.textMuted, letterSpacing: 2)),
           const SizedBox(height: 12),
 
           // Mensaje si la ruta no tiene sitios cargados aún
@@ -10752,9 +11240,9 @@ class _RouteDetailScreenState extends State<RouteDetailScreen> {
               margin: const EdgeInsets.only(bottom: 20),
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
-                color: kCard,
+                color: RDSColor.card,
                 borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: kGold.withOpacity(0.2))),
+                border: Border.all(color: RDSColor.gold.withOpacity(0.2))),
               child: Column(children: [
                 const Text('🗺️', style: TextStyle(fontSize: 36)),
                 const SizedBox(height: 12),
@@ -10767,7 +11255,7 @@ class _RouteDetailScreenState extends State<RouteDetailScreen> {
                        'Mientras tanto, explorá el mapa y la descripción.',
                        'The spots for this route will be available soon. '
                        'In the meantime, explore the map and description.'),
-                  style: const TextStyle(fontSize: 13, color: kTextMuted, height: 1.5),
+                  style: const TextStyle(fontSize: 13, color: RDSColor.textMuted, height: 1.5),
                   textAlign: TextAlign.center),
               ])),
 
@@ -10827,9 +11315,9 @@ class _RouteDetailScreenState extends State<RouteDetailScreen> {
               padding: const EdgeInsets.all(14),
               margin: const EdgeInsets.only(bottom: 10),
               decoration: BoxDecoration(
-                color: kGold.withOpacity(0.08),
+                color: RDSColor.gold.withOpacity(0.08),
                 borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: kGold.withOpacity(0.3))),
+                border: Border.all(color: RDSColor.gold.withOpacity(0.3))),
               child: Row(children: [
                 const Text('🔒', style: TextStyle(fontSize: 20)),
                 const SizedBox(width: 10),
@@ -10849,7 +11337,7 @@ class _RouteDetailScreenState extends State<RouteDetailScreen> {
               padding: const EdgeInsets.symmetric(vertical: 14),
               margin: const EdgeInsets.only(bottom: 10),
               decoration: BoxDecoration(
-                color: kCard,
+                color: RDSColor.card,
                 borderRadius: BorderRadius.circular(14),
                 border: Border.all(color: (kRutaColor(widget.ruta['acento'], kGreen)).withOpacity(0.4))),
               child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
@@ -10876,8 +11364,8 @@ class _RouteDetailScreenState extends State<RouteDetailScreen> {
                   showDialog(
                     context: context,
                     builder: (_) => AlertDialog(
-                      backgroundColor: kCard,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                      backgroundColor: RDSColor.card,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(RDSRadius.xl)),
                       title: Text(
                         t('¿Ya estás en el destino?', 'Already at the destination?'),
                         style: const TextStyle(color: kText, fontSize: 16, fontWeight: FontWeight.w800)),
@@ -10914,7 +11402,7 @@ class _RouteDetailScreenState extends State<RouteDetailScreen> {
                   width: double.infinity,
                   padding: const EdgeInsets.symmetric(vertical: 13),
                   decoration: BoxDecoration(
-                    color: kCard,
+                    color: RDSColor.card,
                     borderRadius: BorderRadius.circular(14),
                     border: Border.all(color: acento.withOpacity(0.35))),
                   child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
@@ -10958,9 +11446,9 @@ class CuriosidadCard extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: kGold.withOpacity(0.10),
+        color: RDSColor.gold.withOpacity(0.10),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: kGold.withOpacity(0.35)),
+        border: Border.all(color: RDSColor.gold.withOpacity(0.35)),
       ),
       child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
         const Text('💡', style: TextStyle(fontSize: 24)),
@@ -11039,7 +11527,7 @@ class _RetoCardState extends State<RetoCard> {
             setState(() => _completado = true);
             widget.onCompletado?.call();
             ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-              backgroundColor: kGreen,
+              backgroundColor: RDSColor.green,
               content: Text(t('🎉 ¡Reto completado! +$puntos puntos',
                               '🎉 Challenge completed! +$puntos points')),
               duration: const Duration(seconds: 2)));
@@ -11092,9 +11580,9 @@ class _TriviaCardState extends State<TriviaCard> {
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: kDark3,
+        color: RDSColor.surface,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: kAccent.withOpacity(0.4), width: 1.5),
+        border: Border.all(color: RDSColor.accent.withOpacity(0.4), width: 1.5),
       ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(children: [
@@ -11107,7 +11595,7 @@ class _TriviaCardState extends State<TriviaCard> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
             decoration: BoxDecoration(
-              color: kAccent.withOpacity(0.2),
+              color: RDSColor.accent.withOpacity(0.2),
               borderRadius: BorderRadius.circular(10)),
             child: Text('+$puntos pts',
               style: const TextStyle(color: kAccent, fontSize: 11, fontWeight: FontWeight.w800)),
@@ -11225,8 +11713,8 @@ class MisionEpicaCard extends StatelessWidget {
           colors: [kGold.withOpacity(0.25), kOrchid.withOpacity(0.15)],
           begin: Alignment.topLeft, end: Alignment.bottomRight),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: kGold.withOpacity(0.6), width: 2),
-        boxShadow: [BoxShadow(color: kGold.withOpacity(0.15), blurRadius: 16)],
+        border: Border.all(color: RDSColor.gold.withOpacity(0.6), width: 2),
+        boxShadow: [BoxShadow(color: RDSColor.gold.withOpacity(0.15), blurRadius: 16)],
       ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(children: [
@@ -11242,7 +11730,7 @@ class MisionEpicaCard extends StatelessWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
             decoration: BoxDecoration(
-              color: kGold.withOpacity(0.25),
+              color: RDSColor.gold.withOpacity(0.25),
               borderRadius: BorderRadius.circular(12)),
             child: Text('+$puntos pts',
               style: const TextStyle(color: kGold, fontSize: 12, fontWeight: FontWeight.w800)),
@@ -11372,12 +11860,12 @@ class _SitioInfoScreenState extends State<SitioInfoScreen> {
   Widget build(BuildContext context) {
     final Color acento = kRutaColor(widget.ruta['acento'], kGreen);
     return Scaffold(
-      backgroundColor: kDark2,
+      backgroundColor: RDSColor.base,
       body: Column(children: [
         // ── Header compacto con botón de regreso y contador ──
         Container(
           decoration: BoxDecoration(
-            color: kDark2,
+            color: RDSColor.base,
             border: Border(bottom: BorderSide(color: acento.withOpacity(0.15)))),
           child: SafeArea(
             bottom: false,
@@ -11485,7 +11973,7 @@ class _SitioInfoScreenState extends State<SitioInfoScreen> {
 
             const SizedBox(height: 16),
             Container(padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(color: kCard, borderRadius: BorderRadius.circular(14),
+              decoration: BoxDecoration(color: RDSColor.card, borderRadius: BorderRadius.circular(14),
                 border: Border.all(color: acento.withOpacity(0.2))),
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Row(children: [const Text('📍', style: TextStyle(fontSize: 18)), const SizedBox(width: 8),
@@ -11503,7 +11991,7 @@ class _SitioInfoScreenState extends State<SitioInfoScreen> {
               ])),
             const SizedBox(height: 12),
             Container(padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(color: kCard, borderRadius: BorderRadius.circular(14),
+              decoration: BoxDecoration(color: RDSColor.card, borderRadius: BorderRadius.circular(14),
                 border: Border.all(color: Colors.white.withOpacity(0.06))),
               child: Row(children: [
                 const Text('🚗', style: TextStyle(fontSize: 22)),
@@ -11516,7 +12004,7 @@ class _SitioInfoScreenState extends State<SitioInfoScreen> {
             const SizedBox(height: 12),
             _cargandoGps
               ? Container(padding: const EdgeInsets.all(14),
-                  decoration: BoxDecoration(color: kCard, borderRadius: BorderRadius.circular(14),
+                  decoration: BoxDecoration(color: RDSColor.card, borderRadius: BorderRadius.circular(14),
                     border: Border.all(color: Colors.white.withOpacity(0.08))),
                   child: Row(children: [
                     SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: acento)),
@@ -11556,8 +12044,8 @@ class _SitioInfoScreenState extends State<SitioInfoScreen> {
                       GestureDetector(
                         onTap: () { setState(() { _cargandoGps = true; _errorGps = false; }); _verificarUbicacion(); },
                         child: Container(padding: const EdgeInsets.all(6),
-                          decoration: BoxDecoration(color: kCard, borderRadius: BorderRadius.circular(8)),
-                          child: const Icon(Icons.refresh, color: kTextMuted, size: 16))),
+                          decoration: BoxDecoration(color: RDSColor.card, borderRadius: BorderRadius.circular(8)),
+                          child: const Icon(Icons.refresh, color: RDSColor.textMuted, size: 16))),
                   ])),
             const SizedBox(height: 28),
             GestureDetector(
@@ -11855,7 +12343,7 @@ class _CameraScreenState extends State<CameraScreen> with SingleTickerProviderSt
             const SizedBox(width: 8),
             Text(tFotoGuardada, style: const TextStyle(fontWeight: FontWeight.w600)),
           ]),
-          backgroundColor: kGreen,
+          backgroundColor: RDSColor.green,
           duration: const Duration(seconds: 3)));
       }
     } catch (e) {
@@ -11873,7 +12361,7 @@ class _CameraScreenState extends State<CameraScreen> with SingleTickerProviderSt
         height: MediaQuery.of(context).size.height * 0.85,
         decoration: const BoxDecoration(
           color: Color(0xFF0D0D0D),
-          borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(RDSRadius.xl))),
         child: Column(children: [
           // Handle
           Container(margin: const EdgeInsets.only(top: 12),
@@ -11889,9 +12377,9 @@ class _CameraScreenState extends State<CameraScreen> with SingleTickerProviderSt
             margin: const EdgeInsets.symmetric(horizontal: 16),
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             decoration: BoxDecoration(
-              color: kGold.withOpacity(0.15),
+              color: RDSColor.gold.withOpacity(0.15),
               borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: kGold.withOpacity(0.4))),
+              border: Border.all(color: RDSColor.gold.withOpacity(0.4))),
             child: const Row(mainAxisSize: MainAxisSize.min, children: [
               Text('📱', style: TextStyle(fontSize: 16)),
               SizedBox(width: 8),
@@ -11930,8 +12418,8 @@ class _CameraScreenState extends State<CameraScreen> with SingleTickerProviderSt
                   errorBuilder: (_, __, ___) => Container(
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                     decoration: BoxDecoration(
-                      color: kGreen.withOpacity(0.9),
-                      borderRadius: BorderRadius.circular(20)),
+                      color: RDSColor.green.withOpacity(0.9),
+                      borderRadius: BorderRadius.circular(RDSRadius.xl)),
                     child: const Row(mainAxisSize: MainAxisSize.min, children: [
                       Text('📍', style: TextStyle(fontSize: 12)),
                       SizedBox(width: 4),
@@ -11966,9 +12454,9 @@ class _CameraScreenState extends State<CameraScreen> with SingleTickerProviderSt
                 child: Container(
                   padding: const EdgeInsets.symmetric(vertical: 14),
                   decoration: BoxDecoration(
-                    gradient: const LinearGradient(colors: [kGreen, Color(0xFF00C853)]),
+                    gradient: const LinearGradient(colors: [RDSColor.green, Color(0xFF00C853)]),
                     borderRadius: BorderRadius.circular(14),
-                    boxShadow: [BoxShadow(color: kGreen.withOpacity(0.4), blurRadius: 12)]),
+                    boxShadow: [BoxShadow(color: RDSColor.green.withOpacity(0.4), blurRadius: 12)]),
                   child: Column(children: [
                     const Text('✅', style: TextStyle(fontSize: 22)),
                     const SizedBox(height: 4),
@@ -12207,7 +12695,7 @@ class _CameraScreenState extends State<CameraScreen> with SingleTickerProviderSt
                 child: const Center(child: Text('←', style: TextStyle(color: Colors.white, fontSize: 16))))),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              decoration: BoxDecoration(color: Colors.black.withOpacity(0.6), borderRadius: BorderRadius.circular(20)),
+              decoration: BoxDecoration(color: Colors.black.withOpacity(0.6), borderRadius: BorderRadius.circular(RDSRadius.xl)),
               child: Row(children: [
                 Container(width: 6, height: 6,
                   decoration: BoxDecoration(
@@ -12425,8 +12913,8 @@ class _RewardScreenState extends State<RewardScreen>
     showDialog(
       context: context,
       builder: (_) => AlertDialog(
-        backgroundColor: kCard,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        backgroundColor: RDSColor.card,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(RDSRadius.xl)),
         title: Row(children: [
           const Text('📤', style: TextStyle(fontSize: 22)),
           const SizedBox(width: 8),
@@ -12437,8 +12925,8 @@ class _RewardScreenState extends State<RewardScreen>
           Container(
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
-              color: kDark3, borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: kGreen.withOpacity(0.2))),
+              color: RDSColor.surface, borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: RDSColor.green.withOpacity(0.2))),
             child: Text(texto,
               style: const TextStyle(color: kText, fontSize: 13, height: 1.5))),
         ]),
@@ -12451,7 +12939,7 @@ class _RewardScreenState extends State<RewardScreen>
               ScaffoldMessenger.of(context).showSnackBar(SnackBar(
                 content: Text(t('¡Listo! Copia el texto y pégalo en tus redes 🚀',
                   'Done! Copy the text and paste it on your socials 🚀')),
-                backgroundColor: kGreen, duration: const Duration(seconds: 3)));
+                backgroundColor: RDSColor.green, duration: const Duration(seconds: 3)));
             },
             child: Text(t('¡LISTO!','DONE!'),
               style: const TextStyle(color: kGreen, fontWeight: FontWeight.w800))),
@@ -12464,7 +12952,7 @@ class _RewardScreenState extends State<RewardScreen>
     final esUltimo = widget.sitioNumero >= widget.totalSitios;
 
     return Scaffold(
-      backgroundColor: kDark2,
+      backgroundColor: RDSColor.base,
       body: Stack(children: [
         // ── Fondo con gradiente radial ──
         Positioned.fill(child: Container(
@@ -12552,7 +13040,7 @@ class _RewardScreenState extends State<RewardScreen>
                   ? t('¡Completaste todos los sitios de esta ruta!',
                       'You completed all spots on this route!')
                   : '${widget.sitioEmoji} ${t("completado","completed")} · ${t("Sitio","Spot")} ${widget.sitioNumero} ${t("de","of")} ${widget.totalSitios}',
-                style: TextStyle(fontSize: 13, color: kText.withOpacity(0.55), height: 1.4),
+                style: TextStyle(fontSize: 13, color: RDSColor.textPrimary.withOpacity(0.55), height: 1.4),
                 textAlign: TextAlign.center),
 
               const SizedBox(height: 28),
@@ -12592,10 +13080,10 @@ class _RewardScreenState extends State<RewardScreen>
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: kCard,
+                  color: RDSColor.card,
                   borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: kGold.withOpacity(0.25)),
-                  boxShadow: [BoxShadow(color: kGold.withOpacity(0.05), blurRadius: 16)]),
+                  border: Border.all(color: RDSColor.gold.withOpacity(0.25)),
+                  boxShadow: [BoxShadow(color: RDSColor.gold.withOpacity(0.05), blurRadius: 16)]),
                 child: Row(children: [
                   Container(width: 52, height: 52,
                     decoration: BoxDecoration(
@@ -12634,7 +13122,7 @@ class _RewardScreenState extends State<RewardScreen>
                   padding: const EdgeInsets.symmetric(vertical: 14),
                   margin: const EdgeInsets.only(bottom: 12),
                   decoration: BoxDecoration(
-                    color: kCard,
+                    color: RDSColor.card,
                     borderRadius: BorderRadius.circular(14),
                     border: Border.all(color: acento.withOpacity(0.35))),
                   child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
@@ -12672,7 +13160,7 @@ class _RewardStat extends StatelessWidget {
     const SizedBox(height: 2),
     Text(label, style: const TextStyle(
       fontFamily: 'Inter',
-      fontSize: 10, color: kTextMuted, letterSpacing: 0.3)),
+      fontSize: 10, color: RDSColor.textMuted, letterSpacing: 0.3)),
   ]);
 }
 
@@ -12727,9 +13215,9 @@ class ProfileScreen extends StatelessWidget {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: kCard,
+      backgroundColor: RDSColor.card,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(RDSRadius.xl))),
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setModal) => Padding(
           padding: EdgeInsets.only(
@@ -12738,7 +13226,7 @@ class ProfileScreen extends StatelessWidget {
           child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
 
             Text(t('Editar perfil','Edit profile'),
-              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: kText)),
+              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: RDSColor.textPrimary)),
             const SizedBox(height: 16),
 
             // Foto de perfil
@@ -12766,8 +13254,8 @@ class ProfileScreen extends StatelessWidget {
                 Container(width: 80, height: 80,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    border: Border.all(color: kGold.withOpacity(0.5), width: 2),
-                    boxShadow: [BoxShadow(color: kGold.withOpacity(0.2), blurRadius: 12)]),
+                    border: Border.all(color: RDSColor.gold.withOpacity(0.5), width: 2),
+                    boxShadow: [BoxShadow(color: RDSColor.gold.withOpacity(0.2), blurRadius: 12)]),
                   child: ClipOval(child: user?.photoURL != null
                     ? Image.network(user!.photoURL!, fit: BoxFit.cover,
                         errorBuilder: (_, __, ___) => const Center(
@@ -12777,7 +13265,7 @@ class ProfileScreen extends StatelessWidget {
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     color: kGreen,
-                    border: Border.all(color: kCard, width: 2)),
+                    border: Border.all(color: RDSColor.card, width: 2)),
                   child: const Center(child: Text('📷', style: TextStyle(fontSize: 12)))),
               ]))),
 
@@ -12785,7 +13273,7 @@ class ProfileScreen extends StatelessWidget {
 
             // Campo nombre
             Container(
-              decoration: BoxDecoration(color: kDark3, borderRadius: BorderRadius.circular(12),
+              decoration: BoxDecoration(color: RDSColor.surface, borderRadius: BorderRadius.circular(12),
                 border: Border.all(color: Colors.white.withOpacity(0.1))),
               child: TextField(
                 controller: nombreCtrl,
@@ -12802,7 +13290,7 @@ class ProfileScreen extends StatelessWidget {
 
             // Email (no editable)
             Container(padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(color: kDark3, borderRadius: BorderRadius.circular(12),
+              decoration: BoxDecoration(color: RDSColor.surface, borderRadius: BorderRadius.circular(12),
                 border: Border.all(color: Colors.white.withOpacity(0.06))),
               child: Row(children: [
                 const Text('📧', style: TextStyle(fontSize: 16)),
@@ -12831,7 +13319,7 @@ class ProfileScreen extends StatelessWidget {
                   Navigator.pop(ctx);
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(content: Text(t('✅ Perfil actualizado','✅ Profile updated')),
-                      backgroundColor: kGreen,
+                      backgroundColor: RDSColor.green,
                       duration: const Duration(seconds: 2)));
                 }
               }),
@@ -12844,14 +13332,14 @@ class ProfileScreen extends StatelessWidget {
     bool eventos = false;
     showModalBottomSheet(
       context: context,
-      backgroundColor: kCard,
+      backgroundColor: RDSColor.card,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(RDSRadius.xl))),
       builder: (_) => StatefulBuilder(
         builder: (ctx, setModalState) => Padding(
           padding: const EdgeInsets.all(24),
           child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(t('Notificaciones','Notifications'), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: kText)),
+            Text(t('Notificaciones','Notifications'), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: RDSColor.textPrimary)),
             const SizedBox(height: 16),
             _SwitchTile(
               emoji: '🗺️', titulo: 'Rutas nuevas',
@@ -12878,9 +13366,9 @@ class ProfileScreen extends StatelessWidget {
     String idiomaSeleccionado = kLang == 'en' ? 'English' : 'Español';
     showModalBottomSheet(
       context: context,
-      backgroundColor: kCard,
+      backgroundColor: RDSColor.card,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(RDSRadius.xl))),
       builder: (_) => StatefulBuilder(
         builder: (ctx, setModalState) {
           Widget _idiomaItem(String idioma) => GestureDetector(
@@ -12902,14 +13390,14 @@ class ProfileScreen extends StatelessWidget {
                     fontSize: 14, fontWeight: FontWeight.w600))),
                 if (idiomaSeleccionado == idioma)
                   Container(width: 20, height: 20,
-                    decoration: const BoxDecoration(shape: BoxShape.circle, color: kGreen),
+                    decoration: const BoxDecoration(shape: BoxShape.circle, color: RDSColor.green),
                     child: const Center(child: Text('✓',
                       style: TextStyle(color: Colors.white, fontSize: 12)))),
               ])));
           return Padding(
             padding: const EdgeInsets.all(24),
             child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(t('Idioma', 'Language'), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: kText)),
+              Text(t('Idioma', 'Language'), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: RDSColor.textPrimary)),
               const SizedBox(height: 4),
               Text(t('Próximamente disponible en más idiomas', 'More languages coming soon'),
                 style: const TextStyle(color: kTextMuted, fontSize: 12)),
@@ -12930,10 +13418,10 @@ class ProfileScreen extends StatelessWidget {
   void _mostrarAudio(BuildContext context) {
     showModalBottomSheet(
       context: context,
-      backgroundColor: kCard,
+      backgroundColor: RDSColor.card,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(RDSRadius.xl))),
       builder: (_) => StatefulBuilder(
         builder: (ctx, setModalState) => Padding(
           padding: const EdgeInsets.all(24),
@@ -12946,14 +13434,14 @@ class ProfileScreen extends StatelessWidget {
               const Text('🎵', style: TextStyle(fontSize: 24)),
               const SizedBox(width: 10),
               Text(tConfigAudio,
-                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: kText)),
+                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: RDSColor.textPrimary)),
             ]),
             const SizedBox(height: 24),
 
             // Silenciar todo
             Container(padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(color: kDark3, borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: kGreen.withOpacity(0.2))),
+              decoration: BoxDecoration(color: RDSColor.surface, borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: RDSColor.green.withOpacity(0.2))),
               child: Row(children: [
                 const Text('🔇', style: TextStyle(fontSize: 22)),
                 const SizedBox(width: 12),
@@ -12973,7 +13461,7 @@ class ProfileScreen extends StatelessWidget {
 
             // Volumen música
             Container(padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(color: kDark3, borderRadius: BorderRadius.circular(14),
+              decoration: BoxDecoration(color: RDSColor.surface, borderRadius: BorderRadius.circular(14),
                 border: Border.all(color: Colors.white.withOpacity(0.06))),
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Row(children: [
@@ -13002,7 +13490,7 @@ class ProfileScreen extends StatelessWidget {
 
             // Volumen efectos
             Container(padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(color: kDark3, borderRadius: BorderRadius.circular(14),
+              decoration: BoxDecoration(color: RDSColor.surface, borderRadius: BorderRadius.circular(14),
                 border: Border.all(color: Colors.white.withOpacity(0.06))),
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Row(children: [
@@ -13035,7 +13523,7 @@ class ProfileScreen extends StatelessWidget {
               child: Container(width: double.infinity,
                 padding: const EdgeInsets.symmetric(vertical: 14),
                 decoration: BoxDecoration(
-                  gradient: const LinearGradient(colors: [kGold, kGoldLight]),
+                  gradient: const LinearGradient(colors: [RDSColor.gold, kGoldLight]),
                   borderRadius: BorderRadius.circular(14)),
                 child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
                   const Text('🎉', style: TextStyle(fontSize: 18)),
@@ -13051,9 +13539,9 @@ class ProfileScreen extends StatelessWidget {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: kCard,
+      backgroundColor: RDSColor.card,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(RDSRadius.xl))),
       builder: (_) => DraggableScrollableSheet(
         initialChildSize: 0.75,
         maxChildSize: 0.95,
@@ -13063,7 +13551,7 @@ class ProfileScreen extends StatelessWidget {
           controller: ctrl,
           padding: const EdgeInsets.all(24),
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(t('Ayuda y soporte','Help & support'), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: kText)),
+            Text(t('Ayuda y soporte','Help & support'), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: RDSColor.textPrimary)),
             const SizedBox(height: 20),
             ...[
               {'q': t('¿Cómo funciona Rutero MDE?','How does Rutero MDE work?'), 'a': t('Explora una ruta gratis, visita los sitios en orden, toma una foto en cada lugar para validar tu visita y colecciona insignias al completarla.','Explore a route for free, visit the stops in order, take a photo at each spot to validate your visit and collect badges when you complete it.')},
@@ -13075,7 +13563,7 @@ class ProfileScreen extends StatelessWidget {
             ].map((faq) => Container(
               margin: const EdgeInsets.only(bottom: 10),
               padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(color: kDark3, borderRadius: BorderRadius.circular(12),
+              decoration: BoxDecoration(color: RDSColor.surface, borderRadius: BorderRadius.circular(12),
                 border: Border.all(color: Colors.white.withOpacity(0.06))),
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Row(children: [
@@ -13089,9 +13577,9 @@ class ProfileScreen extends StatelessWidget {
               ]))),
             const SizedBox(height: 16),
             Container(padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(color: kGreen.withOpacity(0.1),
+              decoration: BoxDecoration(color: RDSColor.green.withOpacity(0.1),
                 borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: kGreen.withOpacity(0.3))),
+                border: Border.all(color: RDSColor.green.withOpacity(0.3))),
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Text(tNecesitasAyuda, style: const TextStyle(color: kGreen, fontSize: 13, fontWeight: FontWeight.w700)),
                 SizedBox(height: 4),
@@ -13106,7 +13594,7 @@ class ProfileScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: kDark2,
+      backgroundColor: RDSColor.base,
       body: SingleChildScrollView(child: Column(children: [
         // Header con banner aliados integrado como fondo
         Stack(children: [
@@ -13143,9 +13631,9 @@ class ProfileScreen extends StatelessWidget {
                     Stack(alignment: Alignment.bottomRight, children: [
                       Container(width: 100, height: 100,
                         decoration: BoxDecoration(shape: BoxShape.circle,
-                          color: kCard,
-                          border: Border.all(color: kGold.withOpacity(0.5), width: 2),
-                          boxShadow: [BoxShadow(color: kGold.withOpacity(0.25), blurRadius: 24, spreadRadius: 2)]),
+                          color: RDSColor.card,
+                          border: Border.all(color: RDSColor.gold.withOpacity(0.5), width: 2),
+                          boxShadow: [BoxShadow(color: RDSColor.gold.withOpacity(0.25), blurRadius: 24, spreadRadius: 2)]),
                         child: ClipOval(child: AuthService.currentUser?.photoURL != null
                           ? Image.network(AuthService.currentUser!.photoURL!,
                               fit: BoxFit.cover,
@@ -13157,16 +13645,16 @@ class ProfileScreen extends StatelessWidget {
                         // Emoji nivel
                         Container(width: 28, height: 28,
                           decoration: BoxDecoration(shape: BoxShape.circle,
-                            color: kDark2,
-                            border: Border.all(color: kGold.withOpacity(0.4), width: 1.5)),
+                            color: RDSColor.base,
+                            border: Border.all(color: RDSColor.gold.withOpacity(0.4), width: 1.5)),
                           child: Center(child: Text(nivelEmoji, style: const TextStyle(fontSize: 14)))),
                         const SizedBox(width: 4),
                         // Lápiz
                         GestureDetector(
                           onTap: () => _mostrarEditarPerfil(context),
                           child: Container(width: 30, height: 30,
-                            decoration: BoxDecoration(shape: BoxShape.circle, color: kCard,
-                              border: Border.all(color: kGold.withOpacity(0.5), width: 1.5)),
+                            decoration: BoxDecoration(shape: BoxShape.circle, color: RDSColor.card,
+                              border: Border.all(color: RDSColor.gold.withOpacity(0.5), width: 1.5)),
                             child: const Center(child: Text('✏️', style: TextStyle(fontSize: 14))))),
                       ]),
                     ]),
@@ -13182,23 +13670,23 @@ class ProfileScreen extends StatelessWidget {
                       const Text('📧', style: TextStyle(fontSize: 11)),
                       const SizedBox(width: 4),
                       Text(AuthService.currentUser?.email ?? '',
-                        style: TextStyle(fontSize: 10, color: kText.withOpacity(0.45))),
+                        style: TextStyle(fontSize: 10, color: RDSColor.textPrimary.withOpacity(0.45))),
                     ]),
                     const SizedBox(height: 12),
                     // Badge nivel dinámico
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
                       decoration: BoxDecoration(
-                        color: kGold.withOpacity(0.1),
+                        color: RDSColor.gold.withOpacity(0.1),
                         borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: kGold.withOpacity(0.4))),
+                        border: Border.all(color: RDSColor.gold.withOpacity(0.4))),
                       child: Row(mainAxisSize: MainAxisSize.min, children: [
                         Text(nivelEmoji, style: const TextStyle(fontSize: 13)),
                         const SizedBox(width: 6),
                         Text('NV. $nivelIdx · ${nombreNivel.toUpperCase()}',
                           style: const TextStyle(
                             fontFamily: 'SpaceGrotesk',
-                            fontSize: 10, color: kGold,
+                            fontSize: 10, color: RDSColor.gold,
                             letterSpacing: 1.5, fontWeight: FontWeight.w700)),
                       ])),
                   ]);
@@ -13240,7 +13728,7 @@ class ProfileScreen extends StatelessWidget {
 
           // Nivel dinámico
           Text(tProgresoNivel,
-            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w900, color: kTextMuted, letterSpacing: 2)),
+            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w900, color: RDSColor.textMuted, letterSpacing: 2)),
           const SizedBox(height: 12),
           StreamBuilder<DocumentSnapshot>(
             stream: AuthService.currentUser != null
@@ -13265,8 +13753,8 @@ class ProfileScreen extends StatelessWidget {
                 : 1.0;
               final ptsFaltantes = maxNivel < 99999 ? maxNivel + 1 - puntos : 0;
               return Container(padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(color: kCard, borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: kGold.withOpacity(0.15))),
+                decoration: BoxDecoration(color: RDSColor.card, borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: RDSColor.gold.withOpacity(0.15))),
                 child: Column(children: [
                   Row(children: [
                     Container(width: 36, height: 36,
@@ -13280,7 +13768,7 @@ class ProfileScreen extends StatelessWidget {
                         style: const TextStyle(color: kTextMuted, fontSize: 11)),
                     ])),
                     Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(color: kGold.withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
+                      decoration: BoxDecoration(color: RDSColor.gold.withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
                       child: Text('${(progreso * 100).toInt()}%',
                         style: const TextStyle(color: kGold, fontSize: 12, fontWeight: FontWeight.w700))),
                   ]),
@@ -13300,10 +13788,10 @@ class ProfileScreen extends StatelessWidget {
                     Text(maxNivel < 99999
                       ? '$ptsFaltantes ${t("pts para","pts to")} ${nivel['siguiente']} 🎯'
                       : t('¡Leyenda de Medellín! 🏆','Medellín Legend! 🏆'),
-                      style: TextStyle(color: kTextMuted.withOpacity(0.7), fontSize: 10)),
+                      style: TextStyle(color: RDSColor.textMuted.withOpacity(0.7), fontSize: 10)),
                     if (maxNivel < 99999)
                       Text('${t("Próximo","Next")}: ${nivel['siguiente']}',
-                        style: TextStyle(color: kGold.withOpacity(0.5), fontSize: 10)),
+                        style: TextStyle(color: RDSColor.gold.withOpacity(0.5), fontSize: 10)),
                   ]),
                 ]));
             }),
@@ -13313,7 +13801,7 @@ class ProfileScreen extends StatelessWidget {
           // Insignias
           Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
             Text(tInsigniasRecientes,
-              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w900, color: kTextMuted, letterSpacing: 2)),
+              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w900, color: RDSColor.textMuted, letterSpacing: 2)),
             GestureDetector(
               onTap: () => Navigator.of(context, rootNavigator: false).push(MaterialPageRoute(builder: (_) => const AchievementsScreen())),
               child: Text(tVerTodas, style: const TextStyle(color: kGold, fontSize: 11))),
@@ -13338,15 +13826,15 @@ class ProfileScreen extends StatelessWidget {
 
           // Menú
           Text(tConfiguracion,
-            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w900, color: kTextMuted, letterSpacing: 2)),
+            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w900, color: RDSColor.textMuted, letterSpacing: 2)),
           const SizedBox(height: 12),
           GestureDetector(
             onTap: () => Navigator.of(context, rootNavigator: false).push(MaterialPageRoute(builder: (_) => const MisPremiosScreen())),
             child: Container(
               margin: const EdgeInsets.only(bottom: 8),
               padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(color: kCard, borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: kGold.withOpacity(0.3))),
+              decoration: BoxDecoration(color: RDSColor.card, borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: RDSColor.gold.withOpacity(0.3))),
               child: Row(children: [
                 const Text('🏆', style: TextStyle(fontSize: 22)),
                 const SizedBox(width: 14),
@@ -13354,7 +13842,7 @@ class ProfileScreen extends StatelessWidget {
                   Text(tMisPremiosPerfil, style: const TextStyle(color: kGold, fontSize: 14, fontWeight: FontWeight.w600)),
                   Text(tCodigosQR, style: const TextStyle(color: kTextMuted, fontSize: 11)),
                 ])),
-                const Icon(Icons.chevron_right, color: kTextMuted, size: 18),
+                const Icon(Icons.chevron_right, color: RDSColor.textMuted, size: 18),
               ]))),
           _ProfileMenuItem(
             emoji: '📸', label: t('Mis fotos','My photos'),
@@ -13492,7 +13980,7 @@ class AchievementsScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final user = AuthService.currentUser;
-    if (user == null) return const Scaffold(backgroundColor: kDark2,
+    if (user == null) return const Scaffold(backgroundColor: RDSColor.base,
       body: Center(child: Text('Inicia sesión para ver tus logros',
         style: TextStyle(color: kTextMuted))));
 
@@ -13508,7 +13996,7 @@ class AchievementsScreen extends StatelessWidget {
       }).toList();
 
     return Scaffold(
-      backgroundColor: kDark2,
+      backgroundColor: RDSColor.base,
       body: StreamBuilder<QuerySnapshot>(
         stream: FirebaseFirestore.instance
           .collection('usuarios').doc(user.uid)
@@ -13533,8 +14021,8 @@ class AchievementsScreen extends StatelessWidget {
             // ── Header ──
             Container(
               decoration: BoxDecoration(
-                color: kDark2,
-                border: Border(bottom: BorderSide(color: kGold.withOpacity(0.1)))),
+                color: RDSColor.base,
+                border: Border(bottom: BorderSide(color: RDSColor.gold.withOpacity(0.1)))),
               child: SafeArea(bottom: false, child: Padding(
                 padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
                 child: Column(children: [
@@ -13545,7 +14033,7 @@ class AchievementsScreen extends StatelessWidget {
                           decoration: BoxDecoration(
                             color: Colors.white.withOpacity(0.06),
                             shape: BoxShape.circle,
-                            border: Border.all(color: kGold.withOpacity(0.2))),
+                            border: Border.all(color: RDSColor.gold.withOpacity(0.2))),
                           child: const Center(child: Text('←',
                             style: TextStyle(color: kText, fontSize: 16))))),
                     if (Navigator.canPop(context)) const SizedBox(width: 12),
@@ -13559,11 +14047,11 @@ class AchievementsScreen extends StatelessWidget {
                   const SizedBox(height: 16),
                   Row(mainAxisAlignment: MainAxisAlignment.spaceAround, children: [
                     _LogroStat(valor: '${ganadas.length}',
-                      label: t('Desbloqueadas','Unlocked'), color: kGold),
+                      label: t('Desbloqueadas','Unlocked'), color: RDSColor.gold),
                     _LogroStat(valor: '${todasInsignias.length}',
-                      label: t('Total','Total'), color: kTextMuted),
+                      label: t('Total','Total'), color: RDSColor.textMuted),
                     _LogroStat(valor: '$puntosTotal',
-                      label: t('Puntos','Points'), color: kGreen),
+                      label: t('Puntos','Points'), color: RDSColor.green),
                   ]),
                   const SizedBox(height: 12),
                   ClipRRect(borderRadius: BorderRadius.circular(4),
@@ -13578,7 +14066,7 @@ class AchievementsScreen extends StatelessWidget {
                     '${((ganadas.length / (todasInsignias.isEmpty ? 1 : todasInsignias.length)) * 100).toInt()}% ${t("de la colección","of the collection")}',
                     style: const TextStyle(
                       fontFamily: 'SpaceGrotesk',
-                      fontSize: 10, color: kGold)),
+                      fontSize: 10, color: RDSColor.gold)),
                 ])))),
             Expanded(child: SingleChildScrollView(
               padding: const EdgeInsets.fromLTRB(16, 20, 16, 80),
@@ -13586,7 +14074,7 @@ class AchievementsScreen extends StatelessWidget {
                 if (ganadas.isNotEmpty) ...[
                   Text(tDesbloqueados,
                     style: const TextStyle(fontFamily: 'SpaceGrotesk',
-                      fontSize: 11, color: kGold,
+                      fontSize: 11, color: RDSColor.gold,
                       fontWeight: FontWeight.w700, letterSpacing: 2)),
                   const SizedBox(height: 12),
                   GridView.builder(
@@ -13603,7 +14091,7 @@ class AchievementsScreen extends StatelessWidget {
                 ],
                 Text(tPorDesbloquearTab,
                   style: const TextStyle(fontFamily: 'SpaceGrotesk',
-                    fontSize: 11, color: kTextMuted,
+                    fontSize: 11, color: RDSColor.textMuted,
                     fontWeight: FontWeight.w700, letterSpacing: 2)),
                 const SizedBox(height: 12),
                 GridView.builder(
@@ -13642,11 +14130,11 @@ class _InsigniaCell extends StatelessWidget {
     onTap: onTap,
     child: Container(
       decoration: BoxDecoration(
-        color: kCard, borderRadius: BorderRadius.circular(16),
+        color: RDSColor.card, borderRadius: BorderRadius.circular(16),
         border: Border.all(
           color: desbloqueada ? kGold.withOpacity(0.35) : Colors.white.withOpacity(0.06)),
         boxShadow: desbloqueada
-          ? [BoxShadow(color: kGold.withOpacity(0.1), blurRadius: 12)] : null),
+          ? [BoxShadow(color: RDSColor.gold.withOpacity(0.1), blurRadius: 12)] : null),
       child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
         Container(width: 64, height: 64,
           decoration: BoxDecoration(shape: BoxShape.circle,
@@ -13660,7 +14148,7 @@ class _InsigniaCell extends StatelessWidget {
                   child: Text(insignia['emoji'] ?? '🏅',
                     style: const TextStyle(fontSize: 28)))))
             : const Center(child: Text('🔒',
-                style: TextStyle(fontSize: 26, color: kTextMuted)))),
+                style: TextStyle(fontSize: 26, color: RDSColor.textMuted)))),
         const SizedBox(height: 8),
         Padding(padding: const EdgeInsets.symmetric(horizontal: 6),
           child: Text(insignia['nombre'] ?? '',
@@ -13688,7 +14176,7 @@ class _InsigniaDetalleSheet extends StatelessWidget {
     final acento = kRutaColor(ruta['acento'], kGold);
 
     return Container(
-      decoration: const BoxDecoration(color: kCard,
+      decoration: const BoxDecoration(color: RDSColor.card,
         borderRadius: BorderRadius.vertical(top: Radius.circular(28))),
       padding: const EdgeInsets.fromLTRB(24, 12, 24, 36),
       child: Column(mainAxisSize: MainAxisSize.min, children: [
@@ -13711,11 +14199,11 @@ class _InsigniaDetalleSheet extends StatelessWidget {
                   child: Text(insignia['emoji'] ?? '🏅',
                     style: const TextStyle(fontSize: 52)))))
             : const Center(child: Text('🔒',
-                style: TextStyle(fontSize: 48, color: kTextMuted)))),
+                style: TextStyle(fontSize: 48, color: RDSColor.textMuted)))),
         const SizedBox(height: 20),
         Text(insignia['nombre'] ?? '',
           style: const TextStyle(fontFamily: 'PlayfairDisplay',
-            fontSize: 22, fontWeight: FontWeight.w900, color: kText),
+            fontSize: 22, fontWeight: FontWeight.w900, color: RDSColor.textPrimary),
           textAlign: TextAlign.center),
         const SizedBox(height: 6),
         Text(insignia['rutaNombre'] ?? '',
@@ -15661,15 +16149,15 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
 
     showModalBottomSheet(
       context: context,
-      backgroundColor: kCard,
+      backgroundColor: RDSColor.card,
       shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(RDSRadius.xl))),
       builder: (_) => Padding(
         padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
         child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
           // Handle
           Center(child: Container(width: 40, height: 4,
-              decoration: BoxDecoration(color: kTextMuted.withOpacity(0.4),
+              decoration: BoxDecoration(color: RDSColor.textMuted.withOpacity(0.4),
                   borderRadius: BorderRadius.circular(2)))),
           const SizedBox(height: 16),
           // Header
@@ -15741,13 +16229,13 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
   void _mostrarAlertaBloqueado(String ruta) {
     final sitio = kSitiosMapa.firstWhere(
       (s) => s.ruta == ruta,
-      orElse: () => _SitioMapa(nombre:'', emoji:'🗺️', posicion: const LatLng(0,0), ruta: ruta, color: kGold));
+      orElse: () => _SitioMapa(nombre:'', emoji:'🗺️', posicion: const LatLng(0,0), ruta: ruta, color: RDSColor.gold));
     final String emoji = sitio.emoji.isNotEmpty ? sitio.emoji : '🗺️';
     showModalBottomSheet(
       context: context,
-      backgroundColor: kCard,
+      backgroundColor: RDSColor.card,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(RDSRadius.xl))),
       builder: (_) => Padding(
         padding: const EdgeInsets.all(24),
         child: Column(mainAxisSize: MainAxisSize.min, children: [
@@ -15785,7 +16273,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
                   content: Text(t(
                     '🚧 Esta ruta estará disponible pronto',
                     '🚧 This route will be available soon')),
-                  backgroundColor: kDark2,
+                  backgroundColor: RDSColor.base,
                   duration: const Duration(seconds: 2)));
                 return;
               }
@@ -15805,7 +16293,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
                     : [kGreen, kGreen.withOpacity(0.7)]),
                   borderRadius: BorderRadius.circular(14),
                   border: esPausada
-                    ? Border.all(color: kTextMuted.withOpacity(0.3))
+                    ? Border.all(color: RDSColor.textMuted.withOpacity(0.3))
                     : null),
                 child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
                   Text(esPausada ? '🚧' : '🗺️', style: const TextStyle(fontSize: 18)),
@@ -15901,10 +16389,305 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
     return lines;
   }
 
+  // ═══════════════════════════════════════════════════════════════════════
+  //  FEATURE 1 — RUTAS SUGERIDAS POR PROXIMIDAD
+  // ═══════════════════════════════════════════════════════════════════════
+  List<Map<String, dynamic>> _rutasCercanas({required LatLng desde, int cantidad = 3}) {
+    final rutas = RutasService().rutas
+      .where((r) => r['activa'] != false && r['pausada'] != true)
+      .toList();
+    final conDistancia = <Map<String, dynamic>>[];
+    for (final ruta in rutas) {
+      final detalle = parseSitiosDetalle(ruta['sitiosDetalle']);
+      final gpsRaw  = ruta['gpsSitios'];
+      final gpsList = gpsRaw is List ? gpsRaw : <dynamic>[];
+      LatLng? primerSitio;
+      if (detalle.isNotEmpty && detalle.first is Map) {
+        final s = detalle.first as Map;
+        final lat = (s['lat'] as num?)?.toDouble();
+        final lng = (s['lng'] as num?)?.toDouble();
+        if (lat != null && lng != null) primerSitio = LatLng(lat, lng);
+      } else if (gpsList.isNotEmpty && gpsList.first is Map) {
+        final g = gpsList.first as Map;
+        final lat = (g['lat'] as num?)?.toDouble();
+        final lng = (g['lng'] as num?)?.toDouble();
+        if (lat != null && lng != null) primerSitio = LatLng(lat, lng);
+      }
+      if (primerSitio == null) continue;
+      final distM = Geolocator.distanceBetween(
+        desde.latitude, desde.longitude,
+        primerSitio.latitude, primerSitio.longitude);
+      conDistancia.add({...ruta, '_distanciaM': distM, '_primerSitio': primerSitio});
+    }
+    conDistancia.sort((a, b) =>
+      (a['_distanciaM'] as double).compareTo(b['_distanciaM'] as double));
+    return conDistancia.take(cantidad).toList();
+  }
+
+  Future<void> _mostrarRutasCercanas() async {
+    LatLng posActual;
+    try {
+      final pos = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.medium,
+        timeLimit: const Duration(seconds: 5));
+      posActual = LatLng(pos.latitude, pos.longitude);
+    } catch (_) {
+      posActual = _centerCiudad;
+    }
+    final cercanas = _rutasCercanas(desde: posActual);
+    if (!mounted) return;
+    showRDSSheet(
+      context: context,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(20, 0, 20, 32),
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          Text(t('Rutas cerca de vos', 'Routes near you'),
+            style: RDSType.headlineLg.copyWith(color: RDSColor.gold)),
+          const SizedBox(height: 4),
+          Text(t('Las más cercanas a tu posición actual', 'Closest to your current position'),
+            style: RDSType.bodySm),
+          const SizedBox(height: 20),
+          ...cercanas.map((ruta) {
+            final distM  = (ruta['_distanciaM'] as double).round();
+            final distStr = distM < 1000 ? '$distM m' : '${(distM / 1000).toStringAsFixed(1)} km';
+            final acento = ruta['acento'];
+            final color  = acento is Color ? acento : RDSColor.green;
+            final emoji  = ruta['emoji']?.toString() ?? '🗺️';
+            return GestureDetector(
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.of(context).push(MaterialPageRoute(
+                  builder: (_) => RouteDetailScreen(ruta: ruta)));
+              },
+              child: Container(
+                margin: const EdgeInsets.only(bottom: RDSSpace.sm),
+                padding: const EdgeInsets.all(RDSSpace.md),
+                decoration: BoxDecoration(
+                  color: RDSColor.card,
+                  borderRadius: RDSRadius.bMd,
+                  border: Border.all(color: color.withOpacity(0.3))),
+                child: Row(children: [
+                  Container(width: 44, height: 44,
+                    decoration: BoxDecoration(color: color.withOpacity(0.12), shape: BoxShape.circle),
+                    child: Center(child: Text(emoji, style: const TextStyle(fontSize: 20)))),
+                  const SizedBox(width: 12),
+                  Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text(ruta['nombre']?.toString() ?? '',
+                      style: RDSType.headlineMd.copyWith(color: RDSColor.textPrimary)),
+                    Text(ruta['subtitulo']?.toString() ?? '',
+                      style: RDSType.bodySm, maxLines: 1, overflow: TextOverflow.ellipsis),
+                  ])),
+                  Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
+                    Text(distStr, style: RDSType.labelMd.copyWith(color: color)),
+                    Text(t('de distancia', 'away'), style: RDSType.caption),
+                  ]),
+                ])));
+          }),
+        ])));
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════
+  //  FEATURE 2 — FAB EXPANDIBLE DE CAPAS
+  // ═══════════════════════════════════════════════════════════════════════
+  bool _fabExpandido = false;
+
+  Widget _buildFabCapas() {
+    final opciones = [
+      _FabOpcion(icon: RDSIcons.walk,        label: t('Mi ubicación','My location'),    color: RDSColor.green,
+        onTap: () async {
+          setState(() => _fabExpandido = false);
+          try {
+            final pos = await Geolocator.getCurrentPosition(
+              desiredAccuracy: LocationAccuracy.medium, timeLimit: const Duration(seconds: 4));
+            _mapController?.animateCamera(CameraUpdate.newLatLngZoom(LatLng(pos.latitude, pos.longitude), 15));
+          } catch (_) {
+            _mapController?.animateCamera(CameraUpdate.newLatLngZoom(_centerCiudad, 13));
+          }
+        }),
+      _FabOpcion(icon: RDSIcons.navExplore,  label: t('Rutas cercanas','Nearby routes'), color: RDSColor.gold,
+        onTap: () { setState(() => _fabExpandido = false); _mostrarRutasCercanas(); }),
+      _FabOpcion(icon: RDSIcons.transport,   label: _mostrarEnCicla ? t('Ocultar EnCicla','Hide EnCicla') : t('Ver EnCicla','Show EnCicla'), color: const Color(0xFF0066CC),
+        onTap: () => setState(() { _fabExpandido = false; _mostrarEnCicla = !_mostrarEnCicla; })),
+      _FabOpcion(icon: RDSIcons.planner,     label: t('Ver Planner','View Planner'),    color: RDSColor.orchid,
+        onTap: () { setState(() => _fabExpandido = false); _mostrarCapaPlanner(); }),
+    ];
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: [
+        AnimatedSize(
+          duration: RDSDuration.normal,
+          curve: Curves.easeOutCubic,
+          child: _fabExpandido
+            ? Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: opciones.map((op) => Padding(
+                  padding: const EdgeInsets.only(bottom: 10),
+                  child: Row(mainAxisSize: MainAxisSize.min, children: [
+                    AnimatedOpacity(
+                      opacity: _fabExpandido ? 1.0 : 0.0,
+                      duration: RDSDuration.fast,
+                      child: Container(
+                        margin: const EdgeInsets.only(right: 8),
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                        decoration: BoxDecoration(
+                          color: RDSColor.card.withOpacity(0.95),
+                          borderRadius: RDSRadius.bFull,
+                          border: Border.all(color: op.color.withOpacity(0.4))),
+                        child: Text(op.label, style: RDSType.labelSm.copyWith(color: op.color)))),
+                    GestureDetector(
+                      onTap: op.onTap,
+                      child: Container(
+                        width: 44, height: 44,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: op.color.withOpacity(0.15),
+                          border: Border.all(color: op.color.withOpacity(0.6)),
+                          boxShadow: RDSElevation.glow(color: op.color, opacity: 0.25)),
+                        child: Center(child: Icon(op.icon, size: 20, color: op.color)))),
+                  ]))).toList())
+            : const SizedBox.shrink()),
+        GestureDetector(
+          onTap: () => setState(() => _fabExpandido = !_fabExpandido),
+          child: AnimatedContainer(
+            duration: RDSDuration.fast,
+            width: 52, height: 52,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: _fabExpandido ? RDSColor.accent : RDSColor.card,
+              border: Border.all(color: _fabExpandido ? RDSColor.accent : RDSColor.gold.withOpacity(0.5)),
+              boxShadow: RDSElevation.high()),
+            child: Center(child: AnimatedRotation(
+              turns: _fabExpandido ? 0.125 : 0,
+              duration: RDSDuration.fast,
+              child: Icon(
+                _fabExpandido ? RDSIcons.close : Icons.layers_rounded,
+                size: 24,
+                color: _fabExpandido ? Colors.white : RDSColor.gold))))),
+      ]);
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════
+  //  FEATURE 3 — CAPA PLANNER EN EL MAPA
+  // ═══════════════════════════════════════════════════════════════════════
+  List<Map<String, dynamic>> _plannerDias = [];
+  bool _mostrarCapaPlannerActiva = false;
+  static const List<Color> _coloresDia = [
+    RDSColor.gold, RDSColor.green, RDSColor.orchid, RDSColor.accent,
+  ];
+
+  Future<void> _mostrarCapaPlanner() async {
+    final uid = AuthService.currentUser?.uid;
+    if (uid == null) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(t('Iniciá sesión para ver tu Planner en el mapa',
+                       'Sign in to see your Planner on the map')),
+        backgroundColor: RDSColor.accent));
+      return;
+    }
+    try {
+      final snap = await FirebaseFirestore.instance
+        .collection('planner_metricas')
+        .where('uid', isEqualTo: uid)
+        .orderBy('timestamp', descending: true)
+        .limit(1)
+        .get();
+      if (snap.docs.isEmpty || !mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(t('Todavía no tenés un itinerario generado',
+                         'You haven\'t generated an itinerary yet')),
+          backgroundColor: RDSColor.card));
+        return;
+      }
+      final rutasPlanner = RutasService().rutas
+        .where((r) => r['activa'] != false && r['pausada'] != true)
+        .take(3).toList();
+      if (!mounted) return;
+      setState(() {
+        _mostrarCapaPlannerActiva = true;
+        _plannerDias = rutasPlanner.asMap().entries.map((e) => {
+          'dia': e.key + 1,
+          'ruta': e.value,
+          'color': _coloresDia[e.key % _coloresDia.length],
+        }).toList();
+      });
+      _mapController?.animateCamera(CameraUpdate.newLatLngZoom(_centerCiudad, 12));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(t('Mostrando tu itinerario en el mapa','Showing your itinerary on the map')),
+        backgroundColor: RDSColor.green, duration: const Duration(seconds: 2)));
+    } catch (e) {
+      debugPrint('Planner mapa error: $e');
+    }
+  }
+
+  Set<Polyline> get _polylinaesPlanner {
+    if (!_mostrarCapaPlannerActiva || _plannerDias.isEmpty) return {};
+    final lines = <Polyline>{};
+    for (final dia in _plannerDias) {
+      final ruta   = dia['ruta'] as Map<String, dynamic>;
+      final color  = dia['color'] as Color;
+      final numDia = dia['dia'] as int;
+      final detalle = parseSitiosDetalle(ruta['sitiosDetalle']);
+      final puntos  = <LatLng>[];
+      for (final s in detalle) {
+        if (s is! Map) continue;
+        final lat = (s['lat'] as num?)?.toDouble();
+        final lng = (s['lng'] as num?)?.toDouble();
+        if (lat != null && lng != null) puntos.add(LatLng(lat, lng));
+      }
+      if (puntos.length < 2) continue;
+      lines.add(Polyline(polylineId: PolylineId('planner_glow_dia$numDia'),
+        points: puntos, color: color.withOpacity(0.30), width: 10));
+      lines.add(Polyline(polylineId: PolylineId('planner_dia$numDia'),
+        points: puntos, color: color.withOpacity(0.95), width: 4));
+    }
+    return lines;
+  }
+
+  Widget _buildLeyendaPlanner() {
+    if (!_mostrarCapaPlannerActiva || _plannerDias.isEmpty) return const SizedBox.shrink();
+    return Positioned(
+      top: 16, left: 16,
+      child: Container(
+        padding: const EdgeInsets.all(RDSSpace.sm),
+        decoration: BoxDecoration(
+          color: RDSColor.card.withOpacity(0.95),
+          borderRadius: RDSRadius.bMd,
+          border: Border.all(color: RDSColor.gold.withOpacity(0.3))),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
+          Row(children: [
+            const Icon(RDSIcons.planner, size: 14, color: RDSColor.gold),
+            const SizedBox(width: 4),
+            Text(t('Mi Planner', 'My Planner'), style: RDSType.labelSm.copyWith(color: RDSColor.gold)),
+            const SizedBox(width: 8),
+            GestureDetector(
+              onTap: () => setState(() { _mostrarCapaPlannerActiva = false; _plannerDias = []; }),
+              child: const Icon(RDSIcons.close, size: 14, color: RDSColor.textMuted)),
+          ]),
+          const SizedBox(height: 6),
+          ..._plannerDias.map((dia) {
+            final color = dia['color'] as Color;
+            final ruta  = dia['ruta'] as Map<String, dynamic>;
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 4),
+              child: Row(mainAxisSize: MainAxisSize.min, children: [
+                Container(width: 12, height: 3,
+                  decoration: BoxDecoration(color: color, borderRadius: RDSRadius.bFull)),
+                const SizedBox(width: 6),
+                Text('Día ${dia['dia']}: ${(ruta['nombre']?.toString() ?? '').split(' ').take(3).join(' ')}',
+                  style: RDSType.caption.copyWith(color: RDSColor.textPrimary)),
+              ]));
+          }),
+        ])));
+  }
+
+  // ── BUILD ────────────────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: kDark2,
+      backgroundColor: RDSColor.base,
       body: Column(children: [
         Container(decoration: const BoxDecoration(
           gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight,
@@ -15913,21 +16696,17 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
             Positioned.fill(child: CustomPaint(painter: _LeafPatternPainter())),
             Padding(padding: const EdgeInsets.fromLTRB(16, 12, 16, 16), child: Column(children: [
               Row(children: [
-                GestureDetector(onTap: () { if (Navigator.canPop(context)) Navigator.pop(context); },
+                GestureDetector(
+                  onTap: () { if (Navigator.canPop(context)) Navigator.pop(context); },
                   child: Container(width: 36, height: 36,
                     decoration: BoxDecoration(color: Colors.black.withOpacity(0.3), shape: BoxShape.circle),
-                    child: const Center(child: Text('←', style: TextStyle(color: kText, fontSize: 16))))),
+                    child: const Center(child: Icon(RDSIcons.back, color: RDSColor.textPrimary, size: 18)))),
                 const SizedBox(width: 12),
                 Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text(tMapaRutero, style: const TextStyle(
-                    fontFamily: 'PlayfairDisplay',
-                    fontSize: 20, fontWeight: FontWeight.w900,
-                    color: kText, letterSpacing: 0.5)),
-                  Text(
-                    '${_ciudadMapa?.ciudad ?? 'Medellín'} · ${_sitiosFiltrados.length} ${t("sitios","spots")}',
-                    style: const TextStyle(fontSize: 11, color: kTextMuted)),
+                  Text(tMapaRutero, style: RDSType.displaySm.copyWith(letterSpacing: 0.5)),
+                  Text('${_ciudadMapa?.ciudad ?? 'Medellín'} · ${_sitiosFiltrados.length} ${t("sitios","spots")}',
+                    style: RDSType.caption),
                 ])),
-                // 🛴 Whoosh Movilidad Oficial — header derecho del mapa
                 GestureDetector(
                   onTap: () async {
                     final uri = Uri.parse('https://whoosh.bike/es_la');
@@ -15943,52 +16722,23 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
               SingleChildScrollView(scrollDirection: Axis.horizontal,
                 child: Row(children: _filtros.map((f) {
                   final isActive = _filtroRuta == f;
-                  // Color según zona de la ruta
-                  Color fc;
-                  if (f == 'Todas') {
-                    fc = kGreen;
-                  } else if (['Transformación Urbana','Patrimonial del Centro','Verde del Norte',
-                      'Metrocable & Arví','Laureles & Tradición',
-                      'Ruta de los Miradores','Cultural Nocturna'].contains(f)) {
-                    fc = kGreen;
-                  } else if (['Guatapé & La Piedra','Café en Santa Elena','San Carlos & Charcos',
-                      'Jardín Colonial','Santa Fe de Antioquia','Envigado Natural',
-                      'Alumbrado Navideño'].contains(f)) {
-                    fc = const Color(0xFF4A90D9);
-                  } else {
-                    fc = kOrchid;
-                  }
-                  return GestureDetector(onTap: () {
-                    setState(() { _filtroRuta = f; _sitioSeleccionado = null; });
-                    if (f != 'Todas') {
-                      final sitiosRuta = _sitiosFiltrados;
-                      if (sitiosRuta.isNotEmpty) {
-                        final lat = sitiosRuta.map((s) => s.posicion.latitude).reduce((a, b) => a + b) / sitiosRuta.length;
-                        final lng = sitiosRuta.map((s) => s.posicion.longitude).reduce((a, b) => a + b) / sitiosRuta.length;
-                        _mapController?.animateCamera(CameraUpdate.newLatLngZoom(LatLng(lat, lng), 14));
+                  return GestureDetector(
+                    onTap: () {
+                      setState(() { _filtroRuta = f; _sitioSeleccionado = null; });
+                      if (f != 'Todas') {
+                        final sitiosRuta = _sitiosFiltrados;
+                        if (sitiosRuta.isNotEmpty) {
+                          final lat = sitiosRuta.map((s) => s.posicion.latitude).reduce((a, b) => a + b) / sitiosRuta.length;
+                          final lng = sitiosRuta.map((s) => s.posicion.longitude).reduce((a, b) => a + b) / sitiosRuta.length;
+                          _mapController?.animateCamera(CameraUpdate.newLatLngZoom(LatLng(lat, lng), 14));
+                        }
+                      } else {
+                        _mapController?.animateCamera(CameraUpdate.newLatLngZoom(_centerCiudad, 13));
                       }
-                    } else {
-                      _mapController?.animateCamera(CameraUpdate.newLatLngZoom(_centerCiudad, 13));
-                    }
-                  },
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 200),
-                      margin: const EdgeInsets.only(right: 8),
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
-                      decoration: BoxDecoration(
-                        color: isActive ? fc.withOpacity(0.15) : kDark3,
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(
-                          color: isActive ? kGold : Colors.white.withOpacity(0.08),
-                          width: isActive ? 1.0 : 0.5),
-                        boxShadow: isActive ? [BoxShadow(
-                          color: kGold.withOpacity(0.15), blurRadius: 8)] : null),
-                      child: Text(_filtroLabel(f), style: TextStyle(
-                        fontFamily: 'Inter',
-                        fontSize: 12,
-                        color: isActive ? kGold : kTextMuted,
-                        fontWeight: isActive ? FontWeight.w700 : FontWeight.w400,
-                        letterSpacing: isActive ? 0.3 : 0))));
+                    },
+                    child: Padding(
+                      padding: const EdgeInsets.only(right: 8),
+                      child: _FiltroChip(label: _filtroLabel(f), activo: isActive, onTap: () {})));
                 }).toList())),
             ])),
           ]))),
@@ -15996,153 +16746,143 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
           GoogleMap(
             initialCameraPosition: CameraPosition(target: _centerCiudad, zoom: 13),
             markers: _buildMarkers(),
-            polylines: _polylines,
+            polylines: {..._polylines, ..._polylinaesPlanner},
             onMapCreated: (c) { _mapController = c; c.setMapStyle(_mapStyle); },
-            onTap: (_) => setState(() => _sitioSeleccionado = null),
+            onTap: (_) => setState(() { _sitioSeleccionado = null; _fabExpandido = false; }),
             onCameraMove: (pos) {
-              if ((pos.zoom - _zoomActual).abs() > 0.3) {
-                setState(() => _zoomActual = pos.zoom);
-              }
+              if ((pos.zoom - _zoomActual).abs() > 0.3) setState(() => _zoomActual = pos.zoom);
             },
             myLocationEnabled: true, myLocationButtonEnabled: false,
             zoomControlsEnabled: false, mapToolbarEnabled: false, compassEnabled: false),
 
-          Positioned(top: 16, right: 16,
-            child: GestureDetector(
-              onTap: () async {
-                try {
-                  final pos = await Geolocator.getCurrentPosition(
-                    desiredAccuracy: LocationAccuracy.medium,
-                    timeLimit: const Duration(seconds: 4));
-                  _mapController?.animateCamera(
-                    CameraUpdate.newLatLngZoom(LatLng(pos.latitude, pos.longitude), 15));
-                } catch (_) {
-                  _mapController?.animateCamera(
-                    CameraUpdate.newLatLngZoom(_centerCiudad, 13));
-                }
-              },
-              child: Container(width: 46, height: 46,
-                decoration: BoxDecoration(
-                  color: kCard,
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: kGold.withOpacity(0.4)),
-                  boxShadow: [
-                    BoxShadow(color: kGold.withOpacity(0.1), blurRadius: 12),
-                    BoxShadow(color: Colors.black.withOpacity(0.4), blurRadius: 8)]),
-                child: const Center(child: Text('🎯', style: TextStyle(fontSize: 22)))))),
+          // Leyenda Planner — arriba izquierda
+          _buildLeyendaPlanner(),
+
+          // FAB expandible — arriba derecha
+          Positioned(top: 16, right: 16, child: _buildFabCapas()),
+
+          // Panel sitio seleccionado — abajo
           if (_sitioSeleccionado != null)
             Positioned(bottom: 16, left: 16, right: 16,
               child: AnimatedSlide(
                 offset: Offset(0, _sitioSeleccionado != null ? 0 : 1),
-                duration: const Duration(milliseconds: 300),
+                duration: RDSDuration.normal,
                 curve: Curves.easeOutCubic,
                 child: AnimatedOpacity(
                   opacity: _sitioSeleccionado != null ? 1.0 : 0.0,
-                  duration: const Duration(milliseconds: 250),
+                  duration: RDSDuration.fast,
                   child: Container(
                     decoration: BoxDecoration(
-                      color: kCard,
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: (_sitioSeleccionado?.color ?? kGreen).withOpacity(0.5), width: 1.5),
+                      color: RDSColor.card,
+                      borderRadius: RDSRadius.bXl,
+                      border: Border.all(color: (_sitioSeleccionado?.color ?? RDSColor.green).withOpacity(0.5), width: 1.5),
                       boxShadow: [
-                        BoxShadow(color: (_sitioSeleccionado?.color ?? kGreen).withOpacity(0.15), blurRadius: 20, spreadRadius: 2),
-                        BoxShadow(color: Colors.black.withOpacity(0.5), blurRadius: 15),
+                        BoxShadow(color: (_sitioSeleccionado?.color ?? RDSColor.green).withOpacity(0.15), blurRadius: 20, spreadRadius: 2),
+                        ...RDSElevation.high(),
                       ]),
                     child: Column(mainAxisSize: MainAxisSize.min, children: [
-                      // Barra de color superior
                       Container(height: 4,
                         decoration: BoxDecoration(
-                          color: (_sitioSeleccionado?.color ?? kGreen),
-                          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)))),
-                      Padding(padding: const EdgeInsets.all(16), child: Row(children: [
-                        // Ícono animado
+                          color: (_sitioSeleccionado?.color ?? RDSColor.green),
+                          borderRadius: const BorderRadius.vertical(top: Radius.circular(RDSRadius.xl)))),
+                      Padding(padding: const EdgeInsets.all(RDSSpace.md), child: Row(children: [
                         AnimatedBuilder(
                           animation: _pulseAnim,
                           builder: (_, __) => Transform.scale(
                             scale: _pulseAnim.value,
                             child: Container(width: 56, height: 56,
-                              decoration: BoxDecoration(shape: BoxShape.circle,
-                                color: (_sitioSeleccionado?.color ?? kGreen).withOpacity(0.2),
-                                border: Border.all(color: (_sitioSeleccionado?.color ?? kGreen), width: 2),
-                                boxShadow: [BoxShadow(color: (_sitioSeleccionado?.color ?? kGreen).withOpacity(0.3), blurRadius: 10)]),
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: (_sitioSeleccionado?.color ?? RDSColor.green).withOpacity(0.2),
+                                border: Border.all(color: (_sitioSeleccionado?.color ?? RDSColor.green), width: 2),
+                                boxShadow: RDSElevation.glow(color: (_sitioSeleccionado?.color ?? RDSColor.green))),
                               child: Center(child: Text((_sitioSeleccionado?.emoji ?? '📍'),
                                 style: const TextStyle(fontSize: 26)))))),
                         const SizedBox(width: 14),
                         Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                          Text((_sitioSeleccionado?.nombre ?? ''),
-                            style: const TextStyle(
-                              fontFamily: 'PlayfairDisplay',
-                              color: kText, fontSize: 15,
-                              fontWeight: FontWeight.w900, height: 1.2)),
+                          Text((_sitioSeleccionado?.nombre ?? ''), style: RDSType.displaySm.copyWith(height: 1.2)),
                           const SizedBox(height: 4),
                           Row(children: [
                             Container(width: 8, height: 8,
-                              decoration: BoxDecoration(color: (_sitioSeleccionado?.color ?? kGreen), shape: BoxShape.circle)),
+                              decoration: BoxDecoration(color: (_sitioSeleccionado?.color ?? RDSColor.green), shape: BoxShape.circle)),
                             const SizedBox(width: 6),
                             Flexible(child: Text((_sitioSeleccionado?.ruta ?? ''),
-                              style: TextStyle(color: (_sitioSeleccionado?.color ?? kGreen), fontSize: 11, fontWeight: FontWeight.w600))),
+                              style: RDSType.labelSm.copyWith(color: (_sitioSeleccionado?.color ?? RDSColor.green)))),
                           ]),
                           const SizedBox(height: 4),
-                          Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                            decoration: BoxDecoration(
-                              color: (_sitioSeleccionado?.visitado ?? false)
-                                ? kGreen.withOpacity(0.15) : Colors.white.withOpacity(0.05),
-                              borderRadius: BorderRadius.circular(8)),
-                            child: Text(
-                              (_sitioSeleccionado?.visitado ?? false)
-                                ? t('✅ Ya visitaste este sitio', '✅ Already visited')
-                                : t('📍 Pendiente de visitar', '📍 Yet to visit'),
-                              style: TextStyle(
-                                color: (_sitioSeleccionado?.visitado ?? false) ? kGreen : kTextMuted,
-                                fontSize: 10, fontWeight: FontWeight.w600))),
+                          _RDSBadge(
+                            label: (_sitioSeleccionado?.visitado ?? false)
+                              ? t('Ya visitaste este sitio', 'Already visited')
+                              : t('Pendiente de visitar', 'Yet to visit'),
+                            color: (_sitioSeleccionado?.visitado ?? false)
+                              ? RDSColor.green.withOpacity(0.15) : Colors.white.withOpacity(0.05),
+                            textColor: (_sitioSeleccionado?.visitado ?? false) ? RDSColor.green : RDSColor.textMuted),
                         ])),
                         const SizedBox(width: 8),
                         GestureDetector(
                           onTap: () => setState(() => _sitioSeleccionado = null),
                           child: Container(width: 30, height: 30,
                             decoration: BoxDecoration(color: Colors.white.withOpacity(0.08), shape: BoxShape.circle),
-                            child: const Center(child: Text('✕',
-                              style: TextStyle(color: kTextMuted, fontSize: 13))))),
+                            child: const Center(child: Icon(RDSIcons.close, size: 16, color: RDSColor.textMuted)))),
                       ])),
                     ]))))),
+
+          // Stats bar — cuando no hay sitio seleccionado
           if (_sitioSeleccionado == null)
             Positioned(bottom: 16, left: 16, right: 16,
-              child: Container(padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                decoration: BoxDecoration(color: kCard.withOpacity(0.95), borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: kGreen.withOpacity(0.2)),
-                  boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.4), blurRadius: 20)]),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                decoration: BoxDecoration(
+                  color: RDSColor.card.withOpacity(0.95),
+                  borderRadius: RDSRadius.bMd,
+                  border: Border.all(color: RDSColor.green.withOpacity(0.2)),
+                  boxShadow: RDSElevation.high()),
                 child: Row(mainAxisAlignment: MainAxisAlignment.spaceAround, children: [
-                  _MapStat(valor: '${RutasService().rutas.fold<int>(0, (s,r) => s + ((r['sitiosDetalle'] as List?)?.length ?? 0))}', label: t('Sitios\ntotales','Total\nspots'), color: kGold),
+                  _MapStat(
+                    valor: '${RutasService().rutas.fold<int>(0, (s,r) => s + ((r['sitiosDetalle'] as List?)?.length ?? 0))}',
+                    label: t('Sitios\ntotales','Total\nspots'), color: RDSColor.gold),
                   Container(width: 1, height: 30, color: Colors.white.withOpacity(0.08)),
                   StreamBuilder<QuerySnapshot>(
                     stream: AuthService.currentUser != null
                       ? FirebaseFirestore.instance.collection('usuarios')
                           .doc(AuthService.currentUser!.uid)
-                          .collection('progreso')
-                          .where('completada', isEqualTo: true)
-                          .snapshots()
+                          .collection('progreso').where('completada', isEqualTo: true).snapshots()
                       : const Stream.empty(),
                     builder: (_, snap) {
                       final completadas = snap.data?.docs.length ?? 0;
-                      return _MapStat(valor: '$completadas', label: t('Rutas\ndescubiertas','Routes\ndiscovered'), color: kGreen);
+                      return _MapStat(valor: '$completadas',
+                        label: t('Rutas\ndescubiertas','Routes\ndiscovered'), color: RDSColor.green);
                     }),
                   Container(width: 1, height: 30, color: Colors.white.withOpacity(0.08)),
-                  _MapStat(valor: '${RutasService().rutas.length}', label: t('Rutas\ntotales','Total\nroutes'), color: kOrchid),
+                  _MapStat(valor: '${RutasService().rutas.length}',
+                    label: t('Rutas\ntotales','Total\nroutes'), color: RDSColor.orchid),
                   Container(width: 1, height: 30, color: Colors.white.withOpacity(0.08)),
-                  GestureDetector(onTap: () { if (Navigator.canPop(context)) Navigator.pop(context); },
-                    child: Container(padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                      decoration: BoxDecoration(gradient: const LinearGradient(colors: [kGreen, kGold]),
-                        borderRadius: BorderRadius.circular(10)),
-                      child: Text(tRutasLabel, style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w800, letterSpacing: 1)))),
+                  GestureDetector(
+                    onTap: () { if (Navigator.canPop(context)) Navigator.pop(context); },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(colors: [RDSColor.green, RDSColor.gold]),
+                        borderRadius: RDSRadius.bSm),
+                      child: Text(tRutasLabel,
+                        style: const TextStyle(color: Colors.white, fontSize: 10,
+                          fontWeight: FontWeight.w800, letterSpacing: 1)))),
                 ]))),
         ])),
       ]),
-
     );
   }
 }
 
-// ─────────────────────────────────────────
+// Modelo para opciones del FAB expandible
+class _FabOpcion {
+  final IconData icon;
+  final String label;
+  final Color color;
+  final VoidCallback onTap;
+  const _FabOpcion({required this.icon, required this.label, required this.color, required this.onTap});
+}
+
 //  AVATAR RUTERO WIDGET
 // ─────────────────────────────────────────
 class _AvatarRutero extends StatefulWidget {
@@ -16211,17 +16951,17 @@ class _AvatarRuteroState extends State<_AvatarRutero>
                 margin: const EdgeInsets.only(bottom: 8),
                 padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                 decoration: BoxDecoration(
-                  color: kCard,
+                  color: RDSColor.card,
                   borderRadius: const BorderRadius.only(
                     topLeft: Radius.circular(16), topRight: Radius.circular(16),
                     bottomRight: Radius.circular(16)),
-                  border: Border.all(color: kGreen.withOpacity(0.3), width: 1.5),
-                  boxShadow: [BoxShadow(color: kGreen.withOpacity(0.1), blurRadius: 12)]),
+                  border: Border.all(color: RDSColor.green.withOpacity(0.3), width: 1.5),
+                  boxShadow: [BoxShadow(color: RDSColor.green.withOpacity(0.1), blurRadius: 12)]),
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   Row(children: [
                     Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                       decoration: BoxDecoration(
-                        color: kGreen.withOpacity(0.15),
+                        color: RDSColor.green.withOpacity(0.15),
                         borderRadius: BorderRadius.circular(8)),
                       child: const Text('RUTERO MDE', style: TextStyle(
                         color: kGreen, fontSize: 9, fontWeight: FontWeight.w900, letterSpacing: 1))),
@@ -16321,15 +17061,15 @@ class _AvatarTipState extends State<AvatarTip> with SingleTickerProviderStateMix
             Container(
               padding: const EdgeInsets.fromLTRB(14, 12, 36, 12),
               decoration: BoxDecoration(
-                color: kCard,
+                color: RDSColor.card,
                 borderRadius: const BorderRadius.only(
                   topLeft: Radius.circular(18),
                   topRight: Radius.circular(18),
                   bottomRight: Radius.circular(18),
                   bottomLeft: Radius.circular(4)),
-                border: Border.all(color: kGreen.withOpacity(0.4), width: 1.5),
+                border: Border.all(color: RDSColor.green.withOpacity(0.4), width: 1.5),
                 boxShadow: [
-                  BoxShadow(color: kGreen.withOpacity(0.1), blurRadius: 12),
+                  BoxShadow(color: RDSColor.green.withOpacity(0.1), blurRadius: 12),
                   BoxShadow(color: Colors.black.withOpacity(0.3), blurRadius: 8),
                 ]),
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -16377,7 +17117,7 @@ class _MisFotosScreenState extends State<MisFotosScreen> {
   Widget build(BuildContext context) {
     final user = AuthService.currentUser;
     return Scaffold(
-      backgroundColor: kDark2,
+      backgroundColor: RDSColor.base,
       body: Column(children: [
         // Header
         Container(
@@ -16396,7 +17136,7 @@ class _MisFotosScreenState extends State<MisFotosScreen> {
                 Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   Text(tMisFotos, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900,
                     color: kText, letterSpacing: 2)),
-                  Text(tRecuerdosRutas, style: const TextStyle(fontSize: 11, color: kTextMuted)),
+                  Text(tRecuerdosRutas, style: const TextStyle(fontSize: 11, color: RDSColor.textMuted)),
                 ]),
               ]),
             ])))),
@@ -16437,8 +17177,8 @@ class _MisFotosScreenState extends State<MisFotosScreen> {
                         child: Container(
                           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
                           decoration: BoxDecoration(
-                            gradient: const LinearGradient(colors: [kGreen, kGold]),
-                            borderRadius: BorderRadius.circular(20)),
+                            gradient: const LinearGradient(colors: [RDSColor.green, kGold]),
+                            borderRadius: BorderRadius.circular(RDSRadius.xl)),
                           child: const Text('EXPLORAR RUTAS',
                             style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w800)))),
                     ]));
@@ -16455,12 +17195,12 @@ class _MisFotosScreenState extends State<MisFotosScreen> {
                     // Stats bar
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                      color: kCard,
+                      color: RDSColor.card,
                       child: Row(children: [
-                        _MapStat(valor: '${fotos.length}', label: 'Fotos', color: kGreen),
+                        _MapStat(valor: '${fotos.length}', label: 'Fotos', color: RDSColor.green),
                         Container(width: 1, height: 30, color: Colors.white.withOpacity(0.08),
                           margin: const EdgeInsets.symmetric(horizontal: 16)),
-                        _MapStat(valor: '${rutasList.length - 1}', label: 'Rutas', color: kGold),
+                        _MapStat(valor: '${rutasList.length - 1}', label: 'Rutas', color: RDSColor.gold),
                         Container(width: 1, height: 30, color: Colors.white.withOpacity(0.08),
                           margin: const EdgeInsets.symmetric(horizontal: 16)),
                         _MapStat(valor: '${fotosFiltradas.length}', label: 'Mostrando', color: kOrchid),
@@ -16470,7 +17210,7 @@ class _MisFotosScreenState extends State<MisFotosScreen> {
                     if (rutasList.length > 2)
                       Container(
                         height: 44,
-                        color: kDark3,
+                        color: RDSColor.surface,
                         child: ListView.builder(
                           scrollDirection: Axis.horizontal,
                           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
@@ -16520,7 +17260,7 @@ class _MisFotosScreenState extends State<MisFotosScreen> {
                             onTap: () => _verFotoCompleta(context, data),
                             child: Container(
                               decoration: BoxDecoration(
-                                color: kCard,
+                                color: RDSColor.card,
                                 borderRadius: BorderRadius.circular(16),
                                 border: Border.all(color: acento.withOpacity(0.3)),
                                 boxShadow: [BoxShadow(
@@ -16533,7 +17273,7 @@ class _MisFotosScreenState extends State<MisFotosScreen> {
                                     ? Image.network(url, fit: BoxFit.cover,
                                         loadingBuilder: (_, child, progress) => progress == null
                                           ? child
-                                          : Container(color: kDark3,
+                                          : Container(color: RDSColor.surface,
                                               child: const Center(child: CircularProgressIndicator(
                                                 color: kGreen, strokeWidth: 2))),
                                         errorBuilder: (_, __, ___) {
@@ -16647,9 +17387,9 @@ class _MisFotosScreenState extends State<MisFotosScreen> {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
               decoration: BoxDecoration(
-                color: kGreen.withOpacity(0.2),
+                color: RDSColor.green.withOpacity(0.2),
                 borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: kGreen.withOpacity(0.5))),
+                border: Border.all(color: RDSColor.green.withOpacity(0.5))),
               child: const Text('↗️ Compartir',
                 style: TextStyle(color: kGreen, fontWeight: FontWeight.w700)))),
           const SizedBox(width: 12),
@@ -16660,7 +17400,7 @@ class _MisFotosScreenState extends State<MisFotosScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
               decoration: BoxDecoration(
                 color: Colors.white.withOpacity(0.08),
-                borderRadius: BorderRadius.circular(20)),
+                borderRadius: BorderRadius.circular(RDSRadius.xl)),
               child: const Text('✕ Cerrar',
                 style: TextStyle(color: kTextMuted, fontWeight: FontWeight.w700)))),
         ]),
@@ -16694,7 +17434,7 @@ class _MisFotosScreenState extends State<MisFotosScreen> {
       if (url != null && url.isNotEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
           content: Text(t('Preparando foto...', 'Preparing photo...')),
-          backgroundColor: kGreen,
+          backgroundColor: RDSColor.green,
           duration: const Duration(seconds: 2)));
 
         final response = await http.get(Uri.parse(url));
@@ -16718,7 +17458,7 @@ class _MisFotosScreenState extends State<MisFotosScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
           content: Text(t('Error al compartir: $e', 'Error sharing: $e')),
-          backgroundColor: kAccent,
+          backgroundColor: RDSColor.accent,
           duration: const Duration(seconds: 3)));
       }
     }
@@ -16768,7 +17508,7 @@ class _PremioCardState extends State<_PremioCard> {
       decoration: BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topLeft, end: Alignment.bottomRight,
-          colors: [kCard, acento.withOpacity(0.1)]),
+          colors: [RDSColor.card, acento.withOpacity(0.1)]),
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: acento.withOpacity(0.5), width: 1.5),
         boxShadow: [BoxShadow(color: acento.withOpacity(0.2), blurRadius: 20)]),
@@ -16808,9 +17548,9 @@ class _PremioCardState extends State<_PremioCard> {
         Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: kDark3,
+            color: RDSColor.surface,
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: kGold.withOpacity(0.3))),
+            border: Border.all(color: RDSColor.gold.withOpacity(0.3))),
           child: Column(children: [
             const Text('CÓDIGO DE PREMIO',
               style: TextStyle(color: kTextMuted, fontSize: 10, letterSpacing: 2)),
@@ -16819,9 +17559,9 @@ class _PremioCardState extends State<_PremioCard> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               decoration: BoxDecoration(
-                color: kGold.withOpacity(0.1),
+                color: RDSColor.gold.withOpacity(0.1),
                 borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: kGold.withOpacity(0.3))),
+                border: Border.all(color: RDSColor.gold.withOpacity(0.3))),
               child: Text(codigo,
                 style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w900,
                   color: kGold, letterSpacing: 4))),
@@ -16872,7 +17612,7 @@ class _PremioCardState extends State<_PremioCard> {
         Container(
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            color: kCard,
+            color: RDSColor.card,
             borderRadius: BorderRadius.circular(12),
             border: Border.all(color: Colors.white.withOpacity(0.06))),
           child: const Row(children: [
@@ -16915,9 +17655,9 @@ class _AliadoRutaCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: kCard,
+        color: RDSColor.card,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: kGreen.withOpacity(0.35))),
+        border: Border.all(color: RDSColor.green.withOpacity(0.35))),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(children: [
           Text(emoji, style: const TextStyle(fontSize: 22)),
@@ -16930,7 +17670,7 @@ class _AliadoRutaCard extends StatelessWidget {
           ])),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-            decoration: BoxDecoration(color: kGreen.withOpacity(0.12), borderRadius: BorderRadius.circular(20)),
+            decoration: BoxDecoration(color: RDSColor.green.withOpacity(0.12), borderRadius: BorderRadius.circular(RDSRadius.xl)),
             child: Text(t('Activo', 'Active'),
               style: TextStyle(color: kGreen, fontSize: 10, fontWeight: FontWeight.w600))),
         ]),
@@ -16938,7 +17678,7 @@ class _AliadoRutaCard extends StatelessWidget {
           const SizedBox(height: 10),
           Container(
             padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(color: kGreen.withOpacity(0.07), borderRadius: BorderRadius.circular(10)),
+            decoration: BoxDecoration(color: RDSColor.green.withOpacity(0.07), borderRadius: BorderRadius.circular(10)),
             child: Row(children: [
               const Text('🎁', style: TextStyle(fontSize: 14)),
               const SizedBox(width: 8),
@@ -16995,8 +17735,8 @@ class _WelcomeChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Container(
     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-    decoration: BoxDecoration(color: kGreen.withOpacity(0.1), borderRadius: BorderRadius.circular(20),
-      border: Border.all(color: kGreen.withOpacity(0.25))),
+    decoration: BoxDecoration(color: RDSColor.green.withOpacity(0.1), borderRadius: BorderRadius.circular(20),
+      border: Border.all(color: RDSColor.green.withOpacity(0.25))),
     child: Row(mainAxisSize: MainAxisSize.min, children: [
       Text(emoji, style: const TextStyle(fontSize: 12)),
       const SizedBox(width: 4),
@@ -17022,7 +17762,7 @@ class _HomeAvatarNivel extends StatelessWidget {
       return Container(width: 48, height: 48,
         decoration: BoxDecoration(shape: BoxShape.circle,
           color: Colors.transparent,
-          border: Border.all(color: kGold.withOpacity(0.4), width: 1.5)),
+          border: Border.all(color: RDSColor.gold.withOpacity(0.4), width: 1.5)),
         child: const Center(child: Text('👤', style: TextStyle(fontSize: 22))));
     }
     return StreamBuilder<DocumentSnapshot>(
@@ -17038,8 +17778,8 @@ class _HomeAvatarNivel extends StatelessWidget {
           Container(width: 48, height: 48,
             decoration: BoxDecoration(shape: BoxShape.circle,
               color: Colors.transparent,
-              border: Border.all(color: kGold.withOpacity(0.5), width: 1.5),
-              boxShadow: [BoxShadow(color: kGold.withOpacity(0.15), blurRadius: 8)]),
+              border: Border.all(color: RDSColor.gold.withOpacity(0.5), width: 1.5),
+              boxShadow: [BoxShadow(color: RDSColor.gold.withOpacity(0.15), blurRadius: 8)]),
             child: ClipOval(child: AuthService.currentUser?.photoURL != null
               ? Image.network(AuthService.currentUser!.photoURL!,
                   fit: BoxFit.cover,
@@ -17052,13 +17792,13 @@ class _HomeAvatarNivel extends StatelessWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
             decoration: BoxDecoration(
-              color: kGold.withOpacity(0.15),
+              color: RDSColor.gold.withOpacity(0.15),
               borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: kGold.withOpacity(0.4))),
+              border: Border.all(color: RDSColor.gold.withOpacity(0.4))),
             child: Text('Nv. $nivelIdx',
               style: const TextStyle(
                 fontFamily: 'SpaceGrotesk',
-                fontSize: 9, color: kGold, fontWeight: FontWeight.w700))),
+                fontSize: 9, color: RDSColor.gold, fontWeight: FontWeight.w700))),
         ]);
       });
   }
@@ -17073,9 +17813,9 @@ class _HomeStatsRow extends StatelessWidget {
   Widget build(BuildContext context) {
     if (AuthService.currentUser == null) {
       return Row(children: [
-        _HeaderChip(emoji: '🗺️', label: '$rutasCount ${t("rutas","routes")}', color: kGold),
+        _HeaderChip(emoji: '🗺️', label: '$rutasCount ${t("rutas","routes")}', color: RDSColor.gold),
         const SizedBox(width: 8),
-        _HeaderChip(emoji: '⭐', label: '0 pts', color: kGreen),
+        _HeaderChip(emoji: '⭐', label: '0 pts', color: RDSColor.green),
         const SizedBox(width: 8),
         if (kModoLanzamiento)
           _HeaderChip(emoji: '🧪', label: t('BETA GRATIS','FREE BETA'), color: kOrchid),
@@ -17089,7 +17829,7 @@ class _HomeStatsRow extends StatelessWidget {
         final int puntos = (data['puntosTotal'] ?? 0) as int;
         final int sitios = (data['sitiosVisitados'] ?? 0) as int;
         return Row(children: [
-          _HeaderChip(emoji: '🗺️', label: '$rutasCount ${t("rutas","routes")}', color: kGold),
+          _HeaderChip(emoji: '🗺️', label: '$rutasCount ${t("rutas","routes")}', color: RDSColor.gold),
           const SizedBox(width: 8),
           _HeaderChip(emoji: '⭐',
             label: '$puntos pts',
@@ -17107,17 +17847,9 @@ class _HeaderChip extends StatelessWidget {
   final String emoji, label; final Color color;
   const _HeaderChip({required this.emoji, required this.label, required this.color});
   @override
-  Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-    decoration: BoxDecoration(color: color.withOpacity(0.12), borderRadius: BorderRadius.circular(20),
-      border: Border.all(color: color.withOpacity(0.3))),
-    child: Row(mainAxisSize: MainAxisSize.min, children: [
-      Text(emoji, style: const TextStyle(fontSize: 11)),
-      const SizedBox(width: 4),
-      Text(label, style: TextStyle(color: color, fontSize: 10, fontWeight: FontWeight.w600, letterSpacing: 0.5)),
-    ]));
+  Widget build(BuildContext context) => _RDSMetricChip(
+    icon: null, emoji: emoji, label: label, color: color);
 }
-
 class _FiltroChip extends StatelessWidget {
   final String label;
   final bool activo;
@@ -17127,25 +17859,23 @@ class _FiltroChip extends StatelessWidget {
   Widget build(BuildContext context) => GestureDetector(
     onTap: onTap,
     child: AnimatedContainer(
-      duration: const Duration(milliseconds: 200),
+      duration: RDSDuration.fast,                        // Duration(ms:200) → token
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       decoration: BoxDecoration(
-        color: activo ? kGreen.withOpacity(0.15) : kCard,
-        borderRadius: BorderRadius.circular(20),
+        color: activo ? RDSColor.green.withOpacity(0.15) : RDSColor.card,
+        borderRadius: RDSRadius.bFull,                   // circular(20) → token
         border: Border.all(
-          color: activo ? kGold : Colors.white.withOpacity(0.08),
+          color: activo ? RDSColor.gold : RDSColor.borderSubtle,
           width: activo ? 1.0 : 0.5),
-        boxShadow: activo ? [BoxShadow(
-          color: kGold.withOpacity(0.15),
-          blurRadius: 8, offset: const Offset(0, 2))] : null),
-      child: Text(label, style: TextStyle(
-        fontFamily: 'Inter',
-        fontSize: 12,
-        color: activo ? kGold : kTextMuted,
-        fontWeight: activo ? FontWeight.w700 : FontWeight.w400,
-        letterSpacing: activo ? 0.3 : 0))));
+        boxShadow: activo
+            ? RDSElevation.low(color: RDSColor.gold, opacity: 0.15)
+            : null),
+      child: Text(label,
+        style: RDSType.bodySm.copyWith(               // fontSize:12 Inter → token
+          color: activo ? RDSColor.gold : RDSColor.textMuted,
+          fontWeight: activo ? FontWeight.w700 : FontWeight.w400,
+          letterSpacing: activo ? 0.3 : 0))));
 }
-
 // ─────────────────────────────────────────────────────────────────────────
 //  🌹 FERIA DE LAS FLORES — Countdown Widget
 //  Muestra contador regresivo hasta el 31 de julio de 2026
@@ -17347,7 +18077,7 @@ class _SectionHeader extends StatelessWidget {
       const SizedBox(width: 8),
       Text(subtitulo, style: const TextStyle(
         fontFamily: 'Inter',
-        fontSize: 10, color: kTextMuted)),
+        fontSize: 10, color: RDSColor.textMuted)),
     ]));
 }
 
@@ -17362,179 +18092,215 @@ class _RouteCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final Color acento = activa ? kRutaColor(ruta['acento'], kGold) : kTextMuted;
+    final Color acento    = activa ? kRutaColor(ruta['acento'], RDSColor.gold) : RDSColor.textMuted;
     final bool esImperdible = ruta['imperdible'] == true || ruta['zona'] == 'Ciudad';
-    final int puntos = ((ruta['sitios'] ?? 5) as int) * 30;
+    final int puntos      = ((ruta['sitios'] ?? 5) as int) * 30;
 
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        margin: const EdgeInsets.only(bottom: 16),
-        height: 240,
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: [BoxShadow(
-            color: acento.withOpacity(activa ? 0.25 : 0.08),
-            blurRadius: 20, offset: const Offset(0, 6))]),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(20),
-          child: Stack(fit: StackFit.expand, children: [
-            // Imagen de fondo o gradiente
-            if (ruta['imagen'] != null)
-              Image.asset(ruta['imagen'], fit: BoxFit.cover,
-                cacheWidth: 600,
-                errorBuilder: (_, __, ___) => Container(
-                  decoration: BoxDecoration(gradient: LinearGradient(
-                    begin: Alignment.topLeft, end: Alignment.bottomRight,
-                    colors: [kRutaColor(ruta['color1'], kDark2), kRutaColor(ruta['color2'], kDark3)]))))
-            else
-              Container(decoration: BoxDecoration(gradient: LinearGradient(
-                begin: Alignment.topLeft, end: Alignment.bottomRight,
-                colors: [kRutaColor(ruta['color1'], kDark2), kRutaColor(ruta['color2'], kDark3)]))),
+        margin: const EdgeInsets.only(bottom: RDSSpace.md),   // 16 → token
+        // AspectRatio reemplaza height:240 fijo — responsive en todas las pantallas
+        child: AspectRatio(
+          aspectRatio: 16 / 9,
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              borderRadius: RDSRadius.bXl,                    // circular(20) → token
+              boxShadow: activa
+                  ? RDSElevation.mid(color: acento, opacity: 0.25)
+                  : RDSElevation.low(color: acento, opacity: 0.08)),
+            child: ClipRRect(
+              borderRadius: RDSRadius.bXl,
+              child: Stack(fit: StackFit.expand, children: [
 
-            // Gradiente oscuro de abajo para legibilidad
-            Container(decoration: const BoxDecoration(gradient: LinearGradient(
-              begin: Alignment.topCenter, end: Alignment.bottomCenter,
-              stops: [0.0, 0.35, 1.0],
-              colors: [Colors.transparent, Colors.transparent, Color(0xEE000000)]))),
+                // ── Imagen de fondo o gradiente fallback ──────────────────
+                if (ruta['imagen'] != null)
+                  Image.asset(ruta['imagen'], fit: BoxFit.cover,
+                    cacheWidth: 600,
+                    errorBuilder: (_, __, ___) => _CardGradientFallback(ruta: ruta))
+                else
+                  _CardGradientFallback(ruta: ruta),
 
-            // Overlay pausa — texto en la parte SUPERIOR, imagen opaca debajo
-            if (!activa) ...[
-              // Capa extra de oscuridad
-              Container(color: Colors.black.withOpacity(0.72)),
-              // Contenido en la parte SUPERIOR
-              Positioned(top: 0, left: 0, right: 0,
-                child: Container(
-                  padding: const EdgeInsets.fromLTRB(14, 14, 14, 16),
+                // ── Scrim inferior — legibilidad del texto ────────────────
+                const DecoratedBox(
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
-                      begin: Alignment.topCenter, end: Alignment.bottomCenter,
-                      colors: [Colors.black.withOpacity(0.85), Colors.transparent])),
-                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Row(children: [
-                      Text(proximaActivacion.isNotEmpty ? '🗓️' : '🔒',
-                        style: const TextStyle(fontSize: 18)),
-                      const SizedBox(width: 8),
-                      Text(proximaActivacion.isNotEmpty
-                        ? t('TEMPORADA ESPECIAL', 'SPECIAL SEASON')
-                        : t('PRÓXIMAMENTE', 'COMING SOON'),
-                        style: const TextStyle(color: kGold, fontSize: 11,
-                          letterSpacing: 2, fontWeight: FontWeight.w900)),
-                    ]),
-                    if (proximaActivacion.isNotEmpty)
-                      Padding(padding: const EdgeInsets.only(top: 3, left: 26),
-                        child: Text(proximaActivacion,
-                          style: const TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.w600))),
-                    if (diasParaActivacion > 0)
-                      Padding(padding: const EdgeInsets.only(top: 6, left: 26),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: kGold.withOpacity(0.20),
-                            borderRadius: BorderRadius.circular(20),
-                            border: Border.all(color: kGold.withOpacity(0.6), width: 1.5)),
-                          child: Text('${t("Faltan","In")} $diasParaActivacion ${t("días","days")}',
-                            style: const TextStyle(color: kGold, fontSize: 11,
-                              fontWeight: FontWeight.w800, letterSpacing: 0.5)))),
-                    if (diasParaActivacion < 0)
-                      Padding(padding: const EdgeInsets.only(top: 6, left: 26),
-                        child: Text(t('Temporada finalizada', 'Season ended'),
-                          style: const TextStyle(color: kTextMuted, fontSize: 10))),
-                  ]))),
-            ],
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      stops: [0.0, 0.35, 1.0],
+                      colors: RDSColor.gradientScrim))),
 
-            // Badge IMPERDIBLE — arriba izquierda
-            if (activa && esImperdible)
-              Positioned(top: 12, left: 12,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFE85D26),
-                    borderRadius: BorderRadius.circular(20)),
-                  child: Text(t('IMPERDIBLE', 'MUST DO'),
-                    style: const TextStyle(color: Colors.white, fontSize: 9,
-                      fontWeight: FontWeight.w800, letterSpacing: 1.5)))),
-
-            // Badge tag — arriba izquierda (si no es imperdible)
-            if (activa && !esImperdible)
-              Positioned(top: 12, left: 12,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: Colors.black.withOpacity(0.5),
-                    borderRadius: BorderRadius.circular(20)),
-                  child: Text(ruta['tag'] ?? '',
-                    style: TextStyle(color: acento, fontSize: 9, fontWeight: FontWeight.w600)))),
-
-            // Badge puntos — arriba derecha
-            if (activa)
-              Positioned(top: 12, right: 12,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: kGold.withOpacity(0.15),
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: kGold.withOpacity(0.5))),
-                  child: Text('+$puntos pts',
-                    style: const TextStyle(
-                      fontFamily: 'SpaceGrotesk',
-                      color: kGold, fontSize: 10, fontWeight: FontWeight.w700)))),
-
-            // Contenido inferior
-            Positioned(left: 0, right: 0, bottom: 0,
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
-                child: Column(crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min, children: [
-                  Text(rNombre(ruta),
-                    style: const TextStyle(
-                      fontFamily: 'PlayfairDisplay',
-                      fontSize: 18, fontWeight: FontWeight.w900,
-                      color: kText, letterSpacing: 0.3, height: 1.1)),
-                  const SizedBox(height: 4),
-                  // Sitios emblemáticos — primeros 3 del sitiosList
-                  Builder(builder: (_) {
-                    final rawSitios = ruta['sitiosList'];
-                    final sitios = rawSitios is List
-                        ? List<String>.from(rawSitios.map((e) => e.toString()))
-                        : <String>[];
-                    final preview = sitios.take(3).join(' · ');
-                    if (preview.isEmpty) return const SizedBox.shrink();
-                    return Text(
-                      preview,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 10,
-                        color: kText.withOpacity(0.65),
-                        letterSpacing: 0.2));
-                  }),
-                  const SizedBox(height: 8),
-                  Row(children: [
-                    _InfoPill(icon: '⏱', text: ruta['tiempo']?.toString() ?? ''),
-                    const SizedBox(width: 6),
-                    _InfoPill(icon: '📍', text: '${ruta["sitios"]} ${t("sitios","spots"?.toString() ?? '')}'),
-                    const Spacer(),
-                    // Botón Explorar
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+                // ── Overlay estado inactivo ───────────────────────────────
+                if (!activa) ...[                  ColoredBox(color: Colors.black.withOpacity(0.72)),
+                  Positioned(top: 0, left: 0, right: 0,
+                    child: Container(
+                      padding: const EdgeInsets.fromLTRB(14, 14, 14, 16),
                       decoration: BoxDecoration(
-                        color: kGreen,
-                        borderRadius: BorderRadius.circular(20),
-                        boxShadow: [BoxShadow(
-                          color: kGreen.withOpacity(0.4),
-                          blurRadius: 8, offset: const Offset(0, 3))]),
-                      child: Text(t('Explorar →', 'Explore →'),
-                        style: const TextStyle(
-                          fontFamily: 'Inter',
-                          color: Colors.white, fontSize: 11,
-                          fontWeight: FontWeight.w700, letterSpacing: 0.5))),
-                  ]),
-                ]))),
-          ]))));
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter, end: Alignment.bottomCenter,
+                          colors: [Colors.black.withOpacity(0.85), Colors.transparent])),
+                      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                        Row(children: [
+                          Icon(
+                            proximaActivacion.isNotEmpty
+                                ? RDSIcons.timer
+                                : RDSIcons.actionLock,
+                            size: 18, color: RDSColor.gold),  // emoji 🗓️/🔒 → ícono
+                          const SizedBox(width: 8),
+                          Text(proximaActivacion.isNotEmpty
+                            ? t('TEMPORADA ESPECIAL', 'SPECIAL SEASON')
+                            : t('PRÓXIMAMENTE', 'COMING SOON'),
+                            style: RDSType.labelSm.copyWith(
+                              color: RDSColor.gold, letterSpacing: 2)),
+                        ]),
+                        if (proximaActivacion.isNotEmpty)
+                          Padding(padding: const EdgeInsets.only(top: 3, left: 26),
+                            child: Text(proximaActivacion,
+                              style: RDSType.caption.copyWith(color: Colors.white70))),
+                        if (diasParaActivacion > 0)
+                          Padding(padding: const EdgeInsets.only(top: 6, left: 26),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: RDSColor.gold.withOpacity(0.20),
+                                borderRadius: RDSRadius.bFull,
+                                border: Border.all(color: RDSColor.gold.withOpacity(0.6), width: 1.5)),
+                              child: Text('${t("Faltan","In")} $diasParaActivacion ${t("días","days")}',
+                                style: RDSType.labelSm.copyWith(
+                                  color: RDSColor.gold, letterSpacing: 0.5)))),
+                        if (diasParaActivacion < 0)
+                          Padding(padding: const EdgeInsets.only(top: 6, left: 26),
+                            child: Text(t('Temporada finalizada', 'Season ended'),
+                              style: RDSType.caption)),
+                      ]))),
+                ],
+
+                // ── Badge IMPERDIBLE ──────────────────────────────────────
+                if (activa && esImperdible)
+                  Positioned(top: 12, left: 12,
+                    child: _RDSBadge(
+                      label: t('IMPERDIBLE', 'MUST DO'),
+                      color: RDSColor.accent,
+                      textColor: Colors.white)),
+
+                // ── Badge tag (si no es imperdible) ──────────────────────
+                if (activa && !esImperdible)
+                  Positioned(top: 12, left: 12,
+                    child: _RDSBadge(
+                      label: ruta['tag'] ?? '',
+                      color: Colors.black.withOpacity(0.5),
+                      textColor: acento)),
+
+                // ── Badge puntos ──────────────────────────────────────────
+                if (activa)
+                  Positioned(top: 12, right: 12,
+                    child: _RDSBadge(
+                      label: '+$puntos pts',
+                      color: RDSColor.gold.withOpacity(0.15),
+                      textColor: RDSColor.gold,
+                      border: Border.all(color: RDSColor.gold.withOpacity(0.5)),
+                      fontFamily: RDSType.familyData)),
+
+                // ── Contenido inferior ────────────────────────────────────
+                Positioned(left: 0, right: 0, bottom: 0,
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(rNombre(ruta),
+                          style: RDSType.displaySm.copyWith(   // fontSize:18 PlayfairDisplay → token
+                            letterSpacing: 0.3, height: 1.1)),
+                        const SizedBox(height: 4),
+                        Builder(builder: (_) {
+                          final rawSitios = ruta['sitiosList'];
+                          final sitios = rawSitios is List
+                              ? List<String>.from(rawSitios.map((e) => e.toString()))
+                              : <String>[];
+                          final preview = sitios.take(3).join(' · ');
+                          if (preview.isEmpty) return const SizedBox.shrink();
+                          return Text(
+                            preview,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: RDSType.caption.copyWith(
+                              color: RDSColor.textPrimary.withOpacity(0.65)));
+                        }),
+                        const SizedBox(height: 8),
+                        Row(children: [
+                          _InfoPill(icon: '⏱', text: ruta['tiempo']?.toString() ?? ''),
+                          const SizedBox(width: 6),
+                          _InfoPill(icon: '📍', text: '${(ruta["sitios"] ?? 0).toString()} ${t("sitios","spots")}'),
+                          const Spacer(),
+                          // Botón Explorar
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+                            decoration: BoxDecoration(
+                              color: RDSColor.green,
+                              borderRadius: RDSRadius.bFull,             // circular(20) → token
+                              boxShadow: RDSElevation.glow(color: RDSColor.green, opacity: 0.4)),
+                            child: Row(mainAxisSize: MainAxisSize.min, children: [
+                              Text(t('Explorar', 'Explore'),
+                                style: RDSType.labelSm.copyWith(
+                                  color: Colors.white, letterSpacing: 0.5)),
+                              const SizedBox(width: 4),
+                              const Icon(RDSIcons.actionExplore,   // '→' → ícono
+                                size: 12, color: Colors.white),
+                            ])),
+                        ]),
+                      ]))),
+
+              ])),
+          ),
+        ),
+      ),
+    );
   }
 }
 
+// Gradiente fallback cuando no hay imagen — extraído para reutilizar
+class _CardGradientFallback extends StatelessWidget {
+  final Map<String, dynamic> ruta;
+  const _CardGradientFallback({required this.ruta});
+  @override
+  Widget build(BuildContext context) => DecoratedBox(
+    decoration: BoxDecoration(
+      gradient: LinearGradient(
+        begin: Alignment.topLeft, end: Alignment.bottomRight,
+        colors: [
+          kRutaColor(ruta['color1'], RDSColor.base),
+          kRutaColor(ruta['color2'], RDSColor.surface),
+        ])));
+}
+
+// Badge reutilizable — extrae el patrón repetido 4 veces en RouteCard
+class _RDSBadge extends StatelessWidget {
+  final String label;
+  final Color color;
+  final Color textColor;
+  final BoxBorder? border;
+  final String? fontFamily;
+  const _RDSBadge({
+    required this.label,
+    required this.color,
+    required this.textColor,
+    this.border,
+    this.fontFamily,
+  });
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+    decoration: BoxDecoration(
+      color: color,
+      borderRadius: RDSRadius.bFull,
+      border: border),
+    child: Text(label,
+      style: RDSType.labelSm.copyWith(
+        color: textColor,
+        fontFamily: fontFamily,
+        letterSpacing: 1.5)));
+}
 // ─────────────────────────────────────────
 //  CONSEJOS CARD
 // ─────────────────────────────────────────
@@ -17574,7 +18340,7 @@ class _ComoLlegarCard extends StatelessWidget {
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
-        color: kCard,
+        color: RDSColor.card,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: acento.withOpacity(0.25))),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -17670,15 +18436,15 @@ class _ConsejosCardState extends State<_ConsejosCard> {
       : widget.ruta['momentoClave']) ?? '';
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
-      decoration: BoxDecoration(color: kCard, borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: kGold.withOpacity(0.25))),
+      decoration: BoxDecoration(color: RDSColor.card, borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: RDSColor.gold.withOpacity(0.25))),
       child: Column(children: [
         GestureDetector(
           onTap: () => setState(() => _expandido = !_expandido),
           child: Container(padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
             child: Row(children: [
               Container(width: 36, height: 36,
-                decoration: BoxDecoration(color: kGold.withOpacity(0.12), shape: BoxShape.circle),
+                decoration: BoxDecoration(color: RDSColor.gold.withOpacity(0.12), shape: BoxShape.circle),
                 child: const Center(child: Text('🛡️', style: TextStyle(fontSize: 18)))),
               const SizedBox(width: 12),
               Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -17688,10 +18454,10 @@ class _ConsejosCardState extends State<_ConsejosCard> {
                   style: const TextStyle(color: kTextMuted, fontSize: 11)),
               ])),
               Icon(_expandido ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
-                color: kGold.withOpacity(0.7), size: 20),
+                color: RDSColor.gold.withOpacity(0.7), size: 20),
             ]))),
         if (_expandido) ...[
-          Container(height: 1, color: kGold.withOpacity(0.1)),
+          Container(height: 1, color: RDSColor.gold.withOpacity(0.1)),
           Padding(padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               ...consejos.map((c) => Padding(padding: const EdgeInsets.only(bottom: 10),
@@ -17717,6 +18483,95 @@ class _ConsejosCardState extends State<_ConsejosCard> {
             ])),
         ],
       ]),
+    );
+  }
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+//  _RuteroAppBar — AppBar estándar del Design System
+//
+//  Úsalo en Fase 3 cuando migres cada pantalla. Por ahora los AppBar
+//  inline siguen funcionando; este componente es el destino de migración.
+//
+//  VARIANTES
+//  ─────────
+//  standard  → título centrado, fondo kDark2, back arrow ← (default)
+//  transparent → fondo transparente, para pantallas con hero image
+//  colored   → fondo personalizado (para Feria, rutas con color propio)
+//
+//  USO
+//  ───
+//  appBar: _RuteroAppBar(title: t('Mi Ruta', 'My Route'))
+//  appBar: _RuteroAppBar.transparent(title: t('Detalle', 'Detail'))
+//  appBar: _RuteroAppBar(title: 'Feria', backgroundColor: kFeriaRojo)
+// ════════════════════════════════════════════════════════════════════════════
+class _RuteroAppBar extends StatelessWidget implements PreferredSizeWidget {
+  final String title;
+  final Color? backgroundColor;
+  final bool transparent;
+  final List<Widget>? actions;
+  final bool showBack;
+  final Widget? leading;
+
+  const _RuteroAppBar({
+    required this.title,
+    this.backgroundColor,
+    this.transparent = false,
+    this.actions,
+    this.showBack = true,
+    this.leading,
+  });
+
+  // Constructor named para pantallas con hero image
+  const _RuteroAppBar.transparent({
+    required this.title,
+    this.actions,
+    this.showBack = true,
+  })  : backgroundColor = Colors.transparent,
+        transparent = true,
+        leading = null;
+
+  @override
+  Size get preferredSize => const Size.fromHeight(kToolbarHeight);
+
+  @override
+  Widget build(BuildContext context) {
+    final Color bg = transparent
+        ? Colors.transparent
+        : (backgroundColor ?? RDSColor.base);   // kDark2 → token
+
+    return AppBar(
+      backgroundColor: bg,
+      elevation: 0,
+      scrolledUnderElevation: 0,
+      centerTitle: false,
+
+      // Back button con ícono del sistema
+      leading: showBack
+          ? (leading ??
+              IconButton(
+                icon: const Icon(RDSIcons.back, size: 22),  // Icons.arrow_back → token
+                color: RDSColor.textPrimary,
+                onPressed: () => Navigator.of(context).pop()))
+          : null,
+      automaticallyImplyLeading: false,
+
+      // Título con tipografía del sistema
+      title: Text(
+        title,
+        style: RDSType.headlineLg.copyWith(letterSpacing: 0.2)),
+
+      // Separador inferior sutil (solo en variante standard)
+      bottom: transparent
+          ? null
+          : PreferredSize(
+              preferredSize: const Size.fromHeight(0.5),
+              child: Divider(
+                height: 0.5,
+                color: RDSColor.borderSubtle)),
+
+      // Acciones opcionales
+      actions: actions,
     );
   }
 }
@@ -17856,19 +18711,19 @@ class _TransporteAliadoCardState extends State<_TransporteAliadoCard> {
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [kCard, kGreen.withOpacity(0.08)]),
+          colors: [RDSColor.card, kGreen.withOpacity(0.08)]),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: kGreen.withOpacity(0.35), width: 1.2),
-        boxShadow: [BoxShadow(color: kGreen.withOpacity(0.10), blurRadius: 16, offset: const Offset(0, 4))]),
+        border: Border.all(color: RDSColor.green.withOpacity(0.35), width: 1.2),
+        boxShadow: [BoxShadow(color: RDSColor.green.withOpacity(0.10), blurRadius: 16, offset: const Offset(0, 4))]),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         // ── Header: badge ALIADO + nombre + logo ──
         Row(children: [
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
             decoration: BoxDecoration(
-              color: kGreen.withOpacity(0.18),
+              color: RDSColor.green.withOpacity(0.18),
               borderRadius: BorderRadius.circular(6),
-              border: Border.all(color: kGreen.withOpacity(0.4))),
+              border: Border.all(color: RDSColor.green.withOpacity(0.4))),
             child: Text(t('ALIADO OFICIAL', 'OFFICIAL PARTNER'),
               style: TextStyle(color: kGreen, fontSize: 9,
                 fontWeight: FontWeight.w900, letterSpacing: 1.2)),
@@ -17933,9 +18788,9 @@ class _TransporteAliadoCardState extends State<_TransporteAliadoCard> {
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
           decoration: BoxDecoration(
-            color: kGold.withOpacity(0.08),
+            color: RDSColor.gold.withOpacity(0.08),
             borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: kGold.withOpacity(0.25))),
+            border: Border.all(color: RDSColor.gold.withOpacity(0.25))),
           child: Row(children: [
             const Text('🎫', style: TextStyle(fontSize: 16)),
             const SizedBox(width: 8),
@@ -18075,18 +18930,18 @@ class _MuseoEscobarCardState extends State<_MuseoEscobarCard> {
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [kCard, kGold.withOpacity(0.08)]),
+          colors: [RDSColor.card, kGold.withOpacity(0.08)]),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: kGold.withOpacity(0.35), width: 1.2),
-        boxShadow: [BoxShadow(color: kGold.withOpacity(0.10), blurRadius: 16, offset: const Offset(0, 4))]),
+        border: Border.all(color: RDSColor.gold.withOpacity(0.35), width: 1.2),
+        boxShadow: [BoxShadow(color: RDSColor.gold.withOpacity(0.10), blurRadius: 16, offset: const Offset(0, 4))]),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(children: [
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
             decoration: BoxDecoration(
-              color: kGold.withOpacity(0.18),
+              color: RDSColor.gold.withOpacity(0.18),
               borderRadius: BorderRadius.circular(6),
-              border: Border.all(color: kGold.withOpacity(0.4))),
+              border: Border.all(color: RDSColor.gold.withOpacity(0.4))),
             child: Text(t('ALIADO', 'PARTNER'),
               style: TextStyle(color: kGold, fontSize: 9,
                 fontWeight: FontWeight.w900, letterSpacing: 1.2)),
@@ -18114,9 +18969,9 @@ class _MuseoEscobarCardState extends State<_MuseoEscobarCard> {
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
           decoration: BoxDecoration(
-            color: kGold.withOpacity(0.08),
+            color: RDSColor.gold.withOpacity(0.08),
             borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: kGold.withOpacity(0.25))),
+            border: Border.all(color: RDSColor.gold.withOpacity(0.25))),
           child: Row(children: [
             const Text('🎫', style: TextStyle(fontSize: 16)),
             const SizedBox(width: 8),
@@ -18180,9 +19035,9 @@ class _PasoHopOn extends StatelessWidget {
         Container(
           width: 22, height: 22,
           decoration: BoxDecoration(
-            color: kGreen.withOpacity(0.2),
+            color: RDSColor.green.withOpacity(0.2),
             shape: BoxShape.circle,
-            border: Border.all(color: kGreen.withOpacity(0.5))),
+            border: Border.all(color: RDSColor.green.withOpacity(0.5))),
           child: Center(child: Text(numero,
             style: TextStyle(color: kGreen, fontSize: 11, fontWeight: FontWeight.w900))),
         ),
@@ -18269,7 +19124,7 @@ class _SiteItem extends StatelessWidget {
 
     }
     return Container(margin: const EdgeInsets.only(bottom: 10), padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(color: kCard, borderRadius: BorderRadius.circular(12),
+      decoration: BoxDecoration(color: RDSColor.card, borderRadius: BorderRadius.circular(12),
         border: Border.all(color: estado == 'active' ? acento.withOpacity(0.3) : Colors.white.withOpacity(0.05))),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(children: [
@@ -18349,7 +19204,7 @@ class _SiteItem extends StatelessWidget {
                 child: Container(
                   padding: const EdgeInsets.symmetric(vertical: 10),
                   decoration: BoxDecoration(
-                    color: kCard,
+                    color: RDSColor.card,
                     borderRadius: BorderRadius.circular(10),
                     border: Border.all(color: acento.withOpacity(0.6), width: 1.5),
                   ),
@@ -18401,16 +19256,57 @@ class _StatChip extends StatelessWidget {
   final String label, value; final Color color;
   const _StatChip({required this.label, required this.value, required this.color});
   @override
-  Widget build(BuildContext context) => Container(padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-    decoration: BoxDecoration(color: kCard, borderRadius: BorderRadius.circular(12),
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+    decoration: BoxDecoration(
+      color: RDSColor.card,                            // kCard → token
+      borderRadius: RDSRadius.bMd,                    // circular(12) → token
       border: Border.all(color: color.withOpacity(0.25))),
     child: Column(children: [
-      Text(value, style: TextStyle(color: color, fontSize: 18, fontWeight: FontWeight.w800)),
+      Text(value,
+        style: RDSType.displaySm.copyWith(            // fontSize:18 → token displaySm
+          color: color, fontWeight: FontWeight.w800)),
       const SizedBox(height: 2),
-      Text(label, style: const TextStyle(color: kTextMuted, fontSize: 10)),
+      Text(label, style: RDSType.caption),            // fontSize:10 → token caption
     ]));
 }
 
+// ── _RDSMetricChip — chip de métrica premium ──────────────────────────────
+// Reemplaza _HeaderChip con soporte de ícono (IconData) O emoji.
+// El emoji se mantiene para BETA y casos donde el ícono no aplica.
+// Para métricas de navegación, usar icon: RDSIcons.metricXxx.
+class _RDSMetricChip extends StatelessWidget {
+  final IconData? icon;      // ícono premium (Material Symbol)
+  final String? emoji;       // emoji fallback (BETA chip, etc.)
+  final String label;
+  final Color color;
+
+  const _RDSMetricChip({
+    this.icon,
+    this.emoji,
+    required this.label,
+    required this.color,
+  }) : assert(icon != null || emoji != null,
+         '_RDSMetricChip requiere icon o emoji');
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+    decoration: BoxDecoration(
+      color: color.withOpacity(0.12),
+      borderRadius: RDSRadius.bFull,                  // circular(20) → token
+      border: Border.all(color: color.withOpacity(0.30))),
+    child: Row(mainAxisSize: MainAxisSize.min, children: [
+      if (icon != null)
+        Icon(icon, size: 13, color: color)            // ícono premium
+      else
+        Text(emoji!, style: const TextStyle(fontSize: 11)),  // emoji fallback
+      const SizedBox(width: RDSSpace.xs),
+      Text(label,
+        style: RDSType.labelSm.copyWith(              // fontSize:10 → token labelSm
+          color: color, letterSpacing: 0.5)),
+    ]));
+}
 // ════════════════════════════════════════════════════════════════
 //  _CardCodigoAliado — Sprint 1: Aliado Final con código de canje
 // ════════════════════════════════════════════════════════════════
@@ -18437,7 +19333,7 @@ class _CardCodigoAliado extends StatelessWidget {
           colors: [kGold.withOpacity(0.18), kOrchid.withOpacity(0.12)],
         ),
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: kGold.withOpacity(0.5), width: 1.5),
+        border: Border.all(color: RDSColor.gold.withOpacity(0.5), width: 1.5),
       ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         // Header
@@ -18483,7 +19379,7 @@ class _CardCodigoAliado extends StatelessWidget {
             Clipboard.setData(ClipboardData(text: codigo));
             ScaffoldMessenger.of(context).showSnackBar(SnackBar(
               content: Text(kLang == 'en' ? '✅ Code copied!' : '✅ ¡Código copiado!'),
-              backgroundColor: kGreen,
+              backgroundColor: RDSColor.green,
               duration: const Duration(seconds: 2),
             ));
           },
@@ -18491,9 +19387,9 @@ class _CardCodigoAliado extends StatelessWidget {
             width: double.infinity,
             padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
             decoration: BoxDecoration(
-              color: kDark3,
+              color: RDSColor.surface,
               borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: kGold.withOpacity(0.4), width: 1.5),
+              border: Border.all(color: RDSColor.gold.withOpacity(0.4), width: 1.5),
             ),
             child: Row(children: [
               Expanded(child: Text(
@@ -18507,7 +19403,7 @@ class _CardCodigoAliado extends StatelessWidget {
                 ),
                 textAlign: TextAlign.center,
               )),
-              const Icon(Icons.copy, color: kGold, size: 18),
+              const Icon(Icons.copy, color: RDSColor.gold, size: 18),
             ]),
           ),
         ),
@@ -18526,7 +19422,7 @@ class _CardCodigoAliado extends StatelessWidget {
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
           decoration: BoxDecoration(
-            color: kGreen.withOpacity(0.12),
+            color: RDSColor.green.withOpacity(0.12),
             borderRadius: BorderRadius.circular(8),
           ),
           child: Text(
@@ -18553,7 +19449,7 @@ class _MapStat extends StatelessWidget {
     Text(label, textAlign: TextAlign.center,
       style: const TextStyle(
         fontFamily: 'Inter',
-        fontSize: 9, color: kTextMuted, height: 1.2)),
+        fontSize: 9, color: RDSColor.textMuted, height: 1.2)),
   ]);
 }
 
@@ -18564,10 +19460,10 @@ class _ProfileStat extends StatelessWidget {
   Widget build(BuildContext context) => Expanded(child: Container(
     padding: const EdgeInsets.symmetric(vertical: 16),
     decoration: BoxDecoration(
-      color: kCard,
+      color: RDSColor.card,
       borderRadius: BorderRadius.circular(16),
-      border: Border.all(color: kGold.withOpacity(0.2)),
-      boxShadow: [BoxShadow(color: kGold.withOpacity(0.06), blurRadius: 12)]),
+      border: Border.all(color: RDSColor.gold.withOpacity(0.2)),
+      boxShadow: [BoxShadow(color: RDSColor.gold.withOpacity(0.06), blurRadius: 12)]),
     child: Column(children: [
       Text(emoji, style: const TextStyle(fontSize: 22)),
       const SizedBox(height: 6),
@@ -18578,12 +19474,12 @@ class _ProfileStat extends StatelessWidget {
         builder: (_, v, __) => Text(v.toInt().toString(),
           style: const TextStyle(
             fontFamily: 'SpaceGrotesk',
-            fontSize: 24, fontWeight: FontWeight.w700, color: kGold))),
+            fontSize: 24, fontWeight: FontWeight.w700, color: RDSColor.gold))),
       const SizedBox(height: 3),
       Text(label, textAlign: TextAlign.center,
         style: const TextStyle(
           fontFamily: 'Inter',
-          fontSize: 9, color: kTextMuted, height: 1.3)),
+          fontSize: 9, color: RDSColor.textMuted, height: 1.3)),
     ])));
 }
 
@@ -18599,7 +19495,7 @@ class _BadgeChip extends StatelessWidget {
       decoration: BoxDecoration(shape: BoxShape.circle,
         color: desbloqueado ? kGreen.withOpacity(0.1) : kDark3,
         border: Border.all(color: desbloqueado ? kGreen.withOpacity(0.5) : Colors.white.withOpacity(0.08), width: 1.5),
-        boxShadow: desbloqueado ? [BoxShadow(color: kGreen.withOpacity(0.2), blurRadius: 8)] : null),
+        boxShadow: desbloqueado ? [BoxShadow(color: RDSColor.green.withOpacity(0.2), blurRadius: 8)] : null),
       child: desbloqueado && insigniaImg != null
         ? ClipOval(child: Image.asset(insigniaImg!, width: 64, height: 64, fit: BoxFit.cover,
             errorBuilder: (_, __, ___) => Center(child: Text(emoji, style: const TextStyle(fontSize: 24)))))
@@ -18620,7 +19516,7 @@ class _SwitchTile extends StatelessWidget {
   Widget build(BuildContext context) => Container(
     margin: const EdgeInsets.only(bottom: 8),
     padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-    decoration: BoxDecoration(color: kDark3, borderRadius: BorderRadius.circular(12),
+    decoration: BoxDecoration(color: RDSColor.surface, borderRadius: BorderRadius.circular(12),
       border: Border.all(color: Colors.white.withOpacity(0.06))),
     child: Row(children: [
       Text(emoji, style: const TextStyle(fontSize: 20)),
@@ -18645,7 +19541,7 @@ class _ProfileMenuItem extends StatelessWidget {
     onTap: onTap,
     child: Container(margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-      decoration: BoxDecoration(color: kCard, borderRadius: BorderRadius.circular(12),
+      decoration: BoxDecoration(color: RDSColor.card, borderRadius: BorderRadius.circular(12),
         border: Border.all(color: isRed ? const Color(0xFFE05252).withOpacity(0.2) : Colors.white.withOpacity(0.05))),
       child: Row(children: [
         Text(emoji, style: const TextStyle(fontSize: 18)),
@@ -18663,7 +19559,7 @@ class _LogroCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final bool d = logro['desbloqueado'] == true;
     return Container(margin: const EdgeInsets.only(bottom: 10), padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(color: kCard, borderRadius: BorderRadius.circular(14),
+      decoration: BoxDecoration(color: RDSColor.card, borderRadius: BorderRadius.circular(14),
         border: Border.all(color: d ? kGold.withOpacity(0.2) : Colors.white.withOpacity(0.05))),
       child: Row(children: [
         Container(width: 64, height: 64,
@@ -18681,7 +19577,7 @@ class _LogroCard extends StatelessWidget {
           Text(logro['desc'], style: const TextStyle(color: kTextMuted, fontSize: 11)),
           if (d && logro['fecha'] != '')
             Padding(padding: const EdgeInsets.only(top: 4),
-              child: Text(logro['fecha'], style: TextStyle(color: kGold.withOpacity(0.5), fontSize: 10))),
+              child: Text(logro['fecha'], style: TextStyle(color: RDSColor.gold.withOpacity(0.5), fontSize: 10))),
         ])),
         Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
           decoration: BoxDecoration(color: d ? kGold.withOpacity(0.1) : kDark3, borderRadius: BorderRadius.circular(8)),
@@ -18719,103 +19615,347 @@ class _BottomNav extends StatelessWidget {
     required this.onTap,
     this.feriaActiva = false,
   });
+
   @override
   Widget build(BuildContext context) {
+    // Tabs base con íconos del Design System (RDSIcons).
+    // Emojis eliminados de navegación; se conservan solo en logros/insignias.
     final base = [
-      {'icon': '🗺️', 'label': t('Explorar','Explore')},
-      {'icon': '📍', 'label': t('Mapa','Map')},
-      {'icon': '🏆', 'label': t('Logros','Achievements')},
-      {'icon': '👤', 'label': t('Perfil','Profile')},
+      _NavItem(icon: RDSIcons.navExplore, label: t('Explorar', 'Explore')),
+      _NavItem(icon: RDSIcons.navMap,     label: t('Mapa', 'Map')),
+      _NavItem(icon: RDSIcons.navAchiev,  label: t('Logros', 'Achievements')),
+      _NavItem(icon: RDSIcons.navProfile, label: t('Perfil', 'Profile')),
     ];
-    // Durante la feria: Feria va primero, el resto después
+    // Durante la feria: tab Feria va primero
     final items = feriaActiva
-        ? [{'icon': '🌹', 'label': t('Feria','Festival')}, ...base]
+        ? [_NavItem(icon: RDSIcons.navFeria, label: t('Feria', 'Festival')), ...base]
         : base;
+
     return Container(
       decoration: BoxDecoration(
-        color: const Color(0xFF0F1A0A),
+        color: RDSColor.base,  // Unificado — elimina RDSColor.base hardcodeado
         border: Border(
-          top: BorderSide(color: kFeriaDorado.withOpacity(0.20), width: 0.5)),
-        boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.5), blurRadius: 20, offset: const Offset(0, -4)),
-        ]),
+          top: BorderSide(color: RDSColor.gold.withOpacity(0.20), width: 0.5)),
+        boxShadow: RDSElevation.high()),
       child: SafeArea(
         top: false,
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceAround,
           children: items.asMap().entries.map((e) {
-            final isActive = e.key == currentIndex;
-            final isFeria = e.value['label'] == t('Feria','Festival');
-            final activeColor = isFeria ? kFeriaRojo : kGreen;
+            final isActive    = e.key == currentIndex;
+            final isFeria     = e.value.label == t('Feria', 'Festival');
+            final activeColor = isFeria ? RDSColor.feriaRed : RDSColor.green;
+
             return GestureDetector(
               onTap: () => onTap(e.key),
               child: AnimatedContainer(
-                duration: const Duration(milliseconds: 200),
+                duration: RDSDuration.fast,             // Duration(ms:200) → token
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                 decoration: BoxDecoration(
-                  color: isActive ? (isFeria ? kFeriaRojo : kGreen).withOpacity(0.12) : Colors.transparent,
-                  borderRadius: BorderRadius.circular(12)),
-                child: Column(mainAxisSize: MainAxisSize.min,
-                  mainAxisAlignment: MainAxisAlignment.center, children: [
-                  Text(e.value['icon']!,
-                    style: TextStyle(fontSize: isActive ? 20 : 18,
-                      shadows: isActive ? [Shadow(color: activeColor.withOpacity(0.6), blurRadius: 8)] : null)),
-                  const SizedBox(height: 2),
-                  Text(e.value['label']!,
-                    style: TextStyle(
-                      fontSize: 9,
-                      fontFamily: 'Inter',
-                      color: isActive ? activeColor : kTextMuted,
-                      fontWeight: isActive ? FontWeight.w700 : FontWeight.w400,
-                      letterSpacing: 0.3)),
-                ])));
-          }).toList())));
+                  color: isActive
+                      ? activeColor.withOpacity(0.12)
+                      : Colors.transparent,
+                  borderRadius: RDSRadius.bMd),         // circular(12) → token
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    AnimatedScale(
+                      scale: isActive ? 1.15 : 1.0,
+                      duration: RDSDuration.fast,
+                      child: Icon(
+                        e.value.icon,
+                        size: 22,
+                        color: isActive ? activeColor : RDSColor.textMuted,
+                        shadows: isActive
+                            ? [Shadow(color: activeColor.withOpacity(0.50), blurRadius: 8)]
+                            : null,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      e.value.label,
+                      style: RDSType.caption.copyWith(  // fontSize:9 → token caption (11)
+                        color: isActive ? activeColor : RDSColor.textMuted,
+                        fontWeight: isActive ? FontWeight.w700 : FontWeight.w400,
+                        letterSpacing: 0.3,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          }).toList(),
+        ),
+      ),
+    );
   }
 }
 
+// Modelo tipado para cada tab — reemplaza Map<String,String> anterior
+class _NavItem {
+  final IconData icon;
+  final String label;
+  const _NavItem({required this.icon, required this.label});
+}
+// ═══════════════════════════════════════════════════════════════════════════
+//  SISTEMA DE BOTONES — Rutero Design System v1.0
+//
+//  Jerarquía de 3 niveles:
+//  1. _RDSButtonPrimary   — CTA principal (Ingresar, Continuar, Explorar)
+//  2. _RDSButtonSecondary — Acción alternativa (outline con borde visible)
+//  3. _RDSButtonTertiary  — Acción de bajo peso (texto plano, sin fondo)
+//
+//  Más botones especializados:
+//  _RDSButtonGoogle       — Login con Google
+//  _RDSButtonIcon         — Ícono + label compacto (para filas de acciones)
+//
+//  ALIASES de compatibilidad al final — _GoldButton y _OutlineButton siguen
+//  funcionando sin cambiar ninguna línea del código existente.
+// ═══════════════════════════════════════════════════════════════════════════
+
+// ── 1. Botón Primario ─────────────────────────────────────────────────────
+// Gradiente verde, sombra glow, ancho completo por defecto.
+// Úsalo para la acción más importante de cada pantalla.
+class _RDSButtonPrimary extends StatelessWidget {
+  final String label;
+  final VoidCallback? onTap;   // null = estado disabled automático
+  final IconData? icon;
+  final bool isLoading;
+  final bool fullWidth;
+
+  const _RDSButtonPrimary({
+    required this.label,
+    required this.onTap,
+    this.icon,
+    this.isLoading = false,
+    this.fullWidth = true,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final bool enabled = onTap != null && !isLoading;
+    return GestureDetector(
+      onTap: enabled ? onTap : null,
+      child: AnimatedOpacity(
+        opacity: enabled ? 1.0 : 0.45,
+        duration: RDSDuration.fast,
+        child: Container(
+          width: fullWidth ? double.infinity : null,
+          padding: const EdgeInsets.symmetric(
+            horizontal: RDSSpace.lg, vertical: RDSSpace.md),
+          decoration: BoxDecoration(
+            gradient: enabled
+                ? const LinearGradient(colors: RDSColor.gradientPrimary)
+                : null,
+            color: enabled ? null : RDSColor.textMuted,
+            borderRadius: RDSRadius.bMd,                 // circular(14) → token md(12)
+            boxShadow: enabled
+                ? RDSElevation.glow(color: RDSColor.green, opacity: 0.35)
+                : null),
+          child: isLoading
+              ? const Center(
+                  child: SizedBox(width: 20, height: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2, color: Colors.white)))
+              : Row(
+                  mainAxisSize: fullWidth ? MainAxisSize.max : MainAxisSize.min,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    if (icon != null) ...[
+                      Icon(icon, size: 18, color: Colors.white),
+                      const SizedBox(width: RDSSpace.sm),
+                    ],
+                    Text(label,
+                      style: RDSType.headlineMd.copyWith(
+                        color: Colors.white, letterSpacing: 1.2)),
+                  ]),
+        ),
+      ),
+    );
+  }
+}
+
+// ── 2. Botón Secundario (Outline) ─────────────────────────────────────────
+// Borde de color, fondo transparente.
+// Úsalo para la segunda acción de la pantalla ("Cancelar", "Ver más").
+class _RDSButtonSecondary extends StatelessWidget {
+  final String label;
+  final VoidCallback? onTap;
+  final IconData? icon;
+  final Color? borderColor;
+  final bool fullWidth;
+
+  const _RDSButtonSecondary({
+    required this.label,
+    required this.onTap,
+    this.icon,
+    this.borderColor,
+    this.fullWidth = true,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final bool enabled   = onTap != null;
+    final Color borde    = borderColor ?? RDSColor.textPrimary.withOpacity(0.25);
+    return GestureDetector(
+      onTap: enabled ? onTap : null,
+      child: AnimatedOpacity(
+        opacity: enabled ? 1.0 : 0.45,
+        duration: RDSDuration.fast,
+        child: Container(
+          width: fullWidth ? double.infinity : null,
+          padding: const EdgeInsets.symmetric(
+            horizontal: RDSSpace.lg, vertical: RDSSpace.md),
+          decoration: BoxDecoration(
+            color: Colors.transparent,
+            borderRadius: RDSRadius.bMd,
+            border: Border.all(color: borde, width: 1.5)),
+          child: Row(
+            mainAxisSize: fullWidth ? MainAxisSize.max : MainAxisSize.min,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              if (icon != null) ...[
+                Icon(icon, size: 18, color: RDSColor.textPrimary),
+                const SizedBox(width: RDSSpace.sm),
+              ],
+              Text(label,
+                style: RDSType.headlineMd.copyWith(
+                  color: RDSColor.textPrimary, letterSpacing: 1.2)),
+            ]),
+        ),
+      ),
+    );
+  }
+}
+
+// ── 3. Botón Terciario (texto plano) ──────────────────────────────────────
+// Sin fondo ni borde. Para acciones de bajo peso: "Omitir", "Ver después".
+class _RDSButtonTertiary extends StatelessWidget {
+  final String label;
+  final VoidCallback? onTap;
+  final Color? color;
+
+  const _RDSButtonTertiary({
+    required this.label,
+    required this.onTap,
+    this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) => GestureDetector(
+    onTap: onTap,
+    child: Padding(
+      padding: const EdgeInsets.symmetric(
+        horizontal: RDSSpace.md, vertical: RDSSpace.sm),
+      child: Text(label,
+        style: RDSType.bodyMd.copyWith(
+          color: color ?? RDSColor.textMuted,
+          decoration: TextDecoration.underline,
+          decorationColor: (color ?? RDSColor.textMuted).withOpacity(0.5)))));
+}
+
+// ── Botón Google ──────────────────────────────────────────────────────────
+class _RDSButtonGoogle extends StatelessWidget {
+  final VoidCallback onTap;
+  const _RDSButtonGoogle({required this.onTap});
+
+  @override
+  Widget build(BuildContext context) => GestureDetector(
+    onTap: onTap,
+    child: Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(
+        horizontal: RDSSpace.lg, vertical: RDSSpace.md - 2),
+      decoration: BoxDecoration(
+        color: RDSColor.surface,            // RDSColor.surface → token surface
+        borderRadius: RDSRadius.bMd,
+        border: Border.all(
+          color: RDSColor.borderSubtle, width: 1.0)),
+      child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+        // Logo Google — círculo azul con 'G' (sin imágenes externas)
+        Container(
+          width: 20, height: 20,
+          decoration: const BoxDecoration(
+            shape: BoxShape.circle, color: Color(0xFF4285F4)),
+          child: const Center(
+            child: Text('G',
+              style: TextStyle(
+                fontSize: 12, fontWeight: FontWeight.w700,
+                color: Colors.white)))),
+        const SizedBox(width: RDSSpace.sm + 2),
+        Text(tContinuarGoogle,
+          style: RDSType.bodyMd.copyWith(color: RDSColor.textPrimary)),
+      ])));
+}
+
+// ── Botón ícono compacto ───────────────────────────────────────────────────
+// Para filas de acciones: compartir, copiar, SOS, etc.
+class _RDSButtonIcon extends StatelessWidget {
+  final IconData icon;
+  final String? label;
+  final VoidCallback? onTap;
+  final Color? color;
+  final Color? backgroundColor;
+
+  const _RDSButtonIcon({
+    required this.icon,
+    this.label,
+    this.onTap,
+    this.color,
+    this.backgroundColor,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final Color iconColor = color ?? RDSColor.textPrimary;
+    final Color bgColor   = backgroundColor ?? RDSColor.card;
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: label != null
+            ? const EdgeInsets.symmetric(horizontal: 14, vertical: 8)
+            : const EdgeInsets.all(10),
+        decoration: BoxDecoration(
+          color: bgColor,
+          borderRadius: RDSRadius.bSm,
+          border: Border.all(color: RDSColor.borderSubtle)),
+        child: label != null
+            ? Row(mainAxisSize: MainAxisSize.min, children: [
+                Icon(icon, size: 16, color: iconColor),
+                const SizedBox(width: RDSSpace.xs),
+                Text(label!, style: RDSType.labelSm.copyWith(color: iconColor)),
+              ])
+            : Icon(icon, size: 20, color: iconColor)));
+  }
+}
+
+// ── ALIASES de compatibilidad ─────────────────────────────────────────────
+// Permiten que el código existente siga compilando sin cambios.
+// Migrar gradualmente: cuando una pantalla se toque, reemplazar
+// _GoldButton → _RDSButtonPrimary, _OutlineButton → _RDSButtonSecondary.
 class _GoldButton extends StatelessWidget {
   final String label; final VoidCallback onTap;
   const _GoldButton({required this.label, required this.onTap});
   @override
-  Widget build(BuildContext context) => GestureDetector(onTap: onTap,
-    child: Container(width: double.infinity, padding: const EdgeInsets.symmetric(vertical: 16),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(colors: [kGreen, Color(0xFF7ACC85)]),
-        borderRadius: BorderRadius.circular(14),
-        boxShadow: [BoxShadow(color: kGreen.withOpacity(0.35), blurRadius: 20, offset: const Offset(0, 8))]),
-      child: Text(label, textAlign: TextAlign.center,
-        style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: Colors.white, letterSpacing: 2))));
+  Widget build(BuildContext context) =>
+      _RDSButtonPrimary(label: label, onTap: onTap);
 }
 
 class _OutlineButton extends StatelessWidget {
   final String label; final VoidCallback onTap;
   const _OutlineButton({required this.label, required this.onTap});
   @override
-  Widget build(BuildContext context) => GestureDetector(onTap: onTap,
-    child: Container(width: double.infinity, padding: const EdgeInsets.symmetric(vertical: 16),
-      decoration: BoxDecoration(color: Colors.transparent, borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: Colors.white.withOpacity(0.15))),
-      child: Text(label, textAlign: TextAlign.center,
-        style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: kText, letterSpacing: 2))));
+  Widget build(BuildContext context) =>
+      _RDSButtonSecondary(label: label, onTap: onTap);
 }
 
 class _GoogleButton extends StatelessWidget {
   final VoidCallback onTap;
   const _GoogleButton({required this.onTap});
   @override
-  Widget build(BuildContext context) => GestureDetector(onTap: onTap,
-    child: Container(width: double.infinity, padding: const EdgeInsets.symmetric(vertical: 14),
-      decoration: BoxDecoration(color: const Color(0xFF161A12), borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: Colors.white.withOpacity(0.08))),
-      child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-        Container(width: 20, height: 20,
-          decoration: const BoxDecoration(shape: BoxShape.circle, color: Color(0xFF4285F4)),
-          child: Center(child: Text('G', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Colors.white)))),
-        const SizedBox(width: 10),
-        Text(tContinuarGoogle, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: kText)),
-      ])));
+  Widget build(BuildContext context) => _RDSButtonGoogle(onTap: onTap);
 }
-
 // ═══════════════════════════════════════════════════════════════════════════════
 //  FERIA DE LAS FLORES — PANTALLA PRINCIPAL
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -18851,7 +19991,7 @@ class _FeriaScreenState extends State<FeriaScreen> with SingleTickerProviderStat
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: kDark2,
+      backgroundColor: RDSColor.base,
       body: NestedScrollView(
         headerSliverBuilder: (context, innerBoxIsScrolled) => [
           SliverToBoxAdapter(
@@ -18935,7 +20075,7 @@ class _FeriaHeader extends StatelessWidget {
                   color: kFeriaDorado, letterSpacing: -1, height: 1.05)),
               const SizedBox(height: 4),
               Text(t('"Medellín te quiere" 🌺', '"Medellín te quiere" 🌺'),
-                style: TextStyle(fontSize: 12, color: kText.withOpacity(0.75),
+                style: TextStyle(fontSize: 12, color: RDSColor.textPrimary.withOpacity(0.75),
                   fontStyle: FontStyle.italic)),
               const SizedBox(height: 14),
 
@@ -18945,11 +20085,11 @@ class _FeriaHeader extends StatelessWidget {
               else if (terminada)
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                  decoration: BoxDecoration(color: kCard, borderRadius: BorderRadius.circular(10)),
+                  decoration: BoxDecoration(color: RDSColor.card, borderRadius: BorderRadius.circular(10)),
                   child: Text(
                     t('La Feria 2026 ha concluido · Hasta el año que viene 🌹',
                       'Festival 2026 has concluded · See you next year 🌹'),
-                    style: TextStyle(fontSize: 12, color: kTextMuted)))
+                    style: TextStyle(fontSize: 12, color: RDSColor.textMuted)))
               else
                 _FeriaCountdownDias(dias: diasParaFeria),
 
@@ -19045,7 +20185,7 @@ National Geographic included Medellín in the 25 world destinations to visit in 
                   style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: kFeriaDorado)),
                 Text(t('69 años de tradición · Patrimonio Cultural de Colombia',
                        '69 years of tradition · Colombian Cultural Heritage'),
-                  style: const TextStyle(fontSize: 11, color: kTextMuted)),
+                  style: const TextStyle(fontSize: 11, color: RDSColor.textMuted)),
               ])),
               AnimatedRotation(
                 turns: _expandido ? 0.5 : 0,
@@ -19076,7 +20216,7 @@ National Geographic included Medellín in the 25 world destinations to visit in 
                 child: SingleChildScrollView(
                   physics: const BouncingScrollPhysics(),
                   child: Text(t(_historiaES, _historiaEN),
-                    style: const TextStyle(fontSize: 12, color: kText, height: 1.55)))),
+                    style: const TextStyle(fontSize: 12, color: RDSColor.textPrimary, height: 1.55)))),
             ])),
           secondChild: const SizedBox.shrink()),
       ]));
@@ -19184,7 +20324,7 @@ class _GameStatCell extends StatelessWidget {
             fontFamily: 'SpaceGrotesk',
             fontSize: 15, fontWeight: FontWeight.w700, color: color)),
         Text(label,
-          style: const TextStyle(fontSize: 9, color: kTextMuted)),
+          style: const TextStyle(fontSize: 9, color: RDSColor.textMuted)),
       ])));
 }
 
@@ -19204,9 +20344,9 @@ class _FeriaCountdownDias extends StatelessWidget {
         const SizedBox(width: 12),
         Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Text(t('Faltan $dias días', '$dias days to go'),
-            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: kText)),
+            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: RDSColor.textPrimary)),
           Text(t('Reserva tu agenda · 31 julio – 9 agosto','Save the dates · July 31 – August 9'),
-            style: TextStyle(fontSize: 11, color: kTextMuted)),
+            style: TextStyle(fontSize: 11, color: RDSColor.textMuted)),
         ]),
       ]));
   }
@@ -19221,12 +20361,12 @@ class _FeriaCountdownHoy extends StatelessWidget {
       return Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         decoration: BoxDecoration(
-          color: kGreen.withOpacity(0.12), borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: kGreen.withOpacity(0.3))),
+          color: RDSColor.green.withOpacity(0.12), borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: RDSColor.green.withOpacity(0.3))),
         child: Row(children: [
           Text('🌹', style: TextStyle(fontSize: 20)),
           SizedBox(width: 10),
-          Text(t('¡La Feria está activa!','Festival is on!'), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: kText)),
+          Text(t('¡La Feria está activa!','Festival is on!'), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: RDSColor.textPrimary)),
         ]));
     }
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -19237,16 +20377,16 @@ class _FeriaCountdownHoy extends StatelessWidget {
         margin: const EdgeInsets.only(bottom: 4),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         decoration: BoxDecoration(
-          color: kCard, borderRadius: BorderRadius.circular(10),
+          color: RDSColor.card, borderRadius: BorderRadius.circular(10),
           border: Border.all(color: kFeriaRojo.withOpacity(0.2))),
         child: Row(children: [
           Text(e['emoji']?.toString() ?? '', style: const TextStyle(fontSize: 16)),
           const SizedBox(width: 10),
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text(t(e['titulo']?.toString() ?? '', e['tituloEN']?.toString() ?? e['titulo']?.toString() ?? ''),
-              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: kText)),
+              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: RDSColor.textPrimary)),
             Text('${e['hora']} · ${e['lugar']}',
-              style: const TextStyle(fontSize: 10, color: kTextMuted)),
+              style: const TextStyle(fontSize: 10, color: RDSColor.textMuted)),
           ])),
         ]))),
     ]);
@@ -19266,7 +20406,7 @@ class _FeriaStatChip extends StatelessWidget {
       border: Border.all(color: color.withOpacity(0.25))),
     child: Column(children: [
       Text(valor, style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: color)),
-      Text(label, style: const TextStyle(fontSize: 9, color: kTextMuted)),
+      Text(label, style: const TextStyle(fontSize: 9, color: RDSColor.textMuted)),
     ]));
 }
 
@@ -19281,7 +20421,7 @@ class _FeriaTabDelegate extends SliverPersistentHeaderDelegate {
   @override
   Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) {
     return Container(
-      color: kDark2,
+      color: RDSColor.base,
       child: TabBar(
         controller: tabController,
         isScrollable: true,
@@ -19398,7 +20538,7 @@ class _FeriaAgendaTabState extends State<_FeriaAgendaTab> {
       slivers: [
       SliverToBoxAdapter(child: Container(
         height: 68,
-        color: kDark3,
+        color: RDSColor.surface,
         child: ListView.builder(
           scrollDirection: Axis.horizontal,
           padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
@@ -19437,13 +20577,13 @@ class _FeriaAgendaTabState extends State<_FeriaAgendaTab> {
       ),
       // Toggle cercanía
       SliverToBoxAdapter(child: Container(
-        color: kDark3,
+        color: RDSColor.surface,
         padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
         child: Row(children: [
           const Text('📍', style: TextStyle(fontSize: 12)),
           const SizedBox(width: 6),
           Text(_posUsuario != null ? t('Tu ubicación activa','Your location active') : t('Obteniendo ubicación...','Getting location...'),
-            style: const TextStyle(fontSize: 11, color: kTextMuted)),
+            style: const TextStyle(fontSize: 11, color: RDSColor.textMuted)),
           const Spacer(),
           if (_posUsuario != null)
             GestureDetector(
@@ -19480,7 +20620,7 @@ class _FeriaAgendaTabState extends State<_FeriaAgendaTab> {
                         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                         decoration: BoxDecoration(
                           color: kFeriaRojo,
-                          borderRadius: BorderRadius.circular(20)),
+                          borderRadius: BorderRadius.circular(RDSRadius.xl)),
                         child: Text(t('🟢 AHORA · FERIA EN VIVO','🟢 NOW · LIVE FERIA'),
                           style: const TextStyle(fontSize: 10, color: Colors.white,
                             fontWeight: FontWeight.w800, letterSpacing: 1))),
@@ -19501,15 +20641,15 @@ class _FeriaAgendaTabState extends State<_FeriaAgendaTab> {
                             borderRadius: BorderRadius.circular(8),
                             border: Border.all(color: kFeriaDorado.withOpacity(0.4))),
                           child: Row(mainAxisSize: MainAxisSize.min, children: [
-                            const Icon(Icons.share, size: 14, color: kGold),
+                            const Icon(Icons.share, size: 14, color: RDSColor.gold),
                             const SizedBox(width: 4),
                             Text(t('Compartir','Share'),
-                              style: const TextStyle(fontSize: 11, color: kGold, fontWeight: FontWeight.w600)),
+                              style: const TextStyle(fontSize: 11, color: RDSColor.gold, fontWeight: FontWeight.w600)),
                           ]))),
                     ]),
                     const SizedBox(height: 12),
                     Text(t('📅 Hoy hay ${eventosMostrar.length} eventos','📅 ${eventosMostrar.length} events today'),
-                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: kText)),
+                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: RDSColor.textPrimary)),
                     const SizedBox(height: 8),
                     ...eventosMostrar.take(3).map((e) => Padding(
                       padding: const EdgeInsets.only(bottom: 4),
@@ -19518,16 +20658,16 @@ class _FeriaAgendaTabState extends State<_FeriaAgendaTab> {
                         const SizedBox(width: 8),
                         Expanded(child: Text(
                           '${t(e['titulo']?.toString() ?? '', e['tituloEN']?.toString() ?? e['titulo']?.toString() ?? '')} · ${e['hora'] ?? ''}',
-                          style: TextStyle(fontSize: 12, color: kText.withOpacity(0.9)),
+                          style: TextStyle(fontSize: 12, color: RDSColor.textPrimary.withOpacity(0.9)),
                           maxLines: 1, overflow: TextOverflow.ellipsis)),
                         if (e['gratuito'] == true)
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                             decoration: BoxDecoration(
-                              color: kGreen.withOpacity(0.15),
+                              color: RDSColor.green.withOpacity(0.15),
                               borderRadius: BorderRadius.circular(4)),
                             child: Text(t('Gratis','Free'),
-                              style: const TextStyle(fontSize: 9, color: kGreen, fontWeight: FontWeight.w700))),
+                              style: const TextStyle(fontSize: 9, color: RDSColor.green, fontWeight: FontWeight.w700))),
                       ]))),
                     if (eventosMostrar.length > 3)
                       Text(t('+ ${eventosMostrar.length - 3} eventos más abajo ↓',
@@ -19548,10 +20688,10 @@ class _FeriaAgendaTabState extends State<_FeriaAgendaTab> {
                   const SizedBox(width: 12),
                   Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                     Text(textoContadorFeria,
-                      style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: kText)),
+                      style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: RDSColor.textPrimary)),
                     Text(t('Explorá la programación y planificá tu Feria',
                           'Explore the program and plan your Feria'),
-                      style: const TextStyle(fontSize: 11, color: kTextMuted)),
+                      style: const TextStyle(fontSize: 11, color: RDSColor.textMuted)),
                   ])),
                 ])),
             ],
@@ -19593,14 +20733,14 @@ class _FeriaAgendaTabState extends State<_FeriaAgendaTab> {
                               color: esEstrella ? kFeriaRojo : kText)),
                           const SizedBox(height: 2),
                           Text('${e['hora']} · ${e['lugar']}',
-                            style: const TextStyle(fontSize: 11, color: kTextMuted)),
+                            style: const TextStyle(fontSize: 11, color: RDSColor.textMuted)),
                           if (e['artistas'] != null) ...[
                             const SizedBox(height: 4),
                             Wrap(children: [
                               const Text('🎤 ', style: TextStyle(fontSize: 11)),
                               Text(e['artistas']?.toString() ?? '',
                                 style: const TextStyle(
-                                  fontSize: 11, color: kGold,
+                                  fontSize: 11, color: RDSColor.gold,
                                   fontWeight: FontWeight.w600, height: 1.4)),
                             ]),
                           ],
@@ -19609,7 +20749,7 @@ class _FeriaAgendaTabState extends State<_FeriaAgendaTab> {
                             Text(t(e['tip']?.toString() ?? '', e['tipEN']?.toString() ?? e['tip']?.toString() ?? ''),
                               style: TextStyle(
                                 fontSize: 11,
-                                color: kText.withOpacity(0.65),
+                                color: RDSColor.textPrimary.withOpacity(0.65),
                                 height: 1.4)),
                           ],
                         ])),
@@ -19617,10 +20757,10 @@ class _FeriaAgendaTabState extends State<_FeriaAgendaTab> {
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                         decoration: BoxDecoration(
-                          color: kGreen.withOpacity(0.15),
+                          color: RDSColor.green.withOpacity(0.15),
                           borderRadius: BorderRadius.circular(6)),
                         child: const Text('FREE',
-                          style: TextStyle(fontSize: 9, color: kGreen, fontWeight: FontWeight.w700))),
+                          style: TextStyle(fontSize: 9, color: RDSColor.green, fontWeight: FontWeight.w700))),
                     ]),
                     // Transporte + distancia + botón mapa + compartir
                     if (transporte != null || lat != null) ...[
@@ -19653,7 +20793,7 @@ class _FeriaAgendaTabState extends State<_FeriaAgendaTab> {
                             decoration: BoxDecoration(
                               color: Colors.white.withOpacity(0.05),
                               borderRadius: BorderRadius.circular(8)),
-                            child: const Icon(Icons.share, size: 14, color: kTextMuted))),
+                            child: const Icon(Icons.share, size: 14, color: RDSColor.textMuted))),
                         const SizedBox(width: 6),
                         if (lat != null && lng != null)
                           GestureDetector(
@@ -19709,7 +20849,7 @@ class _FeriaRutasTab extends StatelessWidget {
                   style: TextStyle(fontSize: 13, fontWeight: FontWeight.w900,
                     color: kFeriaDorado, letterSpacing: 1)),
                 Text(t('Completa las 2 rutas y gana la insignia especial','Complete both routes and earn the special badge'),
-                  style: TextStyle(fontSize: 11, color: kTextMuted)),
+                  style: TextStyle(fontSize: 11, color: RDSColor.textMuted)),
               ])),
             ]),
             const SizedBox(height: 12),
@@ -19722,7 +20862,7 @@ class _FeriaRutasTab extends StatelessWidget {
             ]),
             const SizedBox(height: 8),
             Text(t('Feria Clásica → Silletera → Insignia Colección','Classic Feria → Silletera → Collection Badge'),
-              style: TextStyle(fontSize: 10, color: kTextMuted)),
+              style: TextStyle(fontSize: 10, color: RDSColor.textMuted)),
           ])),
         // Rutas
         ...kFeriaRutas.map((r) => _FeriaRutaCard(ruta: r)),
@@ -19746,7 +20886,7 @@ class _ColeccionDot extends StatelessWidget {
 class _ColeccionLine extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Expanded(
-    child: Container(height: 1, color: kTextMuted.withOpacity(0.2)));
+    child: Container(height: 1, color: RDSColor.textMuted.withOpacity(0.2)));
 }
 
 class _FeriaRutaCard extends StatelessWidget {
@@ -19803,7 +20943,7 @@ class _FeriaRutaCard extends StatelessWidget {
                   style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w900,
                     color: kText, letterSpacing: 1)),
                 Text(t(ruta['desc']?.toString() ?? ruta['descripcion']?.toString() ?? '', ruta['descEN']?.toString() ?? ruta['descripcionEN']?.toString() ?? ''),
-                  style: const TextStyle(fontSize: 11, color: kTextMuted, height: 1.4)),
+                  style: const TextStyle(fontSize: 11, color: RDSColor.textMuted, height: 1.4)),
               ])),
             ]),
             const SizedBox(height: 12),
@@ -19820,7 +20960,7 @@ class _FeriaRutaCard extends StatelessWidget {
                   border: Border.all(color: kRutaColor(ruta['acento'], kGold).withOpacity(0.4))),
                 child: Row(children: [
                   Text('${ruta['insigniaEmoji'] ?? ''} ${ruta['insignia'] ?? ''}',
-                    style: const TextStyle(fontSize: 10, color: kGold, fontWeight: FontWeight.w600)),
+                    style: const TextStyle(fontSize: 10, color: RDSColor.gold, fontWeight: FontWeight.w600)),
                 ])),
             ]),
           ]))));
@@ -19962,7 +21102,7 @@ class _FeriaTableadosV2 extends StatelessWidget {
           margin: const EdgeInsets.only(bottom: 20),
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: kCard,
+            color: RDSColor.card,
             borderRadius: BorderRadius.circular(14),
             border: Border.all(color: kFeriaDorado.withOpacity(0.3))),
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -19975,7 +21115,7 @@ class _FeriaTableadosV2 extends StatelessWidget {
                     color: kFeriaDorado, letterSpacing: 0.8)),
                 Text(t('Un tablado diferente cada noche · 31 jul – 8 ago · Gratis',
                        'A different stage each night · Jul 31 – Aug 8 · Free'),
-                  style: const TextStyle(fontSize: 11, color: kTextMuted)),
+                  style: const TextStyle(fontSize: 11, color: RDSColor.textMuted)),
               ])),
             ]),
           ])),
@@ -20002,7 +21142,7 @@ class _FeriaTableadosV2 extends StatelessWidget {
                         color: kFeriaRojo, letterSpacing: 0.5))),
                   const SizedBox(width: 8),
                   Text('${tablados.length} ${tablados.length == 1 ? t("tablado","stage") : t("tablados","stages")}',
-                    style: const TextStyle(fontSize: 11, color: kTextMuted)),
+                    style: const TextStyle(fontSize: 11, color: RDSColor.textMuted)),
                 ])),
               // Cards de tablados
               ...tablados.map((tab) => _TabladoCard(tablado: tab)),
@@ -20027,9 +21167,9 @@ class _TabladoCard extends StatelessWidget {
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       decoration: BoxDecoration(
-        color: kCard,
+        color: RDSColor.card,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: kDark3)),
+        border: Border.all(color: RDSColor.surface)),
       child: Padding(
         padding: const EdgeInsets.all(14),
         child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -20043,30 +21183,30 @@ class _TabladoCard extends StatelessWidget {
           const SizedBox(width: 12),
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text(tablado['nombre']?.toString() ?? '',
-              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: kText)),
+              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: RDSColor.textPrimary)),
             const SizedBox(height: 3),
             Text(tablado['zona']?.toString() ?? '',
               style: const TextStyle(fontSize: 11, color: kFeriaDorado, fontWeight: FontWeight.w600)),
             const SizedBox(height: 5),
             Row(children: [
-              const Icon(Icons.location_on_outlined, size: 12, color: kTextMuted),
+              const Icon(Icons.location_on_outlined, size: 12, color: RDSColor.textMuted),
               const SizedBox(width: 3),
               Expanded(child: Text(tablado['lugar']?.toString() ?? '',
-                style: const TextStyle(fontSize: 11, color: kTextMuted))),
+                style: const TextStyle(fontSize: 11, color: RDSColor.textMuted))),
             ]),
             const SizedBox(height: 2),
             Row(children: [
-              const Icon(Icons.access_time, size: 12, color: kTextMuted),
+              const Icon(Icons.access_time, size: 12, color: RDSColor.textMuted),
               const SizedBox(width: 3),
               Text('${tablado['hora'] ?? ''} · ${t('Gratuito', 'Free')}',
-                style: const TextStyle(fontSize: 11, color: kTextMuted)),
+                style: const TextStyle(fontSize: 11, color: RDSColor.textMuted)),
             ]),
             const SizedBox(height: 2),
             Row(children: [
-              const Icon(Icons.directions_transit, size: 12, color: kTextMuted),
+              const Icon(Icons.directions_transit, size: 12, color: RDSColor.textMuted),
               const SizedBox(width: 3),
               Expanded(child: Text(tablado['transporte']?.toString() ?? '',
-                style: const TextStyle(fontSize: 11, color: kTextMuted))),
+                style: const TextStyle(fontSize: 11, color: RDSColor.textMuted))),
             ]),
           ])),
           // Botón GPS
@@ -20112,12 +21252,12 @@ class _FeriaTableadosTabState extends State<_FeriaTableadosTab> {
           margin: const EdgeInsets.only(bottom: 16),
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
-            color: kCard, borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: kGreen.withOpacity(0.2))),
+            color: RDSColor.card, borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: RDSColor.green.withOpacity(0.2))),
           child: Text(
             t('21 tablados musicales · GRATIS · Toda la feria. Esponsorados por Aguardiente Antioqueño y Pilsen · Una validación por zona',
               '21 free music stages · Throughout the festival. Sponsored by Aguardiente Antioqueño & Pilsen · One validation per zone'),
-            style: TextStyle(fontSize: 12, color: kTextMuted, height: 1.5))),
+            style: TextStyle(fontSize: 12, color: RDSColor.textMuted, height: 1.5))),
         // Zonas
         ...kFeriaZonasTablero.asMap().entries.map((entry) {
           final i = entry.key;
@@ -20140,16 +21280,16 @@ class _FeriaTableadosTabState extends State<_FeriaTableadosTab> {
                     const SizedBox(width: 12),
                     Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                       Text(zona['zona']?.toString() ?? '',
-                        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: kText)),
+                        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: RDSColor.textPrimary)),
                       Text('${(zona['tablados'] as List).length}' + t(' tablados · Gratis · Toda la feria',' stages · Free · All festival'),
-                        style: const TextStyle(fontSize: 11, color: kTextMuted)),
+                        style: const TextStyle(fontSize: 11, color: RDSColor.textMuted)),
                     ])),
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                       decoration: BoxDecoration(
-                        color: kGreen.withOpacity(0.15),
+                        color: RDSColor.green.withOpacity(0.15),
                         borderRadius: BorderRadius.circular(6)),
-                      child: const Text('GPS', style: TextStyle(fontSize: 10, color: kGreen, fontWeight: FontWeight.w700))),
+                      child: const Text('GPS', style: TextStyle(fontSize: 10, color: RDSColor.green, fontWeight: FontWeight.w700))),
                     const SizedBox(width: 8),
                     Text(sel ? '▲' : '▼', style: const TextStyle(color: kTextMuted, fontSize: 12)),
                   ])),
@@ -20180,13 +21320,13 @@ class _FeriaTableadosTabState extends State<_FeriaTableadosTab> {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(nombre,
-                                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: kText)),
+                                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: RDSColor.textPrimary)),
                                   if (barrio.isNotEmpty)
                                     Text(barrio,
-                                      style: const TextStyle(fontSize: 10, color: kGreen)),
+                                      style: const TextStyle(fontSize: 10, color: RDSColor.green)),
                                   if (lugar.isNotEmpty)
                                     Text(lugar,
-                                      style: const TextStyle(fontSize: 10, color: kTextMuted)),
+                                      style: const TextStyle(fontSize: 10, color: RDSColor.textMuted)),
                                 ])),
                               if (lat != null && lng != null)
                                 GestureDetector(
@@ -20197,9 +21337,9 @@ class _FeriaTableadosTabState extends State<_FeriaTableadosTab> {
                                   child: Container(
                                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
                                     decoration: BoxDecoration(
-                                      color: kGreen.withOpacity(0.15),
+                                      color: RDSColor.green.withOpacity(0.15),
                                       borderRadius: BorderRadius.circular(8),
-                                      border: Border.all(color: kGreen.withOpacity(0.3))),
+                                      border: Border.all(color: RDSColor.green.withOpacity(0.3))),
                                     child: const Text('📍', style: TextStyle(fontSize: 14)))),
                             ]));
                         }).toList(),
@@ -20208,13 +21348,13 @@ class _FeriaTableadosTabState extends State<_FeriaTableadosTab> {
                           Container(
                             padding: const EdgeInsets.all(10),
                             decoration: BoxDecoration(
-                              color: kCard,
+                              color: RDSColor.card,
                               borderRadius: BorderRadius.circular(8)),
                             child: Row(children: [
                               const Text('🚇', style: TextStyle(fontSize: 14)),
                               const SizedBox(width: 8),
                               Expanded(child: Text(zona['transporte']?.toString() ?? '',
-                                style: const TextStyle(fontSize: 11, color: kTextMuted))),
+                                style: const TextStyle(fontSize: 11, color: RDSColor.textMuted))),
                             ])),
                       ])),
                 ],
@@ -20314,13 +21454,13 @@ class _FeriaGuiaTab extends StatelessWidget {
       children: secciones.map((s) => Container(
         margin: const EdgeInsets.only(bottom: 12),
         decoration: BoxDecoration(
-          color: kCard, borderRadius: BorderRadius.circular(14),
+          color: RDSColor.card, borderRadius: BorderRadius.circular(14),
           border: Border.all(color: Colors.white.withOpacity(0.05))),
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text(t(s['titulo']?.toString() ?? '', s['tituloEN']?.toString() ?? s['titulo']?.toString() ?? ''),
-              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: kText)),
+              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: RDSColor.textPrimary)),
             const SizedBox(height: 10),
             ...(s['items'] as List<String>).map((item) => Padding(
               padding: const EdgeInsets.only(bottom: 8),
@@ -20328,7 +21468,7 @@ class _FeriaGuiaTab extends StatelessWidget {
                 Container(width: 5, height: 5, margin: const EdgeInsets.only(top: 6, right: 8),
                   decoration: const BoxDecoration(shape: BoxShape.circle, color: kFeriaRojo)),
                 Expanded(child: Text(item,
-                  style: const TextStyle(fontSize: 12, color: kTextMuted, height: 1.5))),
+                  style: const TextStyle(fontSize: 12, color: RDSColor.textMuted, height: 1.5))),
               ]))).toList(),
           ])),
         )).toList());
@@ -20357,7 +21497,7 @@ class FeriaRutaDetailScreen extends StatelessWidget {
       orElse: () => rutaFeria);
 
     return Scaffold(
-      backgroundColor: kDark2,
+      backgroundColor: RDSColor.base,
       body: CustomScrollView(slivers: [
         SliverAppBar(
           expandedHeight: 200,
@@ -20391,7 +21531,7 @@ class FeriaRutaDetailScreen extends StatelessWidget {
               Text(t(
                 rutaFeria['desc']?.toString() ?? rutaFeria['descripcion']?.toString() ?? '',
                 rutaFeria['descEN']?.toString() ?? rutaFeria['descripcionEN']?.toString() ?? ''),
-                style: const TextStyle(fontSize: 14, color: kTextMuted, height: 1.6)),
+                style: const TextStyle(fontSize: 14, color: RDSColor.textMuted, height: 1.6)),
               const SizedBox(height: 20),
               // Validación por fecha
               _FechaValidacionInfo(rutaId: rutaFeria['id']?.toString() ?? ''),
@@ -20444,7 +21584,7 @@ class _FechaValidacionInfo extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: kCard,
+        color: RDSColor.card,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: kFeriaDorado.withOpacity(0.2))),
       child: Column(
@@ -20470,22 +21610,22 @@ class _FechaValidacionInfo extends StatelessWidget {
                       children: [
                         Text(t(e['titulo']?.toString() ?? '', e['tituloEN']?.toString() ?? e['titulo']?.toString() ?? ''),
                           style: const TextStyle(fontSize: 12,
-                            fontWeight: FontWeight.w600, color: kText)),
+                            fontWeight: FontWeight.w600, color: RDSColor.textPrimary)),
                         Text(e['fecha']?.toString() ?? '',
-                          style: const TextStyle(fontSize: 10, color: kTextMuted)),
+                          style: const TextStyle(fontSize: 10, color: RDSColor.textMuted)),
                       ])),
                   if (esHoy2)
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                       decoration: BoxDecoration(
-                        color: kGreen.withOpacity(0.2),
+                        color: RDSColor.green.withOpacity(0.2),
                         borderRadius: BorderRadius.circular(6)),
                       child: Text(t('¡HOY!','TODAY!'),
-                        style: TextStyle(fontSize: 9, color: kGreen,
+                        style: TextStyle(fontSize: 9, color: RDSColor.green,
                           fontWeight: FontWeight.w800)))
                   else if (fechaData != null && diasFaltan > 0)
                     Text('en $diasFaltan días',
-                      style: const TextStyle(fontSize: 10, color: kTextMuted)),
+                      style: const TextStyle(fontSize: 10, color: RDSColor.textMuted)),
                 ]));
             }),
           ],
@@ -20493,7 +21633,7 @@ class _FechaValidacionInfo extends StatelessWidget {
           Text(
             t('Los sitios de evento único solo se pueden validar en su día específico',
               'Single-event spots can only be validated on their specific day'),
-            style: TextStyle(fontSize: 10, color: kTextMuted, height: 1.4)),
+            style: TextStyle(fontSize: 10, color: RDSColor.textMuted, height: 1.4)),
         ]));
   }
 }
