@@ -296,6 +296,12 @@ class NotificationManager {
 
   Future<void> inicializar() async {
     if (_inicializado) return;
+    // FIX iOS: flutter_local_notifications causa SIGABRT en iOS
+    // Deshabilitar completamente en iOS hasta resolver compatibilidad
+    if (!Platform.isAndroid) {
+      _inicializado = true;
+      return;
+    }
     try {
       tzdata.initializeTimeZones();
       tz.setLocalLocation(tz.getLocation('America/Bogota'));
@@ -320,7 +326,6 @@ class NotificationManager {
           }
         });
 
-      // Solicitar permiso en Android 13+
       final androidPlugin = _plugin.resolvePlatformSpecificImplementation<
           AndroidFlutterLocalNotificationsPlugin>();
       await androidPlugin?.requestNotificationsPermission();
