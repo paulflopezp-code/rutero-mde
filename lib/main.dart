@@ -298,16 +298,23 @@ class NotificationManager {
     if (_inicializado) return;
     try {
       tzdata.initializeTimeZones();
-      // Zona horaria de Medellín
       tz.setLocalLocation(tz.getLocation('America/Bogota'));
 
       const androidInit = AndroidInitializationSettings('@mipmap/ic_launcher');
-      const initSettings = InitializationSettings(android: androidInit);
+      const darwinInit = DarwinInitializationSettings(
+        requestAlertPermission: false,
+        requestBadgePermission: false,
+        requestSoundPermission: false,
+      );
+      const initSettings = InitializationSettings(
+        android: androidInit,
+        iOS: darwinInit,
+        macOS: darwinInit,
+      );
 
       await _plugin.initialize(
         initSettings,
         onDidReceiveNotificationResponse: (response) {
-          // Deep link desde notificación
           if (response.payload != null && response.payload!.isNotEmpty) {
             DeepLinkManager().procesarLink(response.payload!);
           }
