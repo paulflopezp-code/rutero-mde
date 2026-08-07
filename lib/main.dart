@@ -29,7 +29,6 @@ import 'package:geolocator/geolocator.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:firebase_storage/firebase_storage.dart';
 import 'dart:io';
 import 'dart:convert';
 import 'package:crypto/crypto.dart';
@@ -38,6 +37,7 @@ import 'dart:async';
 import 'dart:math' as math;
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_firestore/cloud_firestore.dart' as fs show Source;
 import 'package:google_sign_in/google_sign_in.dart';
@@ -1271,7 +1271,7 @@ String get tPorDesbloquear   => t('Por desbloquear', 'To unlock');
 String get tTomarFoto        => t('TOMAR FOTO', 'TAKE PHOTO');
 String get tRetomar          => t('Retomar', 'Retake');
 String get tEnviar           => t('ENVIAR', 'SUBMIT');
-String get tSubiendoFoto     => t('Subiendo foto...', 'Uploading photo...');
+String get tSubiendoFoto     => t('Validando visita...', 'Validating visit...');
 String get tFotoValidada     => t('¡Foto validada!', 'Photo validated!');
 
 // ── Splash / Welcome ──
@@ -1454,8 +1454,8 @@ void main() async {
   );
   // AppCheck producción — playIntegrity para verificación real en Play Store
   await FirebaseAppCheck.instance.activate(
-   androidProvider: AndroidProvider.playIntegrity,
-appleProvider: AppleProvider.deviceCheck,
+    androidProvider: AndroidProvider.playIntegrity,
+        appleProvider: AppleProvider.deviceCheck,
   );
   // Cargar configuraciones persistentes (modo demo admin, sonido, ruta activa)
   // Esto permite que la app recuerde el estado del usuario entre cierres.
@@ -3216,13 +3216,24 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
         .animate(CurvedAnimation(parent: _floatCtrl, curve: Curves.easeInOut));
 
     _ctrl.forward();
-    Future.delayed(const Duration(milliseconds: 3200), () {
-      if (mounted) {
-        // 🔐 Persistencia de sesión:
-        // Si el usuario ya está autenticado en Firebase, ir directo a MainShell.
-        // De lo contrario, flujo normal: LangSelect → Onboarding/Welcome → Login
-        final usuarioActual = FirebaseAuth.instance.currentUser;
-        if (usuarioActual != null) {
+    Future.delayed(const Duration(milliseconds: 3200), () async {
+      if (!mounted) return;
+      // FIX iOS: currentUser puede ser null en iOS aunque haya sesión activa
+      // porque Firebase necesita tiempo para restaurar el token del keychain.
+      // Esperamos el primer evento del stream con timeout de 3s.
+      User? usuarioActual = FirebaseAuth.instance.currentUser;
+      if (usuarioActual == null) {
+        try {
+          usuarioActual = await FirebaseAuth.instance
+            .authStateChanges()
+            .first
+            .timeout(const Duration(seconds: 3));
+        } catch (_) {
+          usuarioActual = null;
+        }
+      }
+      if (!mounted) return;
+      if (usuarioActual != null) {
           Navigator.of(context).pushReplacement(PageRouteBuilder(
             pageBuilder: (_, __, ___) => const MainShell(),
             transitionsBuilder: (_, anim, __, child) => FadeTransition(opacity: anim, child: child),
@@ -3236,8 +3247,7 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
           transitionsBuilder: (_, anim, __, child) => FadeTransition(opacity: anim, child: child),
           transitionDuration: const Duration(milliseconds: 700),
         ));
-      }
-    });
+      });
   }
 
   @override
@@ -6140,12 +6150,70 @@ Respond ONLY with valid JSON (no markdown):
 
         Expanded(child: SingleChildScrollView(
           padding: const EdgeInsets.all(RDSSpace.lg),
-          child: AnimatedSwitcher(
-            duration: RDSDuration.fast,
-            child: _paso == 0 ? _buildPaso0() :
-                   _paso == 1 ? _buildPaso1() :
-                   _paso == 2 ? _buildPaso2() :
-                   _paso == 3 ? _buildPaso3() : _buildResumen()))),
+          child: Column(children: [
+
+            // ── Banner itinerario previo ──────────────────────────────
+            if (!_cargandoPrevio && _itinerarioPrevio != null)
+              GestureDetector(
+                onTap: () => Navigator.of(context).push(MaterialPageRoute(
+                  builder: (_) => _PlannerResultScreen(
+                    data: _itinerarioPrevio!, dias: _diasPrevio))),
+                child: Container(
+                  margin: const EdgeInsets.only(bottom: 20),
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [RDSColor.gold.withOpacity(0.14),
+                               RDSColor.green.withOpacity(0.08)],
+                      begin: Alignment.topLeft, end: Alignment.bottomRight),
+                    borderRadius: BorderRadius.circular(18),
+                    border: Border.all(color: RDSColor.gold.withOpacity(0.45)),
+                    boxShadow: [BoxShadow(
+                      color: RDSColor.gold.withOpacity(0.1),
+                      blurRadius: 16, offset: const Offset(0, 4))]),
+                  child: Row(children: [
+                    Container(width: 46, height: 46,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: RDSColor.gold.withOpacity(0.12),
+                        border: Border.all(color: RDSColor.gold.withOpacity(0.4))),
+                      child: const Center(child: Icon(
+                        Icons.calendar_today_rounded,
+                        color: RDSColor.gold, size: 20))),
+                    const SizedBox(width: 14),
+                    Expanded(child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      Text(t('VER MI ITINERARIO', 'VIEW MY ITINERARY'),
+                        style: const TextStyle(
+                          fontFamily: 'SpaceGrotesk',
+                          fontSize: 11, fontWeight: FontWeight.w900,
+                          color: RDSColor.gold, letterSpacing: 1.5)),
+                      const SizedBox(height: 3),
+                      Text(t('Tu planificación guardada — tocá para consultarla',
+                             'Your saved plan — tap to view it'),
+                        style: const TextStyle(
+                          fontSize: 11, color: RDSColor.textMuted)),
+                    ])),
+                    const SizedBox(width: 8),
+                    Row(mainAxisSize: MainAxisSize.min, children: [
+                      GestureDetector(
+                        onTap: _borrarItinerarioPrevio,
+                        child: const Padding(
+                          padding: EdgeInsets.all(8),
+                          child: Icon(Icons.close_rounded,
+                            color: RDSColor.textMuted, size: 16))),
+                      const Icon(Icons.arrow_forward_ios_rounded,
+                        color: RDSColor.gold, size: 14),
+                    ]),
+                  ]))),
+
+            AnimatedSwitcher(
+              duration: RDSDuration.fast,
+              child: _paso == 0 ? _buildPaso0() :
+                     _paso == 1 ? _buildPaso1() :
+                     _paso == 2 ? _buildPaso2() :
+                     _paso == 3 ? _buildPaso3() : _buildResumen()),
+          ]))),
 
         Container(
           padding: const EdgeInsets.fromLTRB(24, 12, 24, 32),
@@ -6895,17 +6963,80 @@ class _PlannerLoadingScreenState extends State<_PlannerLoadingScreen>
 }
 
 // ── Pantalla de resultado ─────────────────────────────────────────────────
-class _PlannerResultScreen extends StatelessWidget {
+class _PlannerResultScreen extends StatefulWidget {
   final Map<String, dynamic> data;
   final int dias;
   const _PlannerResultScreen({required this.data, required this.dias});
 
   @override
+  State<_PlannerResultScreen> createState() => _PlannerResultScreenState();
+}
+
+class _PlannerResultScreenState extends State<_PlannerResultScreen> {
+  // visitados[diaIdx][bloqueIdx] = true/false
+  Map<String, bool> _visitados = {};
+
+  @override
+  void initState() {
+    super.initState();
+    _cargarVisitados();
+  }
+
+  String _keyVisitado(int diaIdx, int bloqueIdx) => 'planner_visitado_${diaIdx}_$bloqueIdx';
+
+  Future<void> _cargarVisitados() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final diasList = (widget.data['dias'] as List? ?? []).cast<Map<String, dynamic>>();
+      final Map<String, bool> v = {};
+      for (int d = 0; d < diasList.length; d++) {
+        final bloques = (diasList[d]['bloques'] as List? ?? []);
+        for (int b = 0; b < bloques.length; b++) {
+          final key = _keyVisitado(d, b);
+          v[key] = prefs.getBool(key) ?? false;
+        }
+      }
+      if (mounted) setState(() => _visitados = v);
+    } catch (e) {
+      debugPrint('Planner visitados: $e');
+    }
+  }
+
+  Future<void> _toggleVisitado(int diaIdx, int bloqueIdx) async {
+    final key = _keyVisitado(diaIdx, bloqueIdx);
+    final nuevo = !(_visitados[key] ?? false);
+    setState(() => _visitados[key] = nuevo);
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool(key, nuevo);
+    } catch (e) {
+      debugPrint('Planner toggle: $e');
+    }
+  }
+
+  int _visitadosEnDia(int diaIdx, int totalBloques) {
+    int count = 0;
+    for (int b = 0; b < totalBloques; b++) {
+      if (_visitados[_keyVisitado(diaIdx, b)] == true) count++;
+    }
+    return count;
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final saludo = data['saludo']?.toString() ?? '';
-    final diasList = (data['dias'] as List? ?? []).cast<Map<String, dynamic>>();
-    final resumen = data['resumen'] as Map<String, dynamic>? ?? {};
-    final tip = data['tip']?.toString() ?? '';
+    final saludo = widget.data['saludo']?.toString() ?? '';
+    final diasList = (widget.data['dias'] as List? ?? []).cast<Map<String, dynamic>>();
+    final resumen = widget.data['resumen'] as Map<String, dynamic>? ?? {};
+    final tip = widget.data['tip']?.toString() ?? '';
+
+    // Progreso total
+    int totalLugares = 0;
+    int totalVisitados = 0;
+    for (int d = 0; d < diasList.length; d++) {
+      final bloques = (diasList[d]['bloques'] as List? ?? []);
+      totalLugares += bloques.length;
+      totalVisitados += _visitadosEnDia(d, bloques.length);
+    }
 
     return Scaffold(
       backgroundColor: RDSColor.base,
@@ -6927,9 +7058,10 @@ class _PlannerResultScreen extends StatelessWidget {
                     decoration: BoxDecoration(
                       color: Colors.white.withOpacity(0.06), shape: BoxShape.circle,
                       border: Border.all(color: RDSColor.gold.withOpacity(0.2))),
-                    child: const Center(child: Icon(Icons.arrow_back_ios_new_rounded, color: RDSColor.textPrimary, size: 18)))),
+                    child: const Center(child: Icon(Icons.arrow_back_ios_new_rounded,
+                      color: RDSColor.textPrimary, size: 18)))),
                 const SizedBox(width: 12),
-                Expanded(child: Text(t('TU ITINERARIO', 'YOUR ITINERARY'),
+                Expanded(child: Text(t('MI ITINERARIO', 'MY ITINERARY'),
                   style: const TextStyle(fontFamily: 'PlayfairDisplay',
                     fontSize: 18, fontWeight: FontWeight.w900, color: RDSColor.gold))),
                 GestureDetector(
@@ -6957,67 +7089,108 @@ class _PlannerResultScreen extends StatelessWidget {
                           fontWeight: FontWeight.w700)),
                     ]))),
               ]),
+
+              // Barra de progreso total
+              if (totalLugares > 0) ...[
+                const SizedBox(height: 14),
+                Row(children: [
+                  Expanded(child: ClipRRect(
+                    borderRadius: BorderRadius.circular(2),
+                    child: LinearProgressIndicator(
+                      value: totalVisitados / totalLugares,
+                      backgroundColor: Colors.white.withOpacity(0.07),
+                      valueColor: AlwaysStoppedAnimation<Color>(
+                        totalVisitados == totalLugares ? RDSColor.gold : RDSColor.green),
+                      minHeight: 3))),
+                  const SizedBox(width: 10),
+                  Text('$totalVisitados/$totalLugares ${t("lugares", "spots")}',
+                    style: const TextStyle(fontSize: 10, color: RDSColor.textMuted,
+                      fontWeight: FontWeight.w600)),
+                ]),
+              ],
+
               if (saludo.isNotEmpty) ...[
-                const SizedBox(height: 12),
+                const SizedBox(height: 10),
                 Text(saludo,
-                  style: const TextStyle(fontSize: 13, color: RDSColor.textPrimary, height: 1.4)),
+                  style: const TextStyle(fontSize: 12, color: RDSColor.textPrimary, height: 1.4)),
               ],
             ])))),
+
         // Lista de días
         Expanded(child: ListView(
           padding: const EdgeInsets.fromLTRB(20, 16, 20, 40),
           children: [
-            // Días e itinerario
-            ...diasList.map((dia) {
+            ...diasList.asMap().entries.map((diaEntry) {
+              final diaIdx = diaEntry.key;
+              final dia = diaEntry.value;
               final esFeria = dia['esFeria'] == true;
               final bloques = (dia['bloques'] as List? ?? []).cast<Map<String, dynamic>>();
+              final visitadosHoy = _visitadosEnDia(diaIdx, bloques.length);
+              final diaCompleto = bloques.isNotEmpty && visitadosHoy == bloques.length;
+
               return Container(
                 margin: const EdgeInsets.only(bottom: 20),
                 decoration: BoxDecoration(
                   color: RDSColor.card,
                   borderRadius: BorderRadius.circular(16),
                   border: Border.all(
-                    color: esFeria ? kFeriaRojo.withOpacity(0.4) : RDSColor.gold.withOpacity(0.15))),
+                    color: diaCompleto
+                      ? RDSColor.gold.withOpacity(0.5)
+                      : esFeria
+                        ? kFeriaRojo.withOpacity(0.4)
+                        : RDSColor.gold.withOpacity(0.15))),
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   // Header del día
                   Container(
-                    padding: const EdgeInsets.all(16),
+                    padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
                     decoration: BoxDecoration(
-                      color: esFeria ? kFeriaRojo.withOpacity(0.1) : RDSColor.gold.withOpacity(0.08),
+                      color: diaCompleto
+                        ? RDSColor.gold.withOpacity(0.12)
+                        : esFeria
+                          ? kFeriaRojo.withOpacity(0.1)
+                          : RDSColor.gold.withOpacity(0.07),
                       borderRadius: const BorderRadius.vertical(top: Radius.circular(16))),
                     child: Row(children: [
-                      Text(esFeria ? '🌹' : '📅', style: const TextStyle(fontSize: 20)),
+                      Icon(
+                        diaCompleto ? Icons.check_circle_rounded : Icons.calendar_today_rounded,
+                        color: diaCompleto ? RDSColor.gold : esFeria ? kFeriaRojo : RDSColor.gold,
+                        size: 18),
                       const SizedBox(width: 10),
                       Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                        Text(
-                          '${t("DÍA", "DAY")} ${dia['numero']}',
-                          style: TextStyle(fontSize: 10, color: esFeria ? kFeriaRojo : RDSColor.gold,
+                        Text('${t("DÍA", "DAY")} ${dia['numero']}',
+                          style: TextStyle(fontSize: 10,
+                            color: esFeria ? kFeriaRojo : RDSColor.gold,
                             fontWeight: FontWeight.w800, letterSpacing: 1.5)),
                         Text(dia['fecha']?.toString() ?? '',
-                          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: RDSColor.textPrimary)),
+                          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700,
+                            color: RDSColor.textPrimary)),
                       ])),
-                      if (esFeria)
+                      // Progreso del día
+                      if (bloques.isNotEmpty)
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                           decoration: BoxDecoration(
-                            color: kFeriaRojo.withOpacity(0.15),
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: kFeriaRojo.withOpacity(0.4))),
-                          child: Text(t('🌹 FERIA', '🌹 FESTIVAL'),
-                            style: const TextStyle(color: kFeriaRojo, fontSize: 10,
-                              fontWeight: FontWeight.w800))),
+                            color: diaCompleto
+                              ? RDSColor.gold.withOpacity(0.15)
+                              : Colors.white.withOpacity(0.06),
+                            borderRadius: BorderRadius.circular(10)),
+                          child: Text('$visitadosHoy/${bloques.length}',
+                            style: TextStyle(
+                              fontSize: 11, fontWeight: FontWeight.w800,
+                              color: diaCompleto ? RDSColor.gold : RDSColor.textMuted))),
                     ])),
+
                   // Bloques del día
                   ...bloques.asMap().entries.map((entry) {
+                    final bloqueIdx = entry.key;
                     final b = entry.value;
-                    final isLast = entry.key == bloques.length - 1;
+                    final isLast = bloqueIdx == bloques.length - 1;
+                    final visitado = _visitados[_keyVisitado(diaIdx, bloqueIdx)] ?? false;
                     final rutaNombre = b['rutaNombre']?.toString() ?? '';
-                    // Buscar la ruta real — búsqueda flexible (exacta o contains)
                     final todasRutas = RutasService().rutas;
                     Map<String, dynamic> rutaReal = todasRutas.firstWhere(
                       (r) => r['nombre']?.toString() == rutaNombre,
                       orElse: () => <String, dynamic>{});
-                    // Fallback: búsqueda parcial si no hay match exacto
                     if (rutaReal.isEmpty && rutaNombre.isNotEmpty) {
                       rutaReal = todasRutas.firstWhere(
                         (r) => (r['nombre']?.toString() ?? '').toLowerCase()
@@ -7030,58 +7203,77 @@ class _PlannerResultScreen extends StatelessWidget {
                         onTap: rutaReal.isNotEmpty ? () =>
                           RuteroNav.push(context, RouteDetailScreen(ruta: rutaReal)) : null,
                         child: Padding(
-                          padding: const EdgeInsets.all(16),
+                          padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
                           child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                            // Periodo
-                            Container(width: 44,
-                              child: Column(children: [
-                                Text(b['emoji']?.toString() ?? '📍',
-                                  style: const TextStyle(fontSize: 22)),
-                                const SizedBox(height: 4),
-                                Text(
-                                  t(b['periodo']?.toString() ?? '',
-                                    b['periodoEN']?.toString() ?? b['periodo']?.toString() ?? ''),
-                                  textAlign: TextAlign.center,
-                                  style: const TextStyle(fontSize: 8, color: RDSColor.textMuted, height: 1.2)),
-                              ])),
+                            // Checkbox visitado
+                            GestureDetector(
+                              onTap: () => _toggleVisitado(diaIdx, bloqueIdx),
+                              child: Container(
+                                width: 24, height: 24, margin: const EdgeInsets.only(top: 2, right: 12),
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: visitado ? RDSColor.green : Colors.transparent,
+                                  border: Border.all(
+                                    color: visitado ? RDSColor.green : Colors.white.withOpacity(0.2),
+                                    width: 1.5)),
+                                child: visitado
+                                  ? const Icon(Icons.check_rounded, color: Colors.white, size: 14)
+                                  : null)),
+                            // Periodo / emoji
+                            Column(children: [
+                              Text(b['emoji']?.toString() ?? '📍',
+                                style: const TextStyle(fontSize: 20)),
+                              const SizedBox(height: 3),
+                              Text(
+                                t(b['periodo']?.toString() ?? '',
+                                  b['periodoEN']?.toString() ?? b['periodo']?.toString() ?? ''),
+                                textAlign: TextAlign.center,
+                                style: const TextStyle(fontSize: 8, color: RDSColor.textMuted, height: 1.2)),
+                            ]),
                             const SizedBox(width: 12),
-                            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                              Text(rutaNombre,
-                                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800,
-                                  color: RDSColor.textPrimary)),
-                              const SizedBox(height: 4),
-                              Text(b['descripcion']?.toString() ?? '',
-                                style: const TextStyle(fontSize: 12, color: RDSColor.textMuted, height: 1.4)),
-                              const SizedBox(height: 8),
-                              Wrap(
-                                spacing: 6,
-                                runSpacing: 6,
-                                children: [
+                            Expanded(child: Opacity(
+                              opacity: visitado ? 0.5 : 1.0,
+                              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                                Text(rutaNombre,
+                                  style: TextStyle(
+                                    fontSize: 14, fontWeight: FontWeight.w800,
+                                    color: RDSColor.textPrimary,
+                                    decoration: visitado ? TextDecoration.lineThrough : null)),
+                                const SizedBox(height: 4),
+                                Text(b['descripcion']?.toString() ?? '',
+                                  style: const TextStyle(fontSize: 12, color: RDSColor.textMuted, height: 1.4)),
+                                const SizedBox(height: 8),
+                                Wrap(spacing: 6, runSpacing: 6, children: [
                                   _PlannerChip('⏱️ ${b['duracion'] ?? ''}', RDSColor.gold),
                                   _PlannerChip('💵 ${b['precio'] ?? ''}', RDSColor.green),
-                                ],
-                              ),
-                              if (b['transporte'] != null) ...[
-                                const SizedBox(height: 6),
-                                Row(children: [
-                                  const Text('🚇 ', style: TextStyle(fontSize: 11)),
-                                  Expanded(child: Text(b['transporte']!,
-                                    style: const TextStyle(fontSize: 11, color: RDSColor.textMuted))),
                                 ]),
-                              ],
-                              if (rutaReal.isNotEmpty)
-                                Padding(
-                                  padding: const EdgeInsets.only(top: 8),
-                                  child: Text(t('→ Iniciar ruta', '→ Start route'),
-                                    style: const TextStyle(fontSize: 11, color: RDSColor.green,
-                                      fontWeight: FontWeight.w700))),
-                            ])),
+                                if (b['transporte'] != null) ...[
+                                  const SizedBox(height: 6),
+                                  Row(children: [
+                                    const Icon(Icons.directions_subway_rounded,
+                                      size: 11, color: RDSColor.textMuted),
+                                    const SizedBox(width: 4),
+                                    Expanded(child: Text(b['transporte']!,
+                                      style: const TextStyle(fontSize: 11, color: RDSColor.textMuted))),
+                                  ]),
+                                ],
+                                if (rutaReal.isNotEmpty && !visitado)
+                                  Padding(
+                                    padding: const EdgeInsets.only(top: 8),
+                                    child: Row(children: [
+                                      const Icon(Icons.arrow_forward_rounded,
+                                        size: 12, color: RDSColor.green),
+                                      const SizedBox(width: 4),
+                                      Text(t('Ver ruta completa', 'See full route'),
+                                        style: const TextStyle(fontSize: 11, color: RDSColor.green,
+                                          fontWeight: FontWeight.w700)),
+                                    ])),
+                              ]))),
                           ]))),
                       if (!isLast)
                         Padding(
-                          padding: const EdgeInsets.only(left: 36),
-                          child: Container(height: 1,
-                            color: Colors.white.withOpacity(0.05))),
+                          padding: const EdgeInsets.only(left: 52),
+                          child: Container(height: 1, color: Colors.white.withOpacity(0.05))),
                     ]);
                   }),
                 ]));
@@ -7133,7 +7325,7 @@ class _PlannerResultScreen extends StatelessWidget {
                   color: RDSColor.card, borderRadius: BorderRadius.circular(12),
                   border: Border.all(color: RDSColor.green.withOpacity(0.3))),
                 child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  const Text('💡', style: TextStyle(fontSize: 20)),
+                  const Icon(Icons.lightbulb_rounded, color: RDSColor.green, size: 20),
                   const SizedBox(width: 10),
                   Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                     Text(t('Consejo de Rutero', 'Rutero Tip'),
@@ -7144,7 +7336,7 @@ class _PlannerResultScreen extends StatelessWidget {
                   ])),
                 ])),
 
-            // CTA nuevo itinerario
+            // CTA ajustar
             GestureDetector(
               onTap: () => Navigator.of(context).pop(),
               child: Container(
@@ -7153,10 +7345,13 @@ class _PlannerResultScreen extends StatelessWidget {
                 decoration: BoxDecoration(
                   color: RDSColor.card, borderRadius: BorderRadius.circular(12),
                   border: Border.all(color: RDSColor.gold.withOpacity(0.3))),
-                child: Center(child: Text(
-                  t('✏️ Ajustar itinerario', '✏️ Adjust itinerary'),
-                  style: const TextStyle(color: RDSColor.gold, fontSize: 13,
-                    fontWeight: FontWeight.w700))))),
+                child: Center(child: Row(mainAxisSize: MainAxisSize.min, children: [
+                  const Icon(Icons.edit_rounded, color: RDSColor.gold, size: 14),
+                  const SizedBox(width: 6),
+                  Text(t('Ajustar itinerario', 'Adjust itinerary'),
+                    style: const TextStyle(color: RDSColor.gold, fontSize: 13,
+                      fontWeight: FontWeight.w700)),
+                ])))),
           ])),
       ]),
     );
@@ -11252,7 +11447,7 @@ class _RouteDetailScreenState extends State<RouteDetailScreen> {
                     color: Colors.black.withOpacity(0.45),
                     shape: BoxShape.circle,
                     border: Border.all(color: Colors.white.withOpacity(0.2))),
-                  child: const Center(child: Icon(Icons.arrow_back_ios_new_rounded, color: RDSColor.textPrimary, size: 18))))),
+                  child: const Center(child: Text('←', style: TextStyle(color: RDSColor.textPrimary, fontSize: 16)))))),
             // Badge puntos — arriba derecha
             Positioned(top: 8, right: 12,
               child: Container(
@@ -11436,9 +11631,9 @@ class _RouteDetailScreenState extends State<RouteDetailScreen> {
                 decoration: BoxDecoration(shape: BoxShape.circle,
                   color: RDSColor.gold.withOpacity(0.1), border: Border.all(color: RDSColor.gold.withOpacity(0.4))),
                 child: widget.ruta['insigniaImg'] != null
-                  ? Padding(padding: const EdgeInsets.all(4), child: Image.asset(widget.ruta['insigniaImg'], width: 56, height: 56, fit: BoxFit.contain,
-                      errorBuilder: (_, __, ___) => const Center(child: Icon(Icons.emoji_events_rounded, color: RDSColor.gold, size: 28))))
-                  : const Center(child: Icon(Icons.emoji_events_rounded, color: RDSColor.gold, size: 28))),
+                  ? ClipOval(child: Image.asset(widget.ruta['insigniaImg'], width: 56, height: 56, fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => const Center(child: Text('🏆', style: TextStyle(fontSize: 22)))))
+                  : const Center(child: Text('🏆', style: TextStyle(fontSize: 22)))),
               const SizedBox(width: 12),
               Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Text((widget.ruta['insignia'] ?? widget.ruta['premio'] ?? t('Premio al completar','Reward on completion')).toString(),
@@ -11590,7 +11785,7 @@ class _RouteDetailScreenState extends State<RouteDetailScreen> {
                 borderRadius: BorderRadius.circular(14),
                 border: Border.all(color: (kRutaColor(widget.ruta['acento'], RDSColor.green)).withOpacity(0.4))),
               child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-                const Icon(Icons.local_activity_rounded, color: Colors.white, size: 18),
+                const Text('🛒', style: TextStyle(fontSize: 16)),
                 const SizedBox(width: 8),
                 Text('${t("COMPRAR RUTA","BUY ROUTE")} · ${precioMostrado(widget.ruta["precio"])}',
                   style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700,
@@ -11672,7 +11867,6 @@ class _RouteDetailScreenState extends State<RouteDetailScreen> {
   }
 }
 
-// ─────────────────────────────────────────
 //  SITIO INFO SCREEN — GPS + Info del sitio
 // ─────────────────────────────────────────
 // ═══════════════════════════════════════════════════════════════
@@ -13236,20 +13430,17 @@ class _RewardScreenState extends State<RewardScreen>
                     width: 140, height: 140,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      gradient: LinearGradient(
-                        colors: [acento.withOpacity(0.3), const Color(0xFF050A04)],
-                        begin: Alignment.topLeft, end: Alignment.bottomRight),
+                      color: Colors.transparent,
                       boxShadow: [
                         BoxShadow(color: acento.withOpacity(0.5), blurRadius: 40, spreadRadius: 8),
                         BoxShadow(color: acento.withOpacity(0.2), blurRadius: 80, spreadRadius: 20),
-                      ],
-                      border: Border.all(color: acento.withOpacity(0.5), width: 2)),
+                      ]),
                     child: widget.ruta['insigniaImg'] != null
-                      ? Padding(padding: const EdgeInsets.all(10), child: Image.asset(widget.ruta['insigniaImg'],
+                      ? Image.asset(widget.ruta['insigniaImg'],
                           fit: BoxFit.contain,
                           errorBuilder: (_, __, ___) => Center(
                             child: Text(widget.sitioEmoji,
-                              style: const TextStyle(fontSize: 64)))))
+                              style: const TextStyle(fontSize: 64))))
                       : Center(child: Text(
                           esUltimo ? '🏆' : widget.sitioEmoji,
                           style: const TextStyle(fontSize: 64)))))),
@@ -14372,15 +14563,15 @@ class _InsigniaCell extends StatelessWidget {
       child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
         Container(width: 64, height: 64,
           decoration: BoxDecoration(shape: BoxShape.circle,
-            color: desbloqueada ? RDSColor.gold.withOpacity(0.1) : const Color(0xFF050A04),
+            color: desbloqueada ? Colors.transparent : const Color(0xFF050A04),
             border: Border.all(
-              color: desbloqueada ? RDSColor.gold.withOpacity(0.4) : Colors.white.withOpacity(0.08))),
+              color: desbloqueada ? Colors.transparent : Colors.white.withOpacity(0.08))),
           child: desbloqueada
-            ? Padding(padding: const EdgeInsets.all(6), child: Image.asset(insignia['insigniaImg'] ?? '',
+            ? Image.asset(insignia['insigniaImg'] ?? '',
                 fit: BoxFit.contain,
                 errorBuilder: (_, __, ___) => Center(
                   child: Text(insignia['emoji'] ?? '🏅',
-                    style: const TextStyle(fontSize: 28)))))
+                    style: const TextStyle(fontSize: 28))))
             : const Center(child: Icon(Icons.lock_rounded, size: 26, color: RDSColor.textMuted))),
         const SizedBox(height: 8),
         Padding(padding: const EdgeInsets.symmetric(horizontal: 6),
@@ -14418,20 +14609,22 @@ class _InsigniaDetalleSheet extends StatelessWidget {
             borderRadius: BorderRadius.circular(2))),
         const SizedBox(height: 24),
         Container(width: 110, height: 110,
-          decoration: BoxDecoration(shape: BoxShape.circle,
-            color: desbloqueada ? acento.withOpacity(0.12) : const Color(0xFF050A04),
-            border: Border.all(
-              color: desbloqueada ? acento.withOpacity(0.5) : Colors.white.withOpacity(0.1),
-              width: 2),
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: Colors.transparent,
             boxShadow: desbloqueada
               ? [BoxShadow(color: acento.withOpacity(0.3), blurRadius: 30, spreadRadius: 4)] : null),
           child: desbloqueada
-            ? Padding(padding: const EdgeInsets.all(8), child: Image.asset(insignia['insigniaImg'] ?? '',
+            ? Image.asset(insignia['insigniaImg'] ?? '',
                 fit: BoxFit.contain,
                 errorBuilder: (_, __, ___) => Center(
                   child: Text(insignia['emoji'] ?? '🏅',
-                    style: const TextStyle(fontSize: 52)))))
-            : const Center(child: Icon(Icons.lock_rounded, size: 48, color: RDSColor.textMuted))),
+                    style: const TextStyle(fontSize: 52))))
+            : Container(
+                decoration: BoxDecoration(shape: BoxShape.circle,
+                  color: const Color(0xFF050A04),
+                  border: Border.all(color: Colors.white.withOpacity(0.1), width: 2)),
+                child: const Center(child: Icon(Icons.lock_rounded, size: 48, color: RDSColor.textMuted)))),
         const SizedBox(height: 20),
         Text(insignia['nombre'] ?? '',
           style: const TextStyle(fontFamily: 'PlayfairDisplay',
@@ -15928,89 +16121,6 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
     super.dispose();
   }
 
-  Future<BitmapDescriptor> _pinCanvas(String emoji, Color bgColor) async {
-    final rec = ui.PictureRecorder();
-    final c = Canvas(rec);
-    const double w = 72.0, h = 88.0, r = 28.0;
-    final Offset center = const Offset(w/2, r+6);
-    c.drawCircle(Offset(center.dx, center.dy+4), r+2,
-      Paint()..color=Colors.black.withOpacity(0.35)..maskFilter=const MaskFilter.blur(BlurStyle.normal,5));
-    c.drawCircle(center, r+3, Paint()..color=Colors.white);
-    c.drawCircle(center, r, Paint()..color=bgColor);
-    c.drawCircle(Offset(center.dx-6,center.dy-6), r*0.4,
-      Paint()..color=Colors.white.withOpacity(0.22));
-    final tp = TextPainter(text:TextSpan(text:emoji,style:const TextStyle(fontSize:24)),textDirection:TextDirection.ltr);
-    tp.layout(); tp.paint(c, Offset((w-tp.width)/2, center.dy-tp.height/2-1));
-    final path = Path()
-      ..moveTo(w/2-9, center.dy+r-1)..lineTo(w/2, h-4)..lineTo(w/2+9, center.dy+r-1)..close();
-    c.drawPath(path, Paint()..color=bgColor);
-    c.drawPath(path, Paint()..color=Colors.white..style=PaintingStyle.stroke..strokeWidth=2);
-    c.drawCircle(Offset(w/2, h-6), 2.5, Paint()..color=Colors.white.withOpacity(0.8));
-    final img = await rec.endRecording().toImage(w.toInt(), h.toInt());
-    final bytes = await img.toByteData(format:ui.ImageByteFormat.png);
-    return BitmapDescriptor.fromBytes(bytes!.buffer.asUint8List());
-  }
-
-  // Pin para el primer sitio de una ruta bloqueada — candado dorado sobre verde oscuro
-  Future<BitmapDescriptor> _crearPinBloqueado() async {
-    final recorder = ui.PictureRecorder();
-    final canvas = Canvas(recorder);
-    const double w = 64, h = 80, r = 28;
-    const Offset c = Offset(w / 2, r + 4);
-
-    // Sombra
-    canvas.drawCircle(Offset(c.dx, c.dy + 4), r + 2,
-      Paint()..color = Colors.black45..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6));
-    // Borde blanco
-    canvas.drawCircle(c, r + 3, Paint()..color = Colors.white);
-    // Fondo verde oscuro Rutero MDE
-    canvas.drawCircle(c, r, Paint()..color = const Color(0xFF1B4332));
-    // Anillo dorado interno
-    canvas.drawCircle(c, r - 3,
-      Paint()..color = RDSColor.gold..style = PaintingStyle.stroke..strokeWidth = 2);
-    // Emoji candado dorado
-    final tp = TextPainter(
-      text: const TextSpan(text: '🔒', style: TextStyle(fontSize: 26)),
-      textDirection: TextDirection.ltr)..layout();
-    tp.paint(canvas, Offset(c.dx - tp.width / 2, c.dy - tp.height / 2 - 1));
-    // Punta del pin — verde oscuro
-    final tri = Path()
-      ..moveTo(w / 2 - 8, c.dy + r - 1)
-      ..lineTo(w / 2, h - 4)
-      ..lineTo(w / 2 + 8, c.dy + r - 1)
-      ..close();
-    canvas.drawPath(tri, Paint()..color = const Color(0xFF1B4332));
-    canvas.drawPath(tri, Paint()..color = Colors.white..style = PaintingStyle.stroke..strokeWidth = 1.5);
-    // Punto brillante en la punta
-    canvas.drawCircle(Offset(w / 2, h - 6), 2.5,
-      Paint()..color = RDSColor.gold.withOpacity(0.8));
-
-    final img = await recorder.endRecording().toImage(w.toInt(), h.toInt());
-    final bytes = await img.toByteData(format: ui.ImageByteFormat.png);
-    return BitmapDescriptor.fromBytes(bytes!.buffer.asUint8List());
-  }
-
-  Future<BitmapDescriptor> _crearIconoAgrupado(int count) async {
-    final recorder = ui.PictureRecorder();
-    final canvas = Canvas(recorder);
-    const w = 72.0; const h = 80.0;
-    canvas.drawCircle(const Offset(w/2, w/2+3), w/2-2,
-      Paint()..color=Colors.black.withOpacity(0.5)..maskFilter=const MaskFilter.blur(BlurStyle.normal,5));
-    canvas.drawCircle(const Offset(w/2, w/2), w/2-3, Paint()..color=const Color(0xFFFFD700));
-    canvas.drawCircle(const Offset(w/2, w/2), w/2-3,
-      Paint()..color=Colors.white..style=PaintingStyle.stroke..strokeWidth=2.5);
-    final tp = TextPainter(text:const TextSpan(text:'🔒',style:TextStyle(fontSize:26)),textDirection:TextDirection.ltr);
-    tp.layout(); tp.paint(canvas, Offset((w-tp.width)/2, (w/2-tp.height)/2));
-    if (count > 0) {
-      final label = TextPainter(
-        text:TextSpan(text:'$count RUTAS',style:const TextStyle(fontSize:11,color:Colors.white,fontWeight:FontWeight.w800,letterSpacing:0.5)),
-        textDirection:TextDirection.ltr);
-      label.layout(); label.paint(canvas, Offset((w-label.width)/2, w/2+6));
-    }
-    final img = await recorder.endRecording().toImage(w.toInt(), h.toInt());
-    final bytes = await img.toByteData(format:ui.ImageByteFormat.png);
-    return BitmapDescriptor.fromBytes(bytes!.buffer.asUint8List());
-  }
 
   Future<BitmapDescriptor> _markerConLogo({
     Color fondo = const Color(0xFF2E7D32),
@@ -16055,6 +16165,57 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
     }
 
     final img = await recorder.endRecording().toImage(w.toInt(), h.toInt());
+    final bytes = await img.toByteData(format: ui.ImageByteFormat.png);
+    return BitmapDescriptor.fromBytes(bytes!.buffer.asUint8List());
+  }
+
+  Future<BitmapDescriptor> _crearPinBloqueado() async {
+    final rec = ui.PictureRecorder();
+    final c = Canvas(rec);
+    const double w = 72.0, h = 88.0, r = 28.0;
+    final Offset center = const Offset(w/2, r+6);
+    c.drawCircle(Offset(center.dx, center.dy+4), r+2,
+      Paint()..color=Colors.black45..maskFilter=const MaskFilter.blur(BlurStyle.normal,6));
+    c.drawCircle(center, r+3, Paint()..color=Colors.white);
+    c.drawCircle(center, r, Paint()..color=const Color(0xFF1B4332));
+    c.drawCircle(center, r-3,
+      Paint()..color=RDSColor.gold..style=PaintingStyle.stroke..strokeWidth=2);
+    final tp = TextPainter(
+      text: const TextSpan(text: '🔒', style: TextStyle(fontSize: 26)),
+      textDirection: TextDirection.ltr)..layout();
+    tp.paint(c, Offset(center.dx-tp.width/2, center.dy-tp.height/2-1));
+    final tri = Path()
+      ..moveTo(w/2-8, center.dy+r-1)..lineTo(w/2, h-4)..lineTo(w/2+8, center.dy+r-1)..close();
+    c.drawPath(tri, Paint()..color=const Color(0xFF1B4332));
+    c.drawPath(tri, Paint()..color=Colors.white..style=PaintingStyle.stroke..strokeWidth=1.5);
+    c.drawCircle(Offset(w/2, h-6), 2.5, Paint()..color=RDSColor.gold.withOpacity(0.8));
+    final img = await rec.endRecording().toImage(w.toInt(), h.toInt());
+    final bytes = await img.toByteData(format: ui.ImageByteFormat.png);
+    return BitmapDescriptor.fromBytes(bytes!.buffer.asUint8List());
+  }
+
+  Future<BitmapDescriptor> _crearIconoAgrupado(int count) async {
+    final rec = ui.PictureRecorder();
+    final c = Canvas(rec);
+    const double w = 72.0, h = 80.0;
+    c.drawCircle(const Offset(w/2, w/2+3), w/2-2,
+      Paint()..color=Colors.black.withOpacity(0.5)..maskFilter=const MaskFilter.blur(BlurStyle.normal,5));
+    c.drawCircle(const Offset(w/2, w/2), w/2-3, Paint()..color=const Color(0xFFFFD700));
+    c.drawCircle(const Offset(w/2, w/2), w/2-3,
+      Paint()..color=Colors.white..style=PaintingStyle.stroke..strokeWidth=2.5);
+    final tp = TextPainter(
+      text: const TextSpan(text: '🔒', style: TextStyle(fontSize: 26)),
+      textDirection: TextDirection.ltr)..layout();
+    tp.paint(c, Offset((w-tp.width)/2, (w/2-tp.height)/2));
+    if (count > 0) {
+      final label = TextPainter(
+        text: TextSpan(text: '$count RUTAS',
+          style: const TextStyle(fontSize: 11, color: Colors.white,
+            fontWeight: FontWeight.w800, letterSpacing: 0.5)),
+        textDirection: TextDirection.ltr)..layout();
+      label.paint(c, Offset((w-label.width)/2, w/2+6));
+    }
+    final img = await rec.endRecording().toImage(w.toInt(), h.toInt());
     final bytes = await img.toByteData(format: ui.ImageByteFormat.png);
     return BitmapDescriptor.fromBytes(bytes!.buffer.asUint8List());
   }
@@ -16255,14 +16416,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
   }
 
   // Zona de cada ruta para elegir ícono
-  String _zonaDeRuta(String ruta) {
-    if (['RUTA TRANSFORMACIÓN URBANA','RUTA VERDE DEL NORTE',
-         
-         'DEL ORIGEN PAISA A LA MEDELLÍN MODERNA','TRANVÍA CULTURAL'].contains(ruta)) return 'Ciudad';
-    if (['RUTA GUATAPÉ & LA PIEDRA', 'RUTA SANTA FE DE ANTIOQUIA', 'JOYA COLONIAL OCULTA — CONCEPCIÓN'].contains(ruta)) return 'Alrededores';
 
-    return 'Temporada';
-  }
 
   Set<Marker> _buildMarkers() {
     final bool selHay = _sitioSeleccionado != null;
@@ -16302,10 +16456,12 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
       final bool bloqueado = _rutaBloqueada(sitio.ruta);
       final bool visible = _sitioVisible(sitio);
 
-      // Si la ruta está bloqueada y NO es el primer sitio → no mostrar
+      // Solo mostrar el primer sitio de cada ruta bloqueada — el resto se
+      // revela a medida que el usuario visita y valida cada lugar.
+      // Esto evita que el mapa sirva de guía turística sin usar la app.
       if (bloqueado && !visible) continue;
 
-      // Deduplicar pines bloqueados con mismas coordenadas — agrupar si hay varios
+      // Deduplicar pines bloqueados con mismas coordenadas
       if (bloqueado) {
         final String coordKey = sitio.posicion.latitude.toStringAsFixed(4) + ',' + sitio.posicion.longitude.toStringAsFixed(4);
         final String lockId = 'lock_' + coordKey;
@@ -16357,10 +16513,12 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
         anchor: const Offset(0.5, 1.0),
         onTap: () {
           if (bloqueado) {
-            setState(() => _sitioSeleccionado = sitio);
+            setState(() { _sitioSeleccionado = sitio; _fabExpandido = false; });
+            _mapController?.animateCamera(
+              CameraUpdate.newLatLngZoom(sitio.posicion, 16));
             _mostrarAlertaBloqueado(sitio.ruta);
           } else {
-            setState(() => _sitioSeleccionado = sitio);
+            setState(() { _sitioSeleccionado = sitio; _fabExpandido = false; });
             _mapController?.animateCamera(
               CameraUpdate.newLatLngZoom(sitio.posicion, 16));
           }
@@ -16578,13 +16736,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
     return imgs[ruta] ?? '';
   }
 
-  double _hueParaRuta(String ruta) {
-    if (ruta.contains('Patrimonial') || ruta.contains('Nocturna')) return BitmapDescriptor.hueViolet;
-    if (ruta.contains('Gourmet') || ruta.contains('Café') || ruta.contains('Laureles')) return BitmapDescriptor.hueOrange;
-    if (ruta.contains('Guatapé') || ruta.contains('Metrocable') || ruta.contains('San Carlos')) return BitmapDescriptor.hueAzure;
-    if (ruta.contains('Miradores') || ruta.contains('Santa Fe') || ruta.contains('Alumbrado')) return BitmapDescriptor.hueYellow;
-    return BitmapDescriptor.hueGreen;
-  }
+
 
   Color _colorParaRuta(String ruta) {
     // ── Rutas gastronómicas ──
