@@ -296,7 +296,7 @@ class NotificationManager {
   Future<void> mostrarNotificacion(String titulo, String cuerpo, {String? payload}) async {}
   Future<void> cancelarTodas() async {}
   Future<void> bienvenidaDeVuelta() async {}
-  Future<void> sitioValidado(String sitio, String ruta, {String? emoji}) async {}
+  Future<void> sitioValidado(String sitio, int numero, int total) async {}
 }
 
 
