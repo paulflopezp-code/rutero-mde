@@ -1428,60 +1428,58 @@ const Map<String, String> kTipsPorRutaEN = {
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  // Detectar país del dispositivo → definir idioma default
-  // Lógica: si el país es CO → español; cualquier otro país → inglés
-  // (enfoque: turistas internacionales)
-  final locale = WidgetsBinding.instance.platformDispatcher.locale;
-  final country = locale.countryCode;
-  final sysLang = locale.languageCode;
-  // Cargar idioma guardado PRIMERO — respeta la elección del usuario
-  final prefsTemp = await SharedPreferences.getInstance();
-  final langGuardado = prefsTemp.getString('app_lang');
-  if (langGuardado != null) {
-    // El usuario ya eligió idioma → respetar siempre
-    setLang(langGuardado);
-  } else {
-    // Primera vez → inglés por defecto (app enfocada en turistas internacionales)
-    setLang('en');
+
+  // FIX iOS: envolver toda la inicialización en try-catch
+  // para garantizar que runApp() siempre se ejecute aunque algo falle
+  try {
+    final locale = WidgetsBinding.instance.platformDispatcher.locale;
+    final country = locale.countryCode;
+    final sysLang = locale.languageCode;
+    final prefsTemp = await SharedPreferences.getInstance();
+    final langGuardado = prefsTemp.getString('app_lang');
+    if (langGuardado != null) {
+      setLang(langGuardado);
+    } else {
+      setLang('en');
+    }
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
+    FirebaseFirestore.instance.settings = const Settings(
+      persistenceEnabled: true,
+      cacheSizeBytes: Settings.CACHE_SIZE_UNLIMITED,
+    );
+    await FirebaseAppCheck.instance.activate(
+      androidProvider: AndroidProvider.playIntegrity,
+      appleProvider: AppleProvider.debug,
+    );
+    await cargarModoDemo();
+    await cargarIdiomaGuardado();
+    await AudioManager().cargarPreferencias();
+    await SesionManager().cargarRutaActiva();
+    RutasService().cargarEnBackground();
+    AliadosService().cargarEnBackground();
+    SystemChrome.setSystemUIOverlayStyle(
+      const SystemUiOverlayStyle(
+        statusBarColor: Colors.transparent,
+        statusBarIconBrightness: Brightness.light,
+      ),
+    );
+    try {
+      await NotificationManager().inicializar();
+    } catch (e) {
+      debugPrint('⚠️ NotificationManager init falló: $e');
+    }
+  } catch (e) {
+    debugPrint('🔴 Error crítico en main(): $e');
   }
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
-  // Configurar Firestore para reducir latencia inicial
-  FirebaseFirestore.instance.settings = const Settings(
-    persistenceEnabled: true,
-    cacheSizeBytes: Settings.CACHE_SIZE_UNLIMITED,
-  );
-  // AppCheck — playIntegrity para Android, debug para iOS TestFlight
-  // DeviceCheck en iOS requiere configuración adicional en Firebase Console
-  // que aún no está lista — usar debug hasta tener producción configurada
-  await FirebaseAppCheck.instance.activate(
-    androidProvider: AndroidProvider.playIntegrity,
-    appleProvider: AppleProvider.debug,
-  );
-  // Cargar configuraciones persistentes (modo demo admin, sonido, ruta activa)
-  // Esto permite que la app recuerde el estado del usuario entre cierres.
-  await cargarModoDemo();
-  await cargarIdiomaGuardado();
-  await AudioManager().cargarPreferencias();
-  await SesionManager().cargarRutaActiva();
-  RutasService().cargarEnBackground(); // 🌿 Carga rutas de Firestore en background (no bloquea arranque)
-  AliadosService().cargarEnBackground(); // 🤝 Carga aliados de Firestore en background
-  SystemChrome.setSystemUIOverlayStyle(
-    const SystemUiOverlayStyle(
-      statusBarColor: Colors.transparent,
-      statusBarIconBrightness: Brightness.light,
-    ),
-  );
-  // Notificaciones locales — solo inicializar (bloquea mínimo, necesario antes de runApp)
-  await NotificationManager().inicializar();
+
   runApp(const RuteroApp());
-  // ── Post-runApp: tareas en background que no bloquean el primer frame ──
-  // Mover aquí reduce el splash negro en todos los arranques
+
   Future.microtask(() async {
-    await tipsService.precargar();                // 🗒️ Tips desde Firestore
-    await NotificationManager().programarFeria(); // 🌹 Cuenta regresiva Feria
-    await DeepLinkManager().inicializar();        // 🔗 Deep links
+    try { await tipsService.precargar(); } catch (_) {}
+    try { await NotificationManager().programarFeria(); } catch (_) {}
+    try { await DeepLinkManager().inicializar(); } catch (_) {}
   });
 }
 
