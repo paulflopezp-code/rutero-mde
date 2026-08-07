@@ -1454,7 +1454,8 @@ void main() async {
   );
   // AppCheck producción — playIntegrity para verificación real en Play Store
   await FirebaseAppCheck.instance.activate(
-    androidProvider: AndroidProvider.playIntegrity,
+   androidProvider: AndroidProvider.playIntegrity,
+appleProvider: AppleProvider.deviceCheck,
   );
   // Cargar configuraciones persistentes (modo demo admin, sonido, ruta activa)
   // Esto permite que la app recuerde el estado del usuario entre cierres.
@@ -2285,6 +2286,8 @@ class AuthService {
         email: email, password: password);
       await cred.user!.updateDisplayName(nombre);
       await _guardarUsuario(cred.user!);
+      cred.user!.sendEmailVerification().catchError(
+        (e) => debugPrint('⚠️ sendEmailVerification: $e'));
       return cred;
     } on FirebaseAuthException catch (e) {
       if (e.code == 'email-already-in-use') {
@@ -2676,7 +2679,7 @@ class _AudioFloatingButtonState extends State<_AudioFloatingButton> {
 
             Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
               Text(t('Música de fondo', 'Background music'),
-                style: const TextStyle(color: kText, fontSize: 15, fontWeight: FontWeight.w700)),
+                style: const TextStyle(color: RDSColor.textPrimary, fontSize: 15, fontWeight: FontWeight.w700)),
               GestureDetector(
                 onTap: () async {
                   await AudioManager().toggleSilencio();
@@ -2686,15 +2689,15 @@ class _AudioFloatingButtonState extends State<_AudioFloatingButton> {
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
                   decoration: BoxDecoration(
-                    color: AudioManager().silenciado ? kAccent.withOpacity(0.15) : kGreen.withOpacity(0.15),
+                    color: AudioManager().silenciado ? RDSColor.accent.withOpacity(0.15) : RDSColor.green.withOpacity(0.15),
                     borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: AudioManager().silenciado ? kAccent.withOpacity(0.4) : kGreen.withOpacity(0.4))),
+                    border: Border.all(color: AudioManager().silenciado ? RDSColor.accent.withOpacity(0.4) : RDSColor.green.withOpacity(0.4))),
                   child: Row(mainAxisSize: MainAxisSize.min, children: [
                     Icon(AudioManager().silenciado ? Icons.volume_off_rounded : Icons.volume_up_rounded,
-                      color: AudioManager().silenciado ? kAccent : kGreen, size: 16),
+                      color: AudioManager().silenciado ? RDSColor.accent : RDSColor.green, size: 16),
                     const SizedBox(width: 6),
                     Text(AudioManager().silenciado ? t('Silenciado', 'Muted') : t('Activo', 'On'),
-                      style: TextStyle(color: AudioManager().silenciado ? kAccent : kGreen,
+                      style: TextStyle(color: AudioManager().silenciado ? RDSColor.accent : RDSColor.green,
                         fontSize: 12, fontWeight: FontWeight.w700)),
                   ])),
               ),
@@ -2708,8 +2711,8 @@ class _AudioFloatingButtonState extends State<_AudioFloatingButton> {
                 child: Slider(
                   value: AudioManager().volumenMusica,
                   min: 0.0, max: 1.0,
-                  activeColor: kGreen,
-                  inactiveColor: kTextMuted.withOpacity(0.2),
+                  activeColor: RDSColor.green,
+                  inactiveColor: RDSColor.textMuted.withOpacity(0.2),
                   onChanged: (v) async {
                     await AudioManager().setVolumenMusica(v);
                     setS(() {});
@@ -2719,12 +2722,12 @@ class _AudioFloatingButtonState extends State<_AudioFloatingButton> {
               Icon(Icons.volume_up_rounded, color: RDSColor.textMuted, size: 18),
               const SizedBox(width: 8),
               Text('${(AudioManager().volumenMusica * 100).toInt()}%',
-                style: const TextStyle(color: kTextMuted, fontSize: 12)),
+                style: const TextStyle(color: RDSColor.textMuted, fontSize: 12)),
             ]),
 
             const SizedBox(height: 4),
             Text(t('Ajusta el volumen de la música de fondo', 'Adjust background music volume'),
-              style: const TextStyle(color: kTextMuted, fontSize: 11),
+              style: const TextStyle(color: RDSColor.textMuted, fontSize: 11),
               textAlign: TextAlign.center),
           ]))));
   }
@@ -2742,7 +2745,7 @@ class _AudioFloatingButtonState extends State<_AudioFloatingButton> {
           boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.2), blurRadius: 8)]),
         child: Icon(
           AudioManager().silenciado ? Icons.volume_off_rounded : Icons.volume_up_rounded,
-          color: AudioManager().silenciado ? kAccent.withOpacity(0.7) : Colors.white.withOpacity(0.45),
+          color: AudioManager().silenciado ? RDSColor.accent.withOpacity(0.7) : Colors.white.withOpacity(0.45),
           size: 16)),
     );
   }
@@ -2768,11 +2771,11 @@ class _SOSFloatingButton extends StatelessWidget {
           Container(width: 40, height: 4, margin: const EdgeInsets.only(bottom: 16),
             decoration: BoxDecoration(color: RDSColor.textMuted.withOpacity(0.3), borderRadius: BorderRadius.circular(2))),
           Text(t('¿Qué necesitas?', 'What do you need?'),
-            style: const TextStyle(color: kText, fontSize: 16, fontWeight: FontWeight.w800)),
+            style: const TextStyle(color: RDSColor.textPrimary, fontSize: 16, fontWeight: FontWeight.w800)),
           const SizedBox(height: 16),
           _MenuOpcion(emoji: '📸', titulo: t('Captura de campo', 'Field capture'),
             subtitulo: t('Fotografía sitios reales con tu GPS y marca de agua', 'Photograph real sites with GPS and watermark'),
-            color: kGreen,
+            color: RDSColor.green,
             onTap: () { Navigator.pop(ctx); Navigator.of(context, rootNavigator: true).push(MaterialPageRoute(builder: (_) => const CapturasDeCampoScreen())); }),
           const SizedBox(height: 10),
           _MenuOpcion(emoji: '🚨', titulo: t('Emergencias', 'Emergencies'),
@@ -2782,7 +2785,7 @@ class _SOSFloatingButton extends StatelessWidget {
           const SizedBox(height: 10),
           _MenuOpcion(emoji: '🛎️', titulo: t('Servicios para viajeros', 'Traveler services'),
             subtitulo: t('Traductor, guías turísticos y más', 'Translator, tour guides and more'),
-            color: kGold,
+            color: RDSColor.gold,
             onTap: () { Navigator.pop(ctx); Navigator.of(context, rootNavigator: true).push(MaterialPageRoute(builder: (_) => const ServiciosScreen())); }),
           const SizedBox(height: 10),
           _MenuOpcion(emoji: '📱', titulo: t('Mi botón SOS', 'My SOS button'),
@@ -2975,9 +2978,9 @@ class _RDSInput extends StatelessWidget {
       style: RDSType.bodyMd.copyWith(color: RDSColor.textPrimary),
       decoration: InputDecoration(
         hintText: hint,
-        hintStyle: RDSType.bodyMd,                     // kTextMuted ya en token
+        hintStyle: RDSType.bodyMd,                     // RDSColor.textMuted ya en token
         filled: true,
-        fillColor: RDSColor.base,                       // kDark2 → token
+        fillColor: RDSColor.base,                       // RDSColor.base → token
         prefixIcon: prefixIcon,
         suffixIcon: suffixIcon,
         contentPadding: const EdgeInsets.symmetric(
@@ -3111,7 +3114,7 @@ class _RDSDialog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => AlertDialog(
-    backgroundColor: RDSColor.card,                    // kCard → token
+    backgroundColor: RDSColor.card,                    // RDSColor.card → token
     surfaceTintColor: Colors.transparent,
     shape: RoundedRectangleBorder(
       borderRadius: RDSRadius.bLg,                     // circular(16) → token
@@ -3165,7 +3168,7 @@ Future<T?> showRDSSheet<T>({
   bool isScrollControlled = true,
 }) => showModalBottomSheet<T>(
   context: context,
-  backgroundColor: RDSColor.card,                     // kDark2 → RDSColor.card
+  backgroundColor: RDSColor.card,                     // RDSColor.base → RDSColor.card
   isScrollControlled: isScrollControlled,
   useSafeArea: true,
   shape: const RoundedRectangleBorder(
@@ -3241,171 +3244,176 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
   void dispose() { _ctrl.dispose(); _floatCtrl.dispose(); super.dispose(); }
 
   @override
+  @override
   Widget build(BuildContext context) {
+    final size = MediaQuery.of(context).size;
     return Scaffold(
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft, end: Alignment.bottomRight,
-            colors: [Color(0xFF060A04), RDSColor.base, Color(0xFF060A04)],
-          ),
-        ),
-        child: Stack(children: [
-          // ── Fondo cinematográfico — Medellín metrocable al atardecer ──
-          // Imagen generada 19/05/2026 — reemplaza el grid de 4 fotos
-          Positioned.fill(child: Image.asset(
+      backgroundColor: const Color(0xFF060A04),
+      body: Stack(children: [
+
+        // CAPA 1: Foto full-screen protagonista
+        Positioned.fill(
+          child: Image.asset(
             'assets/images/splash_bg.png',
             fit: BoxFit.cover,
-            errorBuilder: (_, __, ___) => Container(color: RDSColor.overlay))),
+            errorBuilder: (_, __, ___) => Container(
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [Color(0xFF0D2010), Color(0xFF060A04)]))))),
 
-          // Overlay degradado — refuerza el negro inferior para logo y barra legibles
-          Positioned.fill(child: Container(
+        // CAPA 2: Overlay cinematografico 5 zonas
+        Positioned.fill(
+          child: Container(
             decoration: const BoxDecoration(
               gradient: LinearGradient(
-                begin: Alignment.topCenter, end: Alignment.bottomCenter,
-                stops: [0.0, 0.45, 0.70, 1.0],
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                stops: [0.0, 0.25, 0.50, 0.72, 1.0],
                 colors: [
-                  Colors.transparent,
-                  Colors.transparent,
-                  Color(0x99000000),
-                  Color(0xFF0D0D0D),
+                  Color(0xBB000000),
+                  Color(0x33000000),
+                  Color(0x66000000),
+                  Color(0xCC060A04),
+                  Color(0xFF060A04),
                 ])))),
 
-          // Resplandor central verde
-          Center(child: Container(width: 320, height: 320,
-            decoration: BoxDecoration(shape: BoxShape.circle,
-              gradient: RadialGradient(colors: [kGreen.withOpacity(0.15), Colors.transparent])))),
+        // CAPA 3: Resplandor radial verde
+        Positioned(
+          bottom: size.height * 0.25,
+          left: size.width / 2 - 140,
+          child: Container(
+            width: 280, height: 280,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: RadialGradient(colors: [
+                RDSColor.green.withOpacity(0.12),
+                Colors.transparent,
+              ])))),
 
-          Center(child: FadeTransition(opacity: _fadeAnim,
-            child: ScaleTransition(scale: _scaleAnim,
-              child: Column(mainAxisSize: MainAxisSize.min, children: [
+        // CAPA 4: Contenido anclado al fondo
+        Positioned(
+          bottom: 0, left: 0, right: 0,
+          child: FadeTransition(
+            opacity: _fadeAnim,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(32, 0, 32, 52),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
 
-                // Logo flotante — imagen real
-                AnimatedBuilder(animation: _floatAnim, builder: (_, __) =>
-                  Transform.translate(offset: Offset(0, _floatAnim.value),
-                    child: Container(width: 140, height: 140,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        boxShadow: [
-                          BoxShadow(color: RDSColor.green.withOpacity(0.35), blurRadius: 40, spreadRadius: 8),
-                          BoxShadow(color: RDSColor.gold.withOpacity(0.2), blurRadius: 25),
-                        ]),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(140),
-                        child: Image.asset('assets/images/logo_splash.png',
-                          width: 140, height: 140, fit: BoxFit.cover,
-                          errorBuilder: (_, __, ___) => const Text('🌿', style: TextStyle(fontSize: 52))))))),
+                  // Logo con glow flotante
+                  AnimatedBuilder(
+                    animation: _floatAnim,
+                    builder: (_, __) => Transform.translate(
+                      offset: Offset(0, _floatAnim.value),
+                      child: Container(
+                        width: 100, height: 100,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          boxShadow: [
+                            BoxShadow(color: RDSColor.green.withOpacity(0.5),
+                              blurRadius: 48, spreadRadius: 6),
+                            BoxShadow(color: RDSColor.gold.withOpacity(0.2),
+                              blurRadius: 24),
+                            BoxShadow(color: Colors.black.withOpacity(0.5),
+                              blurRadius: 12, offset: const Offset(0, 6)),
+                          ]),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(100),
+                          child: Image.asset(
+                            'assets/images/logo_splash.png',
+                            width: 100, height: 100, fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) => Container(
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: RDSColor.green.withOpacity(0.15)),
+                              child: const Center(
+                                child: Icon(Icons.explore_rounded,
+                                  color: RDSColor.green, size: 44)))))))),
 
-                const SizedBox(height: 28),
+                  const SizedBox(height: 20),
 
-                // ── Título editorial ──
-                ShaderMask(
-                  shaderCallback: (b) => const LinearGradient(
-                    colors: [RDSColor.gold, kGoldLight, Color(0xFFF5E4A0), kGold],
-                  ).createShader(b),
-                  child: const Text('RUTERO',
+                  // Titulo RUTERO gradiente dorado
+                  ShaderMask(
+                    shaderCallback: (b) => const LinearGradient(
+                      colors: [Color(0xFFD4AF7A), Color(0xFFF5E4A0),
+                               Color(0xFFE8C96B), Color(0xFFD4AF7A)],
+                      stops: [0.0, 0.35, 0.65, 1.0],
+                    ).createShader(b),
+                    child: const Text('RUTERO',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontFamily: 'PlayfairDisplay',
+                        fontSize: 48, fontWeight: FontWeight.w900,
+                        color: Colors.white, letterSpacing: 5, height: 1.0))),
+
+                  const SizedBox(height: 4),
+
+                  // MEDELLIN separador
+                  Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                    Container(width: 28, height: 1,
+                      decoration: BoxDecoration(gradient: LinearGradient(
+                        colors: [Colors.transparent, RDSColor.gold.withOpacity(0.5)]))),
+                    const SizedBox(width: 10),
+                    const Text('MEDELLÍN',
+                      style: TextStyle(
+                        fontFamily: 'SpaceGrotesk',
+                        fontSize: 10, fontWeight: FontWeight.w600,
+                        color: Color(0xFF8BA878), letterSpacing: 6)),
+                    const SizedBox(width: 10),
+                    Container(width: 28, height: 1,
+                      decoration: BoxDecoration(gradient: LinearGradient(
+                        colors: [RDSColor.gold.withOpacity(0.5), Colors.transparent]))),
+                  ]),
+
+                  const SizedBox(height: 18),
+
+                  // Tagline
+                  Text(tTaglineSplash,
                     textAlign: TextAlign.center,
                     style: TextStyle(
-                      fontFamily: 'PlayfairDisplay',
-                      fontSize: 56, fontWeight: FontWeight.w900,
-                      color: Colors.white, letterSpacing: 6, height: 1)),
-                ),
+                      fontFamily: 'Inter', fontSize: 11,
+                      color: const Color(0xFFD4AF7A).withOpacity(0.8),
+                      fontStyle: FontStyle.italic,
+                      letterSpacing: 0.3, height: 1.4)),
 
-                // MDE en SpaceGrotesk
-                const Text('MDE',
-                  style: TextStyle(
-                    fontFamily: 'SpaceGrotesk',
-                    fontSize: 18, fontWeight: FontWeight.w700,
-                    color: kGold, letterSpacing: 12)),
+                  const SizedBox(height: 32),
 
-                const SizedBox(height: 10),
+                  // Barra de progreso
+                  AnimatedBuilder(
+                    animation: _progressAnim,
+                    builder: (_, __) => SizedBox(
+                      width: 120,
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(1),
+                        child: LinearProgressIndicator(
+                          value: _progressAnim.value,
+                          backgroundColor: Colors.white.withOpacity(0.07),
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                            Color.lerp(RDSColor.green, RDSColor.gold,
+                              _progressAnim.value) ?? RDSColor.green),
+                          minHeight: 2)))),
 
-                // Ciudad
-                Row(mainAxisSize: MainAxisSize.min, children: [
-                  Container(width: 30, height: 1,
-                    decoration: BoxDecoration(gradient: LinearGradient(
-                      colors: [Colors.transparent, kGold.withOpacity(0.5)]))),
-                  const SizedBox(width: 8),
-                  const Text('MEDELLÍN',
-                    style: TextStyle(fontSize: 13, letterSpacing: 7,
-                      color: Color(0xFF8BA878), fontWeight: FontWeight.w400)),
-                  const SizedBox(width: 8),
-                  Container(width: 30, height: 1,
-                    decoration: BoxDecoration(gradient: LinearGradient(
-                      colors: [kGold.withOpacity(0.5), Colors.transparent]))),
-                ]),
+                  const SizedBox(height: 20),
 
-                const SizedBox(height: 16),
-
-                // Tagline Feria
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
-                  decoration: BoxDecoration(
-                    color: RDSColor.gold.withOpacity(0.08),
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: RDSColor.gold.withOpacity(0.25))),
-                  child: Row(mainAxisSize: MainAxisSize.min, children: [
-                    const Text('🌺', style: TextStyle(fontSize: 13)),
-                    const SizedBox(width: 6),
-                    Text(tTaglineSplash,
-                      style: const TextStyle(
-                        fontFamily: 'Inter',
-                        fontSize: 11, color: Color(0xFFD4AF7A),
-                        fontStyle: FontStyle.italic, letterSpacing: 0.5)),
-                    const SizedBox(width: 6),
-                    const Text('🌺', style: TextStyle(fontSize: 13)),
-                  ])),
-
-                const SizedBox(height: 44),
-
-                // Barra de progreso con glow
-                AnimatedBuilder(animation: _progressAnim, builder: (_, __) =>
-                  Column(children: [
-                    Container(width: 140, height: 3,
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.06),
-                        borderRadius: BorderRadius.circular(2)),
-                      child: FractionallySizedBox(
-                        widthFactor: _progressAnim.value,
-                        alignment: Alignment.centerLeft,
-                        child: Container(
-                          decoration: BoxDecoration(
-                            gradient: const LinearGradient(colors: [RDSColor.green, kGold]),
-                            borderRadius: BorderRadius.circular(2),
-                            boxShadow: [BoxShadow(
-                              color: RDSColor.gold.withOpacity(0.5), blurRadius: 6)])))),
-                    const SizedBox(height: 10),
-                    Text('${(_progressAnim.value * 100).toInt()}%',
-                      style: const TextStyle(
-                        fontFamily: 'SpaceGrotesk',
-                        color: kGold, fontSize: 10, letterSpacing: 2)),
-                  ])),
-
-                const SizedBox(height: 24),
-
-                // Badge Créame
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF0A1628).withOpacity(0.8),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: const Color(0xFF1E3A5F).withOpacity(0.6), width: 1)),
-                  child: Row(mainAxisSize: MainAxisSize.min, children: [
-                    const Text('🏛️', style: TextStyle(fontSize: 11)),
-                    const SizedBox(width: 6),
-                    const Text('Proyecto Créame · Alcaldía de Medellín',
+                  // Badge Creame
+                  Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                    const Icon(Icons.account_balance_rounded,
+                      size: 9, color: Color(0xFF6A8AAA)),
+                    const SizedBox(width: 5),
+                    const Text('Créame · Alcaldía de Medellín',
                       style: TextStyle(
-                        color: Color(0xFF90CAF9),
-                        fontSize: 9, letterSpacing: 0.3)),
-                  ])),
-              ])))),
-        ]),
-      ),
+                        color: Color(0xFF6A8AAA),
+                        fontSize: 8, letterSpacing: 0.5)),
+                  ]),
+
+                ])))),
+      ]),
     );
   }
 }
-
 // ─────────────────────────────────────────
 //  MIS PREMIOS SCREEN
 // ─────────────────────────────────────────
@@ -3433,11 +3441,11 @@ class MisPremiosScreen extends StatelessWidget {
                 },
                 child: Container(width: 36, height: 36,
                   decoration: BoxDecoration(color: Colors.black.withOpacity(0.4), shape: BoxShape.circle),
-                  child: const Center(child: Text('←', style: TextStyle(color: kText, fontSize: 16))))),
+                  child: const Center(child: Text('←', style: TextStyle(color: RDSColor.textPrimary, fontSize: 16))))),
               const SizedBox(width: 14),
               Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Text(tMisPremiosTitle, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900,
-                  color: kGold, letterSpacing: 2)),
+                  color: RDSColor.gold, letterSpacing: 2)),
                 Text(tCodigosGanados,
                   style: const TextStyle(fontSize: 11, color: RDSColor.textMuted)),
               ]),
@@ -3451,7 +3459,7 @@ class MisPremiosScreen extends StatelessWidget {
                 const Text('🔒', style: TextStyle(fontSize: 48)),
                 const SizedBox(height: 12),
                 Text(tIniciarSesionPremios,
-                  style: const TextStyle(color: kTextMuted, fontSize: 14)),
+                  style: const TextStyle(color: RDSColor.textMuted, fontSize: 14)),
               ]))
             : StreamBuilder<QuerySnapshot>(
                 stream: FirebaseFirestore.instance
@@ -3461,16 +3469,16 @@ class MisPremiosScreen extends StatelessWidget {
                   .snapshots(),
                 builder: (ctx, snap) {
                   if (snap.connectionState == ConnectionState.waiting)
-                    return const Center(child: CircularProgressIndicator(color: kGold));
+                    return const Center(child: CircularProgressIndicator(color: RDSColor.gold));
                   final premios = snap.data?.docs ?? [];
                   if (premios.isEmpty)
                     return Center(child: Column(mainAxisSize: MainAxisSize.min, children: [
                       const Text('🏆', style: TextStyle(fontSize: 52)),
                       const SizedBox(height: 12),
-                      Text(tSinPremios, style: const TextStyle(color: kText, fontSize: 16, fontWeight: FontWeight.w700)),
+                      Text(tSinPremios, style: const TextStyle(color: RDSColor.textPrimary, fontSize: 16, fontWeight: FontWeight.w700)),
                       const SizedBox(height: 6),
                       Text(tCompletaRutaPremio,
-                        style: const TextStyle(color: kTextMuted, fontSize: 13), textAlign: TextAlign.center),
+                        style: const TextStyle(color: RDSColor.textMuted, fontSize: 13), textAlign: TextAlign.center),
                     ]));
                   // Deduplicar premios por rutaNombre — evitar QR repetidos
                   final _seenRutas = <String>{};
@@ -3493,7 +3501,7 @@ class MisPremiosScreen extends StatelessWidget {
                           borderRadius: BorderRadius.circular(16),
                           border: Border.all(color: canjeado
                             ? Colors.white.withOpacity(0.06)
-                            : kGold.withOpacity(0.3))),
+                            : RDSColor.gold.withOpacity(0.3))),
                         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                           Row(children: [
                             // Insignia ilustrada si existe
@@ -3505,17 +3513,17 @@ class MisPremiosScreen extends StatelessWidget {
                             const SizedBox(width: 10),
                             Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                               Text(data['rutaNombre'] ?? '',
-                                style: const TextStyle(color: kText, fontSize: 13, fontWeight: FontWeight.w700)),
+                                style: const TextStyle(color: RDSColor.textPrimary, fontSize: 13, fontWeight: FontWeight.w700)),
                               Text(data['insignia'] ?? '',
-                                style: const TextStyle(color: kTextMuted, fontSize: 11)),
+                                style: const TextStyle(color: RDSColor.textMuted, fontSize: 11)),
                             ])),
                             Container(
                               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                               decoration: BoxDecoration(
-                                color: canjeado ? kTextMuted.withOpacity(0.1) : kGreen.withOpacity(0.15),
+                                color: canjeado ? RDSColor.textMuted.withOpacity(0.1) : RDSColor.green.withOpacity(0.15),
                                 borderRadius: BorderRadius.circular(RDSRadius.xl)),
                               child: Text(canjeado ? 'Canjeado' : 'Disponible',
-                                style: TextStyle(color: canjeado ? kTextMuted : kGreen,
+                                style: TextStyle(color: canjeado ? RDSColor.textMuted : RDSColor.green,
                                   fontSize: 10, fontWeight: FontWeight.w700))),
                           ]),
                           const SizedBox(height: 12),
@@ -3530,7 +3538,7 @@ class MisPremiosScreen extends StatelessWidget {
                             child: Column(children: [
                               Text(data['codigo'] ?? '',
                                 style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900,
-                                  color: kGold, letterSpacing: 3)),
+                                  color: RDSColor.gold, letterSpacing: 3)),
                               const SizedBox(height: 6),
                               // Mini QR
                               Container(
@@ -3543,7 +3551,7 @@ class MisPremiosScreen extends StatelessWidget {
                             ])),
                           const SizedBox(height: 10),
                           Text(data['premio'] ?? '',
-                            style: const TextStyle(color: kTextMuted, fontSize: 11, height: 1.4)),
+                            style: const TextStyle(color: RDSColor.textMuted, fontSize: 11, height: 1.4)),
                         ]));
                     });
                 })),
@@ -3673,12 +3681,12 @@ class _CompraScreenState extends State<CompraScreen> {
             const SizedBox(height: 12),
             const Text('PAGO EN PROCESO',
               style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900,
-                color: kGold, letterSpacing: 2)),
+                color: RDSColor.gold, letterSpacing: 2)),
             const SizedBox(height: 8),
             Text(t('Completa el pago en el navegador y regresa aquí.',
                    'Complete the payment in the browser and return here.'),
               textAlign: TextAlign.center,
-              style: const TextStyle(color: kTextMuted, fontSize: 13)),
+              style: const TextStyle(color: RDSColor.textMuted, fontSize: 13)),
             const SizedBox(height: 20),
             // Botón: ya pagué
             GestureDetector(
@@ -3689,7 +3697,7 @@ class _CompraScreenState extends State<CompraScreen> {
               child: Container(width: double.infinity,
                 padding: const EdgeInsets.symmetric(vertical: 14),
                 decoration: BoxDecoration(
-                  color: kGreen,
+                  color: RDSColor.green,
                   borderRadius: BorderRadius.circular(14)),
                 child: Center(child: Text(
                   t('✅  YA PAGUÉ', '✅  I PAID'),
@@ -3700,7 +3708,7 @@ class _CompraScreenState extends State<CompraScreen> {
             GestureDetector(
               onTap: () => Navigator.pop(context),
               child: Text(t('Cancelar', 'Cancel'),
-                style: const TextStyle(color: kTextMuted, fontSize: 13))),
+                style: const TextStyle(color: RDSColor.textMuted, fontSize: 13))),
           ]))));
   }
 
@@ -3749,23 +3757,23 @@ class _CompraScreenState extends State<CompraScreen> {
             builder: (_) => AlertDialog(
               backgroundColor: RDSColor.card,
               title: Text(t('Pago pendiente', 'Payment pending'),
-                style: const TextStyle(color: kGold)),
+                style: const TextStyle(color: RDSColor.gold)),
               content: Text(
                 t('Tu pago está siendo procesado. Si ya pagaste, espera unos minutos y vuelve a intentar.',
                   'Your payment is being processed. If you already paid, wait a few minutes and try again.'),
-                style: const TextStyle(color: kTextMuted, fontSize: 13)),
+                style: const TextStyle(color: RDSColor.textMuted, fontSize: 13)),
               actions: [
                 TextButton(
                   onPressed: () => Navigator.pop(context),
                   child: Text(t('Entendido', 'Got it'),
-                    style: const TextStyle(color: kGreen))),
+                    style: const TextStyle(color: RDSColor.green))),
                 TextButton(
                   onPressed: () async {
                     Navigator.pop(context);
                     await _verificarPago(referencia);
                   },
                   child: Text(t('Reintentar', 'Retry'),
-                    style: const TextStyle(color: kGold))),
+                    style: const TextStyle(color: RDSColor.gold))),
               ]));
         }
       }
@@ -3781,9 +3789,9 @@ class _CompraScreenState extends State<CompraScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final Color acento = kRutaColor(widget.ruta['acento'], kGreen);
-    final Color color1 = kRutaColor(widget.ruta['color1'], kDark2);
-    final Color color2 = kRutaColor(widget.ruta['color2'], kDark3);
+    final Color acento = kRutaColor(widget.ruta['acento'], RDSColor.green);
+    final Color color1 = kRutaColor(widget.ruta['color1'], RDSColor.base);
+    final Color color2 = kRutaColor(widget.ruta['color2'], const Color(0xFF050A04));
     final String emoji = widget.ruta['emoji']?.toString() ?? '🗺️';
     final String nombre = kLang == 'en'
       ? (widget.ruta['nombreEN']?.toString() ?? widget.ruta['nombre']?.toString() ?? '')
@@ -3831,14 +3839,14 @@ class _CompraScreenState extends State<CompraScreen> {
                   child: GestureDetector(onTap: () => Navigator.pop(context),
                     child: Container(width: 36, height: 36,
                       decoration: BoxDecoration(color: Colors.black.withOpacity(0.4), shape: BoxShape.circle),
-                      child: const Center(child: Text('←', style: TextStyle(color: kText, fontSize: 16)))))),
+                      child: const Center(child: Text('←', style: TextStyle(color: RDSColor.textPrimary, fontSize: 16)))))),
                 Positioned(bottom: 20, left: 20, right: 20,
                   child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                     Text(tComprarRutaTitle, style: TextStyle(
                       color: RDSColor.textPrimary.withOpacity(0.7), fontSize: 10, letterSpacing: 2)),
                     const SizedBox(height: 4),
                     Text(nombre, textAlign: TextAlign.left,
-                      style: const TextStyle(color: kText, fontSize: 18,
+                      style: const TextStyle(color: RDSColor.textPrimary, fontSize: 18,
                         fontWeight: FontWeight.w900, letterSpacing: 0.5,
                         shadows: [Shadow(color: Colors.black87, blurRadius: 8)])),
                     if (subtitulo.isNotEmpty)
@@ -3891,16 +3899,16 @@ class _CompraScreenState extends State<CompraScreen> {
                 border: Border.all(color: RDSColor.gold.withOpacity(0.3))),
               child: Row(children: [
                 Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text(tPrecioRuta, style: const TextStyle(color: kTextMuted, fontSize: 10, letterSpacing: 2)),
+                  Text(tPrecioRuta, style: const TextStyle(color: RDSColor.textMuted, fontSize: 10, letterSpacing: 2)),
                   const SizedBox(height: 4),
-                  Text(tAccesoCompleto, style: const TextStyle(color: kTextMuted, fontSize: 11)),
+                  Text(tAccesoCompleto, style: const TextStyle(color: RDSColor.textMuted, fontSize: 11)),
                 ])),
                 Text(precio,
                   style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w900, color: RDSColor.gold)),
               ])),
             const SizedBox(height: 16),
             Text(tMetodoPagoTitle,
-              style: TextStyle(color: kTextMuted, fontSize: 11, letterSpacing: 2)),
+              style: TextStyle(color: RDSColor.textMuted, fontSize: 11, letterSpacing: 2)),
             const SizedBox(height: 10),
             ...[
               {'id': 'nequi', 'emoji': '📱', 'nombre': 'Nequi', 'sub': 'Pago inmediato desde tu app'},
@@ -3913,7 +3921,7 @@ class _CompraScreenState extends State<CompraScreen> {
                 margin: const EdgeInsets.only(bottom: 8),
                 padding: const EdgeInsets.all(14),
                 decoration: BoxDecoration(
-                  color: _metodoPago == m['id'] ? acento.withOpacity(0.1) : kCard,
+                  color: _metodoPago == m['id'] ? acento.withOpacity(0.1) : RDSColor.card,
                   borderRadius: BorderRadius.circular(14),
                   border: Border.all(
                     color: _metodoPago == m['id'] ? acento : Colors.white.withOpacity(0.06),
@@ -3922,8 +3930,8 @@ class _CompraScreenState extends State<CompraScreen> {
                   Text(m['emoji']!, style: const TextStyle(fontSize: 24)),
                   const SizedBox(width: 12),
                   Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Text(m['nombre']!, style: const TextStyle(color: kText, fontSize: 14, fontWeight: FontWeight.w600)),
-                    Text(m['sub']!, style: const TextStyle(color: kTextMuted, fontSize: 11)),
+                    Text(m['nombre']!, style: const TextStyle(color: RDSColor.textPrimary, fontSize: 14, fontWeight: FontWeight.w600)),
+                    Text(m['sub']!, style: const TextStyle(color: RDSColor.textMuted, fontSize: 11)),
                   ])),
                   if (_metodoPago == m['id'])
                     Container(width: 20, height: 20,
@@ -3970,7 +3978,7 @@ class _CompraScreenState extends State<CompraScreen> {
                 ]))),
             const SizedBox(height: 12),
             Center(child: Text(tPagoSeguro,
-              style: TextStyle(color: kTextMuted, fontSize: 11))),
+              style: TextStyle(color: RDSColor.textMuted, fontSize: 11))),
             const SizedBox(height: 40),
           ]),
         )),
@@ -3985,7 +3993,7 @@ class _DialogCompraExitosa extends StatelessWidget {
   const _DialogCompraExitosa({required this.ruta});
   @override
   Widget build(BuildContext context) {
-    final Color acento = kRutaColor(ruta['acento'], kGreen);
+    final Color acento = kRutaColor(ruta['acento'], RDSColor.green);
     return Dialog(
       backgroundColor: RDSColor.card,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(RDSRadius.xl)),
@@ -3996,11 +4004,11 @@ class _DialogCompraExitosa extends StatelessWidget {
           const SizedBox(height: 12),
           Text(tCompraExitosaTitle,
             style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900,
-              color: kGreen, letterSpacing: 2)),
+              color: RDSColor.green, letterSpacing: 2)),
           const SizedBox(height: 8),
           Text('${t("Ya puedes empezar la","You can now start the")} ${rNombre(ruta)}',
             textAlign: TextAlign.center,
-            style: const TextStyle(color: kTextMuted, fontSize: 13)),
+            style: const TextStyle(color: RDSColor.textMuted, fontSize: 13)),
           const SizedBox(height: 20),
           Container(padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(color: RDSColor.surface, borderRadius: BorderRadius.circular(12)),
@@ -4008,7 +4016,7 @@ class _DialogCompraExitosa extends StatelessWidget {
               Text(ruta['personaje'] ?? '🏅', style: const TextStyle(fontSize: 24)),
               const SizedBox(width: 10),
               Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text(tPremioAlCompletar, style: const TextStyle(color: kTextMuted, fontSize: 10)),
+                Text(tPremioAlCompletar, style: const TextStyle(color: RDSColor.textMuted, fontSize: 10)),
                 Text(ruta['insignia'] ?? ruta['premio'],
                   style: TextStyle(color: acento, fontSize: 12, fontWeight: FontWeight.w600)),
               ])),
@@ -4024,7 +4032,7 @@ class _DialogCompraExitosa extends StatelessWidget {
           const SizedBox(height: 10),
           GestureDetector(
             onTap: () { Navigator.of(context).pop(); Navigator.of(context).pop(); },
-            child: Text(tHacerDespues, style: const TextStyle(color: kTextMuted, fontSize: 12))),
+            child: Text(tHacerDespues, style: const TextStyle(color: RDSColor.textMuted, fontSize: 12))),
         ])));
   }
 }
@@ -4089,43 +4097,50 @@ class _LoginScreenState extends State<LoginScreen> {
         child: SafeArea(child: SingleChildScrollView(
           padding: EdgeInsets.zero,
           child: Column(children: [
-            // ── Colage header ──
-            SizedBox(height: 220, child: Stack(fit: StackFit.expand, children: [
-              // Grid de 4 fotos
-              GridView.count(
-                crossAxisCount: 2, physics: const NeverScrollableScrollPhysics(),
-                padding: EdgeInsets.zero, mainAxisSpacing: 2, crossAxisSpacing: 2,
-                children: [
-                  'assets/images/rutas/ruta_01_transformacion.jpg',
-                  'assets/images/rutas/ruta_09_guatape.jpg',
-                  'assets/images/rutas/ruta_15_alumbrado.jpg',
-                  'assets/images/rutas/ruta_17_feria_flores.jpg',
-                ].map((img) => Image.asset(img, fit: BoxFit.cover,
-                  cacheWidth: 300,
-                  errorBuilder: (_, __, ___) => Container(color: RDSColor.surface))).toList()),
-              // Overlay gradiente
+            // ── Hero header — foto full-width cinematográfica ──
+            SizedBox(height: 240, child: Stack(fit: StackFit.expand, children: [
+              Image.asset('assets/images/rutas/ruta_01_transformacion.jpg',
+                fit: BoxFit.cover, cacheWidth: 600,
+                errorBuilder: (_, __, ___) => Container(
+                  decoration: const BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [Color(0xFF0D2010), Color(0xFF060A04)])))),
+              // Overlay degradado cinematográfico
               Positioned.fill(child: Container(
-                decoration: BoxDecoration(
+                decoration: const BoxDecoration(
                   gradient: LinearGradient(
                     begin: Alignment.topCenter, end: Alignment.bottomCenter,
-                    colors: [Colors.transparent, Colors.black.withOpacity(0.8)])))),
-              // Logo y título sobre el colage
-              Positioned(bottom: 16, left: 0, right: 0,
+                    stops: [0.0, 0.3, 0.7, 1.0],
+                    colors: [
+                      Color(0x55000000),
+                      Colors.transparent,
+                      Color(0xBB000000),
+                      Color(0xFF060A04),
+                    ])))),
+              // Logo + título anclado abajo
+              Positioned(bottom: 20, left: 0, right: 0,
                 child: Column(children: [
-                  Container(width: 70, height: 70,
-                    decoration: BoxDecoration(shape: BoxShape.circle,
-                      border: Border.all(color: kGold, width: 2),
-                      boxShadow: [BoxShadow(color: RDSColor.green.withOpacity(0.4), blurRadius: 16)]),
-                    child: ClipRRect(borderRadius: BorderRadius.circular(70),
-                      child: Image.asset('assets/images/logo_splash.png',
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => const Text('🗺️', style: TextStyle(fontSize: 32))))),
-                  const SizedBox(height: 8),
-                  const Text('RUTERO MDE', style: TextStyle(
-                    fontSize: 24, fontWeight: FontWeight.w900, color: RDSColor.textPrimary, letterSpacing: 4)),
-                  const SizedBox(height: 2),
+                  Container(width: 60, height: 60,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(color: RDSColor.gold.withOpacity(0.6), width: 1.5),
+                      boxShadow: [
+                        BoxShadow(color: RDSColor.green.withOpacity(0.45), blurRadius: 24),
+                        BoxShadow(color: Colors.black.withOpacity(0.3), blurRadius: 8),
+                      ]),
+                    child: ClipRRect(borderRadius: BorderRadius.circular(60),
+                      child: Image.asset('assets/images/logo_splash.png', fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => const Icon(
+                          Icons.explore_rounded, color: RDSColor.green, size: 32)))),
+                  const SizedBox(height: 10),
+                  const Text('RUTERO MDE',
+                    style: TextStyle(
+                      fontFamily: 'PlayfairDisplay',
+                      fontSize: 22, fontWeight: FontWeight.w900,
+                      color: RDSColor.textPrimary, letterSpacing: 3)),
+                  const SizedBox(height: 3),
                   Text(tTaglineLogin,
-                    style: TextStyle(fontSize: 12, color: RDSColor.textMuted)),
+                    style: const TextStyle(fontSize: 11, color: RDSColor.textMuted)),
                 ])),
             ])),
             const SizedBox(height: 28),
@@ -4142,7 +4157,7 @@ class _LoginScreenState extends State<LoginScreen> {
               suffix: GestureDetector(
                 onTap: () => setState(() => _verPass = !_verPass),
                 child: Icon(_verPass ? Icons.visibility_off : Icons.visibility,
-                  color: kTextMuted, size: 18))),
+                  color: RDSColor.textMuted, size: 18))),
             const SizedBox(height: 8),
 
             // Error
@@ -4154,7 +4169,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   color: RDSColor.accent.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(8),
                   border: Border.all(color: RDSColor.accent.withOpacity(0.3))),
-                child: Text(_error, style: const TextStyle(color: kAccent, fontSize: 12))),
+                child: Text(_error, style: const TextStyle(color: RDSColor.accent, fontSize: 12))),
             const SizedBox(height: 20),
 
             // Botón login email
@@ -4167,7 +4182,7 @@ class _LoginScreenState extends State<LoginScreen> {
             Row(children: [
               Expanded(child: Divider(color: Colors.white.withOpacity(0.1))),
               const Padding(padding: EdgeInsets.symmetric(horizontal: 12),
-                child: Text('o', style: TextStyle(color: kTextMuted, fontSize: 12))),
+                child: Text('o', style: TextStyle(color: RDSColor.textMuted, fontSize: 12))),
               Expanded(child: Divider(color: Colors.white.withOpacity(0.1))),
             ]),
             const SizedBox(height: 12),
@@ -4192,12 +4207,12 @@ class _LoginScreenState extends State<LoginScreen> {
 
             // Ir a registro
             Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-              Text(tNoTienesCuenta, style: const TextStyle(color: kTextMuted, fontSize: 13)),
+              Text(tNoTienesCuenta, style: const TextStyle(color: RDSColor.textMuted, fontSize: 13)),
               GestureDetector(
                 onTap: () => Navigator.of(context).push(
                   MaterialPageRoute(builder: (_) => const RegisterScreen())),
                 child: Text(tCrearCuenta,
-                  style: const TextStyle(color: kGreen, fontSize: 13, fontWeight: FontWeight.w700))),
+                  style: const TextStyle(color: RDSColor.green, fontSize: 13, fontWeight: FontWeight.w700))),
             ]),
             const SizedBox(height: 16),
 
@@ -4207,7 +4222,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 MaterialPageRoute(builder: (_) => const MainShell()),
                 (route) => false),
               child: Text(t('Explorar sin cuenta →','Explore without account →'),
-                style: TextStyle(color: kTextMuted, fontSize: 12,
+                style: TextStyle(color: RDSColor.textMuted, fontSize: 12,
                   decoration: TextDecoration.underline))),
           ]))
         ]))
@@ -4256,9 +4271,38 @@ class _RegisterScreenState extends State<RegisterScreen> {
       if (cred == null) {
         setState(() => _error = AuthService._ultimoError ?? t('No se pudo crear la cuenta. Intenta de nuevo.','Could not create account. Please try again.'));
       } else {
-        Navigator.of(context, rootNavigator: true).pushAndRemoveUntil(
-          MaterialPageRoute(builder: (_) => const MainShell()),
-          (route) => false);
+        await showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (_) => AlertDialog(
+            backgroundColor: RDSColor.card,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            title: Row(children: [
+              const Icon(Icons.mark_email_unread_rounded, color: RDSColor.gold, size: 28),
+              const SizedBox(width: 12),
+              Text(t('Verifica tu correo', 'Verify your email'),
+                style: const TextStyle(color: RDSColor.textPrimary, fontSize: 18, fontWeight: FontWeight.w800)),
+            ]),
+            content: Text(
+              t('Te enviamos un correo de verificación. Verifica tu cuenta para acceder a todas las funciones.',
+                'We sent a verification email. Verify your account to access all features.'),
+              style: const TextStyle(color: RDSColor.textMuted, fontSize: 13, height: 1.5)),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                style: TextButton.styleFrom(
+                  backgroundColor: RDSColor.green,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                  child: Text(t('¡Vamos!', "Let's go!"),
+                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800)))),
+            ]));
+        if (mounted) {
+          Navigator.of(context, rootNavigator: true).pushAndRemoveUntil(
+            MaterialPageRoute(builder: (_) => const MainShell()),
+            (route) => false);
+        }
       }
     }
   }
@@ -4266,53 +4310,80 @@ class _RegisterScreenState extends State<RegisterScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: RDSColor.base,
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter,
-            colors: [Color(0xFF080C06), Color(0xFF0F1A08), Color(0xFF080C06)])),
-        child: SafeArea(child: SingleChildScrollView(
-          padding: const EdgeInsets.all(28),
+      backgroundColor: const Color(0xFF060A04),
+      body: Stack(children: [
+        // ── Hero header cinematográfico ──
+        Positioned(top: 0, left: 0, right: 0, height: 200,
+          child: Stack(fit: StackFit.expand, children: [
+            Image.asset('assets/images/rutas/ruta_17_feria_flores.jpg',
+              fit: BoxFit.cover, cacheWidth: 600,
+              errorBuilder: (_, __, ___) => Container(color: const Color(0xFF0D200A))),
+            Container(decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter, end: Alignment.bottomCenter,
+                stops: [0.0, 0.4, 1.0],
+                colors: [Color(0x44000000), Colors.transparent, Color(0xFF060A04)]))),
+          ])),
+
+        // ── Contenido scrolleable ──
+        SafeArea(child: SingleChildScrollView(
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            GestureDetector(onTap: () => Navigator.pop(context),
-              child: Container(width: 36, height: 36,
-                decoration: BoxDecoration(color: RDSColor.card, shape: BoxShape.circle),
-                child: const Center(child: Text('←', style: TextStyle(color: kText, fontSize: 16))))),
-            const SizedBox(height: 24),
-            Text(tCrearCuenta,
-              style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w900, color: RDSColor.textPrimary)),
-            const SizedBox(height: 4),
-            Text(tUneteRuteros,
-              style: const TextStyle(fontSize: 13, color: RDSColor.textMuted)),
-            const SizedBox(height: 32),
+            // Botón atrás sobre la foto
+            Padding(padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
+              child: GestureDetector(onTap: () => Navigator.pop(context),
+                child: Container(width: 38, height: 38,
+                  decoration: BoxDecoration(
+                    color: Colors.black.withOpacity(0.45),
+                    shape: BoxShape.circle,
+                    border: Border.all(color: Colors.white.withOpacity(0.15))),
+                  child: const Center(child: Icon(
+                    Icons.arrow_back_ios_new_rounded,
+                    color: Colors.white, size: 16))))),
 
-            _InputField(ctrl: _nombreCtrl, hint: 'Nombre completo', emoji: '👤'),
-            const SizedBox(height: 12),
-            _InputField(ctrl: _emailCtrl, hint: tCorreo,
-              emoji: '📧', keyboardType: TextInputType.emailAddress),
-            const SizedBox(height: 12),
-            _InputField(ctrl: _passCtrl, hint: 'Contraseña (mín. 8 caracteres)',
-              emoji: '🔒', obscure: true),
-            const SizedBox(height: 12),
-            _InputField(ctrl: _pass2Ctrl, hint: 'Confirmar contraseña',
-              emoji: '🔒', obscure: true),
-            const SizedBox(height: 8),
+            const SizedBox(height: 120), // espacio para la foto
 
-            if (_error.isNotEmpty)
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: RDSColor.accent.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: RDSColor.accent.withOpacity(0.3))),
-                child: Text(_error, style: const TextStyle(color: kAccent, fontSize: 12))),
-            const SizedBox(height: 20),
+            Padding(padding: const EdgeInsets.fromLTRB(28, 0, 28, 40),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text(tCrearCuenta,
+                  style: const TextStyle(
+                    fontFamily: 'PlayfairDisplay',
+                    fontSize: 30, fontWeight: FontWeight.w900,
+                    color: RDSColor.textPrimary)),
+                const SizedBox(height: 4),
+                Text(tUneteRuteros,
+                  style: const TextStyle(fontSize: 13, color: RDSColor.textMuted)),
+                const SizedBox(height: 28),
 
-            _GoldButton(
-              label: _cargando ? 'Creando cuenta...' : 'CREAR MI CUENTA',
-              onTap: _cargando ? () {} : _registrar),
-          ])))));
+                _InputField(ctrl: _nombreCtrl, hint: 'Nombre completo', emoji: '👤'),
+                const SizedBox(height: 12),
+                _InputField(ctrl: _emailCtrl, hint: tCorreo,
+                  emoji: '📧', keyboardType: TextInputType.emailAddress),
+                const SizedBox(height: 12),
+                _InputField(ctrl: _passCtrl, hint: 'Contraseña (mín. 8 caracteres)',
+                  emoji: '🔒', obscure: true),
+                const SizedBox(height: 12),
+                _InputField(ctrl: _pass2Ctrl, hint: 'Confirmar contraseña',
+                  emoji: '🔒', obscure: true),
+                const SizedBox(height: 8),
+
+                if (_error.isNotEmpty)
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: RDSColor.accent.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: RDSColor.accent.withOpacity(0.3))),
+                    child: Text(_error,
+                      style: const TextStyle(color: RDSColor.accent, fontSize: 12))),
+                const SizedBox(height: 20),
+
+                _GoldButton(
+                  label: _cargando ? 'Creando cuenta...' : 'CREAR MI CUENTA',
+                  onTap: _cargando ? () {} : _registrar),
+              ])),
+          ])))
+      ]));
   }
 }
 
@@ -4341,7 +4412,7 @@ Future<bool?> mostrarBottomSheetConversion(BuildContext context) async {
         const SizedBox(height: 12),
         Text(
           t('¡Estás en el lugar!', "You're at the spot!"),
-          style: const TextStyle(color: kText, fontSize: 22, fontWeight: FontWeight.w900),
+          style: const TextStyle(color: RDSColor.textPrimary, fontSize: 22, fontWeight: FontWeight.w900),
           textAlign: TextAlign.center),
         const SizedBox(height: 8),
         Text(
@@ -4349,7 +4420,7 @@ Future<bool?> mostrarBottomSheetConversion(BuildContext context) async {
             'Crea una cuenta gratis para guardar tu progreso,\ninsignias y puntos.',
             'Create a free account to save your progress,\nbadges and points.',
           ),
-          style: const TextStyle(color: kTextMuted, fontSize: 14, height: 1.5),
+          style: const TextStyle(color: RDSColor.textMuted, fontSize: 14, height: 1.5),
           textAlign: TextAlign.center),
         const SizedBox(height: 28),
         // Botón principal — Registrarse
@@ -4379,7 +4450,7 @@ Future<bool?> mostrarBottomSheetConversion(BuildContext context) async {
             child: Text(
               t('Ya tengo cuenta — Iniciar sesión', 'I have an account — Sign in'),
               textAlign: TextAlign.center,
-              style: const TextStyle(color: kTextMuted, fontSize: 14, fontWeight: FontWeight.w600)))),
+              style: const TextStyle(color: RDSColor.textMuted, fontSize: 14, fontWeight: FontWeight.w600)))),
         const SizedBox(height: 12),
         // Escape — continuar sin guardar
         GestureDetector(
@@ -4410,9 +4481,9 @@ class _InputField extends StatelessWidget {
       border: Border.all(color: Colors.white.withOpacity(0.08))),
     child: TextField(
       controller: ctrl, obscureText: obscure, keyboardType: keyboardType,
-      style: const TextStyle(color: kText, fontSize: 14),
+      style: const TextStyle(color: RDSColor.textPrimary, fontSize: 14),
       decoration: InputDecoration(
-        hintText: hint, hintStyle: const TextStyle(color: kTextMuted, fontSize: 13),
+        hintText: hint, hintStyle: const TextStyle(color: RDSColor.textMuted, fontSize: 13),
         prefixIcon: Padding(padding: const EdgeInsets.all(12),
           child: Text(emoji, style: const TextStyle(fontSize: 16))),
         suffixIcon: suffix != null ? Padding(padding: const EdgeInsets.all(12), child: suffix) : null,
@@ -4453,96 +4524,181 @@ class _LangSelectScreenState extends State<LangSelectScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: RDSColor.base,
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft, end: Alignment.bottomRight,
-            colors: [Color(0xFF060A04), RDSColor.base, Color(0xFF060A04)])),
-        child: SafeArea(child: Padding(
-          padding: const EdgeInsets.all(32),
-          child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-            // Logo
-            Container(width: 90, height: 90,
-              decoration: BoxDecoration(shape: BoxShape.circle,
-                boxShadow: [BoxShadow(color: RDSColor.green.withOpacity(0.3), blurRadius: 30)]),
-              child: ClipRRect(borderRadius: BorderRadius.circular(90),
-                child: Image.asset('assets/images/logo_splash.png', fit: BoxFit.cover,
-                  errorBuilder: (_, __, ___) => const Text('🌿', style: TextStyle(fontSize: 36))))),
-            const SizedBox(height: 24),
-            const Text('RUTERO MDE', style: TextStyle(
-              fontSize: 28, fontWeight: FontWeight.w900, color: RDSColor.textPrimary, letterSpacing: 6)),
-            const SizedBox(height: 8),
-            const Text('🌐  Choose your language / Elige tu idioma',
-              style: TextStyle(color: kTextMuted, fontSize: 13), textAlign: TextAlign.center),
-            const SizedBox(height: 40),
-            // Opción Español
-            GestureDetector(
-              onTap: () => setState(() => _selected = 'es'),
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 200),
-                width: double.infinity,
-                padding: const EdgeInsets.all(18),
-                margin: const EdgeInsets.only(bottom: 14),
-                decoration: BoxDecoration(
-                  color: _selected == 'es' ? kGreen.withOpacity(0.15) : kCard,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(
-                    color: _selected == 'es' ? kGreen : Colors.white.withOpacity(0.08),
-                    width: _selected == 'es' ? 2 : 1)),
-                child: Row(children: [
-                  const Text('🇨🇴', style: TextStyle(fontSize: 32)),
-                  const SizedBox(width: 16),
-                  Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    const Text('Español', style: TextStyle(color: kText, fontSize: 18, fontWeight: FontWeight.w700)),
-                    const Text('Continúa en español', style: TextStyle(color: kTextMuted, fontSize: 12)),
-                  ])),
-                  if (_selected == 'es')
-                    Container(width: 24, height: 24,
-                      decoration: const BoxDecoration(shape: BoxShape.circle, color: RDSColor.green),
-                      child: const Center(child: Text('✓', style: TextStyle(color: Colors.white, fontSize: 14)))),
-                ]))),
-            // Opción English
-            GestureDetector(
-              onTap: () => setState(() => _selected = 'en'),
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 200),
-                width: double.infinity,
-                padding: const EdgeInsets.all(18),
-                decoration: BoxDecoration(
-                  color: _selected == 'en' ? const Color(0xFF1565C0).withOpacity(0.15) : kCard,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(
-                    color: _selected == 'en' ? const Color(0xFF4A90D9) : Colors.white.withOpacity(0.08),
-                    width: _selected == 'en' ? 2 : 1)),
-                child: Row(children: [
-                  const Text('🇺🇸', style: TextStyle(fontSize: 32)),
-                  const SizedBox(width: 16),
-                  Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    const Text('English', style: TextStyle(color: kText, fontSize: 18, fontWeight: FontWeight.w700)),
-                    const Text('Continue in English', style: TextStyle(color: kTextMuted, fontSize: 12)),
-                  ])),
-                  if (_selected == 'en')
-                    Container(width: 24, height: 24,
-                      decoration: const BoxDecoration(shape: BoxShape.circle, color: Color(0xFF4A90D9)),
-                      child: const Center(child: Text('✓', style: TextStyle(color: Colors.white, fontSize: 14)))),
-                ]))),
-            const SizedBox(height: 40),
-            // Botón continuar
-            GestureDetector(
-              onTap: _continuar,
-              child: Container(
-                width: double.infinity,
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(colors: [RDSColor.green, kGreen.withOpacity(0.7)]),
-                  borderRadius: BorderRadius.circular(14),
-                  boxShadow: [BoxShadow(color: RDSColor.green.withOpacity(0.3), blurRadius: 20, offset: const Offset(0, 8))]),
-                child: Text(
-                  _selected == 'es' ? 'CONTINUAR  →' : 'CONTINUE  →',
+      backgroundColor: const Color(0xFF060A04),
+      body: Stack(children: [
+
+        // ── Fondo: 2 fotos divididas verticalmente ──
+        Positioned(top: 0, left: 0, right: 0,
+          height: MediaQuery.of(context).size.height * 0.45,
+          child: Row(children: [
+            Expanded(child: Image.asset('assets/images/rutas/ruta_17_feria_flores.jpg',
+              fit: BoxFit.cover, cacheWidth: 400,
+              errorBuilder: (_, __, ___) => Container(color: const Color(0xFF0D200A)))),
+            const SizedBox(width: 2),
+            Expanded(child: Image.asset('assets/images/rutas/ruta_09_guatape.jpg',
+              fit: BoxFit.cover, cacheWidth: 400,
+              errorBuilder: (_, __, ___) => Container(color: const Color(0xFF0A1510)))),
+          ])),
+
+        // ── Overlay cinematográfico ──
+        Positioned.fill(child: Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter, end: Alignment.bottomCenter,
+              stops: [0.0, 0.20, 0.45, 0.65, 1.0],
+              colors: [
+                Color(0x55000000),
+                Color(0x22000000),
+                Color(0x88060A04),
+                Color(0xEE060A04),
+                Color(0xFF060A04),
+              ])))),
+
+        // ── Contenido anclado abajo ──
+        Positioned(bottom: 0, left: 0, right: 0,
+          child: SafeArea(top: false,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(28, 0, 28, 32),
+              child: Column(mainAxisSize: MainAxisSize.min, children: [
+
+                // Logo + título
+                Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                  Container(width: 48, height: 48,
+                    decoration: BoxDecoration(shape: BoxShape.circle,
+                      boxShadow: [BoxShadow(color: RDSColor.green.withOpacity(0.4), blurRadius: 20)]),
+                    child: ClipRRect(borderRadius: BorderRadius.circular(48),
+                      child: Image.asset('assets/images/logo_splash.png', fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => const Icon(Icons.explore_rounded,
+                          color: RDSColor.green, size: 28)))),
+                  const SizedBox(width: 12),
+                  const Text('RUTERO MDE',
+                    style: TextStyle(
+                      fontFamily: 'PlayfairDisplay',
+                      fontSize: 24, fontWeight: FontWeight.w900,
+                      color: RDSColor.textPrimary, letterSpacing: 2)),
+                ]),
+
+                const SizedBox(height: 8),
+
+                Text('Choose your language  ·  Elige tu idioma',
                   textAlign: TextAlign.center,
-                  style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w800, letterSpacing: 1)))),
-          ])))));
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: RDSColor.textMuted.withOpacity(0.7),
+                    letterSpacing: 0.3)),
+
+                const SizedBox(height: 28),
+
+                // Opción Español
+                GestureDetector(
+                  onTap: () => setState(() => _selected = 'es'),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(18),
+                    margin: const EdgeInsets.only(bottom: 12),
+                    decoration: BoxDecoration(
+                      color: _selected == 'es'
+                        ? RDSColor.green.withOpacity(0.12)
+                        : Colors.white.withOpacity(0.04),
+                      borderRadius: BorderRadius.circular(18),
+                      border: Border.all(
+                        color: _selected == 'es'
+                          ? RDSColor.green.withOpacity(0.6)
+                          : Colors.white.withOpacity(0.08),
+                        width: _selected == 'es' ? 1.5 : 1),
+                      boxShadow: _selected == 'es' ? [
+                        BoxShadow(color: RDSColor.green.withOpacity(0.12),
+                          blurRadius: 16, offset: const Offset(0, 4))
+                      ] : []),
+                    child: Row(children: [
+                      const Text('🇨🇴', style: TextStyle(fontSize: 28)),
+                      const SizedBox(width: 16),
+                      Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                        const Text('Español',
+                          style: TextStyle(fontFamily: 'SpaceGrotesk',
+                            color: RDSColor.textPrimary, fontSize: 16, fontWeight: FontWeight.w800)),
+                        const SizedBox(height: 2),
+                        Text('Continúa en español',
+                          style: TextStyle(color: RDSColor.textMuted.withOpacity(0.7), fontSize: 11)),
+                      ])),
+                      if (_selected == 'es')
+                        Container(width: 22, height: 22,
+                          decoration: const BoxDecoration(
+                            shape: BoxShape.circle, color: RDSColor.green),
+                          child: const Center(child: Icon(
+                            Icons.check_rounded, color: Colors.white, size: 14))),
+                    ]))),
+
+                // Opción English
+                GestureDetector(
+                  onTap: () => setState(() => _selected = 'en'),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(18),
+                    decoration: BoxDecoration(
+                      color: _selected == 'en'
+                        ? const Color(0xFF1565C0).withOpacity(0.12)
+                        : Colors.white.withOpacity(0.04),
+                      borderRadius: BorderRadius.circular(18),
+                      border: Border.all(
+                        color: _selected == 'en'
+                          ? const Color(0xFF4A90D9).withOpacity(0.6)
+                          : Colors.white.withOpacity(0.08),
+                        width: _selected == 'en' ? 1.5 : 1),
+                      boxShadow: _selected == 'en' ? [
+                        BoxShadow(color: const Color(0xFF4A90D9).withOpacity(0.12),
+                          blurRadius: 16, offset: const Offset(0, 4))
+                      ] : []),
+                    child: Row(children: [
+                      const Text('🇺🇸', style: TextStyle(fontSize: 28)),
+                      const SizedBox(width: 16),
+                      Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                        const Text('English',
+                          style: TextStyle(fontFamily: 'SpaceGrotesk',
+                            color: RDSColor.textPrimary, fontSize: 16, fontWeight: FontWeight.w800)),
+                        const SizedBox(height: 2),
+                        Text('Continue in English',
+                          style: TextStyle(color: RDSColor.textMuted.withOpacity(0.7), fontSize: 11)),
+                      ])),
+                      if (_selected == 'en')
+                        Container(width: 22, height: 22,
+                          decoration: const BoxDecoration(
+                            shape: BoxShape.circle, color: Color(0xFF4A90D9)),
+                          child: const Center(child: Icon(
+                            Icons.check_rounded, color: Colors.white, size: 14))),
+                    ]))),
+
+                const SizedBox(height: 28),
+
+                // Botón continuar
+                GestureDetector(
+                  onTap: _continuar,
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(vertical: 17),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [RDSColor.green, RDSColor.green.withOpacity(0.75)]),
+                      borderRadius: BorderRadius.circular(18),
+                      boxShadow: [BoxShadow(
+                        color: RDSColor.green.withOpacity(0.35),
+                        blurRadius: 24, offset: const Offset(0, 6))]),
+                    child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                      Text(
+                        _selected == 'es' ? 'CONTINUAR' : 'CONTINUE',
+                        style: const TextStyle(
+                          fontFamily: 'SpaceGrotesk',
+                          color: Colors.white, fontSize: 15,
+                          fontWeight: FontWeight.w900, letterSpacing: 1)),
+                      const SizedBox(width: 8),
+                      const Icon(Icons.arrow_forward_rounded,
+                        color: Colors.white, size: 18),
+                    ]))),
+              ])))),
+      ])
+    );
   }
 }
 
@@ -4655,7 +4811,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                 width: _paginaActual == i ? 24 : 8,
                 height: 8,
                 decoration: BoxDecoration(
-                  color: _paginaActual == i ? kGold : Colors.white.withOpacity(0.3),
+                  color: _paginaActual == i ? RDSColor.gold : Colors.white.withOpacity(0.3),
                   borderRadius: BorderRadius.circular(4))),
           ])),
 
@@ -4728,7 +4884,7 @@ class _Pagina1 extends StatelessWidget {
                 border: Border.all(color: RDSColor.gold.withOpacity(0.4))),
               child: Text('🌹 ${t("Medellín", "Medellín")}',
                 style: const TextStyle(
-                  color: kGold, fontSize: 12, fontWeight: FontWeight.w700,
+                  color: RDSColor.gold, fontSize: 12, fontWeight: FontWeight.w700,
                   letterSpacing: 0.5))),
             const SizedBox(height: 16),
             // Título
@@ -4798,10 +4954,10 @@ class _Pagina2 extends StatelessWidget {
                   child: Container(
                     width: 52, height: 52,
                     decoration: BoxDecoration(
-                      color: esPin ? kGold.withOpacity(0.15) : Colors.white.withOpacity(0.06),
+                      color: esPin ? RDSColor.gold.withOpacity(0.15) : Colors.white.withOpacity(0.06),
                       borderRadius: BorderRadius.circular(14),
                       border: Border.all(
-                        color: esPin ? kGold.withOpacity(0.5) : Colors.white.withOpacity(0.1))),
+                        color: esPin ? RDSColor.gold.withOpacity(0.5) : Colors.white.withOpacity(0.1))),
                     child: Center(child: Text(paso['emoji']!,
                       style: const TextStyle(fontSize: 22))))),
                 const SizedBox(width: 16),
@@ -4824,7 +4980,7 @@ class _Pagina2 extends StatelessWidget {
                           border: Border.all(color: RDSColor.green.withOpacity(0.4))),
                         child: Text(t('✓ Validado', '✓ Validated'),
                           style: const TextStyle(
-                            color: kGreen, fontSize: 11,
+                            color: RDSColor.green, fontSize: 11,
                             fontWeight: FontWeight.w700))))),
               ]));
           }),
@@ -4943,7 +5099,8 @@ class _Pagina4 extends StatelessWidget {
           const SizedBox(height: 40),
           // Botón Google
           _AuthButton(
-            icon: '🔵',
+            icon: '',
+            materialIcon: Icons.g_mobiledata_rounded,
             label: t('Continuar con Google', 'Continue with Google'),
             color: Colors.white,
             textColor: RDSColor.base,
@@ -4966,10 +5123,10 @@ class _Pagina4 extends StatelessWidget {
               child: Text(t('¿Ya tenés cuenta? Iniciá sesión',
                            'Already have an account? Sign in'),
                 style: TextStyle(
-                  color: kGold, fontSize: 13,
+                  color: RDSColor.gold, fontSize: 13,
                   fontWeight: FontWeight.w600,
                   decoration: TextDecoration.underline,
-                  decorationColor: kGold)))),
+                  decorationColor: RDSColor.gold)))),
           const SizedBox(height: 60),
         ]));
   }
@@ -4980,10 +5137,11 @@ class _AuthButton extends StatelessWidget {
   final Color color, textColor;
   final bool border;
   final VoidCallback onTap;
+  final IconData? materialIcon;
   const _AuthButton({
     required this.icon, required this.label,
     required this.color, required this.textColor,
-    required this.onTap, this.border = false});
+    required this.onTap, this.border = false, this.materialIcon});
 
   @override
   Widget build(BuildContext context) => GestureDetector(
@@ -4996,7 +5154,10 @@ class _AuthButton extends StatelessWidget {
         borderRadius: BorderRadius.circular(16),
         border: border ? Border.all(color: Colors.white.withOpacity(0.2)) : null),
       child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-        Text(icon, style: const TextStyle(fontSize: 18)),
+        if (materialIcon != null)
+          Icon(materialIcon, size: 20, color: textColor)
+        else
+          Text(icon, style: const TextStyle(fontSize: 18)),
         const SizedBox(width: 10),
         Text(label, style: TextStyle(
           color: textColor, fontSize: 15,
@@ -5077,18 +5238,18 @@ class _BetaWelcomeScreenState extends State<BetaWelcomeScreen>
               color: RDSColor.gold.withOpacity(0.12), borderRadius: BorderRadius.circular(20),
               border: Border.all(color: RDSColor.gold.withOpacity(0.4))),
             child: Text(t('🌿 ACCESO GRATUITO · Lanzamiento oficial', '🌿 FREE ACCESS · Official launch'),
-              style: TextStyle(color: kGold, fontSize: 11, fontWeight: FontWeight.w700, letterSpacing: 1))),
+              style: TextStyle(color: RDSColor.gold, fontSize: 11, fontWeight: FontWeight.w700, letterSpacing: 1))),
           const SizedBox(height: 32),
           const Text('🌿', style: TextStyle(fontSize: 64)),
           const SizedBox(height: 20),
           Text(t('Bienvenido a Rutero MDE', 'Welcome to Rutero MDE'),
-            style: const TextStyle(color: kText, fontSize: 26, fontWeight: FontWeight.w900),
+            style: const TextStyle(color: RDSColor.textPrimary, fontSize: 26, fontWeight: FontWeight.w900),
             textAlign: TextAlign.center),
           const SizedBox(height: 12),
           Text(
             t('Explora Medellín con rutas GPS, gana insignias y desbloquea recompensas reales en negocios locales.',
               'Explore Medellín with GPS routes, earn badges and unlock real rewards at local businesses.'),
-            style: const TextStyle(color: kTextMuted, fontSize: 14, height: 1.6),
+            style: const TextStyle(color: RDSColor.textMuted, fontSize: 14, height: 1.6),
             textAlign: TextAlign.center),
           const SizedBox(height: 32),
           _BetaChip(emoji: '🎁', texto: t('Todas las rutas disponibles de forma gratuita', 'All routes available for free')),
@@ -5105,7 +5266,7 @@ class _BetaWelcomeScreenState extends State<BetaWelcomeScreen>
               width: double.infinity,
               padding: const EdgeInsets.symmetric(vertical: 16),
               decoration: BoxDecoration(
-                gradient: LinearGradient(colors: [RDSColor.green, kGreen.withOpacity(0.7)]),
+                gradient: LinearGradient(colors: [RDSColor.green, RDSColor.green.withOpacity(0.7)]),
                 borderRadius: BorderRadius.circular(16)),
               child: Text(t('¡Empezar a explorar!', 'Start exploring!'),
                 style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w900),
@@ -5132,8 +5293,7 @@ class _BetaWelcomeScreenState extends State<BetaWelcomeScreen>
                   boxShadow: [BoxShadow(
                     color: const Color(0xFF1565C0).withOpacity(0.4),
                     blurRadius: 8)]),
-                child: const Center(child: Text('🏛️',
-                  style: TextStyle(fontSize: 16)))),
+                child: const Center(child: Icon(Icons.account_balance_rounded, color: Colors.white, size: 16))),
               const SizedBox(width: 10),
               Column(crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min, children: [
@@ -5174,7 +5334,7 @@ class _BetaChip extends StatelessWidget {
     child: Row(children: [
       Text(emoji, style: const TextStyle(fontSize: 16)),
       const SizedBox(width: 10),
-      Expanded(child: Text(texto, style: const TextStyle(color: kText, fontSize: 12, height: 1.4))),
+      Expanded(child: Text(texto, style: const TextStyle(color: RDSColor.textPrimary, fontSize: 12, height: 1.4))),
     ]));
 }
 
@@ -5472,7 +5632,7 @@ class ServiciosScreen extends StatelessWidget {
     try {
       color = Color(int.parse(colorHex.replaceAll('#', '0xFF')));
     } catch (_) {
-      color = kGreen;
+      color = RDSColor.green;
     }
 
     return Container(
@@ -5498,7 +5658,7 @@ class ServiciosScreen extends StatelessWidget {
               : Center(child: Text(emoji, style: const TextStyle(fontSize: 22))))),
           const SizedBox(width: 12),
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(nombre, style: const TextStyle(color: kText, fontSize: 14, fontWeight: FontWeight.w800)),
+            Text(nombre, style: const TextStyle(color: RDSColor.textPrimary, fontSize: 14, fontWeight: FontWeight.w800)),
             Text(empresa, style: TextStyle(color: color, fontSize: 11, fontWeight: FontWeight.w700)),
           ])),
         ]),
@@ -5570,7 +5730,7 @@ class ServiciosScreen extends StatelessWidget {
                   decoration: BoxDecoration(
                     color: Colors.white.withOpacity(0.06), shape: BoxShape.circle,
                     border: Border.all(color: RDSColor.gold.withOpacity(0.2))),
-                  child: const Center(child: Text('←', style: TextStyle(color: kText, fontSize: 16))))),
+                  child: const Center(child: Icon(Icons.arrow_back_ios_new_rounded, color: RDSColor.textPrimary, size: 18)))),
               const SizedBox(width: 12),
               Expanded(child: Text(t('Servicios para viajeros', 'Traveler services'),
                 style: const TextStyle(fontFamily: 'PlayfairDisplay',
@@ -5582,7 +5742,7 @@ class ServiciosScreen extends StatelessWidget {
           children: [
             Text(t('Servicios verificados por Rutero MDE', 'Services verified by Rutero MDE'),
               style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w900,
-                color: kTextMuted, letterSpacing: 1.5)),
+                color: RDSColor.textMuted, letterSpacing: 1.5)),
             const SizedBox(height: 4),
             Text(t('Contacta directamente por WhatsApp — di que vienes de Rutero MDE',
                 'Contact directly via WhatsApp — mention you come from Rutero MDE'),
@@ -5632,7 +5792,7 @@ class ServiciosScreen extends StatelessWidget {
                   borderRadius: BorderRadius.circular(16),
                   border: Border.all(color: RDSColor.gold.withOpacity(0.35)),
                   gradient: LinearGradient(
-                    colors: [kGold.withOpacity(0.06), kCard],
+                    colors: [RDSColor.gold.withOpacity(0.06), RDSColor.card],
                     begin: Alignment.topLeft, end: Alignment.bottomRight)),
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   Row(children: [
@@ -5640,7 +5800,7 @@ class ServiciosScreen extends StatelessWidget {
                     const SizedBox(width: 10),
                     Expanded(child: Text(
                       t('¿Tenés un servicio para viajeros?', 'Do you offer a traveler service?'),
-                      style: const TextStyle(color: kGold, fontSize: 14, fontWeight: FontWeight.w900))),
+                      style: const TextStyle(color: RDSColor.gold, fontSize: 14, fontWeight: FontWeight.w900))),
                   ]),
                   const SizedBox(height: 8),
                   Text(
@@ -5659,7 +5819,7 @@ class ServiciosScreen extends StatelessWidget {
                       const Text('✉️', style: TextStyle(fontSize: 15)),
                       const SizedBox(width: 8),
                       Text(t('Contáctanos — paulflopezp@gmail.com', 'Contact us — paulflopezp@gmail.com'),
-                        style: const TextStyle(color: kGold, fontSize: 12, fontWeight: FontWeight.w800)),
+                        style: const TextStyle(color: RDSColor.gold, fontSize: 12, fontWeight: FontWeight.w800)),
                     ])),
                 ]))),
           ])),
@@ -5710,8 +5870,54 @@ class PlannerScreen extends StatefulWidget {
 }
 
 class _PlannerScreenState extends State<PlannerScreen> {
+  int _paso = 0;
+  Map<String, dynamic>? _itinerarioPrevio;
+  int _diasPrevio = 1;
+  bool _cargandoPrevio = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _cargarItinerarioPrevio();
+  }
+
+  Future<void> _cargarItinerarioPrevio() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final json = prefs.getString('planner_ultimo_itinerario');
+      final dias = prefs.getInt('planner_ultimo_dias') ?? 1;
+      if (json != null && mounted) {
+        setState(() {
+          _itinerarioPrevio = jsonDecode(json) as Map<String, dynamic>;
+          _diasPrevio = dias;
+        });
+      }
+    } catch (e) {
+      debugPrint('Planner previo: $e');
+    } finally {
+      if (mounted) setState(() => _cargandoPrevio = false);
+    }
+  }
+
+  Future<void> _guardarItinerario(Map<String, dynamic> data, int dias) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('planner_ultimo_itinerario', jsonEncode(data));
+      await prefs.setInt('planner_ultimo_dias', dias);
+    } catch (e) { debugPrint('Planner guardar: $e'); }
+  }
+
+  Future<void> _borrarItinerarioPrevio() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove('planner_ultimo_itinerario');
+      await prefs.remove('planner_ultimo_dias');
+      if (mounted) setState(() => _itinerarioPrevio = null);
+    } catch (_) {}
+  }
+
   // ── Estado del formulario ──────────────────────────────────────────
-  int _paso = 0;  // 0-3 = form, 4 = resumen
+  // _paso: 0-3 = form, 4 = resumen
 
   // Paso 0 — Cuándo y cuánto
   int _dias = 1;
@@ -5866,6 +6072,7 @@ Respond ONLY with valid JSON (no markdown):
       MaterialPageRoute(builder: (_) => _PlannerLoadingScreen(prompt: prompt)));
 
     if (result != null && mounted) {
+      await _guardarItinerario(result, _dias);
       Navigator.of(context).pushReplacement(MaterialPageRoute(
         builder: (_) => _PlannerResultScreen(data: result, dias: _dias)));
     }
@@ -6535,8 +6742,8 @@ class _DateSelector extends StatelessWidget {
           builder: (ctx, child) => Theme(
             data: Theme.of(ctx).copyWith(
               colorScheme: ColorScheme.dark(
-                primary: kGold, onPrimary: Colors.black,
-                surface: kCard, onSurface: kText)),
+                primary: RDSColor.gold, onPrimary: Colors.black,
+                surface: RDSColor.card, onSurface: RDSColor.textPrimary)),
             child: child!));
         if (picked != null) onChanged(picked);
       },
@@ -6574,16 +6781,16 @@ class _PlannerLoadingScreenState extends State<_PlannerLoadingScreen>
   late Animation<double> _anim;
   int _msgIdx = 0;
   final List<String> _msgs = [
-    '🗺️  Analizando 45+ rutas de Medellín...',
-    '📍  Calculando distancias desde tu hotel...',
-    '🎯  Combinando tus intereses...',
-    '✨  Armando tu itinerario perfecto...',
+    'Analizando 45+ rutas de Medellín...',
+    'Calculando distancias desde tu hotel...',
+    'Combinando tus intereses...',
+    'Armando tu itinerario perfecto...',
   ];
   final List<String> _msgsEN = [
-    '🗺️  Analyzing 45+ Medellín routes...',
-    '📍  Calculating distances from your hotel...',
-    '🎯  Matching your interests...',
-    '✨  Building your perfect itinerary...',
+    'Analyzing 45+ Medellín routes...',
+    'Calculating distances from your hotel...',
+    'Matching your interests...',
+    'Building your perfect itinerary...',
   ];
 
   @override
@@ -6656,9 +6863,9 @@ class _PlannerLoadingScreenState extends State<_PlannerLoadingScreen>
             child: Container(width: 80, height: 80,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                border: Border.all(color: kGold, width: 2),
+                border: Border.all(color: RDSColor.gold, width: 2),
                 boxShadow: [BoxShadow(color: RDSColor.gold.withOpacity(0.3), blurRadius: 20)]),
-              child: const Center(child: Text('🗓️', style: TextStyle(fontSize: 36)))))),
+              child: const Center(child: Icon(Icons.auto_awesome_rounded, color: RDSColor.gold, size: 36))))),
           const SizedBox(height: 40),
           Text(t('ARMANDO TU ITINERARIO', 'BUILDING YOUR ITINERARY'),
             style: const TextStyle(fontFamily: 'PlayfairDisplay',
@@ -6681,7 +6888,7 @@ class _PlannerLoadingScreenState extends State<_PlannerLoadingScreen>
             borderRadius: BorderRadius.circular(4),
             child: const LinearProgressIndicator(
               backgroundColor: Color(0xFF1A2A1A),
-              valueColor: AlwaysStoppedAnimation<Color>(kGold),
+              valueColor: AlwaysStoppedAnimation<Color>(RDSColor.gold),
               minHeight: 3)),
         ]))));
   }
@@ -6720,8 +6927,7 @@ class _PlannerResultScreen extends StatelessWidget {
                     decoration: BoxDecoration(
                       color: Colors.white.withOpacity(0.06), shape: BoxShape.circle,
                       border: Border.all(color: RDSColor.gold.withOpacity(0.2))),
-                    child: const Center(child: Text('←',
-                      style: TextStyle(color: kText, fontSize: 16))))),
+                    child: const Center(child: Icon(Icons.arrow_back_ios_new_rounded, color: RDSColor.textPrimary, size: 18)))),
                 const SizedBox(width: 12),
                 Expanded(child: Text(t('TU ITINERARIO', 'YOUR ITINERARY'),
                   style: const TextStyle(fontFamily: 'PlayfairDisplay',
@@ -6747,7 +6953,7 @@ class _PlannerResultScreen extends StatelessWidget {
                       const Icon(Icons.share_outlined, color: RDSColor.gold, size: 14),
                       const SizedBox(width: 5),
                       Text(t('Compartir', 'Share'),
-                        style: const TextStyle(color: kGold, fontSize: 12,
+                        style: const TextStyle(color: RDSColor.gold, fontSize: 12,
                           fontWeight: FontWeight.w700)),
                     ]))),
               ]),
@@ -6771,13 +6977,13 @@ class _PlannerResultScreen extends StatelessWidget {
                   color: RDSColor.card,
                   borderRadius: BorderRadius.circular(16),
                   border: Border.all(
-                    color: esFeria ? kFeriaRojo.withOpacity(0.4) : kGold.withOpacity(0.15))),
+                    color: esFeria ? kFeriaRojo.withOpacity(0.4) : RDSColor.gold.withOpacity(0.15))),
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   // Header del día
                   Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      color: esFeria ? kFeriaRojo.withOpacity(0.1) : kGold.withOpacity(0.08),
+                      color: esFeria ? kFeriaRojo.withOpacity(0.1) : RDSColor.gold.withOpacity(0.08),
                       borderRadius: const BorderRadius.vertical(top: Radius.circular(16))),
                     child: Row(children: [
                       Text(esFeria ? '🌹' : '📅', style: const TextStyle(fontSize: 20)),
@@ -6785,7 +6991,7 @@ class _PlannerResultScreen extends StatelessWidget {
                       Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                         Text(
                           '${t("DÍA", "DAY")} ${dia['numero']}',
-                          style: TextStyle(fontSize: 10, color: esFeria ? kFeriaRojo : kGold,
+                          style: TextStyle(fontSize: 10, color: esFeria ? kFeriaRojo : RDSColor.gold,
                             fontWeight: FontWeight.w800, letterSpacing: 1.5)),
                         Text(dia['fecha']?.toString() ?? '',
                           style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: RDSColor.textPrimary)),
@@ -6842,7 +7048,7 @@ class _PlannerResultScreen extends StatelessWidget {
                             Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                               Text(rutaNombre,
                                 style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800,
-                                  color: kText)),
+                                  color: RDSColor.textPrimary)),
                               const SizedBox(height: 4),
                               Text(b['descripcion']?.toString() ?? '',
                                 style: const TextStyle(fontSize: 12, color: RDSColor.textMuted, height: 1.4)),
@@ -6851,8 +7057,8 @@ class _PlannerResultScreen extends StatelessWidget {
                                 spacing: 6,
                                 runSpacing: 6,
                                 children: [
-                                  _PlannerChip('⏱️ ${b['duracion'] ?? ''}', kGold),
-                                  _PlannerChip('💵 ${b['precio'] ?? ''}', kGreen),
+                                  _PlannerChip('⏱️ ${b['duracion'] ?? ''}', RDSColor.gold),
+                                  _PlannerChip('💵 ${b['precio'] ?? ''}', RDSColor.green),
                                 ],
                               ),
                               if (b['transporte'] != null) ...[
@@ -6888,13 +7094,13 @@ class _PlannerResultScreen extends StatelessWidget {
                 margin: const EdgeInsets.only(bottom: 16),
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
-                    colors: [kGold.withOpacity(0.1), kGreen.withOpacity(0.08)]),
+                    colors: [RDSColor.gold.withOpacity(0.1), RDSColor.green.withOpacity(0.08)]),
                   borderRadius: BorderRadius.circular(16),
                   border: Border.all(color: RDSColor.gold.withOpacity(0.3))),
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   Text(t('RESUMEN DE TU VIAJE', 'TRIP SUMMARY'),
                     style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w900,
-                      color: kGold, letterSpacing: 1.5)),
+                      color: RDSColor.gold, letterSpacing: 1.5)),
                   const SizedBox(height: 14),
                   Row(children: [
                     _ResumenStat('🗺️', '${resumen['rutas'] ?? 0}', t('rutas', 'routes')),
@@ -6949,7 +7155,7 @@ class _PlannerResultScreen extends StatelessWidget {
                   border: Border.all(color: RDSColor.gold.withOpacity(0.3))),
                 child: Center(child: Text(
                   t('✏️ Ajustar itinerario', '✏️ Adjust itinerary'),
-                  style: const TextStyle(color: kGold, fontSize: 13,
+                  style: const TextStyle(color: RDSColor.gold, fontSize: 13,
                     fontWeight: FontWeight.w700))))),
           ])),
       ]),
@@ -7066,7 +7272,7 @@ class ColaboradoresScreen extends StatelessWidget {
                     color: Colors.white.withOpacity(0.06), shape: BoxShape.circle,
                     border: Border.all(color: RDSColor.gold.withOpacity(0.2))),
                   child: const Center(child: Text('←',
-                    style: TextStyle(color: kText, fontSize: 16))))),
+                    style: TextStyle(color: RDSColor.textPrimary, fontSize: 16))))),
               const SizedBox(width: 12),
               Expanded(child: Text(t('Colaboradores', 'Collaborators'),
                 style: const TextStyle(fontFamily: 'PlayfairDisplay',
@@ -7078,7 +7284,7 @@ class ColaboradoresScreen extends StatelessWidget {
           children: [
             Text(t('Creadores que exploran contigo', 'Creators who explore with you'),
               style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w900,
-                color: kTextMuted, letterSpacing: 1.5)),
+                color: RDSColor.textMuted, letterSpacing: 1.5)),
             const SizedBox(height: 4),
             Text(t('Personas reales que muestran Medellín en terreno — con cámara, con moto, con pasión.',
                 'Real people showing Medellín in the field — with camera, with motorcycle, with passion.'),
@@ -7096,7 +7302,7 @@ class ColaboradoresScreen extends StatelessWidget {
                 if (snap.hasData && snap.data!.docs.isNotEmpty) {
                   lista = snap.data!.docs.map((doc) {
                     final d = doc.data() as Map<String, dynamic>;
-                    Color color = kGreen;
+                    Color color = RDSColor.green;
                     try { color = Color(int.parse((d['color']?.toString() ?? '#2D5A1B').replaceAll('#', '0xFF'))); } catch (_) {}
                     return _Colaborador(
                       nombre: d['nombre']?.toString() ?? '',
@@ -7161,7 +7367,7 @@ class _ColaboradorCard extends StatelessWidget {
             color: RDSColor.surface,
             borderRadius: const BorderRadius.vertical(top: Radius.circular(15)),
             gradient: LinearGradient(
-              colors: [c.color.withOpacity(0.3), kDark3],
+              colors: [c.color.withOpacity(0.3), const Color(0xFF050A04)],
               begin: Alignment.topLeft, end: Alignment.bottomRight)),
           child: Padding(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
@@ -7194,7 +7400,7 @@ class _ColaboradorCard extends StatelessWidget {
                   : Center(child: Text(c.emoji, style: const TextStyle(fontSize: 24))))),
               const SizedBox(width: 12),
               Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text(c.nombre, style: const TextStyle(color: kText, fontSize: 15, fontWeight: FontWeight.w800)),
+                Text(c.nombre, style: const TextStyle(color: RDSColor.textPrimary, fontSize: 15, fontWeight: FontWeight.w800)),
                 Text(c.handle, style: TextStyle(color: c.color, fontSize: 11, fontWeight: FontWeight.w700)),
               ]),
             ]),
@@ -7212,10 +7418,10 @@ class _ColaboradorCard extends StatelessWidget {
                 const SizedBox(width: 10),
                 Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   Text(t('Ruta en Rutero MDE', 'Route on Rutero MDE'),
-                    style: const TextStyle(color: kGold, fontSize: 9, fontWeight: FontWeight.w700, letterSpacing: 1)),
+                    style: const TextStyle(color: RDSColor.gold, fontSize: 9, fontWeight: FontWeight.w700, letterSpacing: 1)),
                   const SizedBox(height: 2),
                   Text(t(c.rutaVinculada, c.rutaVinculadaEN),
-                    style: const TextStyle(color: kText, fontSize: 12, fontWeight: FontWeight.w700)),
+                    style: const TextStyle(color: RDSColor.textPrimary, fontSize: 12, fontWeight: FontWeight.w700)),
                 ])),
               ])),
             const SizedBox(height: 14),
@@ -7464,7 +7670,7 @@ class _CapturasDeCampoScreenState extends State<CapturasDeCampoScreen> {
         backgroundColor: RDSColor.overlay,
         appBar: AppBar(backgroundColor: RDSColor.overlay, title: Text(t('Captura de campo', 'Field capture'))),
         body: Center(child: Text(t('Solo disponible para administradores', 'Only available for admins'),
-          style: const TextStyle(color: kTextMuted))));
+          style: const TextStyle(color: RDSColor.textMuted))));
     }
 
     return Scaffold(
@@ -7472,7 +7678,7 @@ class _CapturasDeCampoScreenState extends State<CapturasDeCampoScreen> {
       appBar: AppBar(
         backgroundColor: RDSColor.card,
         title: Text(t('📸 Captura de campo', '📸 Field capture'),
-          style: const TextStyle(color: kText, fontWeight: FontWeight.w800)),
+          style: const TextStyle(color: RDSColor.textPrimary, fontWeight: FontWeight.w800)),
         leading: IconButton(icon: const Icon(RDSIcons.back, color: RDSColor.textPrimary), onPressed: () => Navigator.pop(context)),
       ),
       body: SingleChildScrollView(
@@ -7486,7 +7692,7 @@ class _CapturasDeCampoScreenState extends State<CapturasDeCampoScreen> {
             child: Text(
               t('Detecta tu ubicación → la app identifica el sitio más cercano (máx. 800m) → toma la foto → queda registrada con el nombre del sitio y la ruta.',
                 'Detect your location → the app identifies the nearest site (max. 800m) → take the photo → saved with site name and route.'),
-              style: const TextStyle(color: kTextMuted, fontSize: 12, height: 1.5))),
+              style: const TextStyle(color: RDSColor.textMuted, fontSize: 12, height: 1.5))),
 
           const SizedBox(height: 20),
 
@@ -7498,16 +7704,16 @@ class _CapturasDeCampoScreenState extends State<CapturasDeCampoScreen> {
                 border: Border.all(color: RDSColor.green.withOpacity(0.4))),
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Text('📍 $_sitioDetectado',
-                  style: const TextStyle(color: kText, fontSize: 15, fontWeight: FontWeight.w800)),
+                  style: const TextStyle(color: RDSColor.textPrimary, fontSize: 15, fontWeight: FontWeight.w800)),
                 const SizedBox(height: 4),
-                Text(_rutaDetectada, style: const TextStyle(color: kGreen, fontSize: 11)),
+                Text(_rutaDetectada, style: const TextStyle(color: RDSColor.green, fontSize: 11)),
               ])),
             const SizedBox(height: 12),
           ],
 
           // Estado
           if (_estado.isNotEmpty)
-            Text(_estado, style: TextStyle(color: _estado.contains('⚠️') ? Colors.orange : kGreen, fontSize: 12)),
+            Text(_estado, style: TextStyle(color: _estado.contains('⚠️') ? Colors.orange : RDSColor.green, fontSize: 12)),
 
           const SizedBox(height: 20),
 
@@ -7523,14 +7729,14 @@ class _CapturasDeCampoScreenState extends State<CapturasDeCampoScreen> {
                 child: Center(child: _buscandoGPS
                   ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: RDSColor.green))
                   : Text(t('📍 Detectar sitio', '📍 Detect site'),
-                    style: const TextStyle(color: kGreen, fontWeight: FontWeight.w700)))))),
+                    style: const TextStyle(color: RDSColor.green, fontWeight: FontWeight.w700)))))),
             const SizedBox(width: 12),
             Expanded(child: GestureDetector(
               onTap: _tomarFoto,
               child: Container(
                 padding: const EdgeInsets.symmetric(vertical: 14),
                 decoration: BoxDecoration(
-                  gradient: LinearGradient(colors: [RDSColor.green, kGreen.withOpacity(0.7)]),
+                  gradient: LinearGradient(colors: [RDSColor.green, RDSColor.green.withOpacity(0.7)]),
                   borderRadius: BorderRadius.circular(12)),
                 child: Center(child: Text(t('📸 Tomar foto', '📸 Take photo'),
                   style: const TextStyle(color: Colors.black, fontWeight: FontWeight.w800)))))),
@@ -7541,7 +7747,7 @@ class _CapturasDeCampoScreenState extends State<CapturasDeCampoScreen> {
           // Galería de capturas de esta sesión
           if (_capturas.isNotEmpty) ...[
             Text(t('Capturas de esta sesión', 'This session captures'),
-              style: const TextStyle(color: kText, fontSize: 14, fontWeight: FontWeight.w700)),
+              style: const TextStyle(color: RDSColor.textPrimary, fontSize: 14, fontWeight: FontWeight.w700)),
             const SizedBox(height: 12),
             ..._capturas.map((c) => Container(
               margin: const EdgeInsets.only(bottom: 10),
@@ -7556,10 +7762,10 @@ class _CapturasDeCampoScreenState extends State<CapturasDeCampoScreen> {
                       child: const Icon(Icons.image, color: RDSColor.green)))),
                 const SizedBox(width: 12),
                 Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text(c['sitio']?.toString() ?? '', style: const TextStyle(color: kText, fontSize: 13, fontWeight: FontWeight.w700)),
-                  Text(c['ruta']?.toString() ?? '', style: const TextStyle(color: kGreen, fontSize: 10)),
+                  Text(c['sitio']?.toString() ?? '', style: const TextStyle(color: RDSColor.textPrimary, fontSize: 13, fontWeight: FontWeight.w700)),
+                  Text(c['ruta']?.toString() ?? '', style: const TextStyle(color: RDSColor.green, fontSize: 10)),
                   Text((c['fecha']?.toString() ?? '').substring(0, 16).replaceAll('T', ' '),
-                    style: const TextStyle(color: kTextMuted, fontSize: 10)),
+                    style: const TextStyle(color: RDSColor.textMuted, fontSize: 10)),
                 ])),
               ]))).toList(),
           ],
@@ -7602,13 +7808,13 @@ class EmergenciaScreen extends StatelessWidget {
                     shape: BoxShape.circle,
                     border: Border.all(color: RDSColor.gold.withOpacity(0.2))),
                   child: const Center(child: Text('←',
-                    style: TextStyle(color: kText, fontSize: 16))))),
+                    style: TextStyle(color: RDSColor.textPrimary, fontSize: 16))))),
               const SizedBox(width: 12),
               Expanded(child: Text(t('Directorio de emergencia','Emergency directory'),
                 style: const TextStyle(
                   fontFamily: 'PlayfairDisplay',
                   fontSize: 19, fontWeight: FontWeight.w900,
-                  color: kText, letterSpacing: 0.3))),
+                  color: RDSColor.textPrimary, letterSpacing: 0.3))),
               const Text('🆘', style: TextStyle(fontSize: 20)),
             ])))),
         Expanded(child: ListView.builder(
@@ -7624,7 +7830,7 @@ class EmergenciaScreen extends StatelessWidget {
                   const SizedBox(width: 8),
                   Text(t(cat.titulo, cat.tituloEN),
                     style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w900,
-                      color: kTextMuted, letterSpacing: 1.5)),
+                      color: RDSColor.textMuted, letterSpacing: 1.5)),
                 ]),
                 const SizedBox(height: 10),
                 ...cat.contactos.map((c) => Container(
@@ -7637,7 +7843,7 @@ class EmergenciaScreen extends StatelessWidget {
                     const SizedBox(width: 12),
                     Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                       Text(t(c.nombre, c.nombreEN),
-                        style: const TextStyle(color: kText, fontSize: 13, fontWeight: FontWeight.w700)),
+                        style: const TextStyle(color: RDSColor.textPrimary, fontSize: 13, fontWeight: FontWeight.w700)),
                       const SizedBox(height: 3),
                       Text(t(c.detalle, c.detalleEN),
                         style: TextStyle(color: RDSColor.textMuted.withOpacity(0.85), fontSize: 11.5, height: 1.4)),
@@ -7657,7 +7863,7 @@ class EmergenciaScreen extends StatelessWidget {
                                   const Text('📞', style: TextStyle(fontSize: 12)),
                                   const SizedBox(width: 6),
                                   Text(c.telefono,
-                                    style: const TextStyle(color: kGreen, fontSize: 12, fontWeight: FontWeight.w700)),
+                                    style: const TextStyle(color: RDSColor.green, fontSize: 12, fontWeight: FontWeight.w700)),
                                 ]))),
                           if (c.direccionMaps != null)
                             GestureDetector(
@@ -7672,7 +7878,7 @@ class EmergenciaScreen extends StatelessWidget {
                                   const Text('🧭', style: TextStyle(fontSize: 12)),
                                   const SizedBox(width: 6),
                                   Text(t('Cómo llegar','Get directions'),
-                                    style: const TextStyle(color: kGold, fontSize: 12, fontWeight: FontWeight.w700)),
+                                    style: const TextStyle(color: RDSColor.gold, fontSize: 12, fontWeight: FontWeight.w700)),
                                 ]))),
                         ]),
                       ],
@@ -7862,13 +8068,13 @@ class _MonedaYJergaScreenState extends State<MonedaYJergaScreen> {
                     shape: BoxShape.circle,
                     border: Border.all(color: RDSColor.gold.withOpacity(0.2))),
                   child: const Center(child: Text('←',
-                    style: TextStyle(color: kText, fontSize: 16))))),
+                    style: TextStyle(color: RDSColor.textPrimary, fontSize: 16))))),
               const SizedBox(width: 12),
               Expanded(child: Text(t('Moneda y jerga paisa','Currency & paisa slang'),
                 style: const TextStyle(
                   fontFamily: 'PlayfairDisplay',
                   fontSize: 18, fontWeight: FontWeight.w900,
-                  color: kText, letterSpacing: 0.2))),
+                  color: RDSColor.textPrimary, letterSpacing: 0.2))),
               const Text('💱', style: TextStyle(fontSize: 20)),
             ])))),
         Expanded(child: ListView(
@@ -7876,7 +8082,7 @@ class _MonedaYJergaScreenState extends State<MonedaYJergaScreen> {
           children: [
             Text(t('Conversor USD → COP','USD → COP Converter'),
               style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w900,
-                color: kTextMuted, letterSpacing: 1.5)),
+                color: RDSColor.textMuted, letterSpacing: 1.5)),
             const SizedBox(height: 12),
             Container(
               padding: const EdgeInsets.all(16),
@@ -7885,16 +8091,16 @@ class _MonedaYJergaScreenState extends State<MonedaYJergaScreen> {
               child: _cargando
                 ? const Center(child: Padding(
                     padding: EdgeInsets.symmetric(vertical: 12),
-                    child: CircularProgressIndicator(color: kGold, strokeWidth: 2)))
+                    child: CircularProgressIndicator(color: RDSColor.gold, strokeWidth: 2)))
                 : Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                     Row(children: [
                       Expanded(child: TextField(
                         controller: _usdCtrl,
                         keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                        style: const TextStyle(color: kText, fontSize: 22, fontWeight: FontWeight.w700),
+                        style: const TextStyle(color: RDSColor.textPrimary, fontSize: 22, fontWeight: FontWeight.w700),
                         decoration: const InputDecoration(
                           prefixText: 'USD \$ ',
-                          prefixStyle: TextStyle(color: kGold, fontSize: 16, fontWeight: FontWeight.w700),
+                          prefixStyle: TextStyle(color: RDSColor.gold, fontSize: 16, fontWeight: FontWeight.w700),
                           border: InputBorder.none),
                         onChanged: (_) => _recalcular())),
                     ]),
@@ -7902,12 +8108,12 @@ class _MonedaYJergaScreenState extends State<MonedaYJergaScreen> {
                       child: Container(height: 1, color: Colors.white.withOpacity(0.08))),
                     Row(children: [
                       Text(t('Equivale a','Equals'),
-                        style: const TextStyle(color: kTextMuted, fontSize: 12)),
+                        style: const TextStyle(color: RDSColor.textMuted, fontSize: 12)),
                     ]),
                     const SizedBox(height: 4),
                     Text(
                       _tasaUsdCop != null ? _formatoCop(_copResultado) : '—',
-                      style: const TextStyle(color: kGreen, fontSize: 26, fontWeight: FontWeight.w900)),
+                      style: const TextStyle(color: RDSColor.green, fontSize: 26, fontWeight: FontWeight.w900)),
                     const SizedBox(height: 10),
                     if (_tasaUsdCop != null)
                       Row(children: [
@@ -7934,9 +8140,9 @@ class _MonedaYJergaScreenState extends State<MonedaYJergaScreen> {
             Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
               Text(t('Diccionario paisa','Paisa dictionary'),
                 style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w900,
-                  color: kTextMuted, letterSpacing: 1.5)),
+                  color: RDSColor.textMuted, letterSpacing: 1.5)),
               Text('${_palabrasAprendidas.length}/${kDiccionarioPaisa.length} ${t("aprendidas","learned")}',
-                style: const TextStyle(color: kGold, fontSize: 11, fontWeight: FontWeight.w700)),
+                style: const TextStyle(color: RDSColor.gold, fontSize: 11, fontWeight: FontWeight.w700)),
             ]),
             const SizedBox(height: 4),
             Text(t('Toca una palabra para marcarla como aprendida','Tap a word to mark it as learned'),
@@ -7952,7 +8158,7 @@ class _MonedaYJergaScreenState extends State<MonedaYJergaScreen> {
                 padding: const EdgeInsets.all(16),
                 margin: const EdgeInsets.only(bottom: 16),
                 decoration: BoxDecoration(
-                  gradient: LinearGradient(colors: [kGold.withOpacity(0.15), kGold.withOpacity(0.05)]),
+                  gradient: LinearGradient(colors: [RDSColor.gold.withOpacity(0.15), RDSColor.gold.withOpacity(0.05)]),
                   borderRadius: BorderRadius.circular(16),
                   border: Border.all(color: RDSColor.gold.withOpacity(0.4))),
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -7960,10 +8166,10 @@ class _MonedaYJergaScreenState extends State<MonedaYJergaScreen> {
                     const Text('⭐', style: TextStyle(fontSize: 14)),
                     const SizedBox(width: 6),
                     Text(t('Palabra del día', 'Word of the day'),
-                      style: const TextStyle(color: kGold, fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 1.5)),
+                      style: const TextStyle(color: RDSColor.gold, fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 1.5)),
                   ]),
                   const SizedBox(height: 8),
-                  Text(p.palabra, style: const TextStyle(color: kGold, fontSize: 22, fontWeight: FontWeight.w900, letterSpacing: 1)),
+                  Text(p.palabra, style: const TextStyle(color: RDSColor.gold, fontSize: 22, fontWeight: FontWeight.w900, letterSpacing: 1)),
                   const SizedBox(height: 4),
                   Text(t(p.significado, p.significadoEN), style: TextStyle(color: RDSColor.textMuted.withOpacity(0.9), fontSize: 13, height: 1.4)),
                   const SizedBox(height: 6),
@@ -7982,17 +8188,17 @@ class _MonedaYJergaScreenState extends State<MonedaYJergaScreen> {
                   decoration: BoxDecoration(
                     color: RDSColor.card, borderRadius: BorderRadius.circular(14),
                     border: Border.all(
-                      color: aprendida ? kGold.withOpacity(0.4) : Colors.white.withOpacity(0.08))),
+                      color: aprendida ? RDSColor.gold.withOpacity(0.4) : Colors.white.withOpacity(0.08))),
                   child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
                     Container(width: 30, height: 30,
                       decoration: BoxDecoration(shape: BoxShape.circle,
-                        color: aprendida ? kGold.withOpacity(0.15) : kDark3),
+                        color: aprendida ? RDSColor.gold.withOpacity(0.15) : const Color(0xFF050A04)),
                       child: Center(child: Text(aprendida ? '✅' : '🗣️',
                         style: const TextStyle(fontSize: 14)))),
                     const SizedBox(width: 12),
                     Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                       Text(p.palabra,
-                        style: TextStyle(color: aprendida ? kGold : kText,
+                        style: TextStyle(color: aprendida ? RDSColor.gold : RDSColor.textPrimary,
                           fontSize: 14, fontWeight: FontWeight.w800, letterSpacing: 0.5)),
                       const SizedBox(height: 4),
                       Text(t(p.significado, p.significadoEN),
@@ -8145,17 +8351,17 @@ class _SOSConfigScreenState extends State<SOSConfigScreen> {
                     shape: BoxShape.circle,
                     border: Border.all(color: RDSColor.gold.withOpacity(0.2))),
                   child: const Center(child: Text('←',
-                    style: TextStyle(color: kText, fontSize: 16))))),
+                    style: TextStyle(color: RDSColor.textPrimary, fontSize: 16))))),
               const SizedBox(width: 12),
               Expanded(child: Text(t('Botón SOS','SOS Button'),
                 style: const TextStyle(
                   fontFamily: 'PlayfairDisplay',
                   fontSize: 19, fontWeight: FontWeight.w900,
-                  color: kText, letterSpacing: 0.3))),
+                  color: RDSColor.textPrimary, letterSpacing: 0.3))),
               const Text('🆘', style: TextStyle(fontSize: 20)),
             ])))),
         Expanded(child: _cargando
-          ? const Center(child: CircularProgressIndicator(color: kGold))
+          ? const Center(child: CircularProgressIndicator(color: RDSColor.gold))
           : ListView(
               padding: EdgeInsets.fromLTRB(20, 16, 20, 40 + MediaQuery.of(context).padding.bottom),
               children: [
@@ -8185,7 +8391,7 @@ class _SOSConfigScreenState extends State<SOSConfigScreen> {
 
                 Text(t('Contacto de emergencia','Emergency contact'),
                   style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w900,
-                    color: kTextMuted, letterSpacing: 1.5)),
+                    color: RDSColor.textMuted, letterSpacing: 1.5)),
                 const SizedBox(height: 4),
                 Text(t('Se usará para enviar tu ubicación cuando presiones SOS',
                     'Used to send your location when you press SOS'),
@@ -8197,10 +8403,10 @@ class _SOSConfigScreenState extends State<SOSConfigScreen> {
                     border: Border.all(color: Colors.white.withOpacity(0.1))),
                   child: TextField(
                     controller: _nombreCtrl,
-                    style: const TextStyle(color: kText, fontSize: 14),
+                    style: const TextStyle(color: RDSColor.textPrimary, fontSize: 14),
                     decoration: InputDecoration(
                       hintText: t('Nombre del contacto','Contact name'),
-                      hintStyle: const TextStyle(color: kTextMuted),
+                      hintStyle: const TextStyle(color: RDSColor.textMuted),
                       prefixIcon: const Padding(padding: EdgeInsets.all(12),
                         child: Text('👤', style: TextStyle(fontSize: 16))),
                       border: InputBorder.none,
@@ -8214,11 +8420,11 @@ class _SOSConfigScreenState extends State<SOSConfigScreen> {
                   child: TextField(
                     controller: _numeroCtrl,
                     keyboardType: TextInputType.phone,
-                    style: const TextStyle(color: kText, fontSize: 14),
+                    style: const TextStyle(color: RDSColor.textPrimary, fontSize: 14),
                     decoration: InputDecoration(
                       hintText: t('Número con indicativo (ej: +57 300 1234567)',
                           'Number with country code (e.g: +57 300 1234567)'),
-                      hintStyle: const TextStyle(color: kTextMuted, fontSize: 12),
+                      hintStyle: const TextStyle(color: RDSColor.textMuted, fontSize: 12),
                       prefixIcon: const Padding(padding: EdgeInsets.all(12),
                         child: Text('📱', style: TextStyle(fontSize: 16))),
                       border: InputBorder.none,
@@ -8284,7 +8490,7 @@ class _FeedbackBetaScreenState extends State<FeedbackBetaScreen> {
     if (_estrellas == 0) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
         content: Text(t('Por favor califica tu experiencia', 'Please rate your experience')),
-        backgroundColor: kOrchid));
+        backgroundColor: RDSColor.orchid));
       return;
     }
     setState(() => _enviando = true);
@@ -8316,7 +8522,7 @@ class _FeedbackBetaScreenState extends State<FeedbackBetaScreen> {
     appBar: AppBar(
       backgroundColor: RDSColor.base,
       title: Text(t('Tu opinión', 'Your feedback'),
-        style: const TextStyle(color: kText, fontWeight: FontWeight.w800)),
+        style: const TextStyle(color: RDSColor.textPrimary, fontWeight: FontWeight.w800)),
       leading: IconButton(
         icon: const Icon(RDSIcons.back, color: RDSColor.textPrimary),
         onPressed: () => Navigator.pop(context))),
@@ -8334,20 +8540,20 @@ class _FeedbackBetaScreenState extends State<FeedbackBetaScreen> {
             Expanded(child: Text(
               t('Versión beta · Tu experiencia mejora Rutero MDE para todos',
                 'Beta · Your experience improves Rutero MDE for everyone'),
-              style: const TextStyle(color: kTextMuted, fontSize: 12, height: 1.4))),
+              style: const TextStyle(color: RDSColor.textMuted, fontSize: 12, height: 1.4))),
           ])),
         const SizedBox(height: 28),
         Text(t('¿Cómo fue tu experiencia?', 'How was your experience?'),
-          style: const TextStyle(color: kText, fontSize: 15, fontWeight: FontWeight.w800)),
+          style: const TextStyle(color: RDSColor.textPrimary, fontSize: 15, fontWeight: FontWeight.w800)),
         const SizedBox(height: 12),
         Row(children: List.generate(5, (i) => GestureDetector(
           onTap: () => setState(() => _estrellas = i + 1),
           child: Padding(padding: const EdgeInsets.only(right: 8),
             child: Icon(i < _estrellas ? Icons.star_rounded : Icons.star_outline_rounded,
-              color: kGold, size: 36))))),
+              color: RDSColor.gold, size: 36))))),
         const SizedBox(height: 28),
         Text(t('¿Recomendarías Rutero MDE?', 'Would you recommend Rutero MDE?'),
-          style: const TextStyle(color: kText, fontSize: 15, fontWeight: FontWeight.w800)),
+          style: const TextStyle(color: RDSColor.textPrimary, fontSize: 15, fontWeight: FontWeight.w800)),
         const SizedBox(height: 12),
         Row(children: [
           _OpcionBtn(texto: t('Sí, claro','Yes!'), emoji: '👍',
@@ -8360,12 +8566,12 @@ class _FeedbackBetaScreenState extends State<FeedbackBetaScreen> {
         ]),
         const SizedBox(height: 28),
         Text(t('Tu nombre (opcional)', 'Your name (optional)'),
-          style: const TextStyle(color: kText, fontSize: 15, fontWeight: FontWeight.w800)),
+          style: const TextStyle(color: RDSColor.textPrimary, fontSize: 15, fontWeight: FontWeight.w800)),
         const SizedBox(height: 10),
         _campo(_nombreCtrl, t('Anónimo si prefieres','Anonymous if you prefer'), 1),
         const SizedBox(height: 20),
         Text(t('Comentarios o sugerencias', 'Comments or suggestions'),
-          style: const TextStyle(color: kText, fontSize: 15, fontWeight: FontWeight.w800)),
+          style: const TextStyle(color: RDSColor.textPrimary, fontSize: 15, fontWeight: FontWeight.w800)),
         const SizedBox(height: 10),
         _campo(_comentarioCtrl,
           t('¿Qué te gustó? ¿Qué mejorarías?','What did you like? What would you improve?'), 4),
@@ -8376,7 +8582,7 @@ class _FeedbackBetaScreenState extends State<FeedbackBetaScreen> {
             width: double.infinity,
             padding: const EdgeInsets.symmetric(vertical: 16),
             decoration: BoxDecoration(
-              color: _enviando ? kTextMuted : kGreen,
+              color: _enviando ? RDSColor.textMuted : RDSColor.green,
               borderRadius: BorderRadius.circular(16)),
             child: _enviando
               ? const Center(child: SizedBox(width: 20, height: 20,
@@ -8389,16 +8595,16 @@ class _FeedbackBetaScreenState extends State<FeedbackBetaScreen> {
 
   Widget _campo(TextEditingController ctrl, String hint, int lines) => TextField(
     controller: ctrl, maxLines: lines,
-    style: const TextStyle(color: kText, fontSize: 13),
+    style: const TextStyle(color: RDSColor.textPrimary, fontSize: 13),
     decoration: InputDecoration(
-      hintText: hint, hintStyle: const TextStyle(color: kTextMuted),
-      filled: true, fillColor: kDark2,
+      hintText: hint, hintStyle: const TextStyle(color: RDSColor.textMuted),
+      filled: true, fillColor: RDSColor.base,
       border: OutlineInputBorder(borderRadius: BorderRadius.circular(12),
         borderSide: BorderSide(color: RDSColor.green.withOpacity(0.2))),
       enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12),
         borderSide: BorderSide(color: RDSColor.green.withOpacity(0.2))),
       focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide(color: kGreen))));
+        borderSide: BorderSide(color: RDSColor.green))));
 }
 
 class _OpcionBtn extends StatelessWidget {
@@ -8413,14 +8619,14 @@ class _OpcionBtn extends StatelessWidget {
     child: Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
       decoration: BoxDecoration(
-        color: seleccionado ? kGreen.withOpacity(0.15) : kDark2,
+        color: seleccionado ? RDSColor.green.withOpacity(0.15) : RDSColor.base,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: seleccionado ? kGreen : kGreen.withOpacity(0.2),
+        border: Border.all(color: seleccionado ? RDSColor.green : RDSColor.green.withOpacity(0.2),
           width: seleccionado ? 1.5 : 1)),
       child: Row(mainAxisSize: MainAxisSize.min, children: [
         Text(emoji, style: const TextStyle(fontSize: 16)),
         const SizedBox(width: 6),
-        Text(texto, style: TextStyle(color: seleccionado ? kGreen : kTextMuted,
+        Text(texto, style: TextStyle(color: seleccionado ? RDSColor.green : RDSColor.textMuted,
           fontSize: 12, fontWeight: FontWeight.w600)),
       ])));
 }
@@ -8434,18 +8640,18 @@ class _PantallaEnviada extends StatelessWidget {
       const Text('🌿', style: TextStyle(fontSize: 64)),
       const SizedBox(height: 20),
       Text(t('¡Gracias!','Thank you!'),
-        style: const TextStyle(color: kText, fontSize: 28, fontWeight: FontWeight.w900)),
+        style: const TextStyle(color: RDSColor.textPrimary, fontSize: 28, fontWeight: FontWeight.w900)),
       const SizedBox(height: 12),
       Text(t('Tu opinión nos ayuda a construir la mejor app de turismo de Medellín.',
              'Your feedback helps us build the best tourism app in Medellín.'),
-        style: const TextStyle(color: kTextMuted, fontSize: 14, height: 1.6),
+        style: const TextStyle(color: RDSColor.textMuted, fontSize: 14, height: 1.6),
         textAlign: TextAlign.center),
       const SizedBox(height: 32),
       GestureDetector(
         onTap: () => Navigator.pop(context),
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 14),
-          decoration: BoxDecoration(color: kGreen, borderRadius: BorderRadius.circular(14)),
+          decoration: BoxDecoration(color: RDSColor.green, borderRadius: BorderRadius.circular(14)),
           child: Text(t('Volver','Back'),
             style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w800)))),
     ])));
@@ -8537,108 +8743,137 @@ class _WelcomeScreenState extends State<WelcomeScreen> with SingleTickerProvider
 
   Widget _buildContent(BuildContext context) {
     return Scaffold(
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter,
-            colors: [Color(0xFF080C06), Color(0xFF0D1209), kDark2]),
-        ),
-        child: Stack(children: [
-          // Colage de fondo con sitios emblemáticos de Antioquia
-          Positioned.fill(child: GridView.count(
-            crossAxisCount: 3, physics: const NeverScrollableScrollPhysics(),
-            padding: EdgeInsets.zero, mainAxisSpacing: 2, crossAxisSpacing: 2,
-            children: [
-              'assets/images/rutas/ruta_09_guatape.jpg',
-              'assets/images/rutas/ruta_17_feria_flores.jpg',
-              'assets/images/rutas/ruta_12_jardin.jpg',
-              'assets/images/rutas/ruta_13_santa_fe.jpg',
-              'assets/images/rutas/ruta_01_transformacion.jpg',
-              'assets/images/rutas/ruta_15_alumbrado.jpg',
-            ].map((img) => Image.asset(img, fit: BoxFit.cover,
-              cacheWidth: 300,
-              errorBuilder: (_, __, ___) => Container(color: RDSColor.surface))).toList())),
-          // Overlay degradado oscuro para legibilidad
-          Positioned.fill(child: Container(
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter, end: Alignment.bottomCenter,
-                colors: [
-                  Color(0xCC060A04),
-                  Color(0x88060A04),
-                  Color(0xEE060A04),
-                ])))),
-          SafeArea(child: FadeTransition(opacity: _fadeAnim, child: SlideTransition(position: _slideAnim,
-            child: Padding(padding: const EdgeInsets.symmetric(horizontal: 28), child: Column(children: [
-              const SizedBox(height: 32),
+      backgroundColor: const Color(0xFF060A04),
+      body: Stack(children: [
 
-              // Hero visual
-              Expanded(flex: 4, child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-                // Emblema circular paisa
-                Container(width: 150, height: 150,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    boxShadow: [
-                      BoxShadow(color: RDSColor.green.withOpacity(0.35), blurRadius: 40, spreadRadius: 8),
-                      BoxShadow(color: RDSColor.gold.withOpacity(0.2), blurRadius: 20),
-                    ]),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(150),
-                    child: Image.asset('assets/images/logo_splash.png',
-                      width: 150, height: 150, fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => const Text('🌿', style: TextStyle(fontSize: 52))))),
+        // ── Mosaico de fotos — parte superior ──
+        // 2 filas x 3 fotos = 6 imágenes de Antioquia
+        Positioned(top: 0, left: 0, right: 0,
+          height: MediaQuery.of(context).size.height * 0.52,
+          child: Column(children: [
+            Expanded(child: Row(children: [
+              Expanded(child: Image.asset('assets/images/rutas/ruta_09_guatape.jpg',
+                fit: BoxFit.cover, cacheWidth: 400,
+                errorBuilder: (_, __, ___) => Container(color: const Color(0xFF0D1A0A)))),
+              const SizedBox(width: 2),
+              Expanded(child: Image.asset('assets/images/rutas/ruta_17_feria_flores.jpg',
+                fit: BoxFit.cover, cacheWidth: 400,
+                errorBuilder: (_, __, ___) => Container(color: const Color(0xFF0A150A)))),
+              const SizedBox(width: 2),
+              Expanded(child: Image.asset('assets/images/rutas/ruta_12_jardin.jpg',
+                fit: BoxFit.cover, cacheWidth: 400,
+                errorBuilder: (_, __, ___) => Container(color: const Color(0xFF0D200A)))),
+            ])),
+            const SizedBox(height: 2),
+            Expanded(child: Row(children: [
+              Expanded(child: Image.asset('assets/images/rutas/ruta_13_santa_fe.jpg',
+                fit: BoxFit.cover, cacheWidth: 400,
+                errorBuilder: (_, __, ___) => Container(color: const Color(0xFF0A1510)))),
+              const SizedBox(width: 2),
+              Expanded(child: Image.asset('assets/images/rutas/ruta_01_transformacion.jpg',
+                fit: BoxFit.cover, cacheWidth: 400,
+                errorBuilder: (_, __, ___) => Container(color: const Color(0xFF0D1A0D)))),
+              const SizedBox(width: 2),
+              Expanded(child: Image.asset('assets/images/rutas/ruta_15_alumbrado.jpg',
+                fit: BoxFit.cover, cacheWidth: 400,
+                errorBuilder: (_, __, ___) => Container(color: const Color(0xFF0A1208)))),
+            ])),
+          ])),
 
-                const SizedBox(height: 28),
+        // ── Overlay — gradiente que devora las fotos hacia abajo ──
+        Positioned.fill(child: Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter, end: Alignment.bottomCenter,
+              stops: [0.0, 0.15, 0.42, 0.60, 1.0],
+              colors: [
+                Color(0x44000000), // top — fotos respiran
+                Color(0x22000000), // fotos visibles
+                Color(0x99060A04), // transición
+                Color(0xEE060A04), // zona contenido
+                Color(0xFF060A04), // sólido abajo
+              ])))),
 
-                // Título con acento paisa
-                Text(tExplorarCiudad(_ciudadWelcome?.ciudad ?? 'Medellín'), textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 38, fontWeight: FontWeight.w900,
-                    color: kText, letterSpacing: 3, height: 1.1)),
+        // ── Contenido — anclado abajo ──
+        Positioned(bottom: 0, left: 0, right: 0,
+          child: SafeArea(
+            top: false,
+            child: FadeTransition(opacity: _fadeAnim, child: SlideTransition(position: _slideAnim,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(28, 0, 28, 24),
+                child: Column(mainAxisSize: MainAxisSize.min, children: [
 
-                const SizedBox(height: 8),
+                  // Logo pequeño + título
+                  Container(width: 72, height: 72,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(color: RDSColor.green.withOpacity(0.4),
+                          blurRadius: 32, spreadRadius: 4),
+                      ]),
+                    child: ClipRRect(borderRadius: BorderRadius.circular(72),
+                      child: Image.asset('assets/images/logo_splash.png',
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => const Icon(
+                          Icons.explore_rounded, color: RDSColor.green, size: 36)))),
 
-                // Subtítulo
-                Container(margin: const EdgeInsets.symmetric(horizontal: 20),
-                  child: Text(
-                    t('Rutas gamificadas por la ciudad\nmás hermosa de Colombia ☁️',
-                      'Gamified routes through the\nmost beautiful city in Colombia ☁️'),
+                  const SizedBox(height: 16),
+
+                  Text(tExplorarCiudad(_ciudadWelcome?.ciudad ?? 'Medellín'),
                     textAlign: TextAlign.center,
-                    style: TextStyle(fontSize: 13, color: RDSColor.textPrimary.withOpacity(0.45), height: 1.55))),
+                    style: const TextStyle(
+                      fontFamily: 'PlayfairDisplay',
+                      fontSize: 32, fontWeight: FontWeight.w900,
+                      color: RDSColor.textPrimary, letterSpacing: 1, height: 1.1)),
 
-                const SizedBox(height: 20),
+                  const SizedBox(height: 6),
 
-                // Chips de datos
-                Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-                  _WelcomeChip(emoji: '🗺️', label: '${RutasService().rutas.where((r) => r['activa'] != false && r['pausada'] != true && !(r['esFeria'] == true) && !['FERIA CLÁSICA','FERIA DE LAS FLORES'].contains(r['nombre']?.toString())).length} ${t("rutas","routes")}'),
-                  const SizedBox(width: 8),
-                  _WelcomeChip(emoji: '📍', label: '${RutasService().rutas.fold<int>(0, (sum, r) { final sd = r['sitiosDetalle']; final gps = r['gpsSitios']; return sum + ((sd is List ? sd.length : 0) + (gps is List ? gps.length : 0) > 0 ? (sd is List ? sd.length : (gps is List ? gps.length : 0)) : 0); })} ${t("sitios","spots")}'),
-                  const SizedBox(width: 8),
-                  _WelcomeChip(emoji: '🏅', label: t('Premios reales','Real rewards')),
-                ]),
-              ])),
+                  Text(
+                    t('La app de turismo más completa de Colombia',
+                      'The most complete tourism app in Colombia'),
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: RDSColor.textPrimary.withOpacity(0.4),
+                      height: 1.4)),
 
-              // Botones
-              Expanded(flex: 3, child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-                _GoldButton(label: t('🌿  CREAR CUENTA','🌿  CREATE ACCOUNT'), onTap: _goToRegister),
-                const SizedBox(height: 10),
-                _OutlineButton(label: t('YA TENGO CUENTA','I HAVE AN ACCOUNT'), onTap: _goToLogin),
-                const SizedBox(height: 10),
-                _cargandoGoogle
-                  ? Container(width: double.infinity, padding: const EdgeInsets.symmetric(vertical: 14),
-                      decoration: BoxDecoration(color: RDSColor.card, borderRadius: BorderRadius.circular(14),
-                        border: Border.all(color: Colors.white.withOpacity(0.1))),
-                      child: const Center(child: SizedBox(width: 20, height: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF4285F4)))))
-                  : _GoogleButton(onTap: _loginGoogleWelcome),
-                const SizedBox(height: 16),
-                GestureDetector(onTap: _goToHome,
-                  child: Text(tExplorarSinReg,
-                    style: TextStyle(fontSize: 12, color: RDSColor.textPrimary.withOpacity(0.3), letterSpacing: 0.5))),
-              ])),
+                  const SizedBox(height: 16),
 
-              const SizedBox(height: 12),
-            ]))))),
-        ]),
-      ),
+                  // Chips de datos
+                  Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                    _WelcomeChip(emoji: '🗺️', label: '${RutasService().rutas.where((r) => r['activa'] != false && r['pausada'] != true && !(r['esFeria'] == true) && !['FERIA CLÁSICA','FERIA DE LAS FLORES'].contains(r['nombre']?.toString())).length} ${t("rutas","routes")}'),
+                    const SizedBox(width: 8),
+                    _WelcomeChip(emoji: '📍', label: '${RutasService().rutas.fold<int>(0, (sum, r) { final sd = r['sitiosDetalle']; final gps = r['gpsSitios']; return sum + ((sd is List ? sd.length : 0) + (gps is List ? gps.length : 0) > 0 ? (sd is List ? sd.length : (gps is List ? gps.length : 0)) : 0); })} ${t("sitios","spots")}'),
+                    const SizedBox(width: 8),
+                    _WelcomeChip(emoji: '🏅', label: t('Premios reales','Real rewards')),
+                  ]),
+
+                  const SizedBox(height: 24),
+
+                  // CTA principal
+                  _GoldButton(label: t('CREAR CUENTA','CREATE ACCOUNT'), onTap: _goToRegister),
+                  const SizedBox(height: 10),
+                  _OutlineButton(label: t('YA TENGO CUENTA','I HAVE AN ACCOUNT'), onTap: _goToLogin),
+                  const SizedBox(height: 10),
+                  _cargandoGoogle
+                    ? Container(width: double.infinity,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        decoration: BoxDecoration(color: RDSColor.card,
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: Colors.white.withOpacity(0.1))),
+                        child: const Center(child: SizedBox(width: 20, height: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2,
+                            color: Color(0xFF4285F4)))))
+                    : _GoogleButton(onTap: _loginGoogleWelcome),
+                  const SizedBox(height: 14),
+                  GestureDetector(
+                    onTap: _goToHome,
+                    child: Text(tExplorarSinReg,
+                      style: TextStyle(fontSize: 11,
+                        color: RDSColor.textPrimary.withOpacity(0.25),
+                        letterSpacing: 0.3))),
+                ])))))),
+      ]),
     );
   }
 }
@@ -8737,7 +8972,7 @@ class _BannerAliadosState extends State<_BannerAliados> {
           const SizedBox(height: 8),
           Text(aliado['nombre']!,
             style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700,
-              color: kText, letterSpacing: 0.5)),
+              color: RDSColor.textPrimary, letterSpacing: 0.5)),
           const SizedBox(height: 4),
           Text(aliado['desc']!,
             style: const TextStyle(fontSize: 12, color: RDSColor.textMuted)),
@@ -8758,7 +8993,7 @@ class _BannerAliadosState extends State<_BannerAliados> {
                 height: 5,
                 margin: EdgeInsets.only(right: i < _aliados.length - 1 ? 4 : 0),
                 decoration: BoxDecoration(
-                  color: i == _indice ? kGold : kGold.withOpacity(0.25),
+                  color: i == _indice ? RDSColor.gold : RDSColor.gold.withOpacity(0.25),
                   borderRadius: BorderRadius.circular(3))))),
         ])));
   }
@@ -10139,7 +10374,7 @@ class _HomeBodyState extends State<HomeBody> {
                             leading: Text(c.pais == 'Colombia' ? '🇨🇴' : '🌎',
                               style: const TextStyle(fontSize: 20)),
                             title: Text('${c.ciudad}, ${c.pais}',
-                              style: const TextStyle(color: kText, fontSize: 14)),
+                              style: const TextStyle(color: RDSColor.textPrimary, fontSize: 14)),
                             trailing: _ciudadDetectada?.ciudad == c.ciudad
                               ? const Icon(Icons.check_circle, color: RDSColor.green, size: 20)
                               : null,
@@ -10150,7 +10385,7 @@ class _HomeBodyState extends State<HomeBody> {
                           ListTile(
                             leading: const Text('🌍', style: TextStyle(fontSize: 20)),
                             title: Text(t('Todas las ciudades', 'All cities'),
-                              style: const TextStyle(color: kTextMuted, fontSize: 14)),
+                              style: const TextStyle(color: RDSColor.textMuted, fontSize: 14)),
                             onTap: () {
                               setState(() { _ciudadDetectada = null; _filtroActivo = 'Ciudad'; });
                               Navigator.pop(context);
@@ -10167,7 +10402,7 @@ class _HomeBodyState extends State<HomeBody> {
                           style: const TextStyle(
                             fontFamily: 'PlayfairDisplay',
                             fontSize: 30, fontWeight: FontWeight.w900,
-                            color: kGold, letterSpacing: 1, height: 1),
+                            color: RDSColor.gold, letterSpacing: 1, height: 1),
                           overflow: TextOverflow.ellipsis)),
                         const SizedBox(width: 6),
                         Text(_ciudadDetectada?.emoji ?? '🌸',
@@ -10209,50 +10444,64 @@ class _HomeBodyState extends State<HomeBody> {
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
                   gradient: const LinearGradient(
-                    colors: [Color(0xFF0D2010), Color(0xFF142A18)],
+                    colors: [Color(0xFF0D2010), Color(0xFF1A3520)],
                     begin: Alignment.topLeft, end: Alignment.bottomRight),
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: RDSColor.gold.withOpacity(0.35))),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: RDSColor.gold.withOpacity(0.4)),
+                  boxShadow: [BoxShadow(
+                    color: RDSColor.green.withOpacity(0.15),
+                    blurRadius: 20, offset: const Offset(0, 4))]),
                 child: Row(children: [
                   Container(width: 48, height: 48,
                     decoration: BoxDecoration(
-                      color: RDSColor.gold.withOpacity(0.15),
+                      color: RDSColor.gold.withOpacity(0.12),
                       shape: BoxShape.circle,
-                      border: Border.all(color: RDSColor.gold.withOpacity(0.4))),
-                    child: const Center(child: Text('🗓️', style: TextStyle(fontSize: 22)))),
+                      border: Border.all(color: RDSColor.gold.withOpacity(0.45))),
+                    child: const Center(child: Icon(
+                      Icons.auto_awesome_rounded,
+                      color: RDSColor.gold, size: 22))),
                   const SizedBox(width: 14),
                   Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                     Text(t('RUTERO PLANNER IA', 'RUTERO PLANNER AI'),
-                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w900,
-                        color: kGold, letterSpacing: 1)),
-                    const SizedBox(height: 2),
+                      style: const TextStyle(
+                        fontFamily: 'SpaceGrotesk',
+                        fontSize: 11, fontWeight: FontWeight.w900,
+                        color: RDSColor.gold, letterSpacing: 1.5)),
+                    const SizedBox(height: 3),
                     Text(
                       t('Decinos cuándo llegás — nosotros te decimos qué hacer',
                         'Tell us when you arrive — we tell you what to do'),
-                      style: TextStyle(fontSize: 11, color: RDSColor.textMuted.withOpacity(0.85), height: 1.3)),
+                      style: TextStyle(fontSize: 11,
+                        color: RDSColor.textMuted.withOpacity(0.85), height: 1.4)),
                   ])),
                   const SizedBox(width: 8),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
                     decoration: BoxDecoration(
-                      color: kGold,
-                      borderRadius: BorderRadius.circular(RDSRadius.xl)),
+                      gradient: const LinearGradient(
+                        colors: [RDSColor.gold, Color(0xFFE8C96B)]),
+                      borderRadius: BorderRadius.circular(12),
+                      boxShadow: [BoxShadow(
+                        color: RDSColor.gold.withOpacity(0.3),
+                        blurRadius: 8, offset: const Offset(0, 2))]),
                     child: Text(t('Probar', 'Try it'),
-                      style: const TextStyle(color: Colors.black, fontSize: 11,
+                      style: const TextStyle(
+                        fontFamily: 'SpaceGrotesk',
+                        color: Colors.black, fontSize: 11,
                         fontWeight: FontWeight.w900))),
                 ]))),
             // ─────────────────────────────────────────────────────────
             Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
               Text(tRutasDisponibles,
                 style: TextStyle(fontSize: 13, fontWeight: FontWeight.w900,
-                  color: kTextMuted, letterSpacing: 2)),
+                  color: RDSColor.textMuted, letterSpacing: 2)),
               GestureDetector(
                 onTap: () => tabNotifier.value = 1,
                 child: Row(children: [
                   Text(tVerMapa, style: const TextStyle(fontSize: 11, color: RDSColor.gold,
                     fontWeight: FontWeight.w700)),
                   const SizedBox(width: 4),
-                  const Text('🗺️', style: TextStyle(fontSize: 12)),
+                  const Icon(Icons.map_rounded, color: RDSColor.gold, size: 14),
                 ])),
             ]),
             const SizedBox(height: 14),
@@ -10264,10 +10513,10 @@ class _HomeBodyState extends State<HomeBody> {
               child: TextField(
                 controller: _searchCtrl,
                 onChanged: (v) => setState(() => _busqueda = v),
-                style: const TextStyle(color: kText, fontSize: 13),
+                style: const TextStyle(color: RDSColor.textPrimary, fontSize: 13),
                 decoration: InputDecoration(
                   hintText: t('Buscar ruta o sitio...','Search route or spot...'),
-                  hintStyle: const TextStyle(color: kTextMuted, fontSize: 13),
+                  hintStyle: const TextStyle(color: RDSColor.textMuted, fontSize: 13),
                   prefixIcon: const Icon(Icons.search, color: RDSColor.textMuted, size: 18),
                   suffixIcon: _busqueda.isNotEmpty
                     ? GestureDetector(
@@ -10303,11 +10552,11 @@ class _HomeBodyState extends State<HomeBody> {
                     const Text('🔍', style: TextStyle(fontSize: 48)),
                     const SizedBox(height: 12),
                     Text('Sin resultados para "$_busqueda"',
-                      style: const TextStyle(color: kText, fontSize: 15, fontWeight: FontWeight.w700)),
+                      style: const TextStyle(color: RDSColor.textPrimary, fontSize: 15, fontWeight: FontWeight.w700)),
                     const SizedBox(height: 6),
                     Text(tProbarOtroNombre,
                       textAlign: TextAlign.center,
-                      style: TextStyle(color: kTextMuted, fontSize: 13)),
+                      style: TextStyle(color: RDSColor.textMuted, fontSize: 13)),
                   ]))
               else
                 ..._rutasFiltradas.map((r) { final esPausada = r['pausada'] == true; final esTemporada = r['zona'] == 'Temporada' || r['zona'] == 'Eventos'; final activa = !esPausada && (!esTemporada || _rutaActiva(r)); return _RouteCard(
@@ -10367,7 +10616,7 @@ class _HomeBodyState extends State<HomeBody> {
                   widgets.add(Padding(
                     padding: const EdgeInsets.only(top: 12, bottom: 6, left: 4),
                     child: Text(sector,
-                      style: const TextStyle(color: kGold, fontSize: 13,
+                      style: const TextStyle(color: RDSColor.gold, fontSize: 13,
                         fontWeight: FontWeight.w800, letterSpacing: 1.2))));
                   for (final r in porSector[sector]!) {
                     final pausada = r['pausada'] == true;
@@ -10484,7 +10733,7 @@ class _HomeBodyState extends State<HomeBody> {
                   final lista = (snap.hasData && snap.data!.docs.isNotEmpty)
                     ? snap.data!.docs.map((d) {
                         final data = d.data() as Map<String, dynamic>;
-                        Color color = kGreen;
+                        Color color = RDSColor.green;
                         try { color = Color(int.parse((data['color']?.toString() ?? '#2D5A1B').replaceAll('#', '0xFF'))); } catch (_) {}
                         return _Colaborador(
                           nombre: data['nombre']?.toString() ?? '',
@@ -10518,7 +10767,7 @@ class _HomeBodyState extends State<HomeBody> {
                               : Center(child: Text(c.emoji, style: const TextStyle(fontSize: 24))))),
                           const SizedBox(width: 12),
                           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                            Text(c.nombre, style: const TextStyle(color: kText, fontSize: 14, fontWeight: FontWeight.w800)),
+                            Text(c.nombre, style: const TextStyle(color: RDSColor.textPrimary, fontSize: 14, fontWeight: FontWeight.w800)),
                             Text(c.handle, style: TextStyle(color: c.color, fontSize: 11, fontWeight: FontWeight.w600)),
                             const SizedBox(height: 4),
                             Text(c.plataforma, style: TextStyle(color: RDSColor.textMuted.withOpacity(0.6), fontSize: 10)),
@@ -10529,7 +10778,7 @@ class _HomeBodyState extends State<HomeBody> {
                     GestureDetector(
                       onTap: () => RuteroNav.push(context, const ColaboradoresScreen()),
                       child: Text(t('Ver perfil completo →', 'See full profile →'),
-                        style: const TextStyle(color: kGreen, fontSize: 11, fontWeight: FontWeight.w700))),
+                        style: const TextStyle(color: RDSColor.green, fontSize: 11, fontWeight: FontWeight.w700))),
                   ]);
                 }),
             ],
@@ -10559,7 +10808,7 @@ class _HomeBodyState extends State<HomeBody> {
                         color: RDSColor.orchid.withOpacity(0.15),
                         borderRadius: BorderRadius.circular(RDSRadius.xl)),
                       child: Text(t('Opinar', 'Share'),
-                        style: const TextStyle(fontSize: 10, color: kOrchid, fontWeight: FontWeight.w700))),
+                        style: const TextStyle(fontSize: 10, color: RDSColor.orchid, fontWeight: FontWeight.w700))),
                   ]))),
 
             const SizedBox(height: 80),
@@ -10958,7 +11207,7 @@ class _RouteDetailScreenState extends State<RouteDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final Color acento = kRutaColor(widget.ruta['acento'], kGold);
+    final Color acento = kRutaColor(widget.ruta['acento'], RDSColor.gold);
     final List<String> sitiosList = parseSitiosList(widget.ruta);
     final int totalSitios = sitiosList.length;
     final int completados = _completados;
@@ -10980,12 +11229,12 @@ class _RouteDetailScreenState extends State<RouteDetailScreen> {
                   errorBuilder: (_, __, ___) => Container(
                     decoration: BoxDecoration(gradient: LinearGradient(
                       begin: Alignment.topLeft, end: Alignment.bottomRight,
-                      colors: [kRutaColor(widget.ruta['color1'], kDark2),
-                               kRutaColor(widget.ruta['color2'], kDark3)]))))
+                      colors: [kRutaColor(widget.ruta['color1'], RDSColor.base),
+                               kRutaColor(widget.ruta['color2'], const Color(0xFF050A04))]))))
               : Container(decoration: BoxDecoration(gradient: LinearGradient(
                   begin: Alignment.topLeft, end: Alignment.bottomRight,
-                  colors: [kRutaColor(widget.ruta['color1'], kDark2),
-                           kRutaColor(widget.ruta['color2'], kDark3)]))),
+                  colors: [kRutaColor(widget.ruta['color1'], RDSColor.base),
+                           kRutaColor(widget.ruta['color2'], const Color(0xFF050A04))]))),
           ),
           // Gradiente oscuro — legibilidad
           Positioned.fill(child: Container(
@@ -11003,7 +11252,7 @@ class _RouteDetailScreenState extends State<RouteDetailScreen> {
                     color: Colors.black.withOpacity(0.45),
                     shape: BoxShape.circle,
                     border: Border.all(color: Colors.white.withOpacity(0.2))),
-                  child: const Center(child: Text('←', style: TextStyle(color: kText, fontSize: 16)))))),
+                  child: const Center(child: Icon(Icons.arrow_back_ios_new_rounded, color: RDSColor.textPrimary, size: 18))))),
             // Badge puntos — arriba derecha
             Positioned(top: 8, right: 12,
               child: Container(
@@ -11015,7 +11264,7 @@ class _RouteDetailScreenState extends State<RouteDetailScreen> {
                 child: Text('+${totalSitios * 30} pts',
                   style: const TextStyle(
                     fontFamily: 'SpaceGrotesk',
-                    color: kGold, fontSize: 11, fontWeight: FontWeight.w700)))),
+                    color: RDSColor.gold, fontSize: 11, fontWeight: FontWeight.w700)))),
             // Info inferior del hero
             Positioned(left: 20, right: 20, bottom: 16,
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
@@ -11037,7 +11286,7 @@ class _RouteDetailScreenState extends State<RouteDetailScreen> {
                   style: const TextStyle(
                     fontFamily: 'PlayfairDisplay',
                     fontSize: 26, fontWeight: FontWeight.w900,
-                    color: kText, letterSpacing: 0, height: 1.1)),
+                    color: RDSColor.textPrimary, letterSpacing: 0, height: 1.1)),
                 const SizedBox(height: 3),
                 Text(rSubtitulo(widget.ruta),
                   style: TextStyle(fontSize: 11, color: RDSColor.textPrimary.withOpacity(0.75))),
@@ -11110,7 +11359,7 @@ class _RouteDetailScreenState extends State<RouteDetailScreen> {
           // Descripción
           if ((kLang == 'en' ? widget.ruta['descripcionEN'] : widget.ruta['descripcion']) != null) ...[
             Text((kLang == 'en' ? widget.ruta['descripcionEN'] : widget.ruta['descripcion']) ?? '',
-              style: const TextStyle(color: kTextMuted, fontSize: 13, height: 1.6)),
+              style: const TextStyle(color: RDSColor.textMuted, fontSize: 13, height: 1.6)),
             const SizedBox(height: 16),
           ],
 
@@ -11138,14 +11387,14 @@ class _RouteDetailScreenState extends State<RouteDetailScreen> {
               const SizedBox(width: 14),
               Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Text(t('Tu progreso', 'Your progress'),
-                  style: const TextStyle(color: kText, fontSize: 13, fontWeight: FontWeight.w700)),
+                  style: const TextStyle(color: RDSColor.textPrimary, fontSize: 13, fontWeight: FontWeight.w700)),
                 const SizedBox(height: 3),
                 Text(completados == 0
                   ? t('Aún no has comenzado', 'Not started yet')
                   : completados == totalSitios
                     ? t('¡Ruta completada! 🎉', 'Route completed! 🎉')
                     : t('$completados sitios visitados', '$completados spots visited'),
-                  style: const TextStyle(color: kTextMuted, fontSize: 11)),
+                  style: const TextStyle(color: RDSColor.textMuted, fontSize: 11)),
               ])),
               // Puntos al completar
               Container(
@@ -11158,8 +11407,8 @@ class _RouteDetailScreenState extends State<RouteDetailScreen> {
                   Text('+${totalSitios * 30}',
                     style: const TextStyle(
                       fontFamily: 'SpaceGrotesk',
-                      color: kGold, fontSize: 13, fontWeight: FontWeight.w700)),
-                  Text('pts', style: const TextStyle(color: kTextMuted, fontSize: 9)),
+                      color: RDSColor.gold, fontSize: 13, fontWeight: FontWeight.w700)),
+                  Text('pts', style: const TextStyle(color: RDSColor.textMuted, fontSize: 9)),
                 ])),
             ])),
 
@@ -11187,15 +11436,15 @@ class _RouteDetailScreenState extends State<RouteDetailScreen> {
                 decoration: BoxDecoration(shape: BoxShape.circle,
                   color: RDSColor.gold.withOpacity(0.1), border: Border.all(color: RDSColor.gold.withOpacity(0.4))),
                 child: widget.ruta['insigniaImg'] != null
-                  ? ClipOval(child: Image.asset(widget.ruta['insigniaImg'], width: 56, height: 56, fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => const Center(child: Text('🏆', style: TextStyle(fontSize: 22)))))
-                  : const Center(child: Text('🏆', style: TextStyle(fontSize: 22)))),
+                  ? Padding(padding: const EdgeInsets.all(4), child: Image.asset(widget.ruta['insigniaImg'], width: 56, height: 56, fit: BoxFit.contain,
+                      errorBuilder: (_, __, ___) => const Center(child: Icon(Icons.emoji_events_rounded, color: RDSColor.gold, size: 28))))
+                  : const Center(child: Icon(Icons.emoji_events_rounded, color: RDSColor.gold, size: 28))),
               const SizedBox(width: 12),
               Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Text((widget.ruta['insignia'] ?? widget.ruta['premio'] ?? t('Premio al completar','Reward on completion')).toString(),
-                  style: TextStyle(color: kGold, fontSize: 11, fontWeight: FontWeight.w700)),
+                  style: TextStyle(color: RDSColor.gold, fontSize: 11, fontWeight: FontWeight.w700)),
                 const SizedBox(height: 2),
-                Text(premio, style: const TextStyle(color: kTextMuted, fontSize: 11, height: 1.4)),
+                Text(premio, style: const TextStyle(color: RDSColor.textMuted, fontSize: 11, height: 1.4)),
               ])),
             ])),
 
@@ -11249,7 +11498,7 @@ class _RouteDetailScreenState extends State<RouteDetailScreen> {
                 Text(t('Ruta en preparación',
                        'Route being prepared'),
                   style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800,
-                    color: kText), textAlign: TextAlign.center),
+                    color: RDSColor.textPrimary), textAlign: TextAlign.center),
                 const SizedBox(height: 8),
                 Text(t('Los sitios de esta ruta estarán disponibles muy pronto. '
                        'Mientras tanto, explorá el mapa y la descripción.',
@@ -11324,7 +11573,7 @@ class _RouteDetailScreenState extends State<RouteDetailScreen> {
                 Expanded(child: Text(
                   t('Compra esta ruta para activar la navegación GPS y validar cada sitio.',
                     'Buy this route to activate GPS navigation and validate each spot.'),
-                  style: const TextStyle(color: kTextMuted, fontSize: 12))),
+                  style: const TextStyle(color: RDSColor.textMuted, fontSize: 12))),
               ])),
           }.toList(),
 
@@ -11339,13 +11588,13 @@ class _RouteDetailScreenState extends State<RouteDetailScreen> {
               decoration: BoxDecoration(
                 color: RDSColor.card,
                 borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: (kRutaColor(widget.ruta['acento'], kGreen)).withOpacity(0.4))),
+                border: Border.all(color: (kRutaColor(widget.ruta['acento'], RDSColor.green)).withOpacity(0.4))),
               child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-                const Text('🛒', style: TextStyle(fontSize: 16)),
+                const Icon(Icons.local_activity_rounded, color: Colors.white, size: 18),
                 const SizedBox(width: 8),
                 Text('${t("COMPRAR RUTA","BUY ROUTE")} · ${precioMostrado(widget.ruta["precio"])}',
                   style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700,
-                    color: kRutaColor(widget.ruta['acento'], kGreen), letterSpacing: 1)),
+                    color: kRutaColor(widget.ruta['acento'], RDSColor.green), letterSpacing: 1)),
               ]))),
 
           // Botón principal — validar o ver premio
@@ -11368,16 +11617,16 @@ class _RouteDetailScreenState extends State<RouteDetailScreen> {
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(RDSRadius.xl)),
                       title: Text(
                         t('¿Ya estás en el destino?', 'Already at the destination?'),
-                        style: const TextStyle(color: kText, fontSize: 16, fontWeight: FontWeight.w800)),
+                        style: const TextStyle(color: RDSColor.textPrimary, fontSize: 16, fontWeight: FontWeight.w800)),
                       content: Text(
                         t('Si ya estás en ${sitiosList[1]}, puedes saltar la terminal y empezar directo desde allí.',
                           'If you are already at ${sitiosList[1]}, you can skip the terminal and start directly from there.'),
-                        style: const TextStyle(color: kTextMuted, fontSize: 13, height: 1.5)),
+                        style: const TextStyle(color: RDSColor.textMuted, fontSize: 13, height: 1.5)),
                       actions: [
                         TextButton(
                           onPressed: () => Navigator.pop(context),
                           child: Text(t('Cancelar', 'Cancel'),
-                            style: const TextStyle(color: kTextMuted))),
+                            style: const TextStyle(color: RDSColor.textMuted))),
                         TextButton(
                           onPressed: () {
                             Navigator.pop(context);
@@ -11455,10 +11704,10 @@ class CuriosidadCard extends StatelessWidget {
         const SizedBox(width: 10),
         Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Text(t('¿Sabías que...?', 'Did you know?'),
-            style: const TextStyle(color: kGold, fontSize: 11,
+            style: const TextStyle(color: RDSColor.gold, fontSize: 11,
               fontWeight: FontWeight.w800, letterSpacing: 1.3)),
           const SizedBox(height: 4),
-          Text(texto, style: const TextStyle(color: kText, fontSize: 13, height: 1.4)),
+          Text(texto, style: const TextStyle(color: RDSColor.textPrimary, fontSize: 13, height: 1.4)),
         ])),
       ]),
     );
@@ -11493,11 +11742,11 @@ class _RetoCardState extends State<RetoCard> {
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: _completado
-            ? [kGreen.withOpacity(0.2), kGreen.withOpacity(0.05)]
-            : [kOrchid.withOpacity(0.15), kOrchid.withOpacity(0.03)]),
+            ? [RDSColor.green.withOpacity(0.2), RDSColor.green.withOpacity(0.05)]
+            : [RDSColor.orchid.withOpacity(0.15), RDSColor.orchid.withOpacity(0.03)]),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: _completado ? kGreen.withOpacity(0.5) : kOrchid.withOpacity(0.4),
+          color: _completado ? RDSColor.green.withOpacity(0.5) : RDSColor.orchid.withOpacity(0.4),
           width: 1.5,
         ),
       ),
@@ -11506,21 +11755,21 @@ class _RetoCardState extends State<RetoCard> {
           Text(emoji, style: const TextStyle(fontSize: 22)),
           const SizedBox(width: 8),
           Text(t('MINI-RETO', 'MINI-CHALLENGE'),
-            style: TextStyle(color: _completado ? kGreen : kOrchid,
+            style: TextStyle(color: _completado ? RDSColor.green : RDSColor.orchid,
               fontSize: 11, fontWeight: FontWeight.w800, letterSpacing: 1.5)),
           const Spacer(),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
             decoration: BoxDecoration(
-              color: (_completado ? kGreen : kOrchid).withOpacity(0.2),
+              color: (_completado ? RDSColor.green : RDSColor.orchid).withOpacity(0.2),
               borderRadius: BorderRadius.circular(10)),
             child: Text('+$puntos pts',
-              style: TextStyle(color: _completado ? kGreen : kOrchid,
+              style: TextStyle(color: _completado ? RDSColor.green : RDSColor.orchid,
                 fontSize: 11, fontWeight: FontWeight.w800)),
           ),
         ]),
         const SizedBox(height: 8),
-        Text(reto, style: const TextStyle(color: kText, fontSize: 14, height: 1.4)),
+        Text(reto, style: const TextStyle(color: RDSColor.textPrimary, fontSize: 14, height: 1.4)),
         const SizedBox(height: 10),
         GestureDetector(
           onTap: _completado ? null : () {
@@ -11535,7 +11784,7 @@ class _RetoCardState extends State<RetoCard> {
           child: Container(
             padding: const EdgeInsets.symmetric(vertical: 10),
             decoration: BoxDecoration(
-              color: _completado ? kGreen : kOrchid,
+              color: _completado ? RDSColor.green : RDSColor.orchid,
               borderRadius: BorderRadius.circular(10)),
             child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
               Text(_completado ? '✅' : '🎯', style: const TextStyle(fontSize: 16)),
@@ -11589,7 +11838,7 @@ class _TriviaCardState extends State<TriviaCard> {
           const Text('🤔', style: TextStyle(fontSize: 22)),
           const SizedBox(width: 8),
           Text(t('TRIVIA', 'TRIVIA'),
-            style: const TextStyle(color: kAccent, fontSize: 11,
+            style: const TextStyle(color: RDSColor.accent, fontSize: 11,
               fontWeight: FontWeight.w800, letterSpacing: 1.5)),
           const Spacer(),
           Container(
@@ -11598,11 +11847,11 @@ class _TriviaCardState extends State<TriviaCard> {
               color: RDSColor.accent.withOpacity(0.2),
               borderRadius: BorderRadius.circular(10)),
             child: Text('+$puntos pts',
-              style: const TextStyle(color: kAccent, fontSize: 11, fontWeight: FontWeight.w800)),
+              style: const TextStyle(color: RDSColor.accent, fontSize: 11, fontWeight: FontWeight.w800)),
           ),
         ]),
         const SizedBox(height: 10),
-        Text(pregunta, style: const TextStyle(color: kText, fontSize: 14, height: 1.4)),
+        Text(pregunta, style: const TextStyle(color: RDSColor.textPrimary, fontSize: 14, height: 1.4)),
         const SizedBox(height: 12),
         ...List.generate(opciones.length, (i) {
           final esCorrecta = i == correcta;
@@ -11610,7 +11859,7 @@ class _TriviaCardState extends State<TriviaCard> {
           Color bg = Colors.white.withOpacity(0.04);
           Color border = Colors.white.withOpacity(0.1);
           if (_respondido) {
-            if (esCorrecta) { bg = kGreen.withOpacity(0.2); border = kGreen; }
+            if (esCorrecta) { bg = RDSColor.green.withOpacity(0.2); border = RDSColor.green; }
             else if (esSeleccionada) { bg = Colors.red.withOpacity(0.15); border = Colors.red.withOpacity(0.5); }
           }
           return GestureDetector(
@@ -11618,7 +11867,7 @@ class _TriviaCardState extends State<TriviaCard> {
               setState(() { _seleccion = i; _respondido = true; });
               if (esCorrecta) widget.onAcertado?.call();
               ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                backgroundColor: esCorrecta ? kGreen : Colors.red.shade700,
+                backgroundColor: esCorrecta ? RDSColor.green : Colors.red.shade700,
                 content: Text(esCorrecta
                   ? t('✅ ¡Correcto! +$puntos puntos', '✅ Correct! +$puntos points')
                   : t('❌ Casi — la respuesta correcta está marcada', '❌ Close — correct answer is marked')),
@@ -11633,16 +11882,16 @@ class _TriviaCardState extends State<TriviaCard> {
               child: Row(children: [
                 Container(width: 22, height: 22,
                   decoration: BoxDecoration(shape: BoxShape.circle,
-                    border: Border.all(color: kTextMuted),
-                    color: _respondido && esCorrecta ? kGreen : Colors.transparent),
+                    border: Border.all(color: RDSColor.textMuted),
+                    color: _respondido && esCorrecta ? RDSColor.green : Colors.transparent),
                   child: _respondido && esCorrecta
                     ? const Icon(Icons.check, color: Colors.white, size: 14)
                     : Center(child: Text(String.fromCharCode(65 + i),
-                        style: const TextStyle(color: kTextMuted, fontSize: 11, fontWeight: FontWeight.w700))),
+                        style: const TextStyle(color: RDSColor.textMuted, fontSize: 11, fontWeight: FontWeight.w700))),
                 ),
                 const SizedBox(width: 10),
                 Expanded(child: Text(opciones[i].toString(),
-                  style: const TextStyle(color: kText, fontSize: 13))),
+                  style: const TextStyle(color: RDSColor.textPrimary, fontSize: 13))),
               ]),
             ),
           );
@@ -11681,7 +11930,7 @@ class TipSensorialCard extends StatelessWidget {
             style: TextStyle(color: kCafe.withOpacity(0.9), fontSize: 11,
               fontWeight: FontWeight.w800, letterSpacing: 1.3)),
           const SizedBox(height: 4),
-          Text(texto, style: const TextStyle(color: kText, fontSize: 13, height: 1.4, fontStyle: FontStyle.italic)),
+          Text(texto, style: const TextStyle(color: RDSColor.textPrimary, fontSize: 13, height: 1.4, fontStyle: FontStyle.italic)),
         ])),
       ]),
     );
@@ -11710,7 +11959,7 @@ class MisionEpicaCard extends StatelessWidget {
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: [kGold.withOpacity(0.25), kOrchid.withOpacity(0.15)],
+          colors: [RDSColor.gold.withOpacity(0.25), RDSColor.orchid.withOpacity(0.15)],
           begin: Alignment.topLeft, end: Alignment.bottomRight),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: RDSColor.gold.withOpacity(0.6), width: 2),
@@ -11722,9 +11971,9 @@ class MisionEpicaCard extends StatelessWidget {
           const SizedBox(width: 10),
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text(t('MISIÓN ÉPICA', 'EPIC MISSION'),
-              style: const TextStyle(color: kGold, fontSize: 11,
+              style: const TextStyle(color: RDSColor.gold, fontSize: 11,
                 fontWeight: FontWeight.w800, letterSpacing: 1.5)),
-            Text(nombre, style: const TextStyle(color: kText, fontSize: 16,
+            Text(nombre, style: const TextStyle(color: RDSColor.textPrimary, fontSize: 16,
               fontWeight: FontWeight.w900)),
           ])),
           Container(
@@ -11733,29 +11982,29 @@ class MisionEpicaCard extends StatelessWidget {
               color: RDSColor.gold.withOpacity(0.25),
               borderRadius: BorderRadius.circular(12)),
             child: Text('+$puntos pts',
-              style: const TextStyle(color: kGold, fontSize: 12, fontWeight: FontWeight.w800)),
+              style: const TextStyle(color: RDSColor.gold, fontSize: 12, fontWeight: FontWeight.w800)),
           ),
         ]),
         const SizedBox(height: 12),
-        Text(descripcion, style: const TextStyle(color: kText, fontSize: 13, height: 1.5)),
+        Text(descripcion, style: const TextStyle(color: RDSColor.textPrimary, fontSize: 13, height: 1.5)),
         const SizedBox(height: 10),
         Row(children: [
           const Text('🎯', style: TextStyle(fontSize: 14)),
           const SizedBox(width: 6),
           Text(t('Objetivo:', 'Target:'),
-            style: const TextStyle(color: kTextMuted, fontSize: 11, fontWeight: FontWeight.w700)),
+            style: const TextStyle(color: RDSColor.textMuted, fontSize: 11, fontWeight: FontWeight.w700)),
           const SizedBox(width: 4),
-          Text('$objetivo', style: const TextStyle(color: kGold, fontSize: 12, fontWeight: FontWeight.w800)),
+          Text('$objetivo', style: const TextStyle(color: RDSColor.gold, fontSize: 12, fontWeight: FontWeight.w800)),
         ]),
         const SizedBox(height: 4),
         Row(children: [
           const Text('🏅', style: TextStyle(fontSize: 14)),
           const SizedBox(width: 6),
           Text(t('Recompensa:', 'Reward:'),
-            style: const TextStyle(color: kTextMuted, fontSize: 11, fontWeight: FontWeight.w700)),
+            style: const TextStyle(color: RDSColor.textMuted, fontSize: 11, fontWeight: FontWeight.w700)),
           const SizedBox(width: 4),
           Expanded(child: Text(recompensa,
-            style: const TextStyle(color: kText, fontSize: 11, fontStyle: FontStyle.italic))),
+            style: const TextStyle(color: RDSColor.textPrimary, fontSize: 11, fontStyle: FontStyle.italic))),
         ]),
       ]),
     );
@@ -11858,7 +12107,7 @@ class _SitioInfoScreenState extends State<SitioInfoScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final Color acento = kRutaColor(widget.ruta['acento'], kGreen);
+    final Color acento = kRutaColor(widget.ruta['acento'], RDSColor.green);
     return Scaffold(
       backgroundColor: RDSColor.base,
       body: Column(children: [
@@ -11881,7 +12130,7 @@ class _SitioInfoScreenState extends State<SitioInfoScreen> {
                         shape: BoxShape.circle,
                         border: Border.all(color: acento.withOpacity(0.3))),
                       child: const Center(child: Text('←',
-                        style: TextStyle(color: kText, fontSize: 16, fontWeight: FontWeight.w700))))),
+                        style: TextStyle(color: RDSColor.textPrimary, fontSize: 16, fontWeight: FontWeight.w700))))),
                   const SizedBox(width: 12),
                   Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                     Text(rNombre(widget.ruta),
@@ -11892,7 +12141,7 @@ class _SitioInfoScreenState extends State<SitioInfoScreen> {
                       maxLines: 1, overflow: TextOverflow.ellipsis),
                     const SizedBox(height: 2),
                     Text('${t("Sitio","Spot")} ${widget.sitioNumero} ${t("de","of")} ${widget.totalSitios}',
-                      style: const TextStyle(color: kTextMuted, fontSize: 11)),
+                      style: const TextStyle(color: RDSColor.textMuted, fontSize: 11)),
                   ])),
                   // Badge sitio
                   Container(
@@ -11926,7 +12175,7 @@ class _SitioInfoScreenState extends State<SitioInfoScreen> {
               style: const TextStyle(
                 fontFamily: 'PlayfairDisplay',
                 fontSize: 28, fontWeight: FontWeight.w900,
-                color: kText, height: 1.1)),
+                color: RDSColor.textPrimary, height: 1.1)),
             const SizedBox(height: 12),
             // ── Foto del sitio eliminada intencionalmente (21/05/2026)
             // El turista descubre la fachada del lugar por sí mismo — es parte
@@ -11977,10 +12226,10 @@ class _SitioInfoScreenState extends State<SitioInfoScreen> {
                 border: Border.all(color: acento.withOpacity(0.2))),
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Row(children: [const Text('📍', style: TextStyle(fontSize: 18)), const SizedBox(width: 8),
-                  Text(tComoLlegar, style: const TextStyle(color: kTextMuted, fontSize: 11, letterSpacing: 2))]),
+                  Text(tComoLlegar, style: const TextStyle(color: RDSColor.textMuted, fontSize: 11, letterSpacing: 2))]),
                 const SizedBox(height: 8),
                 Text(t('Dirígete a ${widget.sitioNombre}. Una vez estés en el lugar, toma la foto para validar.', 'Head to ${widget.sitioNombre}. Once you are there, take a photo to validate.'),
-                  style: const TextStyle(color: kText, fontSize: 13, height: 1.5)),
+                  style: const TextStyle(color: RDSColor.textPrimary, fontSize: 13, height: 1.5)),
                 // FIX UX (16/05/2026): Botón "CÓMO LLEGAR (Google Maps)" eliminado de aquí.
                 // Anteriormente estaba al final de esta tarjeta de info, duplicando la
                 // función con el botón gigante de la pantalla anterior.
@@ -11997,64 +12246,127 @@ class _SitioInfoScreenState extends State<SitioInfoScreen> {
                 const Text('🚗', style: TextStyle(fontSize: 22)),
                 const SizedBox(width: 12),
                 Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text(tTransporte, style: const TextStyle(color: kTextMuted, fontSize: 10)),
-                  Text(widget.ruta['transporte'] ?? '', style: const TextStyle(color: kText, fontSize: 13, fontWeight: FontWeight.w600)),
+                  Text(tTransporte, style: const TextStyle(color: RDSColor.textMuted, fontSize: 10)),
+                  Text(widget.ruta['transporte'] ?? '', style: const TextStyle(color: RDSColor.textPrimary, fontSize: 13, fontWeight: FontWeight.w600)),
                 ])),
               ])),
             const SizedBox(height: 12),
             _cargandoGps
-              ? Container(padding: const EdgeInsets.all(14),
-                  decoration: BoxDecoration(color: RDSColor.card, borderRadius: BorderRadius.circular(14),
+              ? Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: RDSColor.card,
+                    borderRadius: BorderRadius.circular(16),
                     border: Border.all(color: Colors.white.withOpacity(0.08))),
                   child: Row(children: [
-                    SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: acento)),
+                    SizedBox(width: 20, height: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2, color: acento)),
                     const SizedBox(width: 12),
-                    Text(tVerificandoUbic, style: const TextStyle(color: kTextMuted, fontSize: 13)),
+                    Text(tVerificandoUbic,
+                      style: const TextStyle(color: RDSColor.textMuted, fontSize: 13)),
                   ]))
-              : Container(padding: const EdgeInsets.all(14),
-                  decoration: BoxDecoration(
-                    color: _dentroDelRango ? kGreen.withOpacity(0.1) : kAccent.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: _dentroDelRango ? kGreen.withOpacity(0.4) : kAccent.withOpacity(0.4))),
-                  child: Row(children: [
-                    Text(_dentroDelRango ? '✅' : (_errorGps ? '⚠️' : '📍'), style: const TextStyle(fontSize: 20)),
-                    const SizedBox(width: 10),
-                    Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      // FIX 4 (13/05/2026): Mensajes claros según estado del GPS
-                      Text(_dentroDelRango
-                          ? t('¡Estás en el lugar!',"You're at the spot!")
-                          : _errorGps
-                            ? t('Error de GPS','GPS Error')
-                            : t('Aún no estás en el lugar',"You're not there yet"),
-                        style: TextStyle(
-                          color: _dentroDelRango ? kGreen : (_errorGps ? const Color(0xFFE24B4A) : kAccent),
-                          fontSize: 13,
-                          fontWeight: FontWeight.w700)),
-                      const SizedBox(height: 2),
-                      Text(_dentroDelRango && _distanciaMetros != null
-                          ? t('A ${_distanciaMetros!.toInt()}m — puedes validar', 'At ${_distanciaMetros!.toInt()}m — you can validate')
-                          : _errorGps
-                            ? t('Activa GPS, espera unos segundos y reintenta', 'Enable GPS, wait a few seconds and retry')
-                            : _distanciaMetros != null
-                              ? t('Estás a ${_distanciaMetros!.toInt()}m · necesitas menos de ${_radio.toInt()}m', 'You are ${_distanciaMetros!.toInt()}m away · need less than ${_radio.toInt()}m')
-                              : t('Verificando ubicación...', 'Verifying location...'),
-                        style: const TextStyle(color: kTextMuted, fontSize: 11)),
-                    ])),
-                    if (!_dentroDelRango)
-                      GestureDetector(
-                        onTap: () { setState(() { _cargandoGps = true; _errorGps = false; }); _verificarUbicacion(); },
-                        child: Container(padding: const EdgeInsets.all(6),
-                          decoration: BoxDecoration(color: RDSColor.card, borderRadius: BorderRadius.circular(8)),
-                          child: const Icon(Icons.refresh, color: RDSColor.textMuted, size: 16))),
-                  ])),
-            const SizedBox(height: 28),
+              : Builder(
+                  builder: (context) => Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
+                    decoration: BoxDecoration(
+                      color: _dentroDelRango
+                        ? RDSColor.green.withOpacity(0.08)
+                        : RDSColor.accent.withOpacity(0.06),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                        color: _dentroDelRango
+                          ? RDSColor.green.withOpacity(0.4)
+                          : RDSColor.accent.withOpacity(0.25),
+                        width: 1.5),
+                      boxShadow: _dentroDelRango ? [
+                        BoxShadow(
+                          color: RDSColor.green.withOpacity(0.1),
+                          blurRadius: 20, spreadRadius: 2)
+                      ] : []),
+                    child: Row(children: [
+                      // Icono animado de estado
+                      Container(
+                        width: 44, height: 44,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: _dentroDelRango
+                            ? RDSColor.green.withOpacity(0.2)
+                            : RDSColor.accent.withOpacity(0.1),
+                          border: Border.all(
+                            color: _dentroDelRango
+                              ? RDSColor.green.withOpacity(0.5 + 0.2)
+                              : RDSColor.accent.withOpacity(0.3),
+                            width: 1.5),
+                          boxShadow: _dentroDelRango ? [
+                            BoxShadow(
+                              color: RDSColor.green.withOpacity(0.2),
+                              blurRadius: 12)
+                          ] : []),
+                        child: Icon(
+                          _dentroDelRango
+                            ? Icons.my_location_rounded
+                            : _errorGps
+                              ? Icons.location_off_rounded
+                              : Icons.location_searching_rounded,
+                          color: _dentroDelRango
+                            ? RDSColor.green
+                            : _errorGps
+                              ? const Color(0xFFE24B4A)
+                              : RDSColor.accent,
+                          size: 22)),
+                      const SizedBox(width: 12),
+                      Expanded(child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start, children: [
+                        Text(
+                          _dentroDelRango
+                            ? t('¡Estás en el lugar!', "You're at the spot!")
+                            : _errorGps
+                              ? t('Error de GPS', 'GPS Error')
+                              : t('Aún no estás en el lugar', "You're not there yet"),
+                          style: TextStyle(
+                            fontFamily: 'SpaceGrotesk',
+                            color: _dentroDelRango
+                              ? RDSColor.green
+                              : _errorGps
+                                ? const Color(0xFFE24B4A)
+                                : RDSColor.accent,
+                            fontSize: 13, fontWeight: FontWeight.w800)),
+                        const SizedBox(height: 2),
+                        Text(
+                          _dentroDelRango && _distanciaMetros != null
+                            ? t('A ${_distanciaMetros!.toInt()}m — listo para validar',
+                                'At ${_distanciaMetros!.toInt()}m — ready to validate')
+                            : _errorGps
+                              ? t('Activa GPS, espera y reintenta',
+                                  'Enable GPS, wait and retry')
+                              : _distanciaMetros != null
+                                ? t('Estás a ${_distanciaMetros!.toInt()}m · necesitas menos de ${_radio.toInt()}m',
+                                    'You are ${_distanciaMetros!.toInt()}m away · need less than ${_radio.toInt()}m')
+                                : t('Verificando ubicación...', 'Verifying location...'),
+                          style: const TextStyle(
+                            color: RDSColor.textMuted, fontSize: 11)),
+                      ])),
+                      if (!_dentroDelRango)
+                        GestureDetector(
+                          onTap: () {
+                            setState(() { _cargandoGps = true; _errorGps = false; });
+                            _verificarUbicacion();
+                          },
+                          child: Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: RDSColor.card,
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(color: Colors.white.withOpacity(0.1))),
+                            child: const Icon(Icons.refresh_rounded,
+                              color: RDSColor.textMuted, size: 18))),
+                    ]))),
+            const SizedBox(height: 24),
+
+            // ── Botón CTA principal — el "momento Pokémon GO" ──
             GestureDetector(
-              // FIX 3 (13/05/2026): Re-verificar GPS antes de abrir la cámara
-              // El botón está protegido por (!_cargandoGps && _dentroDelRango),
-              // pero adicionalmente re-verificamos al momento del toque para
-              // evitar que GPS desactualizado permita validación falsa.
               onTap: (!_cargandoGps && _dentroDelRango) ? () async {
-                // ── CONVERSIÓN (junio 2026): usuario sin cuenta → mostrar BottomSheet ──
                 if (AuthService.currentUser == null) {
                   final decision = await mostrarBottomSheetConversion(context);
                   if (!context.mounted) return;
@@ -12067,67 +12379,82 @@ class _SitioInfoScreenState extends State<SitioInfoScreen> {
                       MaterialPageRoute(builder: (_) => const LoginScreen()));
                     return;
                   }
-                  // decision == null → eligió "Continuar sin guardar" → sigue adelante
                 }
-                // ── FIN CONVERSIÓN ──
-
-                // Si NO está en modo demo, re-verificar GPS justo antes
                 if (!kModoDemo) {
                   setState(() { _cargandoGps = true; });
                   await _verificarUbicacion();
                   if (!_dentroDelRango && context.mounted) {
-                    final mensajeError = _errorGps
-                      ? t('📍 No pudimos verificar tu ubicación. Activa GPS y reintenta.',
-                          '📍 We couldn\'t verify your location. Enable GPS and retry.')
-                      : t('📍 No estás en el lugar exacto. Acércate al sitio.',
-                          '📍 You\'re not at the exact location. Get closer to the site.');
                     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                      content: Text(mensajeError),
+                      content: Text(_errorGps
+                        ? t('📍 No pudimos verificar tu ubicación. Activa GPS y reintenta.',
+                            "📍 We couldn't verify your location. Enable GPS and retry.")
+                        : t('📍 No estás en el lugar exacto. Acércate al sitio.',
+                            "📍 You're not at the exact location. Get closer to the site.")),
                       backgroundColor: const Color(0xFFE24B4A),
-                      duration: const Duration(seconds: 4),
-                    ));
+                      duration: const Duration(seconds: 4)));
                     return;
                   }
                 }
                 if (!context.mounted) return;
                 final ok = await Navigator.of(context).push<bool>(MaterialPageRoute(
-                  builder: (_) => CameraScreen(sitioNombre: widget.sitioNombre, sitioEmoji: widget.sitioEmoji,
-                    sitioNumero: widget.sitioNumero, totalSitios: widget.totalSitios, ruta: widget.ruta)));
+                  builder: (_) => CameraScreen(
+                    sitioNombre: widget.sitioNombre,
+                    sitioEmoji: widget.sitioEmoji,
+                    sitioNumero: widget.sitioNumero,
+                    totalSitios: widget.totalSitios,
+                    ruta: widget.ruta)));
                 if (ok == true && context.mounted) Navigator.of(context).pop(true);
               } : null,
               child: AnimatedContainer(
-                duration: const Duration(milliseconds: 300),
-                width: double.infinity,
-                padding: EdgeInsets.symmetric(vertical: _dentroDelRango ? 20 : 16),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(colors: _dentroDelRango
-                    ? [acento, acento.withOpacity(0.8)]
-                    : [kTextMuted.withOpacity(0.4), kTextMuted.withOpacity(0.3)]),
-                  borderRadius: BorderRadius.circular(16),
-                  boxShadow: _dentroDelRango ? [
-                    BoxShadow(color: acento.withOpacity(0.4), blurRadius: 24, offset: const Offset(0, 8)),
-                    BoxShadow(color: acento.withOpacity(0.2), blurRadius: 40),
-                  ] : []),
-                child: Column(mainAxisSize: MainAxisSize.min, children: [
-                  Text(
-                    _cargandoGps ? '🔍' :
-                    _dentroDelRango ? '📷' :
-                    _errorGps ? '⚠️' : '📍',
-                    style: TextStyle(fontSize: _dentroDelRango ? 28 : 22)),
-                  const SizedBox(height: 4),
-                  Text(
-                    _cargandoGps ? t('VERIFICANDO UBICACIÓN...','VERIFYING LOCATION...') :
-                    _dentroDelRango ? t('TOMAR FOTO Y VALIDAR','TAKE PHOTO & VALIDATE') :
-                    _errorGps ? t('REINTENTAR GPS','RETRY GPS') :
-                    t('ACÉRCATE AL SITIO','HEAD TO THE SPOT'),
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontFamily: 'Inter',
-                      fontSize: _dentroDelRango ? 15 : 13,
-                      fontWeight: FontWeight.w800,
+                  duration: const Duration(milliseconds: 400),
+                  curve: Curves.easeOut,
+                  width: double.infinity,
+                  padding: EdgeInsets.symmetric(
+                    vertical: _dentroDelRango ? 22 : 16),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: _dentroDelRango
+                        ? [acento, acento.withOpacity(0.75)]
+                        : [RDSColor.textMuted.withOpacity(0.35),
+                           RDSColor.textMuted.withOpacity(0.25)]),
+                    borderRadius: BorderRadius.circular(20),
+                    boxShadow: _dentroDelRango ? [
+                      BoxShadow(
+                        color: acento.withOpacity(0.5),
+                        blurRadius: 28,
+                        offset: const Offset(0, 6)),
+                      BoxShadow(
+                        color: acento.withOpacity(0.15),
+                        blurRadius: 50),
+                    ] : []),
+                  child: Column(mainAxisSize: MainAxisSize.min, children: [
+                    Icon(
+                      _cargandoGps
+                        ? Icons.location_searching_rounded
+                        : _dentroDelRango
+                          ? Icons.camera_alt_rounded
+                          : _errorGps
+                            ? Icons.location_off_rounded
+                            : Icons.directions_walk_rounded,
                       color: Colors.white,
-                      letterSpacing: 1.5)),
-                ]))),
+                      size: _dentroDelRango ? 32 : 24),
+                    const SizedBox(height: 6),
+                    Text(
+                      _cargandoGps
+                        ? t('VERIFICANDO UBICACIÓN...', 'VERIFYING LOCATION...')
+                        : _dentroDelRango
+                          ? t('TOMAR FOTO Y VALIDAR', 'TAKE PHOTO & VALIDATE')
+                          : _errorGps
+                            ? t('REINTENTAR GPS', 'RETRY GPS')
+                            : t('ACÉRCATE AL SITIO', 'HEAD TO THE SPOT'),
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontFamily: 'SpaceGrotesk',
+                        fontSize: _dentroDelRango ? 15 : 13,
+                        fontWeight: FontWeight.w900,
+                        color: Colors.white,
+                        letterSpacing: 1.5)),
+                  ]))),
             const SizedBox(height: 80),
           ]),
         )),
@@ -12225,7 +12552,10 @@ class _CameraScreenState extends State<CameraScreen> with SingleTickerProviderSt
         ]);
         if (confirmar == true && mounted) {
           setState(() => _fotoTomada = File(foto.path));
-          await _guardarEnGaleria(File(foto.path));
+          _guardarEnGaleria(File(foto.path)).timeout(
+            const Duration(seconds: 12),
+            onTimeout: () => debugPrint('⚠️ Timeout galería'),
+          ).catchError((e) => debugPrint('⚠️ Error galería: \$e'));
           await _validarFoto();
         }
       }
@@ -12370,7 +12700,7 @@ class _CameraScreenState extends State<CameraScreen> with SingleTickerProviderSt
               borderRadius: BorderRadius.circular(2))),
           const SizedBox(height: 16),
           const Text('📸 PREVIEW', style: TextStyle(
-            color: kText, fontSize: 14, fontWeight: FontWeight.w800, letterSpacing: 2)),
+            color: RDSColor.textPrimary, fontSize: 14, fontWeight: FontWeight.w800, letterSpacing: 2)),
           const SizedBox(height: 12),
           // Aviso foto vertical
           Container(
@@ -12384,7 +12714,7 @@ class _CameraScreenState extends State<CameraScreen> with SingleTickerProviderSt
               Text('📱', style: TextStyle(fontSize: 16)),
               SizedBox(width: 8),
               Flexible(child: Text('Para mejores resultados toma la foto en vertical',
-                style: TextStyle(color: kGold, fontSize: 11, fontWeight: FontWeight.w600))),
+                style: TextStyle(color: RDSColor.gold, fontSize: 11, fontWeight: FontWeight.w600))),
             ])),
           const SizedBox(height: 10),
           // Foto con avatar superpuesto
@@ -12445,7 +12775,7 @@ class _CameraScreenState extends State<CameraScreen> with SingleTickerProviderSt
                     const Text('🔄', style: TextStyle(fontSize: 22)),
                     const SizedBox(height: 4),
                     Text(tRepetir, style: const TextStyle(
-                      color: kTextMuted, fontSize: 11, fontWeight: FontWeight.w700)),
+                      color: RDSColor.textMuted, fontSize: 11, fontWeight: FontWeight.w700)),
                   ])))),
               const SizedBox(width: 12),
               // Confirmar foto
@@ -12476,124 +12806,28 @@ class _CameraScreenState extends State<CameraScreen> with SingleTickerProviderSt
   //        en _SitioInfoScreenState antes de abrir la cámara. Ver FIX 1, 2 y 4.
   Future<void> _validarFoto() async {
     if (_fotoTomada == null) return;
-
     setState(() { _validando = true; _subiendo = true; });
 
-    String? urlFoto;
-    bool subidaExitosa = false;
-    String? errorSubida;
-    DocumentReference<Map<String, dynamic>>? fotoDocRef;
-    final fotoPath = _fotoTomada!.path;
-
-    if (kModoDemo) {
-      // MODO DEMO: simular subida sin esperar Firebase
-      await Future.delayed(const Duration(milliseconds: 600));
-      // Guardar en Firestore (fire and forget)
-      if (AuthService.currentUser != null) {
-        try {
-          await FirebaseFirestore.instance
-            .collection('usuarios')
-            .doc(AuthService.currentUser!.uid)
-            .collection('fotos')
-            .add({
-              'sitio': widget.sitioNombre,
-              'ruta': widget.ruta['nombre'],
-              'emoji': widget.sitioEmoji,
-              'rutaEmoji': widget.ruta['emoji'],
-              'acento': (kRutaColor(widget.ruta['acento'], kGreen)).value,
-              'fecha': FieldValue.serverTimestamp(),
-              'modoDemo': true,
-              'url': null,
-              'localPath': fotoPath,
-            });
-          subidaExitosa = true;
-        } catch (e) {
-          debugPrint('Foto registro modo demo: $e');
-          errorSubida = e.toString();
-        }
-      }
-    } else {
-      // MODO PRODUCCIÓN — Estrategia "guardar primero, subir después":
-      // 1. Crear el registro en Firestore inmediatamente con localPath
-      // 2. Después intentar subir a Storage
-      // 3. Si la subida sucede, actualizar el documento con la URL
-      // 4. Si la subida falla, el documento ya existe con localPath
-      //
-      // Esto garantiza que las fotos SIEMPRE queden registradas, aunque
-      // la conexión sea lenta o falle el upload a Storage.
-      if (AuthService.currentUser != null) {
-        try {
-          // PASO 1 — Registrar foto inmediatamente en Firestore
-          fotoDocRef = await FirebaseFirestore.instance
-            .collection('usuarios')
-            .doc(AuthService.currentUser!.uid)
-            .collection('fotos')
-            .add({
-              'sitio': widget.sitioNombre,
-              'ruta': widget.ruta['nombre'],
-              'emoji': widget.sitioEmoji,
-              'rutaEmoji': widget.ruta['emoji'],
-              'acento': (kRutaColor(widget.ruta['acento'], kGreen)).value,
-              'fecha': FieldValue.serverTimestamp(),
-              'modoDemo': false,
-              'url': null,
-              'localPath': fotoPath,
-              'pendienteSubir': true,  // bandera para reintento futuro
-            });
-
-          // PASO 2 — Intentar subir a Storage con timeouts
-          try {
-            final timestamp = DateTime.now().millisecondsSinceEpoch;
-            final ref = FirebaseStorage.instance
-              .ref('fotos_validacion/${AuthService.currentUser!.uid}/${widget.sitioNumero}_$timestamp.jpg');
-            await ref.putFile(_fotoTomada!).timeout(const Duration(seconds: 15));
-            urlFoto = await ref.getDownloadURL().timeout(const Duration(seconds: 8));
-
-            // PASO 3 — Actualizar documento con URL real
-            await fotoDocRef.update({
-              'url': urlFoto,
-              'pendienteSubir': false,
-            });
-            subidaExitosa = true;
-          } catch (eUpload) {
-            // Storage falló pero Firestore SÍ se guardó — la foto queda en local
-            debugPrint('⚠️ Upload Storage falló (foto guardada local): $eUpload');
-            errorSubida = 'storage_timeout';
-            subidaExitosa = false;  // se marca como no subida pero registrada
-          }
-        } catch (eFirestore) {
-          // Firestore falló — error crítico
-          debugPrint('🔴 Firestore falló al guardar foto: $eFirestore');
-          errorSubida = eFirestore.toString();
-          subidaExitosa = false;
-        }
-      }
+    // La foto NO se sube a Storage — queda en galería del usuario.
+    // Solo registramos la validación como doc liviano en Firestore.
+    if (!kModoDemo && AuthService.currentUser != null) {
+      FirebaseFirestore.instance
+        .collection('usuarios')
+        .doc(AuthService.currentUser!.uid)
+        .collection('validaciones')
+        .add({
+          'sitio': widget.sitioNombre,
+          'sitioNumero': widget.sitioNumero,
+          'ruta': widget.ruta['nombre'],
+          'emoji': widget.sitioEmoji,
+          'rutaEmoji': widget.ruta['emoji'],
+          'acento': (kRutaColor(widget.ruta['acento'], RDSColor.green)).value,
+          'fecha': FieldValue.serverTimestamp(),
+        }).catchError((e) => debugPrint('⚠️ validación Firestore: $e'));
     }
-
     setState(() { _subiendo = false; _validando = false; });
 
-    // FIX C: Snackbar informativo si hubo problema con la subida a Storage
-    // (pero la foto SÍ se guardó localmente y en Firestore)
-    if (!subidaExitosa && errorSubida == 'storage_timeout' && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text(t(
-          '📸 Foto guardada localmente. Se subirá cuando tengas mejor señal.',
-          '📸 Photo saved locally. Will upload when you have better signal.')),
-        backgroundColor: kOrchid,
-        duration: const Duration(seconds: 4),
-      ));
-    } else if (errorSubida != null && errorSubida != 'storage_timeout' && mounted) {
-      // Error grave (Firestore falló): aviso rojo
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text(t(
-          '⚠️ Hubo un problema guardando la foto. Inténtalo más tarde.',
-          '⚠️ There was a problem saving the photo. Try again later.')),
-        backgroundColor: const Color(0xFFE24B4A),
-        duration: const Duration(seconds: 4),
-      ));
-    }
-
-    // 🎉 Celebración al validar foto
+        // 🎉 Celebración al validar foto
     await AudioManager().sonarCelebracion();
     // 🔔 Notificación push local de sitio validado
     NotificationManager().sitioValidado(
@@ -12625,7 +12859,7 @@ class _CameraScreenState extends State<CameraScreen> with SingleTickerProviderSt
           sitioNumero: widget.sitioNumero,
           totalSitios: widget.totalSitios,
           ruta: widget.ruta,
-          urlFotoValidacion: urlFoto,
+          urlFotoValidacion: null,
         )));
       if (mounted) Navigator.of(context).pop(true);
     }
@@ -12633,7 +12867,7 @@ class _CameraScreenState extends State<CameraScreen> with SingleTickerProviderSt
 
   @override
   Widget build(BuildContext context) {
-    final Color acento = kRutaColor(widget.ruta['acento'], kGreen);
+    final Color acento = kRutaColor(widget.ruta['acento'], RDSColor.green);
     return Scaffold(
       backgroundColor: Colors.black,
       body: Stack(children: [
@@ -12645,7 +12879,7 @@ class _CameraScreenState extends State<CameraScreen> with SingleTickerProviderSt
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
                     begin: Alignment.topCenter, end: Alignment.bottomCenter,
-                    colors: [kRutaColor(widget.ruta['color1'], kDark2), kRutaColor(widget.ruta['color2'], kDark3)])),
+                    colors: [kRutaColor(widget.ruta['color1'], RDSColor.base), kRutaColor(widget.ruta['color2'], const Color(0xFF050A04))])),
                 child: Stack(children: [
                   Center(child: Text(widget.sitioEmoji,
                     style: const TextStyle(fontSize: 120))),
@@ -12700,7 +12934,7 @@ class _CameraScreenState extends State<CameraScreen> with SingleTickerProviderSt
                 Container(width: 6, height: 6,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: kModoDemo ? Colors.orange : kGreen)),
+                    color: kModoDemo ? Colors.orange : RDSColor.green)),
                 const SizedBox(width: 6),
                 Text(kModoDemo ? '🧪 MODO DEMO' : '📍 GPS VERIFICADO',
                   style: const TextStyle(color: Colors.white, fontSize: 10, letterSpacing: 1)),
@@ -12854,8 +13088,8 @@ class _RewardScreenState extends State<RewardScreen>
   }
 
   void _generarParticulas() {
-    final acento = kRutaColor(widget.ruta['acento'], kGreen);
-    final colores = [acento, kGold, kGreen, Colors.white, acento.withOpacity(0.7)];
+    final acento = kRutaColor(widget.ruta['acento'], RDSColor.green);
+    final colores = [acento, RDSColor.gold, RDSColor.green, Colors.white, acento.withOpacity(0.7)];
     final rand = List.generate(60, (i) => i);
     for (final i in rand) {
       _particles.add(_ConfettiParticle(
@@ -12919,7 +13153,7 @@ class _RewardScreenState extends State<RewardScreen>
           const Text('📤', style: TextStyle(fontSize: 22)),
           const SizedBox(width: 8),
           Text(t('Compartir logro', 'Share achievement'),
-            style: const TextStyle(color: kText, fontSize: 16, fontWeight: FontWeight.w800)),
+            style: const TextStyle(color: RDSColor.textPrimary, fontSize: 16, fontWeight: FontWeight.w800)),
         ]),
         content: Column(mainAxisSize: MainAxisSize.min, children: [
           Container(
@@ -12928,11 +13162,11 @@ class _RewardScreenState extends State<RewardScreen>
               color: RDSColor.surface, borderRadius: BorderRadius.circular(12),
               border: Border.all(color: RDSColor.green.withOpacity(0.2))),
             child: Text(texto,
-              style: const TextStyle(color: kText, fontSize: 13, height: 1.5))),
+              style: const TextStyle(color: RDSColor.textPrimary, fontSize: 13, height: 1.5))),
         ]),
         actions: [
           TextButton(onPressed: () => Navigator.pop(context),
-            child: Text(t('Cerrar','Close'), style: const TextStyle(color: kTextMuted))),
+            child: Text(t('Cerrar','Close'), style: const TextStyle(color: RDSColor.textMuted))),
           TextButton(
             onPressed: () {
               Navigator.pop(context);
@@ -12942,13 +13176,13 @@ class _RewardScreenState extends State<RewardScreen>
                 backgroundColor: RDSColor.green, duration: const Duration(seconds: 3)));
             },
             child: Text(t('¡LISTO!','DONE!'),
-              style: const TextStyle(color: kGreen, fontWeight: FontWeight.w800))),
+              style: const TextStyle(color: RDSColor.green, fontWeight: FontWeight.w800))),
         ]));
   }
 
   @override
   Widget build(BuildContext context) {
-    final acento = kRutaColor(widget.ruta['acento'], kGreen);
+    final acento = kRutaColor(widget.ruta['acento'], RDSColor.green);
     final esUltimo = widget.sitioNumero >= widget.totalSitios;
 
     return Scaffold(
@@ -12958,7 +13192,7 @@ class _RewardScreenState extends State<RewardScreen>
         Positioned.fill(child: Container(
           decoration: BoxDecoration(gradient: RadialGradient(
             center: Alignment.topCenter, radius: 1.5,
-            colors: [acento.withOpacity(0.18), kDark2, kDark])))),
+            colors: [acento.withOpacity(0.18), RDSColor.base, kDark])))),
 
         // ── Confetti animado ──
         if (_particles.isNotEmpty)
@@ -13003,7 +13237,7 @@ class _RewardScreenState extends State<RewardScreen>
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       gradient: LinearGradient(
-                        colors: [acento.withOpacity(0.3), kDark3],
+                        colors: [acento.withOpacity(0.3), const Color(0xFF050A04)],
                         begin: Alignment.topLeft, end: Alignment.bottomRight),
                       boxShadow: [
                         BoxShadow(color: acento.withOpacity(0.5), blurRadius: 40, spreadRadius: 8),
@@ -13011,8 +13245,8 @@ class _RewardScreenState extends State<RewardScreen>
                       ],
                       border: Border.all(color: acento.withOpacity(0.5), width: 2)),
                     child: widget.ruta['insigniaImg'] != null
-                      ? ClipOval(child: Image.asset(widget.ruta['insigniaImg'],
-                          fit: BoxFit.cover,
+                      ? Padding(padding: const EdgeInsets.all(10), child: Image.asset(widget.ruta['insigniaImg'],
+                          fit: BoxFit.contain,
                           errorBuilder: (_, __, ___) => Center(
                             child: Text(widget.sitioEmoji,
                               style: const TextStyle(fontSize: 64)))))
@@ -13030,7 +13264,7 @@ class _RewardScreenState extends State<RewardScreen>
                 style: const TextStyle(
                   fontFamily: 'PlayfairDisplay',
                   fontSize: 26, fontWeight: FontWeight.w900,
-                  color: kText, height: 1.2),
+                  color: RDSColor.textPrimary, height: 1.2),
                 textAlign: TextAlign.center),
 
               const SizedBox(height: 8),
@@ -13054,11 +13288,11 @@ class _RewardScreenState extends State<RewardScreen>
                 _RewardStat(
                   label: t('Progreso','Progress'),
                   value: '${((widget.sitioNumero / widget.totalSitios) * 100).toInt()}%',
-                  color: kGold),
+                  color: RDSColor.gold),
                 _RewardStat(
                   label: t('Puntos','Points'),
                   value: '+${widget.sitioNumero * 30}',
-                  color: kOrchid),
+                  color: RDSColor.orchid),
               ]),
 
               const SizedBox(height: 24),
@@ -13096,12 +13330,12 @@ class _RewardScreenState extends State<RewardScreen>
                   const SizedBox(width: 12),
                   Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                     Text(tPremioAlCompletarRuta,
-                      style: const TextStyle(color: kTextMuted, fontSize: 10,
+                      style: const TextStyle(color: RDSColor.textMuted, fontSize: 10,
                         fontFamily: 'SpaceGrotesk', letterSpacing: 0.5)),
                     const SizedBox(height: 2),
                     Text((widget.ruta['premio'] ?? '').toString(),
                       style: const TextStyle(
-                        color: kGold, fontSize: 12,
+                        color: RDSColor.gold, fontSize: 12,
                         fontWeight: FontWeight.w700, height: 1.4)),
                   ])),
                 ])),
@@ -13126,7 +13360,7 @@ class _RewardScreenState extends State<RewardScreen>
                     borderRadius: BorderRadius.circular(14),
                     border: Border.all(color: acento.withOpacity(0.35))),
                   child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-                    const Text('📤', style: TextStyle(fontSize: 18)),
+                    const Icon(Icons.share_rounded, color: Colors.white70, size: 20),
                     const SizedBox(width: 8),
                     Text(t('COMPARTIR LOGRO', 'SHARE ACHIEVEMENT'),
                       style: TextStyle(
@@ -13138,8 +13372,8 @@ class _RewardScreenState extends State<RewardScreen>
               // ── Botón siguiente ──
               _GoldButton(
                 label: esUltimo
-                  ? t('🏆  VER MI INSIGNIA','🏆  SEE MY BADGE')
-                  : t('✅  SIGUIENTE SITIO →','✅  NEXT SPOT →'),
+                  ? t('VER MI INSIGNIA','SEE MY BADGE')
+                  : t('SIGUIENTE SITIO','NEXT SPOT'),
                 onTap: () => Navigator.of(context).pop()),
 
             ])))),
@@ -13264,7 +13498,7 @@ class ProfileScreen extends StatelessWidget {
                 Container(width: 26, height: 26,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: kGreen,
+                    color: RDSColor.green,
                     border: Border.all(color: RDSColor.card, width: 2)),
                   child: const Center(child: Text('📷', style: TextStyle(fontSize: 12)))),
               ]))),
@@ -13277,10 +13511,10 @@ class ProfileScreen extends StatelessWidget {
                 border: Border.all(color: Colors.white.withOpacity(0.1))),
               child: TextField(
                 controller: nombreCtrl,
-                style: const TextStyle(color: kText, fontSize: 14),
+                style: const TextStyle(color: RDSColor.textPrimary, fontSize: 14),
                 decoration: InputDecoration(
                   hintText: t('Tu nombre','Your name'),
-                  hintStyle: const TextStyle(color: kTextMuted),
+                  hintStyle: const TextStyle(color: RDSColor.textMuted),
                   prefixIcon: const Padding(padding: EdgeInsets.all(12),
                     child: Text('👤', style: TextStyle(fontSize: 16))),
                   border: InputBorder.none,
@@ -13295,9 +13529,9 @@ class ProfileScreen extends StatelessWidget {
               child: Row(children: [
                 const Text('📧', style: TextStyle(fontSize: 16)),
                 const SizedBox(width: 10),
-                Text(user?.email ?? '', style: const TextStyle(color: kTextMuted, fontSize: 13)),
+                Text(user?.email ?? '', style: const TextStyle(color: RDSColor.textMuted, fontSize: 13)),
                 const Spacer(),
-                Text(tNoEditable, style: const TextStyle(color: kTextMuted, fontSize: 10)),
+                Text(tNoEditable, style: const TextStyle(color: RDSColor.textMuted, fontSize: 10)),
               ])),
 
             const SizedBox(height: 20),
@@ -13377,16 +13611,16 @@ class ProfileScreen extends StatelessWidget {
               margin: const EdgeInsets.only(bottom: 8),
               padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
-                color: idiomaSeleccionado == idioma ? kGreen.withOpacity(0.1) : kDark3,
+                color: idiomaSeleccionado == idioma ? RDSColor.green.withOpacity(0.1) : const Color(0xFF050A04),
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(
-                  color: idiomaSeleccionado == idioma ? kGreen : Colors.white.withOpacity(0.06))),
+                  color: idiomaSeleccionado == idioma ? RDSColor.green : Colors.white.withOpacity(0.06))),
               child: Row(children: [
                 Text(idioma == 'Español' ? '🇨🇴' : '🇺🇸', style: const TextStyle(fontSize: 22)),
                 const SizedBox(width: 12),
                 Expanded(child: Text(idioma,
                   style: TextStyle(
-                    color: idiomaSeleccionado == idioma ? kGreen : kText,
+                    color: idiomaSeleccionado == idioma ? RDSColor.green : RDSColor.textPrimary,
                     fontSize: 14, fontWeight: FontWeight.w600))),
                 if (idiomaSeleccionado == idioma)
                   Container(width: 20, height: 20,
@@ -13400,7 +13634,7 @@ class ProfileScreen extends StatelessWidget {
               Text(t('Idioma', 'Language'), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: RDSColor.textPrimary)),
               const SizedBox(height: 4),
               Text(t('Próximamente disponible en más idiomas', 'More languages coming soon'),
-                style: const TextStyle(color: kTextMuted, fontSize: 12)),
+                style: const TextStyle(color: RDSColor.textMuted, fontSize: 12)),
               const SizedBox(height: 16),
               _idiomaItem('Español'),
               _idiomaItem('English'),
@@ -13446,8 +13680,8 @@ class ProfileScreen extends StatelessWidget {
                 const Text('🔇', style: TextStyle(fontSize: 22)),
                 const SizedBox(width: 12),
                 Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text(tSilenciarTodo, style: const TextStyle(color: kText, fontSize: 14, fontWeight: FontWeight.w600)),
-                  Text(tApagaMusicaEfectos, style: const TextStyle(color: kTextMuted, fontSize: 11)),
+                  Text(tSilenciarTodo, style: const TextStyle(color: RDSColor.textPrimary, fontSize: 14, fontWeight: FontWeight.w600)),
+                  Text(tApagaMusicaEfectos, style: const TextStyle(color: RDSColor.textMuted, fontSize: 11)),
                 ])),
                 Switch(
                   value: AudioManager().silenciado,
@@ -13455,7 +13689,7 @@ class ProfileScreen extends StatelessWidget {
                     await AudioManager().toggleSilencio();
                     setModalState(() {});
                   },
-                  activeColor: kAccent, inactiveTrackColor: Colors.white12),
+                  activeColor: RDSColor.accent, inactiveTrackColor: Colors.white12),
               ])),
             const SizedBox(height: 16),
 
@@ -13468,16 +13702,16 @@ class ProfileScreen extends StatelessWidget {
                   const Text('🎶', style: TextStyle(fontSize: 18)),
                   const SizedBox(width: 10),
                   Expanded(child: Text(tVolumenMusica,
-                    style: const TextStyle(color: kText, fontSize: 14, fontWeight: FontWeight.w600))),
+                    style: const TextStyle(color: RDSColor.textPrimary, fontSize: 14, fontWeight: FontWeight.w600))),
                   Text('${(AudioManager().volumenMusica * 100).toInt()}%',
-                    style: TextStyle(color: kGreen, fontSize: 12, fontWeight: FontWeight.w700)),
+                    style: TextStyle(color: RDSColor.green, fontSize: 12, fontWeight: FontWeight.w700)),
                 ]),
                 SliderTheme(
                   data: SliderTheme.of(ctx).copyWith(
-                    activeTrackColor: kGreen,
+                    activeTrackColor: RDSColor.green,
                     inactiveTrackColor: Colors.white12,
-                    thumbColor: kGreen,
-                    overlayColor: kGreen.withOpacity(0.2)),
+                    thumbColor: RDSColor.green,
+                    overlayColor: RDSColor.green.withOpacity(0.2)),
                   child: Slider(
                     value: AudioManager().volumenMusica,
                     min: 0.0, max: 1.0,
@@ -13497,16 +13731,16 @@ class ProfileScreen extends StatelessWidget {
                   const Text('🎉', style: TextStyle(fontSize: 18)),
                   const SizedBox(width: 10),
                   Expanded(child: Text(tVolumenCelebracion,
-                    style: const TextStyle(color: kText, fontSize: 14, fontWeight: FontWeight.w600))),
+                    style: const TextStyle(color: RDSColor.textPrimary, fontSize: 14, fontWeight: FontWeight.w600))),
                   Text('${(AudioManager().volumenEfectos * 100).toInt()}%',
-                    style: TextStyle(color: kGold, fontSize: 12, fontWeight: FontWeight.w700)),
+                    style: TextStyle(color: RDSColor.gold, fontSize: 12, fontWeight: FontWeight.w700)),
                 ]),
                 SliderTheme(
                   data: SliderTheme.of(ctx).copyWith(
-                    activeTrackColor: kGold,
+                    activeTrackColor: RDSColor.gold,
                     inactiveTrackColor: Colors.white12,
-                    thumbColor: kGold,
-                    overlayColor: kGold.withOpacity(0.2)),
+                    thumbColor: RDSColor.gold,
+                    overlayColor: RDSColor.gold.withOpacity(0.2)),
                   child: Slider(
                     value: AudioManager().volumenEfectos,
                     min: 0.0, max: 1.0,
@@ -13570,10 +13804,10 @@ class ProfileScreen extends StatelessWidget {
                   const Text('❓', style: TextStyle(fontSize: 14)),
                   const SizedBox(width: 8),
                   Expanded(child: Text(faq['q']!,
-                    style: const TextStyle(color: kText, fontSize: 13, fontWeight: FontWeight.w700))),
+                    style: const TextStyle(color: RDSColor.textPrimary, fontSize: 13, fontWeight: FontWeight.w700))),
                 ]),
                 const SizedBox(height: 6),
-                Text(faq['a']!, style: const TextStyle(color: kTextMuted, fontSize: 12, height: 1.5)),
+                Text(faq['a']!, style: const TextStyle(color: RDSColor.textMuted, fontSize: 12, height: 1.5)),
               ]))),
             const SizedBox(height: 16),
             Container(padding: const EdgeInsets.all(16),
@@ -13581,11 +13815,11 @@ class ProfileScreen extends StatelessWidget {
                 borderRadius: BorderRadius.circular(14),
                 border: Border.all(color: RDSColor.green.withOpacity(0.3))),
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text(tNecesitasAyuda, style: const TextStyle(color: kGreen, fontSize: 13, fontWeight: FontWeight.w700)),
+                Text(tNecesitasAyuda, style: const TextStyle(color: RDSColor.green, fontSize: 13, fontWeight: FontWeight.w700)),
                 SizedBox(height: 4),
-                Text('📧 paulflopezp@gmail.com', style: const TextStyle(color: kTextMuted, fontSize: 12)),
-                Text('📱 WhatsApp: +57 319 484 0611', style: const TextStyle(color: kTextMuted, fontSize: 12)),
-                Text('⏰ Lunes a viernes 8am – 6pm', style: const TextStyle(color: kTextMuted, fontSize: 12)),
+                Text('📧 paulflopezp@gmail.com', style: const TextStyle(color: RDSColor.textMuted, fontSize: 12)),
+                Text('📱 WhatsApp: +57 319 484 0611', style: const TextStyle(color: RDSColor.textMuted, fontSize: 12)),
+                Text('⏰ Lunes a viernes 8am – 6pm', style: const TextStyle(color: RDSColor.textMuted, fontSize: 12)),
               ])),
             const SizedBox(height: 24),
           ]))));
@@ -13664,7 +13898,7 @@ class ProfileScreen extends StatelessWidget {
                       style: const TextStyle(
                         fontFamily: 'PlayfairDisplay',
                         fontSize: 22, fontWeight: FontWeight.w900,
-                        color: kText, letterSpacing: 1)),
+                        color: RDSColor.textPrimary, letterSpacing: 1)),
                     const SizedBox(height: 4),
                     Row(mainAxisAlignment: MainAxisAlignment.center, children: [
                       const Text('📧', style: TextStyle(fontSize: 11)),
@@ -13759,18 +13993,18 @@ class ProfileScreen extends StatelessWidget {
                   Row(children: [
                     Container(width: 36, height: 36,
                       decoration: BoxDecoration(shape: BoxShape.circle,
-                        gradient: LinearGradient(colors: [kGreen.withOpacity(0.3), kGold.withOpacity(0.2)])),
+                        gradient: LinearGradient(colors: [RDSColor.green.withOpacity(0.3), RDSColor.gold.withOpacity(0.2)])),
                       child: Center(child: Text(nivel['emoji']?.toString() ?? '', style: const TextStyle(fontSize: 18)))),
                     const SizedBox(width: 12),
                     Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      Text('${nivel['nombre']}', style: const TextStyle(color: kText, fontSize: 13, fontWeight: FontWeight.w600)),
+                      Text('${nivel['nombre']}', style: const TextStyle(color: RDSColor.textPrimary, fontSize: 13, fontWeight: FontWeight.w600)),
                       Text('$puntos / ${maxNivel < 99999 ? maxNivel + 1 : puntos} ${t("puntos","pts")}',
-                        style: const TextStyle(color: kTextMuted, fontSize: 11)),
+                        style: const TextStyle(color: RDSColor.textMuted, fontSize: 11)),
                     ])),
                     Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                       decoration: BoxDecoration(color: RDSColor.gold.withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
                       child: Text('${(progreso * 100).toInt()}%',
-                        style: const TextStyle(color: kGold, fontSize: 12, fontWeight: FontWeight.w700))),
+                        style: const TextStyle(color: RDSColor.gold, fontSize: 12, fontWeight: FontWeight.w700))),
                   ]),
                   const SizedBox(height: 12),
                   ClipRRect(borderRadius: BorderRadius.circular(6),
@@ -13781,7 +14015,7 @@ class ProfileScreen extends StatelessWidget {
                       builder: (_, value, __) => LinearProgressIndicator(
                         value: value,
                         backgroundColor: Colors.white.withOpacity(0.06),
-                        valueColor: const AlwaysStoppedAnimation<Color>(kGold),
+                        valueColor: const AlwaysStoppedAnimation<Color>(RDSColor.gold),
                         minHeight: 10))),
                   const SizedBox(height: 8),
                   Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
@@ -13804,7 +14038,7 @@ class ProfileScreen extends StatelessWidget {
               style: TextStyle(fontSize: 12, fontWeight: FontWeight.w900, color: RDSColor.textMuted, letterSpacing: 2)),
             GestureDetector(
               onTap: () => Navigator.of(context, rootNavigator: false).push(MaterialPageRoute(builder: (_) => const AchievementsScreen())),
-              child: Text(tVerTodas, style: const TextStyle(color: kGold, fontSize: 11))),
+              child: Text(tVerTodas, style: const TextStyle(color: RDSColor.gold, fontSize: 11))),
           ]),
           const SizedBox(height: 12),
           Row(mainAxisAlignment: MainAxisAlignment.spaceAround, children: const [
@@ -13839,8 +14073,8 @@ class ProfileScreen extends StatelessWidget {
                 const Text('🏆', style: TextStyle(fontSize: 22)),
                 const SizedBox(width: 14),
                 Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text(tMisPremiosPerfil, style: const TextStyle(color: kGold, fontSize: 14, fontWeight: FontWeight.w600)),
-                  Text(tCodigosQR, style: const TextStyle(color: kTextMuted, fontSize: 11)),
+                  Text(tMisPremiosPerfil, style: const TextStyle(color: RDSColor.gold, fontSize: 14, fontWeight: FontWeight.w600)),
+                  Text(tCodigosQR, style: const TextStyle(color: RDSColor.textMuted, fontSize: 11)),
                 ])),
                 const Icon(Icons.chevron_right, color: RDSColor.textMuted, size: 18),
               ]))),
@@ -13923,7 +14157,7 @@ class ProfileScreen extends StatelessWidget {
                           '🧪 DEMO mode ON — GPS will always appear in range')
                       : t('🛰️ Modo PRODUCCIÓN activado — GPS real, validación por ubicación',
                           '🛰️ PRODUCTION mode ON — real GPS, location-based validation')),
-                    backgroundColor: kModoDemo ? kOrchid : kGreen,
+                    backgroundColor: kModoDemo ? RDSColor.orchid : RDSColor.green,
                     duration: const Duration(seconds: 3),
                   ));
                 }
@@ -13982,7 +14216,7 @@ class AchievementsScreen extends StatelessWidget {
     final user = AuthService.currentUser;
     if (user == null) return const Scaffold(backgroundColor: RDSColor.base,
       body: Center(child: Text('Inicia sesión para ver tus logros',
-        style: TextStyle(color: kTextMuted))));
+        style: TextStyle(color: RDSColor.textMuted))));
 
     // Deduplicar — no mostrar la misma insignia dos veces
     final _seenImgs = <String>{};
@@ -14035,13 +14269,13 @@ class AchievementsScreen extends StatelessWidget {
                             shape: BoxShape.circle,
                             border: Border.all(color: RDSColor.gold.withOpacity(0.2))),
                           child: const Center(child: Text('←',
-                            style: TextStyle(color: kText, fontSize: 16))))),
+                            style: TextStyle(color: RDSColor.textPrimary, fontSize: 16))))),
                     if (Navigator.canPop(context)) const SizedBox(width: 12),
                     Expanded(child: Text(tMisLogrosTitle,
                       style: const TextStyle(
                         fontFamily: 'PlayfairDisplay',
                         fontSize: 20, fontWeight: FontWeight.w900,
-                        color: kText, letterSpacing: 0.5))),
+                        color: RDSColor.textPrimary, letterSpacing: 0.5))),
                     const Text('🏆', style: TextStyle(fontSize: 22)),
                   ]),
                   const SizedBox(height: 16),
@@ -14059,7 +14293,7 @@ class AchievementsScreen extends StatelessWidget {
                       value: todasInsignias.isEmpty ? 0
                         : ganadas.length / todasInsignias.length,
                       backgroundColor: Colors.white.withOpacity(0.06),
-                      valueColor: const AlwaysStoppedAnimation<Color>(kGold),
+                      valueColor: const AlwaysStoppedAnimation<Color>(RDSColor.gold),
                       minHeight: 4)),
                   const SizedBox(height: 6),
                   Text(
@@ -14132,28 +14366,27 @@ class _InsigniaCell extends StatelessWidget {
       decoration: BoxDecoration(
         color: RDSColor.card, borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: desbloqueada ? kGold.withOpacity(0.35) : Colors.white.withOpacity(0.06)),
+          color: desbloqueada ? RDSColor.gold.withOpacity(0.35) : Colors.white.withOpacity(0.06)),
         boxShadow: desbloqueada
           ? [BoxShadow(color: RDSColor.gold.withOpacity(0.1), blurRadius: 12)] : null),
       child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
         Container(width: 64, height: 64,
           decoration: BoxDecoration(shape: BoxShape.circle,
-            color: desbloqueada ? kGold.withOpacity(0.1) : kDark3,
+            color: desbloqueada ? RDSColor.gold.withOpacity(0.1) : const Color(0xFF050A04),
             border: Border.all(
-              color: desbloqueada ? kGold.withOpacity(0.4) : Colors.white.withOpacity(0.08))),
+              color: desbloqueada ? RDSColor.gold.withOpacity(0.4) : Colors.white.withOpacity(0.08))),
           child: desbloqueada
-            ? ClipOval(child: Image.asset(insignia['insigniaImg'] ?? '',
-                fit: BoxFit.cover,
+            ? Padding(padding: const EdgeInsets.all(6), child: Image.asset(insignia['insigniaImg'] ?? '',
+                fit: BoxFit.contain,
                 errorBuilder: (_, __, ___) => Center(
                   child: Text(insignia['emoji'] ?? '🏅',
                     style: const TextStyle(fontSize: 28)))))
-            : const Center(child: Text('🔒',
-                style: TextStyle(fontSize: 26, color: RDSColor.textMuted)))),
+            : const Center(child: Icon(Icons.lock_rounded, size: 26, color: RDSColor.textMuted))),
         const SizedBox(height: 8),
         Padding(padding: const EdgeInsets.symmetric(horizontal: 6),
           child: Text(insignia['nombre'] ?? '',
             style: TextStyle(fontFamily: 'Inter', fontSize: 9,
-              color: desbloqueada ? kText : kTextMuted,
+              color: desbloqueada ? RDSColor.textPrimary : RDSColor.textMuted,
               fontWeight: desbloqueada ? FontWeight.w700 : FontWeight.w400,
               height: 1.3),
             textAlign: TextAlign.center,
@@ -14173,7 +14406,7 @@ class _InsigniaDetalleSheet extends StatelessWidget {
       ruta = RutasService().rutas.firstWhere(
         (r) => r['nombre'] == insignia['rutaNombre'], orElse: () => {});
     } catch (_) {}
-    final acento = kRutaColor(ruta['acento'], kGold);
+    final acento = kRutaColor(ruta['acento'], RDSColor.gold);
 
     return Container(
       decoration: const BoxDecoration(color: RDSColor.card,
@@ -14186,20 +14419,19 @@ class _InsigniaDetalleSheet extends StatelessWidget {
         const SizedBox(height: 24),
         Container(width: 110, height: 110,
           decoration: BoxDecoration(shape: BoxShape.circle,
-            color: desbloqueada ? acento.withOpacity(0.12) : kDark3,
+            color: desbloqueada ? acento.withOpacity(0.12) : const Color(0xFF050A04),
             border: Border.all(
               color: desbloqueada ? acento.withOpacity(0.5) : Colors.white.withOpacity(0.1),
               width: 2),
             boxShadow: desbloqueada
               ? [BoxShadow(color: acento.withOpacity(0.3), blurRadius: 30, spreadRadius: 4)] : null),
           child: desbloqueada
-            ? ClipOval(child: Image.asset(insignia['insigniaImg'] ?? '',
-                fit: BoxFit.cover,
+            ? Padding(padding: const EdgeInsets.all(8), child: Image.asset(insignia['insigniaImg'] ?? '',
+                fit: BoxFit.contain,
                 errorBuilder: (_, __, ___) => Center(
                   child: Text(insignia['emoji'] ?? '🏅',
                     style: const TextStyle(fontSize: 52)))))
-            : const Center(child: Text('🔒',
-                style: TextStyle(fontSize: 48, color: RDSColor.textMuted)))),
+            : const Center(child: Icon(Icons.lock_rounded, size: 48, color: RDSColor.textMuted))),
         const SizedBox(height: 20),
         Text(insignia['nombre'] ?? '',
           style: const TextStyle(fontFamily: 'PlayfairDisplay',
@@ -14214,21 +14446,21 @@ class _InsigniaDetalleSheet extends StatelessWidget {
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           decoration: BoxDecoration(
-            color: desbloqueada ? kGold.withOpacity(0.1) : kDark3,
+            color: desbloqueada ? RDSColor.gold.withOpacity(0.1) : const Color(0xFF050A04),
             borderRadius: BorderRadius.circular(20),
             border: Border.all(
-              color: desbloqueada ? kGold.withOpacity(0.4) : Colors.white.withOpacity(0.08))),
+              color: desbloqueada ? RDSColor.gold.withOpacity(0.4) : Colors.white.withOpacity(0.08))),
           child: Text(
             desbloqueada
               ? t('✅ Insignia desbloqueada', '✅ Badge unlocked')
               : t('🔒 Completa la ruta para desbloquear', '🔒 Complete the route to unlock'),
             style: TextStyle(fontFamily: 'SpaceGrotesk', fontSize: 11,
-              color: desbloqueada ? kGold : kTextMuted,
+              color: desbloqueada ? RDSColor.gold : RDSColor.textMuted,
               fontWeight: FontWeight.w700))),
         if (ruta['descripcion'] != null) ...[
           const SizedBox(height: 16),
           Text((kLang == 'en' ? (ruta['descripcionEN'] ?? ruta['descripcion']) : ruta['descripcion']).toString(),
-            style: const TextStyle(color: kTextMuted, fontSize: 12, height: 1.5),
+            style: const TextStyle(color: RDSColor.textMuted, fontSize: 12, height: 1.5),
             textAlign: TextAlign.center,
             maxLines: 3, overflow: TextOverflow.ellipsis),
         ],
@@ -15652,7 +15884,14 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
   }
 
   void _onRutasCargadasMapa() {
-    if (mounted) setState(() {}); // Refrescar pines cuando Firestore carga
+    if (mounted) {
+      setState(() {});
+      WidgetsBinding.instance.addPostFrameCallback((_) => _reaplicarEstilo());
+    }
+  }
+
+  void _reaplicarEstilo() {
+    _mapController?.setMapStyle(_mapStyle);
   }
 
   Future<void> _cargarEstacionesEnCicla() async {
@@ -15728,7 +15967,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
     canvas.drawCircle(c, r, Paint()..color = const Color(0xFF1B4332));
     // Anillo dorado interno
     canvas.drawCircle(c, r - 3,
-      Paint()..color = kGold..style = PaintingStyle.stroke..strokeWidth = 2);
+      Paint()..color = RDSColor.gold..style = PaintingStyle.stroke..strokeWidth = 2);
     // Emoji candado dorado
     final tp = TextPainter(
       text: const TextSpan(text: '🔒', style: TextStyle(fontSize: 26)),
@@ -15744,7 +15983,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
     canvas.drawPath(tri, Paint()..color = Colors.white..style = PaintingStyle.stroke..strokeWidth = 1.5);
     // Punto brillante en la punta
     canvas.drawCircle(Offset(w / 2, h - 6), 2.5,
-      Paint()..color = kGold.withOpacity(0.8));
+      Paint()..color = RDSColor.gold.withOpacity(0.8));
 
     final img = await recorder.endRecording().toImage(w.toInt(), h.toInt());
     final bytes = await img.toByteData(format: ui.ImageByteFormat.png);
@@ -15822,11 +16061,11 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
 
   Future<void> _cargarIconos() async {
     // Logo Rutero MDE — cargar uno a uno para no perder todos si uno falla
-    try { _iconCache['Logo']         = await _markerConLogo(fondo: kGreen); }
+    try { _iconCache['Logo']         = await _markerConLogo(fondo: RDSColor.green); }
     catch (e) { debugPrint('🔴 Logo error: \$e'); }
-    try { _iconCache['LogoVisitado'] = await _markerConLogo(fondo: kGold, label: '✓'); }
+    try { _iconCache['LogoVisitado'] = await _markerConLogo(fondo: RDSColor.gold, label: '✓'); }
     catch (e) { debugPrint('🔴 LogoVisitado error: \$e'); }
-    try { _iconCache['LogoSel']      = await _markerConLogo(fondo: kAccent); }
+    try { _iconCache['LogoSel']      = await _markerConLogo(fondo: RDSColor.accent); }
     catch (e) { debugPrint('🔴 LogoSel error: \$e'); }
     // Candados
     try { _iconCache['PinBloqueado'] = await _crearPinBloqueado(); }
@@ -16136,7 +16375,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
     child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
       Text(icon, style: const TextStyle(fontSize: 14)),
       const SizedBox(width: 8),
-      Expanded(child: Text(texto, style: const TextStyle(color: kTextMuted, fontSize: 12))),
+      Expanded(child: Text(texto, style: const TextStyle(color: RDSColor.textMuted, fontSize: 12))),
     ]));
 
   void _mostrarInfoEnCicla(Map<String, dynamic> estacion) {
@@ -16168,7 +16407,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
               child: const Center(child: Text('🚲', style: TextStyle(fontSize: 22)))),
             const SizedBox(width: 12),
             Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(nombre, style: const TextStyle(color: kText, fontSize: 16,
+              Text(nombre, style: const TextStyle(color: RDSColor.textPrimary, fontSize: 16,
                   fontWeight: FontWeight.w700)),
               Text(zona, style: const TextStyle(color: Color(0xFF0066CC), fontSize: 12)),
             ])),
@@ -16176,11 +16415,11 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
               decoration: BoxDecoration(
                   color: tipo == 'AUTOM.'
                       ? const Color(0xFF0066CC).withOpacity(0.15)
-                      : kGold.withOpacity(0.15),
+                      : RDSColor.gold.withOpacity(0.15),
                   borderRadius: BorderRadius.circular(8)),
               child: Text(tipo == 'AUTOM.' ? '⚡ Auto' : '👤 Manual',
                   style: TextStyle(fontSize: 11,
-                      color: tipo == 'AUTOM.' ? const Color(0xFF0066CC) : kGold))),
+                      color: tipo == 'AUTOM.' ? const Color(0xFF0066CC) : RDSColor.gold))),
           ]),
           const SizedBox(height: 16),
           // Info
@@ -16195,13 +16434,13 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
                 border: Border.all(color: const Color(0xFF0066CC).withOpacity(0.2))),
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               const Text('¿Cómo usar EnCicla?',
-                  style: TextStyle(color: kText, fontSize: 13, fontWeight: FontWeight.w700)),
+                  style: TextStyle(color: RDSColor.textPrimary, fontSize: 13, fontWeight: FontWeight.w700)),
               const SizedBox(height: 6),
               const Text('1. Registrate en encicla.gov.co o en Parque de los Deseos\n'
                   '2. Cargá saldo en la estación automática\n'
                   '3. Acercá tu tarjeta — ¡30 min gratis al día!\n'
                   '4. Devolvé en cualquier estación EnCicla',
-                  style: TextStyle(color: kTextMuted, fontSize: 12, height: 1.6)),
+                  style: TextStyle(color: RDSColor.textMuted, fontSize: 12, height: 1.6)),
             ])),
           const SizedBox(height: 12),
           // Botón cómo llegar
@@ -16247,11 +16486,11 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
           const Text('🔒', style: TextStyle(fontSize: 28)),
           const SizedBox(height: 12),
           Text(ruta, textAlign: TextAlign.center,
-            style: const TextStyle(color: kText, fontSize: 15, fontWeight: FontWeight.w800)),
+            style: const TextStyle(color: RDSColor.textPrimary, fontSize: 15, fontWeight: FontWeight.w800)),
           const SizedBox(height: 8),
           Text(tRutaBloqueadaMsg,
             textAlign: TextAlign.center,
-            style: const TextStyle(color: kTextMuted, fontSize: 13, height: 1.5)),
+            style: const TextStyle(color: RDSColor.textMuted, fontSize: 13, height: 1.5)),
           const SizedBox(height: 20),
           GestureDetector(
             onTap: () {
@@ -16263,8 +16502,8 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
                   'precio': r'$19.900',
                   'emoji': emoji,
                   'acento': _colorParaRuta(ruta),
-                  'color1': kDark2,
-                  'color2': kDark3,
+                  'color1': RDSColor.base,
+                  'color2': const Color(0xFF050A04),
                   'imagen': _imagenParaRuta(ruta),
                 });
               // 🚧 Ruta pausada → no abrir, mostrar mensaje
@@ -16289,8 +16528,8 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
                 padding: const EdgeInsets.symmetric(vertical: 14),
                 decoration: BoxDecoration(
                   gradient: LinearGradient(colors: esPausada
-                    ? [kDark2, kDark3]
-                    : [kGreen, kGreen.withOpacity(0.7)]),
+                    ? [RDSColor.base, const Color(0xFF050A04)]
+                    : [RDSColor.green, RDSColor.green.withOpacity(0.7)]),
                   borderRadius: BorderRadius.circular(14),
                   border: esPausada
                     ? Border.all(color: RDSColor.textMuted.withOpacity(0.3))
@@ -16303,7 +16542,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
                       ? t('PRÓXIMAMENTE', 'COMING SOON')
                       : t('VER RUTA GRATIS →', 'VIEW FREE ROUTE →'),
                     style: TextStyle(
-                      color: esPausada ? kTextMuted : Colors.white,
+                      color: esPausada ? RDSColor.textMuted : Colors.white,
                       fontSize: 13, fontWeight: FontWeight.w800, letterSpacing: 1)),
                 ]));
             }),
@@ -16350,18 +16589,18 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
   Color _colorParaRuta(String ruta) {
     // ── Rutas gastronómicas ──
     if (ruta.contains('SABOR DE BARRIO'))   return kCafeLight;
-    if (ruta.contains('SABOR DE CANCHA'))   return kGreen;
-    if (ruta.contains('SABOR VIAJERO'))     return kGold;
-    if (ruta.contains('SABOR PAISA'))       return kAccent;
-    if (ruta.contains('SABOR URBANO'))      return kOrchid;
+    if (ruta.contains('SABOR DE CANCHA'))   return RDSColor.green;
+    if (ruta.contains('SABOR VIAJERO'))     return RDSColor.gold;
+    if (ruta.contains('SABOR PAISA'))       return RDSColor.accent;
+    if (ruta.contains('SABOR URBANO'))      return RDSColor.orchid;
     // ── Rutas Medellín ──
-    if (ruta.contains('Patrimonial') || ruta.contains('Nocturna') || ruta.contains('Navideño')) return kOrchid;
+    if (ruta.contains('Patrimonial') || ruta.contains('Nocturna') || ruta.contains('Navideño')) return RDSColor.orchid;
     if (ruta.contains('Gourmet') || ruta.contains('Café') || ruta.contains('Laureles')) return kCafe;
     if (ruta.contains('Guatapé') || ruta.contains('Metrocable') || ruta.contains('Arví')) return const Color(0xFF4A90D9);
     if (ruta.contains('San Carlos')) return const Color(0xFF2AB8D0);
-    if (ruta.contains('Miradores') || ruta.contains('Santa Fe')) return kGold;
+    if (ruta.contains('Miradores') || ruta.contains('Santa Fe')) return RDSColor.gold;
     if (ruta.contains('Alumbrado')) return const Color(0xFFFFD700);
-    return kGreen;
+    return RDSColor.green;
   }
 
   Set<Polyline> get _polylines {
@@ -16507,7 +16746,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
       _FabOpcion(icon: RDSIcons.navExplore,  label: t('Rutas cercanas','Nearby routes'), color: RDSColor.gold,
         onTap: () { setState(() => _fabExpandido = false); _mostrarRutasCercanas(); }),
       _FabOpcion(icon: RDSIcons.transport,   label: _mostrarEnCicla ? t('Ocultar EnCicla','Hide EnCicla') : t('Ver EnCicla','Show EnCicla'), color: const Color(0xFF0066CC),
-        onTap: () => setState(() { _fabExpandido = false; _mostrarEnCicla = !_mostrarEnCicla; })),
+        onTap: () => setState(() { _fabExpandido = false; _mostrarEnCicla = !_mostrarEnCicla; _reaplicarEstilo(); })),
       _FabOpcion(icon: RDSIcons.planner,     label: t('Ver Planner','View Planner'),    color: RDSColor.orchid,
         onTap: () { setState(() => _fabExpandido = false); _mostrarCapaPlanner(); }),
     ];
@@ -16747,7 +16986,11 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
             initialCameraPosition: CameraPosition(target: _centerCiudad, zoom: 13),
             markers: _buildMarkers(),
             polylines: {..._polylines, ..._polylinaesPlanner},
-            onMapCreated: (c) { _mapController = c; c.setMapStyle(_mapStyle); },
+            onMapCreated: (c) {
+              _mapController = c;
+              c.setMapStyle(_mapStyle);
+              Future.delayed(const Duration(milliseconds: 300), () => c.setMapStyle(_mapStyle));
+            },
             onTap: (_) => setState(() { _sitioSeleccionado = null; _fabExpandido = false; }),
             onCameraMove: (pos) {
               if ((pos.zoom - _zoomActual).abs() > 0.3) setState(() => _zoomActual = pos.zoom);
@@ -16964,15 +17207,15 @@ class _AvatarRuteroState extends State<_AvatarRutero>
                         color: RDSColor.green.withOpacity(0.15),
                         borderRadius: BorderRadius.circular(8)),
                       child: const Text('RUTERO MDE', style: TextStyle(
-                        color: kGreen, fontSize: 9, fontWeight: FontWeight.w900, letterSpacing: 1))),
+                        color: RDSColor.green, fontSize: 9, fontWeight: FontWeight.w900, letterSpacing: 1))),
                     const Spacer(),
                     if (widget.onCerrar != null)
                       GestureDetector(onTap: widget.onCerrar,
-                        child: const Text('✕', style: TextStyle(color: kTextMuted, fontSize: 12))),
+                        child: const Text('✕', style: TextStyle(color: RDSColor.textMuted, fontSize: 12))),
                   ]),
                   const SizedBox(height: 6),
                   Text(widget.mensaje,
-                    style: const TextStyle(color: kText, fontSize: 12, height: 1.4)),
+                    style: const TextStyle(color: RDSColor.textPrimary, fontSize: 12, height: 1.4)),
                 ])),
               Positioned(left: 0, bottom: 0,
                 child: CustomPaint(size: const Size(12, 10),
@@ -16984,11 +17227,11 @@ class _AvatarRuteroState extends State<_AvatarRutero>
 class _BubbleTailPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
-    final p = Paint()..color = kCard;
+    final p = Paint()..color = RDSColor.card;
     final path = Path()
       ..moveTo(0, 0) ..lineTo(size.width, 0) ..lineTo(size.width, size.height) ..close();
     canvas.drawPath(path, p);
-    final border = Paint()..color = kGreen.withOpacity(0.3)..style = PaintingStyle.stroke..strokeWidth = 1.5;
+    final border = Paint()..color = RDSColor.green.withOpacity(0.3)..style = PaintingStyle.stroke..strokeWidth = 1.5;
     canvas.drawPath(path, border);
   }
   @override bool shouldRepaint(_) => false;
@@ -17075,14 +17318,14 @@ class _AvatarTipState extends State<AvatarTip> with SingleTickerProviderStateMix
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Row(children: [
                   Container(width: 6, height: 6,
-                    decoration: const BoxDecoration(color: kGreen, shape: BoxShape.circle)),
+                    decoration: const BoxDecoration(color: RDSColor.green, shape: BoxShape.circle)),
                   const SizedBox(width: 6),
                   const Text('RUTERO', style: TextStyle(
-                    color: kGreen, fontSize: 9, fontWeight: FontWeight.w900, letterSpacing: 2)),
+                    color: RDSColor.green, fontSize: 9, fontWeight: FontWeight.w900, letterSpacing: 2)),
                 ]),
                 const SizedBox(height: 6),
                 Text(widget.mensaje,
-                  style: const TextStyle(color: kText, fontSize: 12, height: 1.5)),
+                  style: const TextStyle(color: RDSColor.textPrimary, fontSize: 12, height: 1.5)),
               ])),
             if (widget.onCerrar != null)
               Positioned(top: 6, right: 6,
@@ -17095,7 +17338,7 @@ class _AvatarTipState extends State<AvatarTip> with SingleTickerProviderStateMix
                       shape: BoxShape.circle),
                     child: const Center(
                       child: Text('✕',
-                        style: TextStyle(color: kTextMuted, fontSize: 10)))))),
+                        style: TextStyle(color: RDSColor.textMuted, fontSize: 10)))))),
           ])),
         ]))));
 }
@@ -17131,11 +17374,11 @@ class _MisFotosScreenState extends State<MisFotosScreen> {
                 GestureDetector(onTap: () => Navigator.of(context, rootNavigator: false).pop(),
                   child: Container(width: 36, height: 36,
                     decoration: BoxDecoration(color: Colors.black.withOpacity(0.4), shape: BoxShape.circle),
-                    child: const Center(child: Text('←', style: TextStyle(color: kText, fontSize: 16))))),
+                    child: const Center(child: Text('←', style: TextStyle(color: RDSColor.textPrimary, fontSize: 16))))),
                 const SizedBox(width: 14),
                 Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   Text(tMisFotos, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900,
-                    color: kText, letterSpacing: 2)),
+                    color: RDSColor.textPrimary, letterSpacing: 2)),
                   Text(tRecuerdosRutas, style: const TextStyle(fontSize: 11, color: RDSColor.textMuted)),
                 ]),
               ]),
@@ -17148,7 +17391,7 @@ class _MisFotosScreenState extends State<MisFotosScreen> {
                 const Text('🔒', style: TextStyle(fontSize: 48)),
                 const SizedBox(height: 12),
                 Text(tIniciarSesionFotos,
-                  style: const TextStyle(color: kTextMuted, fontSize: 14)),
+                  style: const TextStyle(color: RDSColor.textMuted, fontSize: 14)),
               ]))
             : StreamBuilder<QuerySnapshot>(
                 stream: FirebaseFirestore.instance
@@ -17158,26 +17401,26 @@ class _MisFotosScreenState extends State<MisFotosScreen> {
                   .snapshots(),
                 builder: (ctx, snap) {
                   if (snap.connectionState == ConnectionState.waiting)
-                    return const Center(child: CircularProgressIndicator(color: kGreen));
+                    return const Center(child: CircularProgressIndicator(color: RDSColor.green));
                   final fotos = snap.data?.docs ?? [];
                   if (fotos.isEmpty)
                     return Center(child: Column(mainAxisSize: MainAxisSize.min, children: [
                       const Text('📸', style: TextStyle(fontSize: 64)),
                       const SizedBox(height: 16),
                       Text(t('Aún no tienes fotos', 'No photos yet'),
-                        style: const TextStyle(color: kText, fontSize: 18, fontWeight: FontWeight.w700)),
+                        style: const TextStyle(color: RDSColor.textPrimary, fontSize: 18, fontWeight: FontWeight.w700)),
                       const SizedBox(height: 8),
                       Text(t('Completa sitios en tus rutas\npara coleccionar recuerdos',
                              'Complete spots on your routes\nto collect memories'),
                         textAlign: TextAlign.center,
-                        style: const TextStyle(color: kTextMuted, fontSize: 13, height: 1.5)),
+                        style: const TextStyle(color: RDSColor.textMuted, fontSize: 13, height: 1.5)),
                       const SizedBox(height: 24),
                       GestureDetector(
                         onTap: () { if (Navigator.canPop(context)) Navigator.pop(context); },
                         child: Container(
                           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
                           decoration: BoxDecoration(
-                            gradient: const LinearGradient(colors: [RDSColor.green, kGold]),
+                            gradient: const LinearGradient(colors: [RDSColor.green, RDSColor.gold]),
                             borderRadius: BorderRadius.circular(RDSRadius.xl)),
                           child: const Text('EXPLORAR RUTAS',
                             style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w800)))),
@@ -17203,7 +17446,7 @@ class _MisFotosScreenState extends State<MisFotosScreen> {
                         _MapStat(valor: '${rutasList.length - 1}', label: 'Rutas', color: RDSColor.gold),
                         Container(width: 1, height: 30, color: Colors.white.withOpacity(0.08),
                           margin: const EdgeInsets.symmetric(horizontal: 16)),
-                        _MapStat(valor: '${fotosFiltradas.length}', label: 'Mostrando', color: kOrchid),
+                        _MapStat(valor: '${fotosFiltradas.length}', label: 'Mostrando', color: RDSColor.orchid),
                       ])),
 
                     // Filtro por ruta
@@ -17224,13 +17467,13 @@ class _MisFotosScreenState extends State<MisFotosScreen> {
                                 margin: const EdgeInsets.only(right: 8),
                                 padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
                                 decoration: BoxDecoration(
-                                  color: activo ? kGreen.withOpacity(0.2) : Colors.transparent,
+                                  color: activo ? RDSColor.green.withOpacity(0.2) : Colors.transparent,
                                   borderRadius: BorderRadius.circular(20),
                                   border: Border.all(
-                                    color: activo ? kGreen : Colors.white.withOpacity(0.12))),
+                                    color: activo ? RDSColor.green : Colors.white.withOpacity(0.12))),
                                 child: Text(ruta == 'Todas' ? 'Todas' : ruta.split(' ').first,
                                   style: TextStyle(
-                                    color: activo ? kGreen : kTextMuted,
+                                    color: activo ? RDSColor.green : RDSColor.textMuted,
                                     fontSize: 11, fontWeight: activo ? FontWeight.w700 : FontWeight.normal))));
                           })),
 
@@ -17253,7 +17496,7 @@ class _MisFotosScreenState extends State<MisFotosScreen> {
                           final rutaEmoji = data['rutaEmoji']?.toString() ?? '🗺️';
                           final acento = data['acento'] != null
                             ? Color((data['acento'] as int?) ?? 0)
-                            : kGreen;
+                            : RDSColor.green;
                           final fecha = (data['fecha'] as Timestamp?)?.toDate();
 
                           return GestureDetector(
@@ -17275,7 +17518,7 @@ class _MisFotosScreenState extends State<MisFotosScreen> {
                                           ? child
                                           : Container(color: RDSColor.surface,
                                               child: const Center(child: CircularProgressIndicator(
-                                                color: kGreen, strokeWidth: 2))),
+                                                color: RDSColor.green, strokeWidth: 2))),
                                         errorBuilder: (_, __, ___) {
                                           final localPath = data['localPath']?.toString();
                                           return localPath != null && File(localPath).existsSync()
@@ -17299,7 +17542,7 @@ class _MisFotosScreenState extends State<MisFotosScreen> {
                                       child: Column(crossAxisAlignment: CrossAxisAlignment.start,
                                         mainAxisSize: MainAxisSize.min, children: [
                                         Text('$emoji $sitio',
-                                          style: const TextStyle(color: kText, fontSize: 11,
+                                          style: const TextStyle(color: RDSColor.textPrimary, fontSize: 11,
                                             fontWeight: FontWeight.w700),
                                           maxLines: 1, overflow: TextOverflow.ellipsis),
                                         Text('$rutaEmoji ${ruta.split(' ').take(2).join(' ')}',
@@ -17307,7 +17550,7 @@ class _MisFotosScreenState extends State<MisFotosScreen> {
                                           maxLines: 1, overflow: TextOverflow.ellipsis),
                                         if (fecha != null)
                                           Text('${fecha.day}/${fecha.month}/${fecha.year}',
-                                            style: const TextStyle(color: kTextMuted, fontSize: 9)),
+                                            style: const TextStyle(color: RDSColor.textMuted, fontSize: 9)),
                                       ]))),
                                   // Badge compartir
                                   Positioned(top: 8, right: 8,
@@ -17332,11 +17575,11 @@ class _MisFotosScreenState extends State<MisFotosScreen> {
       decoration: BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topLeft, end: Alignment.bottomRight,
-          colors: [acento.withOpacity(0.3), kDark3])),
+          colors: [acento.withOpacity(0.3), const Color(0xFF050A04)])),
       child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
         Text(emoji, style: const TextStyle(fontSize: 40)),
         const SizedBox(height: 8),
-        const Text('📸 Foto demo', style: TextStyle(color: kTextMuted, fontSize: 10)),
+        const Text('📸 Foto demo', style: TextStyle(color: RDSColor.textMuted, fontSize: 10)),
       ]));
   }
 
@@ -17345,7 +17588,7 @@ class _MisFotosScreenState extends State<MisFotosScreen> {
     final sitio = data['sitio']?.toString() ?? '';
     final ruta = data['ruta']?.toString() ?? '';
     final emoji = data['emoji']?.toString() ?? '📍';
-    final acento = data['acento'] != null ? Color((data['acento'] as int?) ?? 0) : kGreen;
+    final acento = data['acento'] != null ? Color((data['acento'] as int?) ?? 0) : RDSColor.green;
 
     showDialog(context: context, builder: (_) => Dialog(
       backgroundColor: Colors.transparent,
@@ -17375,7 +17618,7 @@ class _MisFotosScreenState extends State<MisFotosScreen> {
                     colors: [Colors.black87, Colors.transparent])),
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   Text('$emoji $sitio',
-                    style: const TextStyle(color: kText, fontSize: 16, fontWeight: FontWeight.w800)),
+                    style: const TextStyle(color: RDSColor.textPrimary, fontSize: 16, fontWeight: FontWeight.w800)),
                   Text(ruta, style: TextStyle(color: acento, fontSize: 12)),
                 ]))),
           ])),
@@ -17391,7 +17634,7 @@ class _MisFotosScreenState extends State<MisFotosScreen> {
                 borderRadius: BorderRadius.circular(20),
                 border: Border.all(color: RDSColor.green.withOpacity(0.5))),
               child: const Text('↗️ Compartir',
-                style: TextStyle(color: kGreen, fontWeight: FontWeight.w700)))),
+                style: TextStyle(color: RDSColor.green, fontWeight: FontWeight.w700)))),
           const SizedBox(width: 12),
           // Cerrar
           GestureDetector(
@@ -17402,7 +17645,7 @@ class _MisFotosScreenState extends State<MisFotosScreen> {
                 color: Colors.white.withOpacity(0.08),
                 borderRadius: BorderRadius.circular(RDSRadius.xl)),
               child: const Text('✕ Cerrar',
-                style: TextStyle(color: kTextMuted, fontWeight: FontWeight.w700)))),
+                style: TextStyle(color: RDSColor.textMuted, fontWeight: FontWeight.w700)))),
         ]),
       ])));
   }
@@ -17499,7 +17742,7 @@ class _PremioCardState extends State<_PremioCard> {
 
   @override
   Widget build(BuildContext context) {
-    final Color acento = kRutaColor(widget.ruta['acento'], kGold);
+    final Color acento = kRutaColor(widget.ruta['acento'], RDSColor.gold);
     final String codigo = _codigo;
     final String qrData = _qrData;
 
@@ -17541,7 +17784,7 @@ class _PremioCardState extends State<_PremioCard> {
                 style: TextStyle(color: acento, fontSize: 12, fontWeight: FontWeight.w700)),
             ])),
         Text(t('Has visitado los ${widget.totalSitios} sitios de esta ruta','You visited all ${widget.totalSitios} spots on this route'),
-          style: const TextStyle(color: kTextMuted, fontSize: 12)),
+          style: const TextStyle(color: RDSColor.textMuted, fontSize: 12)),
         const SizedBox(height: 20),
 
         // Código + QR
@@ -17553,7 +17796,7 @@ class _PremioCardState extends State<_PremioCard> {
             border: Border.all(color: RDSColor.gold.withOpacity(0.3))),
           child: Column(children: [
             const Text('CÓDIGO DE PREMIO',
-              style: TextStyle(color: kTextMuted, fontSize: 10, letterSpacing: 2)),
+              style: TextStyle(color: RDSColor.textMuted, fontSize: 10, letterSpacing: 2)),
             const SizedBox(height: 10),
             // Código alfanumérico
             Container(
@@ -17564,7 +17807,7 @@ class _PremioCardState extends State<_PremioCard> {
                 border: Border.all(color: RDSColor.gold.withOpacity(0.3))),
               child: Text(codigo,
                 style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w900,
-                  color: kGold, letterSpacing: 4))),
+                  color: RDSColor.gold, letterSpacing: 4))),
             const SizedBox(height: 16),
             // QR Code
             Container(
@@ -17586,7 +17829,7 @@ class _PremioCardState extends State<_PremioCard> {
             const SizedBox(height: 10),
             const Text('Muestra este QR al aliado para reclamar tu premio',
               textAlign: TextAlign.center,
-              style: TextStyle(color: kTextMuted, fontSize: 11)),
+              style: TextStyle(color: RDSColor.textMuted, fontSize: 11)),
           ])),
         const SizedBox(height: 14),
 
@@ -17600,9 +17843,9 @@ class _PremioCardState extends State<_PremioCard> {
             Text(widget.ruta['emoji']?.toString() ?? '🗺️', style: const TextStyle(fontSize: 28)),
             const SizedBox(width: 10),
             Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              const Text('Tu premio', style: TextStyle(color: kTextMuted, fontSize: 10)),
+              const Text('Tu premio', style: TextStyle(color: RDSColor.textMuted, fontSize: 10)),
               Text((widget.ruta['premio'] ?? '').toString(),
-                style: const TextStyle(color: kGold, fontSize: 12,
+                style: const TextStyle(color: RDSColor.gold, fontSize: 12,
                   fontWeight: FontWeight.w600, height: 1.4)),
             ])),
           ])),
@@ -17620,7 +17863,7 @@ class _PremioCardState extends State<_PremioCard> {
             SizedBox(width: 8),
             Expanded(child: Text(
               'El código tiene validez de 30 días. Preséntalo en el establecimiento aliado junto con tu nombre.',
-              style: TextStyle(color: kTextMuted, fontSize: 11, height: 1.4))),
+              style: TextStyle(color: RDSColor.textMuted, fontSize: 11, height: 1.4))),
           ])),
 
         // ── ALIADO ASOCIADO A LA RUTA ──
@@ -17664,15 +17907,15 @@ class _AliadoRutaCard extends StatelessWidget {
           const SizedBox(width: 10),
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text(t('ALIADO DE ESTA RUTA', 'ROUTE PARTNER'),
-              style: TextStyle(color: kGreen, fontSize: 9, fontWeight: FontWeight.w700, letterSpacing: 1.5)),
+              style: TextStyle(color: RDSColor.green, fontSize: 9, fontWeight: FontWeight.w700, letterSpacing: 1.5)),
             const SizedBox(height: 2),
-            Text(nombre, style: const TextStyle(color: kText, fontSize: 13, fontWeight: FontWeight.w700)),
+            Text(nombre, style: const TextStyle(color: RDSColor.textPrimary, fontSize: 13, fontWeight: FontWeight.w700)),
           ])),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
             decoration: BoxDecoration(color: RDSColor.green.withOpacity(0.12), borderRadius: BorderRadius.circular(RDSRadius.xl)),
             child: Text(t('Activo', 'Active'),
-              style: TextStyle(color: kGreen, fontSize: 10, fontWeight: FontWeight.w600))),
+              style: TextStyle(color: RDSColor.green, fontSize: 10, fontWeight: FontWeight.w600))),
         ]),
         if (beneficio.isNotEmpty) ...[ 
           const SizedBox(height: 10),
@@ -17683,7 +17926,7 @@ class _AliadoRutaCard extends StatelessWidget {
               const Text('🎁', style: TextStyle(fontSize: 14)),
               const SizedBox(width: 8),
               Expanded(child: Text(beneficio,
-                style: const TextStyle(color: kText, fontSize: 12, fontWeight: FontWeight.w600, height: 1.3))),
+                style: const TextStyle(color: RDSColor.textPrimary, fontSize: 12, fontWeight: FontWeight.w600, height: 1.3))),
             ])),
         ],
         if (direccion.isNotEmpty) ...[
@@ -17692,7 +17935,7 @@ class _AliadoRutaCard extends StatelessWidget {
             const Text('📍', style: TextStyle(fontSize: 12)),
             const SizedBox(width: 6),
             Expanded(child: Text(direccion,
-              style: const TextStyle(color: kTextMuted, fontSize: 11))),
+              style: const TextStyle(color: RDSColor.textMuted, fontSize: 11))),
           ]),
         ],
         if (whatsapp.isNotEmpty) ...[
@@ -17732,15 +17975,25 @@ class _AliadoRutaCard extends StatelessWidget {
 class _WelcomeChip extends StatelessWidget {
   final String emoji, label;
   const _WelcomeChip({required this.emoji, required this.label});
+
+  IconData get _icon {
+    if (emoji.contains('🗺')) return Icons.map_rounded;
+    if (emoji.contains('📍')) return Icons.location_on_rounded;
+    if (emoji.contains('🏅')) return Icons.emoji_events_rounded;
+    return Icons.star_rounded;
+  }
+
   @override
   Widget build(BuildContext context) => Container(
     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-    decoration: BoxDecoration(color: RDSColor.green.withOpacity(0.1), borderRadius: BorderRadius.circular(20),
+    decoration: BoxDecoration(
+      color: RDSColor.green.withOpacity(0.1),
+      borderRadius: BorderRadius.circular(20),
       border: Border.all(color: RDSColor.green.withOpacity(0.25))),
     child: Row(mainAxisSize: MainAxisSize.min, children: [
-      Text(emoji, style: const TextStyle(fontSize: 12)),
-      const SizedBox(width: 4),
-      Text(label, style: const TextStyle(color: kTextMuted, fontSize: 11)),
+      Icon(_icon, size: 12, color: RDSColor.green),
+      const SizedBox(width: 5),
+      Text(label, style: const TextStyle(color: RDSColor.textMuted, fontSize: 11)),
     ]));
 }
 
@@ -17818,7 +18071,7 @@ class _HomeStatsRow extends StatelessWidget {
         _HeaderChip(emoji: '⭐', label: '0 pts', color: RDSColor.green),
         const SizedBox(width: 8),
         if (kModoLanzamiento)
-          _HeaderChip(emoji: '🧪', label: t('BETA GRATIS','FREE BETA'), color: kOrchid),
+          _HeaderChip(emoji: '🧪', label: t('BETA GRATIS','FREE BETA'), color: RDSColor.orchid),
       ]);
     }
     return StreamBuilder<DocumentSnapshot>(
@@ -17833,11 +18086,11 @@ class _HomeStatsRow extends StatelessWidget {
           const SizedBox(width: 8),
           _HeaderChip(emoji: '⭐',
             label: '$puntos pts',
-            color: kGreen),
+            color: RDSColor.green),
           const SizedBox(width: 8),
           _HeaderChip(emoji: '📍',
             label: '$sitios ${t("sitios","spots")}',
-            color: kOrchid),
+            color: RDSColor.orchid),
         ]);
       });
   }
@@ -17951,9 +18204,9 @@ class _FeriaCountdownWidgetState extends State<_FeriaCountdownWidget> {
           const SizedBox(width: 8),
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text(t('FERIA DE LAS FLORES 2026', 'FERIA DE LAS FLORES 2026'),
-              style: const TextStyle(color: kText, fontSize: 13, fontWeight: FontWeight.w900, letterSpacing: 0.5)),
+              style: const TextStyle(color: RDSColor.textPrimary, fontSize: 13, fontWeight: FontWeight.w900, letterSpacing: 0.5)),
             Text(t('Edición 69 · 31 jul – 9 ago · GRATIS', '69th Edition · Jul 31 – Aug 9 · FREE'),
-              style: const TextStyle(color: kTextMuted, fontSize: 10)),
+              style: const TextStyle(color: RDSColor.textMuted, fontSize: 10)),
           ])),
         ]),
         const SizedBox(height: 8),
@@ -17975,7 +18228,7 @@ class _FeriaCountdownWidgetState extends State<_FeriaCountdownWidget> {
         // Contador
         if (!yaEsFeria) ...[
           Text(t('FALTAN', 'STARTS IN'),
-            style: const TextStyle(color: kTextMuted, fontSize: 9, letterSpacing: 2, fontWeight: FontWeight.w600)),
+            style: const TextStyle(color: RDSColor.textMuted, fontSize: 9, letterSpacing: 2, fontWeight: FontWeight.w600)),
           const SizedBox(height: 8),
           Row(mainAxisAlignment: MainAxisAlignment.center, children: [
             _CountBox(valor: dias.toString(), label: t('DÍAS','DAYS')),
@@ -18025,7 +18278,7 @@ class _FeriaCountdownWidgetState extends State<_FeriaCountdownWidget> {
             child: Row(children: [
               const SizedBox(width: 4),
               Expanded(child: Text(s,
-                style: const TextStyle(color: kTextMuted, fontSize: 11, height: 1.4))),
+                style: const TextStyle(color: RDSColor.textMuted, fontSize: 11, height: 1.4))),
             ]))),
         ],
       ]),
@@ -18046,9 +18299,9 @@ class _CountBox extends StatelessWidget {
         borderRadius: BorderRadius.circular(8),
         border: Border.all(color: const Color(0xFFE85D26).withOpacity(0.3))),
       child: Text(valor,
-        style: const TextStyle(color: kText, fontSize: 22, fontWeight: FontWeight.w900, fontFamily: 'monospace'))),
+        style: const TextStyle(color: RDSColor.textPrimary, fontSize: 22, fontWeight: FontWeight.w900, fontFamily: 'monospace'))),
     const SizedBox(height: 3),
-    Text(label, style: const TextStyle(color: kTextMuted, fontSize: 8, letterSpacing: 1.5)),
+    Text(label, style: const TextStyle(color: RDSColor.textMuted, fontSize: 8, letterSpacing: 1.5)),
   ]);
 }
 
@@ -18057,7 +18310,7 @@ class _Sep extends StatelessWidget {
   @override
   Widget build(BuildContext context) =>
     const Padding(padding: EdgeInsets.fromLTRB(6, 0, 6, 12),
-      child: Text(':', style: TextStyle(color: kGold, fontSize: 22, fontWeight: FontWeight.w900)));
+      child: Text(':', style: TextStyle(color: RDSColor.gold, fontSize: 22, fontWeight: FontWeight.w900)));
 }
 
 class _SectionHeader extends StatelessWidget {
@@ -18072,7 +18325,7 @@ class _SectionHeader extends StatelessWidget {
         style: const TextStyle(
           fontFamily: 'PlayfairDisplay',
           fontSize: 18, fontWeight: FontWeight.w900,
-          color: kText, letterSpacing: 0.3),
+          color: RDSColor.textPrimary, letterSpacing: 0.3),
         overflow: TextOverflow.ellipsis)),
       const SizedBox(width: 8),
       Text(subtitulo, style: const TextStyle(
@@ -18330,7 +18583,7 @@ class _ComoLlegarCard extends StatelessWidget {
     final transporte = ruta['transporte']?.toString() ?? '';
     if (comoLlegar.isEmpty && transporte.isEmpty) return const SizedBox.shrink();
 
-    final Color acento = kRutaColor(ruta['acento'], kGreen);
+    final Color acento = kRutaColor(ruta['acento'], RDSColor.green);
 
     // Split comoLlegar by numbered steps (1️⃣, 2️⃣, etc or plain newlines)
     final pasos = comoLlegar.isNotEmpty
@@ -18355,7 +18608,7 @@ class _ComoLlegarCard extends StatelessWidget {
             const SizedBox(width: 12),
             Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Text(t('Cómo llegar', 'Getting there'),
-                style: const TextStyle(color: kText, fontSize: 13, fontWeight: FontWeight.w700)),
+                style: const TextStyle(color: RDSColor.textPrimary, fontSize: 13, fontWeight: FontWeight.w700)),
               _textoConWhoosh(transporte, fontSize: 11, baseColor: acento, fontWeight: FontWeight.w600),
             ])),
           ])),
@@ -18368,7 +18621,7 @@ class _ComoLlegarCard extends StatelessWidget {
               children: pasos.map((paso) => Padding(
                 padding: const EdgeInsets.only(bottom: 8),
                 child: Text(paso,
-                  style: const TextStyle(color: kText, fontSize: 12, height: 1.5)),
+                  style: const TextStyle(color: RDSColor.textPrimary, fontSize: 12, height: 1.5)),
               )).toList())),
         ],
       ]));
@@ -18392,7 +18645,7 @@ class _AntesDeSalirCard extends StatelessWidget {
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: [kFeriaDorado.withOpacity(0.08), kGreen.withOpacity(0.05)],
+          colors: [kFeriaDorado.withOpacity(0.08), RDSColor.green.withOpacity(0.05)],
           begin: Alignment.topLeft, end: Alignment.bottomRight),
         borderRadius: BorderRadius.circular(14),
         border: Border.all(color: kFeriaDorado.withOpacity(0.35))),
@@ -18406,7 +18659,7 @@ class _AntesDeSalirCard extends StatelessWidget {
               fontWeight: FontWeight.w800, letterSpacing: 0.8)),
           const SizedBox(height: 5),
           Text(antesDeSalir,
-            style: const TextStyle(color: kText, fontSize: 12, height: 1.5)),
+            style: const TextStyle(color: RDSColor.textPrimary, fontSize: 12, height: 1.5)),
         ])),
       ]));
   }
@@ -18430,7 +18683,7 @@ class _ConsejosCardState extends State<_ConsejosCard> {
           ? [raw]
           : [];
     if (consejos.isEmpty) return const SizedBox.shrink();
-    final Color acento = kRutaColor(widget.ruta['acento'], kGreen);
+    final Color acento = kRutaColor(widget.ruta['acento'], RDSColor.green);
     final String momentoClave = (kLang == 'en'
       ? widget.ruta['momentoClaveEN']
       : widget.ruta['momentoClave']) ?? '';
@@ -18449,9 +18702,9 @@ class _ConsejosCardState extends State<_ConsejosCard> {
               const SizedBox(width: 12),
               Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Text(t('Consejos de seguridad & experiencia', 'Safety & experience tips'),
-                  style: const TextStyle(color: kText, fontSize: 13, fontWeight: FontWeight.w700)),
+                  style: const TextStyle(color: RDSColor.textPrimary, fontSize: 13, fontWeight: FontWeight.w700)),
                 Text(t('${consejos.length} recomendaciones para tu ruta', '${consejos.length} recommendations for your route'),
-                  style: const TextStyle(color: kTextMuted, fontSize: 11)),
+                  style: const TextStyle(color: RDSColor.textMuted, fontSize: 11)),
               ])),
               Icon(_expandido ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
                 color: RDSColor.gold.withOpacity(0.7), size: 20),
@@ -18475,7 +18728,7 @@ class _ConsejosCardState extends State<_ConsejosCard> {
                       Text(t('Momento clave', 'Key moment'),
                         style: TextStyle(color: acento, fontSize: 10, fontWeight: FontWeight.w800, letterSpacing: 1)),
                       const SizedBox(height: 4),
-                      Text(momentoClave, style: const TextStyle(color: kText, fontSize: 12, height: 1.4, fontStyle: FontStyle.italic)),
+                      Text(momentoClave, style: const TextStyle(color: RDSColor.textPrimary, fontSize: 12, height: 1.4, fontStyle: FontStyle.italic)),
                     ])),
                   ])),
                 const SizedBox(height: 12),
@@ -18495,7 +18748,7 @@ class _ConsejosCardState extends State<_ConsejosCard> {
 //
 //  VARIANTES
 //  ─────────
-//  standard  → título centrado, fondo kDark2, back arrow ← (default)
+//  standard  → título centrado, fondo RDSColor.base, back arrow ← (default)
 //  transparent → fondo transparente, para pantallas con hero image
 //  colored   → fondo personalizado (para Feria, rutas con color propio)
 //
@@ -18538,7 +18791,7 @@ class _RuteroAppBar extends StatelessWidget implements PreferredSizeWidget {
   Widget build(BuildContext context) {
     final Color bg = transparent
         ? Colors.transparent
-        : (backgroundColor ?? RDSColor.base);   // kDark2 → token
+        : (backgroundColor ?? RDSColor.base);   // RDSColor.base → token
 
     return AppBar(
       backgroundColor: bg,
@@ -18583,7 +18836,7 @@ class _InfoPill extends StatelessWidget {
   Widget build(BuildContext context) => Container(
     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
     decoration: BoxDecoration(color: Colors.white.withOpacity(0.05), borderRadius: BorderRadius.circular(10)),
-    child: Text('$icon $text', style: const TextStyle(color: kTextMuted, fontSize: 10)));
+    child: Text('$icon $text', style: const TextStyle(color: RDSColor.textMuted, fontSize: 10)));
 }
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -18711,7 +18964,7 @@ class _TransporteAliadoCardState extends State<_TransporteAliadoCard> {
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [RDSColor.card, kGreen.withOpacity(0.08)]),
+          colors: [RDSColor.card, RDSColor.green.withOpacity(0.08)]),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: RDSColor.green.withOpacity(0.35), width: 1.2),
         boxShadow: [BoxShadow(color: RDSColor.green.withOpacity(0.10), blurRadius: 16, offset: const Offset(0, 4))]),
@@ -18725,7 +18978,7 @@ class _TransporteAliadoCardState extends State<_TransporteAliadoCard> {
               borderRadius: BorderRadius.circular(6),
               border: Border.all(color: RDSColor.green.withOpacity(0.4))),
             child: Text(t('ALIADO OFICIAL', 'OFFICIAL PARTNER'),
-              style: TextStyle(color: kGreen, fontSize: 9,
+              style: TextStyle(color: RDSColor.green, fontSize: 9,
                 fontWeight: FontWeight.w900, letterSpacing: 1.2)),
           ),
           const Spacer(),
@@ -18735,22 +18988,22 @@ class _TransporteAliadoCardState extends State<_TransporteAliadoCard> {
 
         // ── Título principal ──
         const Text('Alianza Local Tours',
-          style: TextStyle(color: kText, fontSize: 18, fontWeight: FontWeight.w900, letterSpacing: 0.3)),
+          style: TextStyle(color: RDSColor.textPrimary, fontSize: 18, fontWeight: FontWeight.w900, letterSpacing: 0.3)),
         const SizedBox(height: 2),
         Text(t('Respaldados por Sotra San Vicente · 70 años',
               'Backed by Sotra San Vicente · 70 years'),
-          style: const TextStyle(color: kTextMuted, fontSize: 11, fontStyle: FontStyle.italic)),
+          style: const TextStyle(color: RDSColor.textMuted, fontSize: 11, fontStyle: FontStyle.italic)),
 
         const SizedBox(height: 14),
 
         // ── Descripción del servicio ──
         Text(t('🚌 Hop On / Hop Off a $_destino', '🚌 Hop On / Hop Off to $_destino'),
-          style: TextStyle(color: kGold, fontSize: 13, fontWeight: FontWeight.w800)),
+          style: TextStyle(color: RDSColor.gold, fontSize: 13, fontWeight: FontWeight.w800)),
         const SizedBox(height: 6),
         Text(t(
             'Sube y baja del bus las veces que quieras durante el día. Frecuencia cada 15–20 minutos. Sin recargo por paradas extras.',
             'Get on and off the bus as many times as you want during the day. Frequency every 15–20 minutes. No extra charge for additional stops.'),
-          style: const TextStyle(color: kText, fontSize: 12, height: 1.4)),
+          style: const TextStyle(color: RDSColor.textPrimary, fontSize: 12, height: 1.4)),
 
         const SizedBox(height: 12),
 
@@ -18763,7 +19016,7 @@ class _TransporteAliadoCardState extends State<_TransporteAliadoCard> {
             border: Border.all(color: Colors.white.withOpacity(0.05))),
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text(t('CÓMO FUNCIONA', 'HOW IT WORKS'),
-              style: TextStyle(color: kTextMuted, fontSize: 10,
+              style: TextStyle(color: RDSColor.textMuted, fontSize: 10,
                 fontWeight: FontWeight.w800, letterSpacing: 1.5)),
             const SizedBox(height: 8),
             _PasoHopOn(numero: '1', texto: t(
@@ -18796,10 +19049,10 @@ class _TransporteAliadoCardState extends State<_TransporteAliadoCard> {
             const SizedBox(width: 8),
             Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Text(t('Tu código Rutero', 'Your Rutero code'),
-                style: const TextStyle(color: kTextMuted, fontSize: 9, letterSpacing: 1)),
+                style: const TextStyle(color: RDSColor.textMuted, fontSize: 9, letterSpacing: 1)),
               const SizedBox(height: 1),
               Text(_codigo,
-                style: const TextStyle(color: kGold, fontSize: 14,
+                style: const TextStyle(color: RDSColor.gold, fontSize: 14,
                   fontWeight: FontWeight.w900, letterSpacing: 1.5)),
             ])),
           ]),
@@ -18835,7 +19088,7 @@ class _TransporteAliadoCardState extends State<_TransporteAliadoCard> {
         Text(t(
             '💡 El servicio se paga directamente a Alianza Local Tours',
             '💡 The service is paid directly to Alianza Local Tours'),
-          style: const TextStyle(color: kTextMuted, fontSize: 10, fontStyle: FontStyle.italic)),
+          style: const TextStyle(color: RDSColor.textMuted, fontSize: 10, fontStyle: FontStyle.italic)),
       ]),
     );
   }
@@ -18930,7 +19183,7 @@ class _MuseoEscobarCardState extends State<_MuseoEscobarCard> {
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [RDSColor.card, kGold.withOpacity(0.08)]),
+          colors: [RDSColor.card, RDSColor.gold.withOpacity(0.08)]),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: RDSColor.gold.withOpacity(0.35), width: 1.2),
         boxShadow: [BoxShadow(color: RDSColor.gold.withOpacity(0.10), blurRadius: 16, offset: const Offset(0, 4))]),
@@ -18943,7 +19196,7 @@ class _MuseoEscobarCardState extends State<_MuseoEscobarCard> {
               borderRadius: BorderRadius.circular(6),
               border: Border.all(color: RDSColor.gold.withOpacity(0.4))),
             child: Text(t('ALIADO', 'PARTNER'),
-              style: TextStyle(color: kGold, fontSize: 9,
+              style: TextStyle(color: RDSColor.gold, fontSize: 9,
                 fontWeight: FontWeight.w900, letterSpacing: 1.2)),
           ),
           const Spacer(),
@@ -18952,17 +19205,17 @@ class _MuseoEscobarCardState extends State<_MuseoEscobarCard> {
         const SizedBox(height: 10),
 
         Text(t('Museo Beyond Escobar', 'Museo Beyond Escobar'),
-          style: const TextStyle(color: kText, fontSize: 18, fontWeight: FontWeight.w900, letterSpacing: 0.3)),
+          style: const TextStyle(color: RDSColor.textPrimary, fontSize: 18, fontWeight: FontWeight.w900, letterSpacing: 0.3)),
         const SizedBox(height: 2),
         Text(t('Cl. 39 # 107-72 · Barrio 20 de Julio · Metro Floresta · Cita previa',
               'Cl. 39 # 107-72 · 20 de Julio · Metro Floresta · By appointment'),
-          style: const TextStyle(color: kTextMuted, fontSize: 11, fontStyle: FontStyle.italic)),
+          style: const TextStyle(color: RDSColor.textMuted, fontSize: 11, fontStyle: FontStyle.italic)),
 
         const SizedBox(height: 12),
         Text(t(
             '⚠️ Visita bajo tu propio criterio y siguiendo las recomendaciones de seguridad del recorrido.',
             "⚠️ Visit at your own discretion and follow the route's safety guidance."),
-          style: const TextStyle(color: kText, fontSize: 12, height: 1.4)),
+          style: const TextStyle(color: RDSColor.textPrimary, fontSize: 12, height: 1.4)),
 
         const SizedBox(height: 14),
 
@@ -18977,10 +19230,10 @@ class _MuseoEscobarCardState extends State<_MuseoEscobarCard> {
             const SizedBox(width: 8),
             Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Text(t('Tu código Rutero', 'Your Rutero code'),
-                style: const TextStyle(color: kTextMuted, fontSize: 9, letterSpacing: 1)),
+                style: const TextStyle(color: RDSColor.textMuted, fontSize: 9, letterSpacing: 1)),
               const SizedBox(height: 1),
               Text(_codigo,
-                style: const TextStyle(color: kGold, fontSize: 14,
+                style: const TextStyle(color: RDSColor.gold, fontSize: 14,
                   fontWeight: FontWeight.w900, letterSpacing: 1.5)),
             ])),
           ]),
@@ -19014,7 +19267,7 @@ class _MuseoEscobarCardState extends State<_MuseoEscobarCard> {
         Text(t(
             '💡 La entrada y compras se pagan directamente en el museo',
             '💡 Admission and purchases are paid directly at the museum'),
-          style: const TextStyle(color: kTextMuted, fontSize: 10, fontStyle: FontStyle.italic)),
+          style: const TextStyle(color: RDSColor.textMuted, fontSize: 10, fontStyle: FontStyle.italic)),
       ]),
     );
   }
@@ -19039,11 +19292,11 @@ class _PasoHopOn extends StatelessWidget {
             shape: BoxShape.circle,
             border: Border.all(color: RDSColor.green.withOpacity(0.5))),
           child: Center(child: Text(numero,
-            style: TextStyle(color: kGreen, fontSize: 11, fontWeight: FontWeight.w900))),
+            style: TextStyle(color: RDSColor.green, fontSize: 11, fontWeight: FontWeight.w900))),
         ),
         const SizedBox(width: 10),
         Expanded(child: Text(texto,
-          style: const TextStyle(color: kText, fontSize: 11, height: 1.4))),
+          style: const TextStyle(color: RDSColor.textPrimary, fontSize: 11, height: 1.4))),
       ]),
     );
   }
@@ -19063,9 +19316,9 @@ class _SiteItem extends StatelessWidget {
   Widget build(BuildContext context) {
     Color numColor; Color textColor; String icono;
     switch (estado) {
-      case 'done': numColor = kGreen; textColor = kText; icono = '✅'; break;
+      case 'done': numColor = RDSColor.green; textColor = RDSColor.textPrimary; icono = '✅'; break;
       case 'active': numColor = acento; textColor = acento; icono = '📷'; break;
-      default: numColor = kDark3; textColor = kTextMuted; icono = '🔒';
+      default: numColor = const Color(0xFF050A04); textColor = RDSColor.textMuted; icono = '🔒';
     }
     // FIX UX (16/05/2026): Obtener coords del sitio activo para botón "Cómo llegar"
     // FIX (junio 2026): filtrar por rutaNombre para evitar colisión de nombres entre rutas.
@@ -19133,15 +19386,15 @@ class _SiteItem extends StatelessWidget {
             width: 48, height: 48,
             decoration: BoxDecoration(
               color: estado == 'done'
-                ? kGreen.withOpacity(0.12)
+                ? RDSColor.green.withOpacity(0.12)
                 : estado == 'active'
-                  ? kGold.withOpacity(0.12)
+                  ? RDSColor.gold.withOpacity(0.12)
                   : Colors.white.withOpacity(0.04),
               borderRadius: BorderRadius.circular(10),
               border: Border.all(color: estado == 'done'
-                ? kGreen.withOpacity(0.3)
+                ? RDSColor.green.withOpacity(0.3)
                 : estado == 'active'
-                  ? kGold.withOpacity(0.4)
+                  ? RDSColor.gold.withOpacity(0.4)
                   : Colors.white.withOpacity(0.08))),
             child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
               Text(
@@ -19149,9 +19402,9 @@ class _SiteItem extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 16, fontWeight: FontWeight.w500, height: 1,
                   color: estado == 'done'
-                    ? kGreen
+                    ? RDSColor.green
                     : estado == 'active'
-                      ? kGold
+                      ? RDSColor.gold
                       : const Color(0xFF555555))),
               const SizedBox(height: 2),
               Text(
@@ -19163,15 +19416,15 @@ class _SiteItem extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 9, fontWeight: FontWeight.w500,
                   color: estado == 'done'
-                    ? kGreen.withOpacity(0.6)
+                    ? RDSColor.green.withOpacity(0.6)
                     : estado == 'active'
-                      ? kGold
+                      ? RDSColor.gold
                       : const Color(0xFF444444))),
             ])),
           const SizedBox(width: 12),
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text(nombre, style: TextStyle(color: textColor, fontSize: 13, fontWeight: FontWeight.w600)),
-            Text(desc, style: const TextStyle(color: kTextMuted, fontSize: 11)),
+            Text(desc, style: const TextStyle(color: RDSColor.textMuted, fontSize: 11)),
           ])),
           Text(icono, style: const TextStyle(fontSize: 18)),
         ]),
@@ -19259,7 +19512,7 @@ class _StatChip extends StatelessWidget {
   Widget build(BuildContext context) => Container(
     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
     decoration: BoxDecoration(
-      color: RDSColor.card,                            // kCard → token
+      color: RDSColor.card,                            // RDSColor.card → token
       borderRadius: RDSRadius.bMd,                    // circular(12) → token
       border: Border.all(color: color.withOpacity(0.25))),
     child: Column(children: [
@@ -19330,7 +19583,7 @@ class _CardCodigoAliado extends StatelessWidget {
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [kGold.withOpacity(0.18), kOrchid.withOpacity(0.12)],
+          colors: [RDSColor.gold.withOpacity(0.18), RDSColor.orchid.withOpacity(0.12)],
         ),
         borderRadius: BorderRadius.circular(18),
         border: Border.all(color: RDSColor.gold.withOpacity(0.5), width: 1.5),
@@ -19342,10 +19595,10 @@ class _CardCodigoAliado extends StatelessWidget {
           const SizedBox(width: 10),
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text('💎 ${kLang == 'en' ? 'PARTNER REWARD' : 'PREMIO ALIADO'}',
-              style: TextStyle(color: kGold, fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 2)),
+              style: TextStyle(color: RDSColor.gold, fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 2)),
             const SizedBox(height: 2),
             Text(aliado.nombre,
-              style: const TextStyle(color: kText, fontSize: 16, fontWeight: FontWeight.w800)),
+              style: const TextStyle(color: RDSColor.textPrimary, fontSize: 16, fontWeight: FontWeight.w800)),
           ])),
         ]),
         const SizedBox(height: 12),
@@ -19354,7 +19607,7 @@ class _CardCodigoAliado extends StatelessWidget {
         Container(
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            color: kCard.withOpacity(0.6),
+            color: RDSColor.card.withOpacity(0.6),
             borderRadius: BorderRadius.circular(10),
           ),
           child: Row(children: [
@@ -19362,7 +19615,7 @@ class _CardCodigoAliado extends StatelessWidget {
             const SizedBox(width: 10),
             Expanded(child: Text(
               aliado.beneficio,
-              style: const TextStyle(color: kText, fontSize: 13, fontWeight: FontWeight.w600, height: 1.4),
+              style: const TextStyle(color: RDSColor.textPrimary, fontSize: 13, fontWeight: FontWeight.w600, height: 1.4),
             )),
           ]),
         ),
@@ -19371,7 +19624,7 @@ class _CardCodigoAliado extends StatelessWidget {
         // Código (lo más prominente)
         Text(
           kLang == 'en' ? 'YOUR CODE' : 'TU CÓDIGO',
-          style: TextStyle(color: kTextMuted, fontSize: 9, letterSpacing: 2, fontWeight: FontWeight.w800),
+          style: TextStyle(color: RDSColor.textMuted, fontSize: 9, letterSpacing: 2, fontWeight: FontWeight.w800),
         ),
         const SizedBox(height: 6),
         GestureDetector(
@@ -19395,7 +19648,7 @@ class _CardCodigoAliado extends StatelessWidget {
               Expanded(child: Text(
                 codigo,
                 style: const TextStyle(
-                  color: kGold,
+                  color: RDSColor.gold,
                   fontSize: 18,
                   fontWeight: FontWeight.w900,
                   letterSpacing: 1.5,
@@ -19415,7 +19668,7 @@ class _CardCodigoAliado extends StatelessWidget {
           const SizedBox(width: 6),
           Expanded(child: Text(
             aliado.ubicacion,
-            style: const TextStyle(color: kTextMuted, fontSize: 11, height: 1.4),
+            style: const TextStyle(color: RDSColor.textMuted, fontSize: 11, height: 1.4),
           )),
         ]),
         const SizedBox(height: 8),
@@ -19429,7 +19682,7 @@ class _CardCodigoAliado extends StatelessWidget {
             kLang == 'en'
               ? '💡 Show this code to the partner before paying to get your benefit.'
               : '💡 Muestra este código al aliado antes de pagar para obtener tu beneficio.',
-            style: const TextStyle(color: kText, fontSize: 11, height: 1.5),
+            style: const TextStyle(color: RDSColor.textPrimary, fontSize: 11, height: 1.5),
           ),
         ),
       ]),
@@ -19493,16 +19746,16 @@ class _BadgeChip extends StatelessWidget {
   Widget build(BuildContext context) => Column(children: [
     Container(width: 64, height: 64,
       decoration: BoxDecoration(shape: BoxShape.circle,
-        color: desbloqueado ? kGreen.withOpacity(0.1) : kDark3,
-        border: Border.all(color: desbloqueado ? kGreen.withOpacity(0.5) : Colors.white.withOpacity(0.08), width: 1.5),
+        color: desbloqueado ? RDSColor.green.withOpacity(0.1) : const Color(0xFF050A04),
+        border: Border.all(color: desbloqueado ? RDSColor.green.withOpacity(0.5) : Colors.white.withOpacity(0.08), width: 1.5),
         boxShadow: desbloqueado ? [BoxShadow(color: RDSColor.green.withOpacity(0.2), blurRadius: 8)] : null),
       child: desbloqueado && insigniaImg != null
-        ? ClipOval(child: Image.asset(insigniaImg!, width: 64, height: 64, fit: BoxFit.cover,
-            errorBuilder: (_, __, ___) => Center(child: Text(emoji, style: const TextStyle(fontSize: 24)))))
+        ? Image.asset(insigniaImg!, width: 64, height: 64, fit: BoxFit.contain,
+            errorBuilder: (_, __, ___) => Center(child: Text(emoji, style: const TextStyle(fontSize: 24))))
         : Center(child: Text(desbloqueado ? emoji : '🔒',
             style: TextStyle(fontSize: 24, color: desbloqueado ? null : Colors.white24)))),
     const SizedBox(height: 5),
-    Text(nombre, style: TextStyle(fontSize: 9, color: desbloqueado ? kTextMuted : Colors.white24, letterSpacing: 0.5)),
+    Text(nombre, style: TextStyle(fontSize: 9, color: desbloqueado ? RDSColor.textMuted : Colors.white24, letterSpacing: 0.5)),
   ]);
 }
 
@@ -19522,11 +19775,11 @@ class _SwitchTile extends StatelessWidget {
       Text(emoji, style: const TextStyle(fontSize: 20)),
       const SizedBox(width: 12),
       Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text(titulo, style: const TextStyle(color: kText, fontSize: 13, fontWeight: FontWeight.w600)),
-        Text(subtitulo, style: const TextStyle(color: kTextMuted, fontSize: 11)),
+        Text(titulo, style: const TextStyle(color: RDSColor.textPrimary, fontSize: 13, fontWeight: FontWeight.w600)),
+        Text(subtitulo, style: const TextStyle(color: RDSColor.textMuted, fontSize: 11)),
       ])),
       Switch(value: valor, onChanged: onChange,
-        activeColor: kGreen, inactiveTrackColor: Colors.white12),
+        activeColor: RDSColor.green, inactiveTrackColor: Colors.white12),
     ]));
 }
 
@@ -19546,9 +19799,9 @@ class _ProfileMenuItem extends StatelessWidget {
       child: Row(children: [
         Text(emoji, style: const TextStyle(fontSize: 18)),
         const SizedBox(width: 14),
-        Expanded(child: Text(label, style: TextStyle(color: isRed ? const Color(0xFFE05252) : kText,
+        Expanded(child: Text(label, style: TextStyle(color: isRed ? const Color(0xFFE05252) : RDSColor.textPrimary,
           fontSize: 14, fontWeight: FontWeight.w500))),
-        Icon(Icons.chevron_right, color: isRed ? const Color(0xFFE05252).withOpacity(0.5) : kTextMuted.withOpacity(0.4), size: 18),
+        Icon(Icons.chevron_right, color: isRed ? const Color(0xFFE05252).withOpacity(0.5) : RDSColor.textMuted.withOpacity(0.4), size: 18),
       ])));
 }
 
@@ -19560,28 +19813,28 @@ class _LogroCard extends StatelessWidget {
     final bool d = logro['desbloqueado'] == true;
     return Container(margin: const EdgeInsets.only(bottom: 10), padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(color: RDSColor.card, borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: d ? kGold.withOpacity(0.2) : Colors.white.withOpacity(0.05))),
+        border: Border.all(color: d ? RDSColor.gold.withOpacity(0.2) : Colors.white.withOpacity(0.05))),
       child: Row(children: [
         Container(width: 64, height: 64,
           decoration: BoxDecoration(shape: BoxShape.circle,
-            color: d ? kGreen.withOpacity(0.1) : kDark3,
-            border: Border.all(color: d ? kGreen.withOpacity(0.4) : Colors.white.withOpacity(0.06))),
+            color: d ? RDSColor.green.withOpacity(0.1) : const Color(0xFF050A04),
+            border: Border.all(color: d ? RDSColor.green.withOpacity(0.4) : Colors.white.withOpacity(0.06))),
           child: d && logro['insigniaImg'] != null
-            ? ClipOval(child: Image.asset(logro['insigniaImg'], width: 64, height: 64, fit: BoxFit.cover,
-                errorBuilder: (_, __, ___) => Center(child: Text(logro['emoji'], style: const TextStyle(fontSize: 24)))))
+            ? Image.asset(logro['insigniaImg'], width: 64, height: 64, fit: BoxFit.contain,
+                errorBuilder: (_, __, ___) => Center(child: Text(logro['emoji'], style: const TextStyle(fontSize: 24))))
             : Center(child: Text(d ? logro['emoji'] : '🔒', style: const TextStyle(fontSize: 24)))),
         const SizedBox(width: 14),
         Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(logro['nombre'], style: TextStyle(color: d ? kText : kTextMuted, fontSize: 14, fontWeight: FontWeight.w700)),
+          Text(logro['nombre'], style: TextStyle(color: d ? RDSColor.textPrimary : RDSColor.textMuted, fontSize: 14, fontWeight: FontWeight.w700)),
           const SizedBox(height: 2),
-          Text(logro['desc'], style: const TextStyle(color: kTextMuted, fontSize: 11)),
+          Text(logro['desc'], style: const TextStyle(color: RDSColor.textMuted, fontSize: 11)),
           if (d && logro['fecha'] != '')
             Padding(padding: const EdgeInsets.only(top: 4),
               child: Text(logro['fecha'], style: TextStyle(color: RDSColor.gold.withOpacity(0.5), fontSize: 10))),
         ])),
         Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-          decoration: BoxDecoration(color: d ? kGold.withOpacity(0.1) : kDark3, borderRadius: BorderRadius.circular(8)),
-          child: Text('+${logro['puntos']}', style: TextStyle(color: d ? kGold : kTextMuted, fontSize: 12, fontWeight: FontWeight.w700))),
+          decoration: BoxDecoration(color: d ? RDSColor.gold.withOpacity(0.1) : const Color(0xFF050A04), borderRadius: BorderRadius.circular(8)),
+          child: Text('+${logro['puntos']}', style: TextStyle(color: d ? RDSColor.gold : RDSColor.textMuted, fontSize: 12, fontWeight: FontWeight.w700))),
       ]));
   }
 }
@@ -19592,7 +19845,7 @@ class _LogroStat extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Column(children: [
     Text(valor, style: TextStyle(fontSize: 26, fontWeight: FontWeight.w900, color: color)),
-    Text(label, style: const TextStyle(color: kTextMuted, fontSize: 11)),
+    Text(label, style: const TextStyle(color: RDSColor.textMuted, fontSize: 11)),
   ]);
 }
 
@@ -20067,7 +20320,7 @@ class _FeriaHeader extends StatelessWidget {
                 style: const TextStyle(
                   fontFamily: 'PlayfairDisplay',
                   fontSize: 44, fontWeight: FontWeight.w900,
-                  color: kText, letterSpacing: -1, height: 0.95)),
+                  color: RDSColor.textPrimary, letterSpacing: -1, height: 0.95)),
               Text('2026',
                 style: const TextStyle(
                   fontFamily: 'PlayfairDisplay',
@@ -20099,7 +20352,7 @@ class _FeriaHeader extends StatelessWidget {
 
               // Stats chips
               Row(children: [
-                _FeriaStatChip('21', t('tablados','stages'), kGreen),
+                _FeriaStatChip('21', t('tablados','stages'), RDSColor.green),
                 const SizedBox(width: 6),
                 _FeriaStatChip('3', t('rutas','routes'), kFeriaDorado),
                 const SizedBox(width: 6),
@@ -20205,9 +20458,9 @@ National Geographic included Medellín in the 25 world destinations to visit in 
               Wrap(spacing: 8, runSpacing: 6, children: [
                 _ContextChip('🌹 Fundada 1957', kFeriaRojo),
                 _ContextChip('🏔️ Santa Elena 2.600m', kFeriaDorado),
-                _ContextChip('👨‍👩‍👧 500+ familias', kGreen),
+                _ContextChip('👨‍👩‍👧 500+ familias', RDSColor.green),
                 _ContextChip('🌸 3M flores', kFeriaRojo),
-                _ContextChip('🚇 Metro GRATIS 9 ago', kGreen),
+                _ContextChip('🚇 Metro GRATIS 9 ago', RDSColor.green),
               ]),
               const SizedBox(height: 12),
               // Texto con altura máxima + scroll interno — evita overflow
@@ -20284,7 +20537,7 @@ class _FeriaGameStats extends StatelessWidget {
                 emoji: nivel['emoji']?.toString() ?? '',
                 valor: 'Nivel $nivelIndex',
                 label: t(nivel['nombre']?.toString() ?? '', nivel['nombreEN']?.toString() ?? ''),
-                color: kGreen),
+                color: RDSColor.green),
               const SizedBox(width: 8),
               _GameStatCell(
                 emoji: '🌸',
@@ -20429,7 +20682,7 @@ class _FeriaTabDelegate extends SliverPersistentHeaderDelegate {
         indicatorColor: kFeriaRojo,
         indicatorWeight: 2,
         labelColor: kFeriaRojo,
-        unselectedLabelColor: kTextMuted,
+        unselectedLabelColor: RDSColor.textMuted,
         labelStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
         tabs: [
           Tab(text: t('📅 Agenda','📅 Schedule')),
@@ -20507,13 +20760,13 @@ class _FeriaAgendaTabState extends State<_FeriaAgendaTab> {
     switch (tipo) {
       case 'concierto': return kFeriaRojo;
       case 'desfile': return kFeriaDorado;
-      case 'trova': return kOrchid;
-      case 'tablado': return kGreen;
+      case 'trova': return RDSColor.orchid;
+      case 'tablado': return RDSColor.green;
       case 'silletera': return kFeriaVerde;
       case 'flores': return kFeriaRosa;
       case 'familiar': return const Color(0xFF5B8AD4);
-      case 'especial': return kGold;
-      default: return kTextMuted;
+      case 'especial': return RDSColor.gold;
+      default: return RDSColor.textMuted;
     }
   }
 
@@ -20555,7 +20808,7 @@ class _FeriaAgendaTabState extends State<_FeriaAgendaTab> {
                 margin: const EdgeInsets.only(right: 6),
                 padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 0),
                 decoration: BoxDecoration(
-                  color: sel ? kFeriaRojo : (esHoy2 ? kFeriaRojo.withOpacity(0.15) : kCard),
+                  color: sel ? kFeriaRojo : (esHoy2 ? kFeriaRojo.withOpacity(0.15) : RDSColor.card),
                   borderRadius: BorderRadius.circular(10),
                   border: Border.all(
                     color: sel ? kFeriaRojo : (esHoy2 ? kFeriaRojo.withOpacity(0.4) : Colors.transparent))),
@@ -20563,10 +20816,10 @@ class _FeriaAgendaTabState extends State<_FeriaAgendaTab> {
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Text(d['dow']?.toString() ?? '',
-                      style: TextStyle(fontSize: 9, color: sel ? Colors.white70 : kTextMuted)),
+                      style: TextStyle(fontSize: 9, color: sel ? Colors.white70 : RDSColor.textMuted)),
                     Text(d['label']?.toString() ?? '',
                       style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700,
-                        color: sel ? Colors.white : kText)),
+                        color: sel ? Colors.white : RDSColor.textPrimary)),
                     if (tieneEspecial)
                       Container(width: 4, height: 4,
                         decoration: BoxDecoration(
@@ -20591,12 +20844,12 @@ class _FeriaAgendaTabState extends State<_FeriaAgendaTab> {
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
-                  color: _ordenarPorCercania ? kGreen.withOpacity(0.2) : kCard,
+                  color: _ordenarPorCercania ? RDSColor.green.withOpacity(0.2) : RDSColor.card,
                   borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: _ordenarPorCercania ? kGreen : kTextMuted.withOpacity(0.3))),
+                  border: Border.all(color: _ordenarPorCercania ? RDSColor.green : RDSColor.textMuted.withOpacity(0.3))),
                 child: Text(_ordenarPorCercania ? t('✅ Más cercano','✅ Nearest') : t('Por hora','By time'),
                   style: TextStyle(fontSize: 11,
-                    color: _ordenarPorCercania ? kGreen : kTextMuted,
+                    color: _ordenarPorCercania ? RDSColor.green : RDSColor.textMuted,
                     fontWeight: FontWeight.w600)))),
         ]))),
       SliverPadding(
@@ -20700,7 +20953,7 @@ class _FeriaAgendaTabState extends State<_FeriaAgendaTab> {
                 child: Padding(
                   padding: EdgeInsets.all(32),
                   child: Text(t('Sin eventos programados este día','No events scheduled for this day'),
-                    style: TextStyle(color: kTextMuted)))),
+                    style: TextStyle(color: RDSColor.textMuted)))),
             for (final e in eventosMostrar) ...[
               Builder(builder: (_) {
                 final color = _colorTipo(e['tipo']?.toString() ?? '');
@@ -20713,7 +20966,7 @@ class _FeriaAgendaTabState extends State<_FeriaAgendaTab> {
                   margin: const EdgeInsets.only(bottom: 8),
                   padding: const EdgeInsets.all(14),
                   decoration: BoxDecoration(
-                    color: esEstrella ? kFeriaRojo.withOpacity(0.12) : kCard,
+                    color: esEstrella ? kFeriaRojo.withOpacity(0.12) : RDSColor.card,
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(
                       color: esEstrella ? kFeriaRojo.withOpacity(0.5) : color.withOpacity(0.2))),
@@ -20730,7 +20983,7 @@ class _FeriaAgendaTabState extends State<_FeriaAgendaTab> {
                         children: [
                           Text(t(e['titulo']?.toString() ?? '', (e['tituloEN']?.toString()) ?? e['titulo']?.toString() ?? ''),
                             style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700,
-                              color: esEstrella ? kFeriaRojo : kText)),
+                              color: esEstrella ? kFeriaRojo : RDSColor.textPrimary)),
                           const SizedBox(height: 2),
                           Text('${e['hora']} · ${e['lugar']}',
                             style: const TextStyle(fontSize: 11, color: RDSColor.textMuted)),
@@ -20770,11 +21023,11 @@ class _FeriaAgendaTabState extends State<_FeriaAgendaTab> {
                       Row(children: [
                         if (transporte != null)
                           Expanded(child: _textoConWhoosh(transporte,
-                            fontSize: 11, baseColor: kTextMuted)),
+                            fontSize: 11, baseColor: RDSColor.textMuted)),
                         if (distancia != null && distancia < 50)
                           Text(' · ${distancia.toStringAsFixed(1)} km',
                             style: TextStyle(fontSize: 11,
-                              color: distancia < 1.5 ? kGreen : kTextMuted,
+                              color: distancia < 1.5 ? RDSColor.green : RDSColor.textMuted,
                               fontWeight: FontWeight.w600)),
                         const SizedBox(width: 6),
                         // Botón compartir
@@ -20878,8 +21131,8 @@ class _ColeccionDot extends StatelessWidget {
     width: 32, height: 32,
     decoration: BoxDecoration(
       shape: BoxShape.circle,
-      color: completa ? kFeriaDorado.withOpacity(0.3) : kCard,
-      border: Border.all(color: completa ? kFeriaDorado : kTextMuted.withOpacity(0.3))),
+      color: completa ? kFeriaDorado.withOpacity(0.3) : RDSColor.card,
+      border: Border.all(color: completa ? kFeriaDorado : RDSColor.textMuted.withOpacity(0.3))),
     child: Center(child: Text(emoji, style: const TextStyle(fontSize: 14))));
 }
 
@@ -20929,9 +21182,9 @@ class _FeriaRutaCard extends StatelessWidget {
         decoration: BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topLeft, end: Alignment.bottomRight,
-            colors: [kRutaColor(ruta['color1'], kDark2), kRutaColor(ruta['color2'], kDark3)]),
+            colors: [kRutaColor(ruta['color1'], RDSColor.base), kRutaColor(ruta['color2'], const Color(0xFF050A04))]),
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: kRutaColor(ruta['acento'], kGold).withOpacity(0.3))),
+          border: Border.all(color: kRutaColor(ruta['acento'], RDSColor.gold).withOpacity(0.3))),
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -20941,23 +21194,23 @@ class _FeriaRutaCard extends StatelessWidget {
               Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Text(t(ruta['nombre']?.toString() ?? '', ruta['nombreEN']?.toString() ?? ruta['nombre']?.toString() ?? ''),
                   style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w900,
-                    color: kText, letterSpacing: 1)),
+                    color: RDSColor.textPrimary, letterSpacing: 1)),
                 Text(t(ruta['desc']?.toString() ?? ruta['descripcion']?.toString() ?? '', ruta['descEN']?.toString() ?? ruta['descripcionEN']?.toString() ?? ''),
                   style: const TextStyle(fontSize: 11, color: RDSColor.textMuted, height: 1.4)),
               ])),
             ]),
             const SizedBox(height: 12),
             Row(children: [
-              _RutaChip('${ruta['sitios'] ?? ''} sitios', kRutaColor(ruta['acento'], kGold)),
+              _RutaChip('${ruta['sitios'] ?? ''} sitios', kRutaColor(ruta['acento'], RDSColor.gold)),
               const SizedBox(width: 8),
-              _RutaChip(ruta['tiempo']?.toString() ?? '', kRutaColor(ruta['acento'], kGold)),
+              _RutaChip(ruta['tiempo']?.toString() ?? '', kRutaColor(ruta['acento'], RDSColor.gold)),
               const Spacer(),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                 decoration: BoxDecoration(
-                  color: kRutaColor(ruta['acento'], kGold).withOpacity(0.15),
+                  color: kRutaColor(ruta['acento'], RDSColor.gold).withOpacity(0.15),
                   borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: kRutaColor(ruta['acento'], kGold).withOpacity(0.4))),
+                  border: Border.all(color: kRutaColor(ruta['acento'], RDSColor.gold).withOpacity(0.4))),
                 child: Row(children: [
                   Text('${ruta['insigniaEmoji'] ?? ''} ${ruta['insignia'] ?? ''}',
                     style: const TextStyle(fontSize: 10, color: RDSColor.gold, fontWeight: FontWeight.w600)),
@@ -21268,10 +21521,10 @@ class _FeriaTableadosTabState extends State<_FeriaTableadosTab> {
             child: Container(
               margin: const EdgeInsets.only(bottom: 8),
               decoration: BoxDecoration(
-                color: sel ? (zona['color'] as Color) : kCard,
+                color: sel ? (zona['color'] as Color) : RDSColor.card,
                 borderRadius: BorderRadius.circular(14),
                 border: Border.all(
-                  color: sel ? kGreen.withOpacity(0.5) : kTextMuted.withOpacity(0.1))),
+                  color: sel ? RDSColor.green.withOpacity(0.5) : RDSColor.textMuted.withOpacity(0.1))),
               child: Column(children: [
                 Padding(
                   padding: const EdgeInsets.all(14),
@@ -21291,7 +21544,7 @@ class _FeriaTableadosTabState extends State<_FeriaTableadosTab> {
                         borderRadius: BorderRadius.circular(6)),
                       child: const Text('GPS', style: TextStyle(fontSize: 10, color: RDSColor.green, fontWeight: FontWeight.w700))),
                     const SizedBox(width: 8),
-                    Text(sel ? '▲' : '▼', style: const TextStyle(color: kTextMuted, fontSize: 12)),
+                    Text(sel ? '▲' : '▼', style: const TextStyle(color: RDSColor.textMuted, fontSize: 12)),
                   ])),
                 if (sel) ...[
                   const Divider(height: 1, color: Colors.white10),
@@ -21520,7 +21773,7 @@ class FeriaRutaDetailScreen extends StatelessWidget {
                 const SizedBox(height: 8),
                 Text(t(rutaFeria['nombre']?.toString() ?? '', rutaFeria['nombreEN']?.toString() ?? ''),
                   style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900,
-                    color: kText, letterSpacing: 2)),
+                    color: RDSColor.textPrimary, letterSpacing: 2)),
               ])))),
         ),
         SliverList(delegate: SliverChildListDelegate([
@@ -21548,9 +21801,9 @@ class FeriaRutaDetailScreen extends StatelessWidget {
                   width: double.infinity,
                   padding: const EdgeInsets.symmetric(vertical: 16),
                   decoration: BoxDecoration(
-                    color: kRutaColor(rutaFeria['acento'], kGold).withOpacity(0.15),
+                    color: kRutaColor(rutaFeria['acento'], RDSColor.gold).withOpacity(0.15),
                     borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: kRutaColor(rutaFeria['acento'], kGold).withOpacity(0.5))),
+                    border: Border.all(color: kRutaColor(rutaFeria['acento'], RDSColor.gold).withOpacity(0.5))),
                   child: Center(child: Text(
                     t('Iniciar ruta · ${rutaFeria['sitios']} sitios', 'Start route · ${rutaFeria['sitios']} sites'),
                     style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800,
@@ -21663,7 +21916,7 @@ class _LeafPatternPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
-      ..color = kGreen.withOpacity(0.04)
+      ..color = RDSColor.green.withOpacity(0.04)
       ..strokeWidth = 1
       ..style = PaintingStyle.stroke;
 
@@ -21675,7 +21928,7 @@ class _LeafPatternPainter extends CustomPainter {
 
     // Puntos decorativos tipo flor
     final dotPaint = Paint()
-      ..color = kGold.withOpacity(0.06)
+      ..color = RDSColor.gold.withOpacity(0.06)
       ..style = PaintingStyle.fill;
 
     for (double x = 0; x < size.width; x += 60) {
