@@ -1452,10 +1452,12 @@ void main() async {
     persistenceEnabled: true,
     cacheSizeBytes: Settings.CACHE_SIZE_UNLIMITED,
   );
-  // AppCheck producción — playIntegrity para verificación real en Play Store
+  // AppCheck — playIntegrity para Android, debug para iOS TestFlight
+  // DeviceCheck en iOS requiere configuración adicional en Firebase Console
+  // que aún no está lista — usar debug hasta tener producción configurada
   await FirebaseAppCheck.instance.activate(
     androidProvider: AndroidProvider.playIntegrity,
-        appleProvider: AppleProvider.deviceCheck,
+    appleProvider: AppleProvider.debug,
   );
   // Cargar configuraciones persistentes (modo demo admin, sonido, ruta activa)
   // Esto permite que la app recuerde el estado del usuario entre cierres.
