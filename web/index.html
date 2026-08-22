@@ -3,10 +3,10 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Rutero MDE — Explora Medellín jugando · Feria de las Flores 2026</title>
-<meta name="description" content="La primera app que convierte el turismo en una aventura con GPS, insignias y recompensas reales. 49 eventos Feria de las Flores 2026. Gratis en Google Play.">
+<title>Rutero MDE — Explora Medellín jugando · Rutas, GPS e Insignias</title>
+<meta name="description" content="La primera app que convierte el turismo en una aventura con GPS, insignias y recompensas reales. 60+ rutas en Medellín, Bogotá y Popayán. Gratis en Google Play.">
 <meta property="og:title" content="Rutero MDE — Explora Medellín jugando">
-<meta property="og:description" content="49 eventos Feria de las Flores con GPS. Rutas gamificadas. Insignias coleccionables. Gratis en Google Play.">
+<meta property="og:description" content="60+ rutas gamificadas con GPS. Insignias coleccionables. Recompensas en negocios locales. Gratis en Google Play.">
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://rutero-mde.web.app">
 <meta property="og:image" content="https://rutero-mde.web.app/assets/splash.jpg">
@@ -82,12 +82,6 @@ a{text-decoration:none;color:inherit}
 .snum{display:block;font-family:var(--fn);font-size:34px;font-weight:700;color:var(--gold);line-height:1}
 .slabel{font-size:12px;color:var(--muted);font-weight:500;margin-top:4px}
 
-/* COUNTDOWN */
-.cd{display:inline-flex;align-items:center;gap:4px;background:rgba(201,168,76,.08);border:1px solid rgba(201,168,76,.2);border-radius:12px;padding:12px 20px;margin-bottom:28px}
-.cdu{text-align:center;min-width:44px}
-.cdn{font-family:var(--fn);font-size:28px;font-weight:700;color:var(--gold);display:block;line-height:1}
-.cds{font-size:9px;color:var(--muted);font-weight:600;letter-spacing:1px;text-transform:uppercase}
-.cdsp{font-family:var(--fn);font-size:22px;color:rgba(201,168,76,.4);padding-bottom:10px}
 
 /* PHONE */
 .hero-vis{display:flex;justify-content:center;align-items:center;position:relative}
@@ -261,7 +255,7 @@ a{text-decoration:none;color:inherit}
       <div class="nav-logo-t">Rutero <span>MDE</span></div>
     </a>
     <nav class="nav-links">
-      <a href="#feria">Feria de las Flores</a>
+      <a href="#rutas">Rutas</a>
       <a href="#rutas">Rutas</a>
       <a href="#insignias">Insignias</a>
       <a href="#como">Cómo funciona</a>
@@ -273,33 +267,24 @@ a{text-decoration:none;color:inherit}
 <!-- HERO -->
 <section class="hero" id="top">
   <div class="hero-bg">
-    <img src="assets/imagenes/rutas/ruta_corredor_45.jpg" alt="Medellín" loading="eager"
+    <img src="assets/imagenes/rutas/ruta_corredor_45.jpg" alt="Medellín" loading="eager" decoding="async"
          onerror="this.src='assets/splash.jpg'">
   </div>
   <div class="hero-in">
     <div>
-      <div class="eyebrow" data-es="🌺 Feria de las Flores 2026 · 31 jul – 9 ago" data-en="🌺 Flower Festival 2026 · Jul 31 – Aug 9">🌺 Feria de las Flores 2026 · 31 jul – 9 ago</div>
+      <div class="eyebrow" data-es="🗺️ Medellín · Bogotá · Popayán" data-en="🗺️ Medellín · Bogotá · Popayán">🗺️ Medellín · Bogotá · Popayán</div>
       <h1 class="hero-title">
         Explora<br>
         <em>Medellín</em><br>
         jugando.
       </h1>
       <p class="hero-sub" data-es="La primera app que convierte el turismo en una aventura con GPS, insignias y recompensas reales." data-en="The first app that turns tourism into an adventure with GPS, badges and real rewards.">La primera app que convierte el turismo en una aventura con GPS, insignias y recompensas reales.</p>
-      <div class="cd">
-        <div class="cdu"><span class="cdn" id="cd-d">--</span><span class="cds">días</span></div>
-        <span class="cdsp">:</span>
-        <div class="cdu"><span class="cdn" id="cd-h">--</span><span class="cds">hrs</span></div>
-        <span class="cdsp">:</span>
-        <div class="cdu"><span class="cdn" id="cd-m">--</span><span class="cds">min</span></div>
-        <span class="cdsp">:</span>
-        <div class="cdu"><span class="cdn" id="cd-s">--</span><span class="cds">seg</span></div>
-      </div>
       <div class="hero-actions">
         <a href="https://play.google.com/store/apps/details?id=com.ruteromde.app" target="_blank" class="btn-gp">
           <span style="font-size:22px">▶</span>
           <div><small>Disponible en</small><strong>Google Play</strong></div>
         </a>
-        <a href="#feria" class="btn-ghost">Explorar Feria →</a>
+        <a href="#rutas" class="btn-ghost">Explorar rutas →</a>
       </div>
       <div class="hero-stats">
         <div><span class="snum">49</span><div class="slabel" data-es="eventos<br>con GPS" data-en="events<br>with GPS">eventos<br>con GPS</div></div>
@@ -313,11 +298,11 @@ a{text-decoration:none;color:inherit}
         <div class="pdeco pdeco2"></div>
         <div class="phone">
           <div class="phone-notch"></div>
-          <img src="assets/splash.jpg" alt="Rutero MDE app">
+          <img src="assets/splash.jpg" alt="Rutero MDE app" loading="lazy" decoding="async">
           <div class="phone-ov">
             <div class="pchip">
-              <div class="pchip-l">🌹 Feria de las Flores 2026</div>
-              <div class="pchip-t">Concierto Inaugural — Obelisco<br>31 jul · Noche · Gratuito</div>
+              <div class="pchip-l">🗺️ Rutero MDE · Activo ahora</div>
+              <div class="pchip-t">Cafés y Cantinas Históricas · Centro<br>7 sitios · GPS · 20% dcto. Mobiplab</div>
             </div>
             <div class="pchip">
               <div class="pchip-l">📍 Cómo llegar</div>
@@ -338,7 +323,7 @@ a{text-decoration:none;color:inherit}
     <h2 class="h1" id="why-title-el">No es Google Maps.<br>Es un videojuego.</h2>
     <div class="why-grid">
       <div class="why-card"><div class="why-icon">📍</div><h3>GPS Real</h3><p id="why-p1">Validación por GPS en tiempo real. La app confirma que llegaste. Sin trampas, sin atajos. La insignia se gana caminando.</p></div>
-      <div class="why-card"><div class="why-icon">🏅</div><h3>Insignias</h3><p id="why-p2">Colecciones digitales únicas por ciudad y evento. Las de la Feria de las Flores 2026 solo existen este año.</p></div>
+      <div class="why-card"><div class="why-icon">🏅</div><h3>Insignias</h3><p id="why-p2">Colecciones digitales únicas por ciudad. Medellín, Bogotá y Popayán tienen sus propias insignias exclusivas.</p></div>
       <div class="why-card"><div class="why-icon">🎁</div><h3>Recompensas</h3><p id="why-p3">Beneficios reales en negocios locales aliados. Completar una ruta tiene valor tangible, no solo virtual.</p></div>
       <div class="why-card"><div class="why-icon">🏪</div><h3>Negocios Locales</h3><p id="why-p4">Conectamos turistas con el comercio auténtico de Medellín. No cadenas, no franquicias. Lo que hace único al destino.</p></div>
     </div>
@@ -346,15 +331,15 @@ a{text-decoration:none;color:inherit}
 </section>
 
 <!-- FERIA HERO -->
-<section class="feria-hero" id="feria">
+<section class="feria-hero" id="rutas-destacadas">
   <div class="feria-bg">
-    <img src="assets/imagenes/rutas/ruta_01_transformacion.jpg" alt="Feria 2026"
+    <img src="assets/imagenes/rutas/ruta_01_transformacion.jpg" alt="Transformación Urbana Medellín" loading="lazy" decoding="async"
          onerror="this.src='assets/splash.jpg'">
   </div>
   <div class="feria-cnt">
-    <div class="feria-pre" id="feria-pre-el">🌺 Módulo especial · Activo ahora</div>
-    <h2 class="feria-t">Feria de las<br><em>Flores</em> 2026</h2>
-    <p class="feria-d" id="feria-date-el"><strong>31 julio — 9 agosto</strong> · Medellín, Colombia</p>
+    <div class="feria-pre" id="feria-pre-el">🗺️ Rutero MDE · Rutas activas</div>
+    <h2 class="feria-t">Explorá<br><em>Medellín</em></h2>
+    <p class="feria-d" id="feria-date-el"><strong>60+ rutas gamificadas</strong> · Medellín, Bogotá y Popayán</p>
     <a href="https://play.google.com/store/apps/details?id=com.ruteromde.app" target="_blank" class="btn-gp">
       <span style="font-size:22px">▶</span>
       <div><small>Descargá y explorá</small><strong>Google Play</strong></div>
@@ -375,14 +360,14 @@ a{text-decoration:none;color:inherit}
         <div class="swiper-slide" style="width:340px">
           <div class="route-card">
             <div class="route-img">
-              <img src="assets/imagenes/rutas/feria_clasica.jpg" alt="Feria Clásica"
+              <img src="assets/imagenes/rutas/ruta_corredor_45.jpg" alt="Corredor Cultural de la 45" loading="lazy" decoding="async"
                    onerror="this.parentElement.style.background='linear-gradient(135deg,#3D1500,#8B3500)';this.style.display='none'">
             </div>
             <div class="route-body">
-              <span class="route-tag" style="background:rgba(232,93,38,.15);color:#E85D26">FERIA · 13 EVENTOS</span>
-              <div class="route-name">Feria Clásica</div>
-              <p class="route-desc" id="rc-desc1">Los 13 momentos más icónicos. Obelisco, Desfile Silleteros, Súper Concierto, Plaza Gardel.</p>
-              <div class="route-meta"><span>🏅 Insignia Feria Clásica 2026</span></div>
+              <span class="route-tag" style="background:rgba(232,93,38,.15);color:#E85D26">MEDELLÍN · NORTE</span>
+              <div class="route-name">Corredor Cultural de la 45</div>
+              <p class="route-desc" id="rc-desc1">Arte urbano, galerías, cafés y cultura viva entre la 45 y sus calles. La ruta más auténtica del norte de Medellín.</p>
+              <div class="route-meta"><span>🏅 Insignia Hijo del Barrio</span></div>
             </div>
           </div>
         </div>
@@ -394,9 +379,9 @@ a{text-decoration:none;color:inherit}
                    onerror="this.parentElement.style.background='linear-gradient(135deg,#0D2B0F,#1D5C22)';this.style.display='none'">
             </div>
             <div class="route-body">
-              <span class="route-tag" style="background:rgba(91,173,111,.15);color:#5BAD6F">SANTA ELENA · 7 SITIOS</span>
-              <div class="route-name">Ruta Silletera</div>
-              <p class="route-desc" id="rc-desc2">Metrocable, Parque Arví, fincas silleteras El Pinar y La Playa, Parque de Santa Elena.</p>
+              <span class="route-tag" style="background:rgba(91,173,111,.15);color:#5BAD6F">MEDELLÍN · NORTE</span>
+              <div class="route-name">Transformación Urbana</div>
+              <p class="route-desc" id="rc-desc2">La historia del milagro urbano de Medellín. Biblioteca España, Parque Explora, Metrocable y la memoria de la transformación.</p>
               <div class="route-meta"><span>🏅 Insignia Guardián Silletero</span></div>
             </div>
           </div>
@@ -405,13 +390,13 @@ a{text-decoration:none;color:inherit}
         <div class="swiper-slide" style="width:340px">
           <div class="route-card">
             <div class="route-img">
-              <img src="assets/imagenes/rutas/tablados_y_rumba.jpg" alt="Tablados y Rumba"
+              <img src="assets/imagenes/rutas/tablados_y_rumba.jpg" alt="Metrocable & Arví"
                    onerror="this.parentElement.style.background='linear-gradient(135deg,#1A0B2E,#4A1A6E)';this.style.display='none'">
             </div>
             <div class="route-body">
-              <span class="route-tag" style="background:rgba(138,43,226,.15);color:#C084FC">16 COMUNAS · 21 TABLADOS</span>
-              <div class="route-name">Tablados y Rumba</div>
-              <p class="route-desc" id="rc-desc3">Un tablado cada noche en toda la ciudad. Trova, salsa, vallenato. La Feria vive en los barrios.</p>
+              <span class="route-tag" style="background:rgba(138,43,226,.15);color:#C084FC">MEDELLÍN · METROCABLE</span>
+              <div class="route-name">Metrocable & Arví</div>
+              <p class="route-desc" id="rc-desc3">Desde el Metro hasta el Parque Arví. Naturaleza, comunidad y los mejores miradores de Medellín en una sola ruta.</p>
               <div class="route-meta"><span>🏅 Insignia Gozador Paisa</span></div>
             </div>
           </div>
@@ -426,7 +411,7 @@ a{text-decoration:none;color:inherit}
 <!-- NETFLIX -->
 <section class="netflix sec">
   <div class="wrap">
-    <div class="tag">Explorar Medellín</div>
+    <div class="tag">Más rutas · Más ciudades</div>
     <h2 class="h1" id="netflix-title-el">Más rutas.<br>Más aventuras.</h2>
     <p class="sub" data-es="60+ rutas en Medellín y Antioquia. Cada una con historia real, GPS y su insignia." data-en="60+ routes in Medellín and Antioquia. Each one with real history, GPS and its badge.">60+ rutas en Medellín y Antioquia. Cada una con historia real, GPS y su insignia.</p>
   </div>
@@ -495,32 +480,32 @@ a{text-decoration:none;color:inherit}
       <div>
         <div class="tag">Colección 2026</div>
         <h2 class="h1" id="ins-title-el">Insignias que<br>se <span class="gold">ganan.</span></h2>
-        <p class="sub" data-es="No se compran. No se regalan. Se consiguen completando rutas reales con GPS, sitio por sitio. Las de la Feria solo existen en 2026." data-en="Not bought. Not given. Earned by completing real GPS routes, site by site. Festival badges only exist in 2026.">No se compran. No se regalan. Se consiguen completando rutas reales con GPS, sitio por sitio. Las de la Feria solo existen en 2026.</p>
+        <p class="sub" data-es="No se compran. No se regalan. Se consiguen completando rutas reales con GPS, sitio por sitio. Cada ciudad tiene su colección exclusiva." data-en="Not bought. Not given. Earned by completing real GPS routes, site by site. Each city has its own exclusive collection.">No se compran. No se regalan. Se consiguen completando rutas reales con GPS, sitio por sitio. Cada ciudad tiene su colección exclusiva.</p>
       </div>
       <div class="ins-grid">
         <div class="ins-item">
-          <img src="assets/imagenes/insignias/insignia_feria_clasica.png" alt="Feria Clásica 2026">
-          <span class="ins-name" id="ins-name1">Feria Clásica</span>
-          <span class="ins-ruta" id="ins-ruta1">Ruta Feria Clásica</span>
+          <img src="assets/imagenes/insignias/insignia_hijo_barrio.png" loading="lazy" decoding="async" alt="Hijo del Barrio">
+          <span class="ins-name" id="ins-name1">Hijo del Barrio</span>
+          <span class="ins-ruta" id="ins-ruta1">Corredor de la 45</span>
         </div>
         <div class="ins-item">
-          <img src="assets/imagenes/insignias/insignia_feria_silletero_oro.png" alt="Silletero de Oro">
-          <span class="ins-name" id="ins-name2">Silletero de Oro</span>
-          <span class="ins-ruta" id="ins-ruta2">Las 3 rutas Feria</span>
+          <img src="assets/imagenes/insignias/insignia_guardabosque.png" loading="lazy" decoding="async" alt="Guardabosque">
+          <span class="ins-name" id="ins-name2">Guardabosque</span>
+          <span class="ins-ruta" id="ins-ruta2">Ruta Verde del Poblado</span>
         </div>
         <div class="ins-item">
-          <img src="assets/imagenes/insignias/insignia_feria_guardian_silletero.png" alt="Guardián Silletero">
+          <img src="assets/imagenes/insignias/insignia_07_condor_andes.png" loading="lazy" decoding="async" alt="Cóndor de los Andes">
           <span class="ins-name" id="ins-name3">Guardián Silletero</span>
           <span class="ins-ruta" id="ins-ruta3">Ruta Silletera</span>
         </div>
         <div class="ins-item">
-          <img src="assets/imagenes/insignias/insignia_guardian_patrimonio.png" alt="Guardián Patrimonio"
+          <img src="assets/imagenes/insignias/insignia_guardian_patrimonio.png" loading="lazy" decoding="async" alt="Guardián Patrimonio"
                onerror="this.style.display='none'">
           <span class="ins-name" id="ins-name4">Guardián Patrimonio</span>
           <span class="ins-ruta" id="ins-ruta4">Ruta Patrimonial</span>
         </div>
         <div class="ins-item">
-          <img src="assets/imagenes/insignias/insignia_hijo_barrio.png" alt="Hijo del Barrio"
+          <img src="assets/imagenes/insignias/insignia_hijo_barrio.png" loading="lazy" decoding="async" alt="Hijo del Barrio"
                onerror="this.style.display='none'">
           <span class="ins-name" id="ins-name5">Hijo del Barrio</span>
           <span class="ins-ruta" id="ins-ruta5">Corredor Cultural</span>
@@ -582,7 +567,7 @@ a{text-decoration:none;color:inherit}
   </div>
   <div class="cta-in">
     <h2 class="cta-t" id="cta-title-el">Tu próxima<br>aventura<br><em style="color:var(--gold)">empieza hoy.</em></h2>
-    <p class="cta-s" data-es="49 eventos de la Feria de las Flores con GPS. Rutas gamificadas. Insignias únicas. Todo gratis." data-en="49 Flower Festival events with GPS. Gamified routes. Unique badges. All free.">49 eventos de la Feria de las Flores con GPS. Rutas gamificadas. Insignias únicas. Todo gratis.</p>
+    <p class="cta-s" data-es="60+ rutas con GPS en Medellín, Bogotá y Popayán. Insignias únicas. Recompensas reales. Todo gratis." data-en="60+ GPS routes in Medellín, Bogotá and Popayán. Unique badges. Real rewards. All free.">60+ rutas con GPS en Medellín, Bogotá y Popayán. Insignias únicas. Recompensas reales. Todo gratis.</p>
     <div class="cta-btns">
       <a href="https://play.google.com/store/apps/details?id=com.ruteromde.app" target="_blank" class="btn-gp">
         <span style="font-size:24px">▶</span>
@@ -611,7 +596,7 @@ a{text-decoration:none;color:inherit}
       </div>
       <div class="f-col">
         <h4>Explorar</h4>
-        <a href="#feria">Feria de las Flores</a>
+        <a href="#rutas">Rutas</a>
         <a href="#rutas">Rutas</a>
         <a href="#insignias">Insignias</a>
         <a href="#como">Cómo funciona</a>
@@ -638,18 +623,6 @@ a{text-decoration:none;color:inherit}
 <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/ScrollTrigger.min.js"></script>
 <script>
-// Countdown
-(function tick(){
-  const t=new Date('2026-07-31T00:00:00-05:00'),diff=t-new Date();
-  const g=id=>document.getElementById(id);
-  if(diff<=0){['cd-d','cd-h','cd-m','cd-s'].forEach(id=>{const e=g(id);if(e)e.textContent='0'});return}
-  const e=g('cd-d');if(e)e.textContent=Math.floor(diff/86400000);
-  const h=g('cd-h');if(h)h.textContent=String(Math.floor((diff%86400000)/3600000)).padStart(2,'0');
-  const m=g('cd-m');if(m)m.textContent=String(Math.floor((diff%3600000)/60000)).padStart(2,'0');
-  const s=g('cd-s');if(s)s.textContent=String(Math.floor((diff%60000)/1000)).padStart(2,'0');
-  setTimeout(tick,1000);
-})();
-
 // Nav
 window.addEventListener('scroll',()=>{
   document.getElementById('nav').classList.toggle('on',window.scrollY>40);
@@ -690,11 +663,11 @@ const i18n = {
     'why-tag': '¿Por qué Rutero?',
     'why-title': 'No es Google Maps.<br>Es un videojuego.',
     'why-p1': 'Validación por GPS en tiempo real. La app confirma que llegaste. Sin trampas, sin atajos. La insignia se gana caminando.',
-    'why-p2': 'Colecciones digitales únicas por ciudad y evento. Las de la Feria de las Flores 2026 solo existen este año.',
+    'why-p2': 'Colecciones digitales únicas por ciudad. Medellín, Bogotá y Popayán tienen sus propias insignias exclusivas.',
     'why-p3': 'Beneficios reales en negocios locales aliados. Completar una ruta tiene valor tangible, no solo virtual.',
     'why-p4': 'Conectamos turistas con el comercio auténtico de Medellín. No cadenas, no franquicias. Lo que hace único al destino.',
     'feria-pre': '🌺 Módulo especial · Activo ahora',
-    'feria-date': '<strong>31 julio — 9 agosto</strong> · Medellín, Colombia',
+    'feria-date': '<strong>60+ rutas gamificadas</strong> · Medellín, Bogotá y Popayán',
     'rutas-title': '3 rutas. 3 insignias. Solo en 2026.',
     'rc-desc1': 'Los 13 momentos más icónicos. Obelisco, Desfile Silleteros, Súper Concierto, Plaza Gardel.',
     'rc-desc2': 'Metrocable, Parque Arví, fincas silleteras El Pinar y La Playa, Parque de Santa Elena.',
@@ -712,8 +685,8 @@ const i18n = {
     'btn-dl-s': 'Disponible en', 'btn-dl-b': 'Google Play',
     'btn-explore2': 'Descargá y explorá',
     'btn-dl-cta-s': 'Descargar gratis en',
-    'ins-name1': 'Feria Clásica', 'ins-ruta1': 'Ruta Feria Clásica',
-    'ins-name2': 'Silletero de Oro', 'ins-ruta2': 'Las 3 rutas Feria',
+    'ins-name1': 'Hijo del Barrio', 'ins-ruta1': 'Corredor de la 45',
+    'ins-name2': 'Guardabosque', 'ins-ruta2': 'Ruta Verde del Poblado',
     'ins-name3': 'Guardián Silletero', 'ins-ruta3': 'Ruta Silletera',
     'ins-name4': 'Guardián Patrimonio', 'ins-ruta4': 'Ruta Patrimonial',
     'ins-name5': 'Hijo del Barrio', 'ins-ruta5': 'Corredor Cultural',
@@ -752,8 +725,8 @@ const i18n = {
     'btn-dl-s': 'Available on', 'btn-dl-b': 'Google Play',
     'btn-explore2': 'Download & explore',
     'btn-dl-cta-s': 'Download free on',
-    'ins-name1': 'Classic Festival', 'ins-ruta1': 'Feria Clásica Route',
-    'ins-name2': 'Golden Silletero', 'ins-ruta2': 'All 3 Festival Routes',
+    'ins-name1': 'Son of the Barrio', 'ins-ruta1': 'Corredor de la 45',
+    'ins-name2': 'Guardabosque', 'ins-ruta2': 'Green Route Poblado',
     'ins-name3': 'Silletero Guardian', 'ins-ruta3': 'Silletera Route',
     'ins-name4': 'Heritage Guardian', 'ins-ruta4': 'Heritage Route',
     'ins-name5': 'Son of the Hood', 'ins-ruta5': 'Cultural Corridor',

@@ -41,6 +41,7 @@ import 'package:firebase_storage/firebase_storage.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_firestore/cloud_firestore.dart' as fs show Source;
 import 'package:google_sign_in/google_sign_in.dart';
+import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 import 'dart:ui' as ui;
 import 'package:path_provider/path_provider.dart';
 import 'package:firebase_app_check/firebase_app_check.dart';
@@ -1215,7 +1216,9 @@ void main() async {
     );
     await FirebaseAppCheck.instance.activate(
       androidProvider: AndroidProvider.playIntegrity,
-      appleProvider: AppleProvider.debug,
+      appleProvider: const bool.fromEnvironment('dart.vm.product')
+          ? AppleProvider.deviceCheck
+          : AppleProvider.debug,
     );
     await cargarModoDemo();
     await cargarIdiomaGuardado();
@@ -1334,14 +1337,10 @@ const kFeriaPreInicio = [7, 19]; // 19 julio · inicio pre-feria
 /// Módulo visible: desde 19 jul (pre-feria) hasta 9 ago (cierre)
 /// El admin (paulflopezp@gmail.com) siempre lo puede ver para desarrollo
 bool get feriaModuloActivo {
-  // Admin siempre puede ver el módulo para desarrollo
-  final user = FirebaseAuth.instance.currentUser;
-  if (user?.email == kAdminEmail) return true;
-  // Visible para todos: desde 18 jul (pre-feria -1) hasta 9 ago 23:59
-  final now = DateTime.now();
-  final preInicio = DateTime(kFeriaAno, kFeriaPreInicio[0], kFeriaPreInicio[1]);
-  final fin = DateTime(kFeriaAno, kFeriaFin[0], kFeriaFin[1], 23, 59);
-  return now.isAfter(preInicio.subtract(const Duration(days: 1))) && now.isBefore(fin);
+  // Feria 2026 terminó (9 ago 2026) — módulo desactivado hasta Feria 2027
+  // Los datos se cargarán desde Admin/Firestore para la próxima edición
+  // Para reactivar: cambiar kFeriaAno a 2027 y cargar agenda desde Admin
+  return false;
 }
 
 /// Feria oficial activa: 31 jul – 9 ago
@@ -1437,535 +1436,27 @@ List<Map<String, dynamic>> get agendaManana {
 
 /// Agenda completa Feria 2026
 const List<Map<String, dynamic>> kFeriaAgenda = [
-
-  // ══ PRE-FERIA ════════════════════════════════════════════════════════════
-
-  // Colombiamoda 25-31 jul
-  {'dia': 25, 'mes': 7, 'titulo': 'Colombiamoda — Opening Show', 'tituloEN': 'Colombiamoda — Opening Show',
-    'lugar': 'Plaza Mayor Medellín', 'hora': 'Todo el día', 'emoji': '👗', 'tipo': 'preferia', 'gratuito': false,
-    'transporte': '🚇 Est. Industriales → caminata 5 min', 'lat': 6.2445, 'lng': -75.5762,
-    'tip': 'La Semana de la Moda más importante de Latinoamérica. Concepto 2026: "Uniqueness is the New Luxury" 👗',
-    'tipEN': 'The most important Fashion Week in Latin America. 2026 concept: "Uniqueness is the New Luxury" 👗'},
-  {'dia': 27, 'mes': 7, 'titulo': 'Colombiamoda — Desfile Inaugural (Manuela Álvarez)', 'tituloEN': 'Colombiamoda — Opening Runway',
-    'lugar': 'Plaza Mayor Medellín', 'hora': 'Noche', 'emoji': '✨', 'tipo': 'preferia', 'gratuito': false,
-    'transporte': '🚇 Est. Industriales → caminata 5 min', 'lat': 6.2445, 'lng': -75.5762,
-    'tip': 'La diseñadora Manuela Álvarez presenta su colección MAZ con la Orquesta Filarmónica de Medellín en vivo. ✨',
-    'tipEN': 'Designer Manuela Álvarez presents her MAZ collection with the Medellín Philharmonic Orchestra live. ✨'},
-  {'dia': 28, 'mes': 7, 'titulo': 'Colombiamoda — Muestra Comercial', 'tituloEN': 'Colombiamoda — Trade Show',
-    'lugar': 'Plaza Mayor Medellín', 'hora': '9:00 am – 6:00 pm', 'emoji': '🏛️', 'tipo': 'preferia', 'gratuito': false,
-    'transporte': '🚇 Est. Industriales → caminata 5 min', 'lat': 6.2445, 'lng': -75.5762,
-    'tip': 'Del 28 al 30 de julio — Plaza Mayor como capital de la moda latinoamericana. 🌎',
-    'tipEN': 'July 28-30 — Plaza Mayor as the capital of Latin American fashion. 🌎'},
-  {'dia': 29, 'mes': 7, 'titulo': 'Colombiamoda — Ciudad Textil · Teatro Metropolitano', 'tituloEN': 'Colombiamoda — Ciudad Textil',
-    'lugar': 'Teatro Metropolitano', 'hora': 'Noche · acceso libre con registro', 'emoji': '🎭', 'tipo': 'preferia', 'gratuito': true,
-    'transporte': '🚇 Est. Alpujarra → caminata 5 min', 'lat': 6.2393, 'lng': -75.5727,
-    'tip': 'Puesta en escena de la I.U. Pascual Bravo con apoyo de Sapiencia. Entrada libre con registro previo. 🎭',
-    'tipEN': 'Performance by I.U. Pascual Bravo supported by Sapiencia. Free entry with prior registration. 🎭'},
-  // Festival de Sancochos — pre-feria (26 jul, domingo)
-  {'dia': 26, 'mes': 7, 'titulo': 'Festival de Sancochos de Santa Elena', 'tituloEN': 'Santa Elena Sancocho Festival',
-    'lugar': 'Vereda El Placer · Santa Elena (Acueducto Mutiveral)', 'hora': '11:00 am', 'emoji': '🍲', 'tipo': 'preferia', 'gratuito': true,
-    'transporte': '🚕 Taxi desde El Centro ~30 min', 'lat': 6.2359, 'lng': -75.4986,
-    'tip': '🍲 El sancocho de gallina criolla de Santa Elena es legendario. Este festival pre-feria es la antesala perfecta para conocer el corazón silletero antes del gran desfile.',
-    'tipEN': '🍲 Santa Elena\'s criolla hen stew is legendary. This pre-festival event is the perfect prelude to discovering the silletero heartland before the main parade.'},
-
-  // Silleteritos Santa Elena — pre-feria (19 jul)
-  {'dia': 19, 'mes': 7, 'titulo': 'Desfile de Silleteritos Santa Elena', 'tituloEN': 'Mini Silleteros Parade — Santa Elena',
-    'lugar': 'Santa Elena', 'hora': 'Mañana', 'emoji': '🌸', 'tipo': 'preferia', 'gratuito': true,
-    'transporte': '🚕 Taxi desde El Centro ~30 min', 'lat': 6.2359, 'lng': -75.4986,
-    'tip': '🌸 Los niños de Santa Elena portan sus primeras silletas. La tradición se renueva en cada generación.',
-    'tipEN': '🌸 Santa Elena children carry their first silletas. The tradition is renewed with every generation.'},
-
-  // ══ DÍA 1 — Viernes 31 julio ═══════════════════════════════════════════
-
-  {'dia': 31, 'mes': 7, 'titulo': 'Concierto Inaugural 🎆', 'tituloEN': 'Opening Concert 🎆',
-    'lugar': 'Sector Obelisco · Av. Centenario con Cra. 74 · Laureles', 'hora': 'Noche · gratuito', 'emoji': '🎤', 'tipo': 'concierto', 'gratuito': true, 'esEstrellaFeria': true,
-    'transporte': '🚇 Est. Suramericana (L.B) → caminata 8 min por Av. Centenario (Cra 74)', 'lat': 6.257020, 'lng': -75.591759,
-    'tip': '¡El gran arranque de la Feria! Concierto masivo al aire libre. Llegá temprano — es gratuito y se llena. 🎶',
-    'tipEN': 'The big Festival kickoff! Massive open-air concert. Arrive early — it\'s free and fills up fast. 🎶'},
-
-  {'dia': 31, 'mes': 7, 'titulo': 'Trova semifinal "Ñito Restrepo"', 'tituloEN': 'Trova Semifinal "Ñito Restrepo"',
-    'lugar': 'Parque de los Deseos', 'hora': '6:00 pm', 'emoji': '🎤', 'tipo': 'trova', 'gratuito': true,
-    'transporte': '🚇 Est. Universidad → caminata 8 min', 'lat': 6.268617, 'lng': -75.565699},
-
-  {'dia': 31, 'mes': 7, 'titulo': 'Loops — Música Electrónica', 'tituloEN': 'Loops — Electronic Music Festival',
-    'lugar': 'Parque de las Luces', 'hora': 'Noche', 'emoji': '🎧', 'tipo': 'especial', 'gratuito': true,
-    'transporte': '🚇 Est. Cisneros → caminata 2 min', 'lat': 6.245907, 'lng': -75.572735,
-    'tip': '🎧 Festival de música electrónica que abre la Feria. El Parque de las Luces se transforma en el club más grande de Medellín.',
-    'tipEN': '🎧 Electronic music festival that kicks off the Feria. Parque de las Luces becomes the biggest club in Medellín.'},
-
-  {'dia': 31, 'mes': 7, 'titulo': 'Tablado Laureles-Estadio', 'tituloEN': 'Laureles-Estadio Stage',
-    'lugar': 'Sector Obelisco · Laureles (Av. Centenario con Cra 74)', 'hora': 'Noche', 'emoji': '🪗', 'tipo': 'tablado', 'gratuito': true,
-    'transporte': '🚇 Est. Suramericana (L.B) → caminata 8 min', 'lat': 6.257020, 'lng': -75.591759},
-
-  {'dia': 31, 'mes': 7, 'titulo': 'Plaza de las Flores · Parque de los Deseos', 'tituloEN': 'Flowers Square · Parque de los Deseos',
-    'lugar': 'Parque de los Deseos', 'hora': 'Todo el día', 'emoji': '🌺', 'tipo': 'flores', 'gratuito': true,
-    'transporte': '🚇 Est. Universidad → caminata 8 min', 'lat': 6.268617, 'lng': -75.565699,
-    'tip': 'Las Plazas de Flores tienen silleteros en vivo, exhibición de silletas, venta de flores y gastronomía. 🌹',
-    'tipEN': 'The Flores Plazas feature live silleteros, silleta exhibitions, flower sales and gastronomy. 🌹'},
-
-  // ══ DÍA 2 — Sábado 1 agosto ════════════════════════════════════════════
-
-  {'dia': 1, 'mes': 8, 'titulo': 'Feria a ritmo de bicicleta', 'tituloEN': 'Festival by Bicycle',
-    'lugar': 'Parque de las Luces (Plaza Cisneros)', 'hora': '10:00 am', 'emoji': '🚴', 'tipo': 'especial', 'gratuito': true,
-    'transporte': '🚇 Est. Cisneros (L.A) → caminata 2 min', 'lat': 6.2458, 'lng': -75.5722,
-    'tip': 'Ciclopaseo de 12 km con bicicletas decoradas con flores. Hay premios para la más creativa. Familiar y gratis. 🚴🌸',
-    'tipEN': '12 km bike ride with flower-decorated bicycles. Prizes for the most creative. Family-friendly and free. 🚴🌸'},
-
-  {'dia': 1, 'mes': 8, 'titulo': 'Desfile de Chivas y Flores', 'tituloEN': 'Chivas & Flowers Parade',
-    'lugar': 'Parque Guayaquil → Av. Ferrocarril', 'hora': 'Tarde', 'emoji': '🚌', 'tipo': 'desfile', 'gratuito': true,
-    'transporte': '🚇 Est. Cisneros → caminata 5 min', 'lat': 6.236639, 'lng': -75.575864,
-    'tip': '🚌 Las chivas más coloridas de Antioquia decoradas con flores. Un clásico de la Feria que no te podés perder.',
-    'tipEN': '🚌 Antioquia\'s most colorful chivas decorated with flowers. A Festival classic you can\'t miss.'},
-
-  {'dia': 1, 'mes': 8, 'titulo': 'Trova semifinal "Salvo Ruiz"', 'tituloEN': 'Trova Semifinal "Salvo Ruiz"',
-    'lugar': 'Parque de los Deseos', 'hora': '6:00 pm', 'emoji': '🎤', 'tipo': 'trova', 'gratuito': true,
-    'transporte': '🚇 Est. Universidad → caminata 8 min', 'lat': 6.268617, 'lng': -75.565699},
-
-  {'dia': 1, 'mes': 8, 'titulo': 'Zona que Suena — Ciudad de los Niños', 'tituloEN': 'Zona que Suena — Kids City',
-    'lugar': 'Parque Norte', 'hora': 'Todo el día', 'emoji': '🎡', 'tipo': 'familiar', 'gratuito': true,
-    'transporte': '🚇 Est. Acevedo → caminata 10 min', 'lat': 6.272178, 'lng': -75.56564,
-    'tip': 'Zona familiar con música en vivo, talleres de silletas para niños y juegos. El Parque Norte en su mejor versión. 🎡🌸',
-    'tipEN': 'Family zone with live music, kids\' silleta workshops and games. Parque Norte at its best. 🎡🌸'},
-
-  {'dia': 1, 'mes': 8, 'titulo': 'Desfile Silleteritos La Floresta', 'tituloEN': 'Silleteritos Parade — La Floresta',
-    'lugar': 'Parque La Floresta · Laureles', 'hora': 'Mañana', 'emoji': '🌸', 'tipo': 'especial', 'gratuito': true,
-    'transporte': '🚇 Est. Estadio → caminata 10 min', 'lat': 6.256048, 'lng': -75.567981,
-    'tip': '🌸 El Desfile Infantil de Silleteritos de La Floresta en su edición XXXVI. Los niños de Laureles rinden homenaje a la tradición silletera.',
-    'tipEN': '🌸 La Floresta\'s 36th Children\'s Silleteritos Parade. Laureles kids pay tribute to the silletera tradition.'},
-
-  {'dia': 1, 'mes': 8, 'titulo': 'Calle de Artistas · Plaza Botero', 'tituloEN': 'Artists Street · Plaza Botero',
-    'lugar': 'Plaza Botero · Peatonal Carabobo', 'hora': 'Todo el día', 'emoji': '🎨', 'tipo': 'especial', 'gratuito': true,
-    'transporte': '🚇 Est. Alpujarra → caminata 3 min', 'lat': 6.252310, 'lng': -75.567981,
-    'tip': '🎨 El corazón artístico del centro. Artistas plásticos, músicos y artesanos convierten la Peatonal Carabobo en una galería abierta.',
-    'tipEN': '🎨 The artistic heart of downtown. Painters, musicians and artisans turn Peatonal Carabobo into an open gallery.'},
-
-    {'dia': 1, 'mes': 8, 'titulo': 'Tablado Corregimiento Santa Elena', 'tituloEN': 'Stage Corregimiento Santa Elena',
-    'lugar': 'Parque Principal de Santa Elena', 'hora': 'Noche · desde 7:00 pm', 'emoji': '🪗', 'tipo': 'tablado', 'gratuito': true,
-    'transporte': '🚌 Bus desde Parque Berrío → 40 min', 'lat': 6.210093, 'lng': -75.498444,
-    'tip': '🎵 Tablado en Corregimiento Santa Elena. Música en vivo gratis — cumbia, vallenato, salsa. Noche de Feria en el barrio.',
-    'tipEN': '🎵 Stage in Corregimiento Santa Elena. Free live music — cumbia, vallenato, salsa. Festival night in the neighborhood.'},
-  {'dia': 1, 'mes': 8, 'titulo': 'Tablado C15 Guayabal — cancha San Rafael', 'tituloEN': 'Stage Comuna 15 · Guayabal',
-    'lugar': 'Cancha San Rafael, Guayabal', 'hora': 'Noche · desde 7:00 pm', 'emoji': '🪗', 'tipo': 'tablado', 'gratuito': true,
-    'transporte': '🚇 Est. Industriales (L.A) → buseta Guayabal 10 min', 'lat': 6.2017, 'lng': -75.594,
-    'tip': '🎵 Tablado en Comuna 15 · Guayabal. Música en vivo gratis — cumbia, vallenato, salsa. Noche de Feria en el barrio.',
-    'tipEN': '🎵 Stage in Comuna 15 · Guayabal. Free live music — cumbia, vallenato, salsa. Festival night in the neighborhood.'},
-  {'dia': 1, 'mes': 8, 'titulo': 'Tablado C13 San Javier — cancha El Salado', 'tituloEN': 'Stage Comuna 13 · San Javier',
-    'lugar': 'Cancha El Salado, San Javier', 'hora': 'Noche · desde 7:00 pm', 'emoji': '🪗', 'tipo': 'tablado', 'gratuito': true,
-    'transporte': '🚇 Est. San Javier (L.B) → 10 min a pie', 'lat': 6.25349, 'lng': -75.624122,
-    'tip': '🎵 Tablado en Comuna 13 · San Javier. Música en vivo gratis — cumbia, vallenato, salsa. Noche de Feria en el barrio.',
-    'tipEN': '🎵 Stage in Comuna 13 · San Javier. Free live music — cumbia, vallenato, salsa. Festival night in the neighborhood.'},
-
-
-  {'dia': 2, 'mes': 8, 'titulo': 'Caminata Canina y de mascotas', 'tituloEN': 'Dog & Pet Walk',
-    'lugar': 'Estación Estadio Metro → Tierragro (2 km)', 'hora': '10:00 am', 'emoji': '🐾', 'tipo': 'familiar', 'gratuito': true,
-    'transporte': '🚇 Est. Estadio → aquí empieza el recorrido', 'lat': 6.2550, 'lng': -75.5895,
-    'tip': 'Llevá a tu mascota decorada con flores — hay premios para los disfraces más creativos. Recorrido de 2 km. 🐶🌸',
-    'tipEN': 'Bring your flower-decorated pet — prizes for the most creative costumes. 2 km walk. 🐶🌸'},
-
-  {'dia': 2, 'mes': 8, 'titulo': 'Parque Cultural Nocturno — Noche Afro', 'tituloEN': 'Cultural Night Park — Afro Night',
-    'lugar': 'Plaza Gardel', 'hora': '7:00 pm', 'emoji': '🥁', 'tipo': 'concierto', 'gratuito': true,
-    'transporte': '🚇 Est. Exposiciones (L.A) → taxi o bus ~5 min hasta Plaza Gardel (Cra. 65 con Cl. 34)', 'lat': 6.2197, 'lng': -75.5897},
-
-  {'dia': 2, 'mes': 8, 'titulo': 'Zona que Suena — Parque Norte', 'tituloEN': 'Zona que Suena — Parque Norte',
-    'lugar': 'Parque Norte', 'hora': 'Todo el día', 'emoji': '🎶', 'tipo': 'familiar', 'gratuito': true,
-    'transporte': '🚇 Est. Acevedo → caminata 10 min', 'lat': 6.272178, 'lng': -75.56564},
-
-    {'dia': 2, 'mes': 8, 'titulo': 'Cultura Parque Boston', 'tituloEN': 'Boston Park Culture',
-    'lugar': 'Parque de Boston · La Candelaria', 'hora': 'Tarde · gratuito', 'emoji': '🎭', 'tipo': 'cultural', 'gratuito': true,
-    'transporte': '🚇 Est. Prado (L.A) → caminata 12 min hacia el oriente', 'lat': 6.24807, 'lng': -75.55762,
-    'tip': '🎭 Evento cultural en el corazón de la comuna La Candelaria. El Parque Boston es uno de los más emblemáticos del centro de Medellín.',
-    'tipEN': '🎭 Cultural event in the heart of La Candelaria commune. Boston Park is one of the most iconic in downtown Medellín.',
-    'curiosidad': '🧠 Boston es un barrio histórico del centro oriental de Medellín, conocido por sus casas republicanas y su vida cultural.',
-    'curiosidadEN': '🧠 Boston is a historic neighborhood in eastern downtown Medellín, known for its republican houses and cultural life.',
-    'reto': '🎯 Encontrá el árbol más viejo del Parque Boston. ¿Sabés de qué especie es?',
-    'retoEN': '🎯 Find the oldest tree in Boston Park. Do you know what species it is?'},
-  {'dia': 2, 'mes': 8, 'titulo': 'Salsaludando a Medellín', 'tituloEN': 'Salsaludando Medellín',
-    'lugar': 'Parque de las Luces', 'hora': 'Tarde', 'emoji': '💃', 'tipo': 'especial', 'gratuito': true,
-    'transporte': '🚇 Est. Cisneros → caminata 2 min', 'lat': 6.245907, 'lng': -75.572735,
-    'tip': '💃 Un homenaje a la salsa con clases abiertas, exhibiciones y música en vivo en el Parque de las Luces.',
-    'tipEN': '💃 A salsa tribute with open classes, exhibitions and live music at Parque de las Luces.'},
-
-    {'dia': 2, 'mes': 8, 'titulo': 'Tablado C4 Aranjuez — cancha La Brasilia', 'tituloEN': 'Stage Comuna 4 · Aranjuez',
-    'lugar': 'Cancha La Brasilia, Aranjuez', 'hora': 'Noche · desde 7:00 pm', 'emoji': '🪗', 'tipo': 'tablado', 'gratuito': true,
-    'transporte': '🚇 Est. Caribe (L.A) → buseta Aranjuez', 'lat': 6.285419, 'lng': -75.555903,
-    'tip': '🎵 Tablado en Comuna 4 · Aranjuez. Música en vivo gratis — cumbia, vallenato, salsa. Noche de Feria en el barrio.',
-    'tipEN': '🎵 Stage in Comuna 4 · Aranjuez. Free live music — cumbia, vallenato, salsa. Festival night in the neighborhood.'},
-  {'dia': 2, 'mes': 8, 'titulo': 'Tablado Corregimiento Altavista', 'tituloEN': 'Stage Corregimiento Altavista',
-    'lugar': 'Parque Principal de Altavista', 'hora': 'Noche · desde 7:00 pm', 'emoji': '🪗', 'tipo': 'tablado', 'gratuito': true,
-    'transporte': '🚌 Bus desde el Centro → 30 min', 'lat': 6.205, 'lng': -75.617,
-    'tip': '🎵 Tablado en Corregimiento Altavista. Música en vivo gratis — cumbia, vallenato, salsa. Noche de Feria en el barrio.',
-    'tipEN': '🎵 Stage in Corregimiento Altavista. Free live music — cumbia, vallenato, salsa. Festival night in the neighborhood.'},
-  {'dia': 2, 'mes': 8, 'titulo': 'Tablado Corregimiento San Sebastián de Palmitas', 'tituloEN': 'Stage Corregimiento San Sebastián',
-    'lugar': 'Parque Principal de Palmitas', 'hora': 'Noche · desde 7:00 pm', 'emoji': '🪗', 'tipo': 'tablado', 'gratuito': true,
-    'transporte': '🚌 Bus desde San Javier → 45 min', 'lat': 6.3168, 'lng': -75.6622,
-    'tip': '🎵 Tablado en Corregimiento San Sebastián. Música en vivo gratis — cumbia, vallenato, salsa. Noche de Feria en el barrio.',
-    'tipEN': '🎵 Stage in Corregimiento San Sebastián. Free live music — cumbia, vallenato, salsa. Festival night in the neighborhood.'},
-
-
-  {'dia': 3, 'mes': 8, 'titulo': 'Florecer: Orquídeas, Naturaleza y Tradiciones', 'tituloEN': 'Florecer: Orchids, Nature & Traditions',
-    'lugar': 'Jardín Botánico de Medellín', 'hora': 'Todo el día · 3 al 9 ago', 'emoji': '🌸', 'tipo': 'flores', 'gratuito': true,
-    'transporte': '🚇 Est. Universidad → caminata 5 min', 'lat': 6.2685, 'lng': -75.5671,
-    'tip': '🌸 El Jardín Botánico se viste de flores durante toda la segunda semana de Feria. Orquídeas, plantas nativas y talleres.',
-    'tipEN': '🌸 The Botanical Garden dresses in flowers throughout the second Feria week. Orchids, native plants and workshops.'},
-
-  {'dia': 3, 'mes': 8, 'titulo': 'Fincas Silleteras + Parque Arví', 'tituloEN': 'Silletera Farms + Arví Park',
-    'lugar': 'Santa Elena', 'hora': 'Todo el día', 'emoji': '🌿', 'tipo': 'silletera', 'gratuito': false,
-    'transporte': '🚕 Taxi desde El Centro ~30 min', 'lat': 6.210093, 'lng': -75.498444,
-    'tip': '🌺 Durante la semana de Feria las fincas silleteras de Santa Elena reciben visitantes. Ver el armado de una silleta en tiempo real es uno de los momentos más especiales de la Feria.',
-    'tipEN': '🌺 During Feria week, Santa Elena silletera farms welcome visitors. Watching a silleta being built in real time is one of the most special moments of the Festival.'},
-
-    {'dia': 3, 'mes': 8, 'titulo': 'Tablado C12 La América — Parque La Floresta', 'tituloEN': 'Stage Comuna 12 · La América',
-    'lugar': 'Parque La Floresta, La América', 'hora': 'Noche · desde 7:00 pm', 'emoji': '🪗', 'tipo': 'tablado', 'gratuito': true,
-    'transporte': '🚇 Est. Santa Lucía (L.B) → 10 min', 'lat': 6.255825, 'lng': -75.601519,
-    'tip': '🎵 Tablado en Comuna 12 · La América. Música en vivo gratis — cumbia, vallenato, salsa. Noche de Feria en el barrio.',
-    'tipEN': '🎵 Stage in Comuna 12 · La América. Free live music — cumbia, vallenato, salsa. Festival night in the neighborhood.'},
-  {'dia': 3, 'mes': 8, 'titulo': 'Tablado C1 Popular — cancha Granizal', 'tituloEN': 'Stage Comuna 1 · Popular',
-    'lugar': 'Cancha Granizal, Popular', 'hora': 'Noche · desde 7:00 pm', 'emoji': '🪗', 'tipo': 'tablado', 'gratuito': true,
-    'transporte': '🚇 Est. Acevedo → Metro Cable J → 15 min', 'lat': 6.291166, 'lng': -75.54392,
-    'tip': '🎵 Tablado en Comuna 1 · Popular. Música en vivo gratis — cumbia, vallenato, salsa. Noche de Feria en el barrio.',
-    'tipEN': '🎵 Stage in Comuna 1 · Popular. Free live music — cumbia, vallenato, salsa. Festival night in the neighborhood.'},
-
-
-    {'dia': 4, 'mes': 8, 'titulo': 'Tablado C3 Manrique — cancha El Jardín', 'tituloEN': 'Stage Comuna 3 · Manrique',
-    'lugar': 'Cancha El Jardín, Manrique', 'hora': 'Noche · desde 7:00 pm', 'emoji': '🪗', 'tipo': 'tablado', 'gratuito': true,
-    'transporte': '🚇 Est. Acevedo → 15 min', 'lat': 6.276973, 'lng': -75.5453,
-    'tip': '🎵 Tablado en Comuna 3 · Manrique. Música en vivo gratis — cumbia, vallenato, salsa. Noche de Feria en el barrio.',
-    'tipEN': '🎵 Stage in Comuna 3 · Manrique. Free live music — cumbia, vallenato, salsa. Festival night in the neighborhood.'},
-  {'dia': 4, 'mes': 8, 'titulo': 'Tablado C6 Doce de Octubre — cancha La Tinajita', 'tituloEN': 'Stage Comuna 6 · Doce de Octubre',
-    'lugar': 'Cancha La Tinajita, Doce de Octubre', 'hora': 'Noche · desde 7:00 pm', 'emoji': '🪗', 'tipo': 'tablado', 'gratuito': true,
-    'transporte': '🚇 Est. Tricentenario (L.B) → 15 min', 'lat': 6.305823, 'lng': -75.572004,
-    'tip': '🎵 Tablado en Comuna 6 · Doce de Octubre. Música en vivo gratis — cumbia, vallenato, salsa. Noche de Feria en el barrio.',
-    'tipEN': '🎵 Stage in Comuna 6 · Doce de Octubre. Free live music — cumbia, vallenato, salsa. Festival night in the neighborhood.'},
-
-
-    {'dia': 5, 'mes': 8, 'titulo': 'Tablado C9 Buenos Aires — Parque La Milagrosa', 'tituloEN': 'Stage Comuna 9 · Buenos Aires',
-    'lugar': 'Parque La Milagrosa, Buenos Aires', 'hora': 'Noche · desde 7:00 pm', 'emoji': '🪗', 'tipo': 'tablado', 'gratuito': true,
-    'transporte': '🚌 Bus desde el Centro → 15 min', 'lat': 6.235695, 'lng': -75.554299,
-    'tip': '🎵 Tablado en Comuna 9 · Buenos Aires. Música en vivo gratis — cumbia, vallenato, salsa. Noche de Feria en el barrio.',
-    'tipEN': '🎵 Stage in Comuna 9 · Buenos Aires. Free live music — cumbia, vallenato, salsa. Festival night in the neighborhood.'},
-  {'dia': 5, 'mes': 8, 'titulo': 'Tablado C14 El Poblado — Parque de El Poblado', 'tituloEN': 'Stage Comuna 14 · El Poblado',
-    'lugar': 'Parque de El Poblado', 'hora': 'Noche · desde 7:00 pm', 'emoji': '🪗', 'tipo': 'tablado', 'gratuito': true,
-    'transporte': '🚇 Est. El Poblado (L.A) → 5 min', 'lat': 6.210551, 'lng': -75.570433,
-    'tip': '🎵 Tablado en Comuna 14 · El Poblado. Música en vivo gratis — cumbia, vallenato, salsa. Noche de Feria en el barrio.',
-    'tipEN': '🎵 Stage in Comuna 14 · El Poblado. Free live music — cumbia, vallenato, salsa. Festival night in the neighborhood.'},
-
-
-  {'dia': 6, 'mes': 8, 'titulo': 'Fondas de mi Pueblo', 'tituloEN': 'Fondas de mi Pueblo',
-    'lugar': 'Parqueadero Jumbo la 65 · Cl. 47D con Cra. 65', 'hora': 'Tarde/Noche · 6 al 9 ago', 'emoji': '🌽', 'tipo': 'tablado', 'gratuito': true,
-    'transporte': '🚇 Est. Estadio → caminata 10 min por Cra. 65 hacia el sur hasta Cl. 47D', 'lat': 6.252708, 'lng': -75.584593,
-    'tip': '🌽 Réplica de las fondas antioqueñas con arrieros, gastronomía típica y música de cuerda. El ambiente más auténtico de la Feria. 6 al 9 de agosto.',
-    'tipEN': '🌽 Replica of Antioquian fondas with muleteers, traditional food and string music. The most authentic Festival atmosphere. Aug 6-9.'},
-
-    {'dia': 6, 'mes': 8, 'titulo': 'Tablado C16 Belén — Aeroparque Juan Pablo II', 'tituloEN': 'Stage Comuna 16 · Belén',
-    'lugar': 'Carrera 70, sector Aeroparque Juan Pablo II', 'hora': 'Noche · desde 7:00 pm', 'emoji': '🪗', 'tipo': 'tablado', 'gratuito': true,
-    'transporte': '🚇 Est. Estadio → bus Belén 15 min', 'lat': 6.222287, 'lng': -75.592441,
-    'tip': '🎵 Tablado en Comuna 16 · Belén. Música en vivo gratis — cumbia, vallenato, salsa. Noche de Feria en el barrio.',
-    'tipEN': '🎵 Stage in Comuna 16 · Belén. Free live music — cumbia, vallenato, salsa. Festival night in the neighborhood.'},
-  {'dia': 6, 'mes': 8, 'titulo': 'Tablado C10 La Candelaria — Parque de Boston', 'tituloEN': 'Stage Comuna 10 · La Candelaria',
-    'lugar': 'Parque de Boston, La Candelaria', 'hora': 'Noche · desde 7:00 pm', 'emoji': '🪗', 'tipo': 'tablado', 'gratuito': true,
-    'transporte': '🚇 Est. Prado (L.A) → 12 min', 'lat': 6.24807, 'lng': -75.55762,
-    'tip': '🎵 Tablado en Comuna 10 · La Candelaria. Música en vivo gratis — cumbia, vallenato, salsa. Noche de Feria en el barrio.',
-    'tipEN': '🎵 Stage in Comuna 10 · La Candelaria. Free live music — cumbia, vallenato, salsa. Festival night in the neighborhood.'},
-
-
-  {'dia': 7, 'mes': 8, 'titulo': 'Parque Cultural Nocturno — Noche Tropical', 'tituloEN': 'Cultural Night Park — Tropical Night',
-    'lugar': 'Plaza Gardel', 'hora': '7:00 pm', 'emoji': '🌴', 'tipo': 'concierto', 'gratuito': true,
-    'transporte': '🚇 Est. Exposiciones (L.A) → taxi o bus ~5 min hasta Plaza Gardel (Cra. 65 con Cl. 34)', 'lat': 6.2197, 'lng': -75.5897},
-
-  {'dia': 7, 'mes': 8, 'titulo': 'Pueblito Paisa · Placita de Flores', 'tituloEN': 'Pueblito Paisa · Placita de Flores',
-    'lugar': 'Pueblito Paisa · Cerro Nutibara · Av. 33 cra 63B', 'hora': 'Todo el día · 7 al 9 ago', 'emoji': '🏘️', 'tipo': 'flores', 'gratuito': true,
-    'transporte': '🚇 Est. Exposiciones → caminata 10 min por Av. 33 hacia occidente hasta Cra. 63B\n🚌 Metroplús → Est. Nutibara', 'lat': 6.2362, 'lng': -75.5803,
-    'tip': '🏘️ El Pueblito Paisa se llena de flores durante los últimos 3 días de Feria. La Placita de Flores trae lo mejor de la tradición silletera al Cerro Nutibara.',
-    'tipEN': '🏘️ Pueblito Paisa fills with flowers for the last 3 Feria days. Placita de Flores brings the best silletera tradition to Cerro Nutibara.'},
-
-  {'dia': 7, 'mes': 8, 'titulo': 'Cultura Parque Cristo Rey', 'tituloEN': 'Cristo Rey Park Culture',
-    'lugar': 'Parque Cristo Rey · Guayabal · Av. Guayabal entre Cl 1 Sur y 2 Sur', 'hora': 'Tarde · gratuito', 'emoji': '🎪', 'tipo': 'cultural', 'gratuito': true,
-    'transporte': '🚇 Est. Industriales (L.A) → buseta hacia Guayabal 10 min', 'lat': 6.207456, 'lng': -75.585509,
-    'tip': '🎪 Evento cultural en el parque más emblemático de la Comuna 15 Guayabal. Un reencuentro con la cultura barrial de Medellín.',
-    'tipEN': '🎪 Cultural event at the most iconic park in Guayabal commune. A reconnection with Medellín\'s neighborhood culture.',
-    'curiosidad': '🧠 El Parque Cristo Rey es punto de referencia de la vida comunitaria en Guayabal, cerca del Aeropuerto Olaya Herrera.',
-    'curiosidadEN': '🧠 Cristo Rey Park is a community landmark in Guayabal, near Olaya Herrera Airport.',
-    'reto': '🎯 Preguntale a alguien del barrio cuál es la historia del Parque Cristo Rey.',
-    'retoEN': '🎯 Ask a local about the history of Cristo Rey Park.'},
-
-    {'dia': 7, 'mes': 8, 'titulo': 'Fondas de mi Tierra', 'tituloEN': 'Fondas de mi Tierra',
-    'lugar': 'Mova · Cra. 53 #73-115 (contiguo a Parque Norte)', 'hora': 'Tarde/Noche · 7 y 8 ago', 'emoji': '🪗', 'tipo': 'tablado', 'gratuito': true,
-    'transporte': '🚇 Est. Acevedo → caminata 10 min (junto a Parque Norte)', 'lat': 6.272178, 'lng': -75.56564,
-    'tip': '🌽 Fondas de mi Tierra en Mova — el evento más familiar y auténtico de la segunda semana. 7 y 8 de agosto.',
-    'tipEN': '🌽 Fondas de mi Tierra at Mova — the most family-friendly and authentic event of the second week. Aug 7-8.'},
-
-    {'dia': 7, 'mes': 8, 'titulo': 'Tablado C5 Castilla — Feria de Ganado', 'tituloEN': 'Stage Comuna 5 · Castilla',
-    'lugar': 'Feria de Ganado, Castilla', 'hora': 'Noche · desde 7:00 pm', 'emoji': '🪗', 'tipo': 'tablado', 'gratuito': true,
-    'transporte': '🚇 Est. Tricentenario (L.B) → 15 min', 'lat': 6.301272, 'lng': -75.563889,
-    'tip': '🎵 Tablado en Comuna 5 · Castilla. Música en vivo gratis — cumbia, vallenato, salsa. Noche de Feria en el barrio.',
-    'tipEN': '🎵 Stage in Comuna 5 · Castilla. Free live music — cumbia, vallenato, salsa. Festival night in the neighborhood.'},
-  {'dia': 7, 'mes': 8, 'titulo': 'Tablado C8 Villa Hermosa — Parque de Villa Hermosa', 'tituloEN': 'Stage Comuna 8 · Villa Hermosa',
-    'lugar': 'Parque de Villa Hermosa', 'hora': 'Noche · desde 7:00 pm', 'emoji': '🪗', 'tipo': 'tablado', 'gratuito': true,
-    'transporte': '🚌 Bus desde La Alpujarra → 20 min', 'lat': 6.259027, 'lng': -75.551294,
-    'tip': '🎵 Tablado en Comuna 8 · Villa Hermosa. Música en vivo gratis — cumbia, vallenato, salsa. Noche de Feria en el barrio.',
-    'tipEN': '🎵 Stage in Comuna 8 · Villa Hermosa. Free live music — cumbia, vallenato, salsa. Festival night in the neighborhood.'},
-  {'dia': 7, 'mes': 8, 'titulo': 'Tablado Corregimiento San Cristóbal', 'tituloEN': 'Stage Corregimiento San Cristóbal',
-    'lugar': 'Parque Principal de San Cristóbal', 'hora': 'Noche · desde 7:00 pm', 'emoji': '🪗', 'tipo': 'tablado', 'gratuito': true,
-    'transporte': '🚇 Est. San Javier → bus 20 min', 'lat': 6.277778, 'lng': -75.635208,
-    'tip': '🎵 Tablado en Corregimiento San Cristóbal. Música en vivo gratis — cumbia, vallenato, salsa. Noche de Feria en el barrio.',
-    'tipEN': '🎵 Stage in Corregimiento San Cristóbal. Free live music — cumbia, vallenato, salsa. Festival night in the neighborhood.'},
-
-
-  {'dia': 8, 'mes': 8, 'titulo': 'Concierto Estadio — Súper Concierto', 'tituloEN': 'Stadium Concert — Super Concert',
-    'lugar': 'Estadio Atanasio Girardot', 'hora': '7:00 pm', 'emoji': '🎸', 'tipo': 'concierto', 'gratuito': false, 'esEstrellaFeria': true,
-    'transporte': '🚇 Est. Estadio → caminata 5 min', 'lat': 6.2552, 'lng': -75.5880,
-    'artistas': 'John Alex Castaño · Jorge Celedón · El Combo de las Estrellas · Elder Dayán · Ricarena · El Tropicombo · Piso 21 · Francy',
-    'tip': 'El evento más esperado de la Feria. Boletas requeridas — comprá con anticipación en taquillas oficiales. 🏟️',
-    'tipEN': 'The most anticipated Festival event. Tickets required — buy in advance at official box offices. 🏟️'},
-
-  {'dia': 8, 'mes': 8, 'titulo': 'Noche Silletera — Santa Elena', 'tituloEN': 'Silletera Night — Santa Elena',
-    'lugar': 'Santa Elena', 'hora': 'Noche', 'emoji': '🌺', 'tipo': 'silletera', 'gratuito': true,
-    'transporte': '🚕 Taxi desde El Centro ~30 min', 'lat': 6.210093, 'lng': -75.4984440,
-    'tip': '🌺 La noche antes del Desfile — las familias terminan de armar sus silletas bajo las estrellas. Una experiencia única que pocos turistas conocen.',
-    'tipEN': '🌺 The night before the Parade — families finish building their silletas under the stars. A unique experience very few tourists discover.'},
-
-    {'dia': 8, 'mes': 8, 'titulo': 'Tablado C7 Robledo — Calle 73 sector universitario', 'tituloEN': 'Stage Comuna 7 · Robledo',
-    'lugar': 'Calle 73, sector universitario, Robledo', 'hora': 'Noche · desde 7:00 pm', 'emoji': '🪗', 'tipo': 'tablado', 'gratuito': true,
-    'transporte': '🚇 Est. Tricentenario (L.B) → 12 min', 'lat': 6.273092, 'lng': -75.587614,
-    'tip': '🎵 Tablado en Comuna 7 · Robledo. Música en vivo gratis — cumbia, vallenato, salsa. Noche de Feria en el barrio.',
-    'tipEN': '🎵 Stage in Comuna 7 · Robledo. Free live music — cumbia, vallenato, salsa. Festival night in the neighborhood.'},
-  {'dia': 8, 'mes': 8, 'titulo': 'Tablado C2 Santa Cruz — cancha La Frontera', 'tituloEN': 'Stage Comuna 2 · Santa Cruz',
-    'lugar': 'Cancha La Frontera, Santa Cruz', 'hora': 'Noche · desde 7:00 pm', 'emoji': '🪗', 'tipo': 'tablado', 'gratuito': true,
-    'transporte': '🚇 Est. Acevedo (L.A) → 15 min', 'lat': 6.305387, 'lng': -75.554017,
-    'tip': '🎵 Tablado en Comuna 2 · Santa Cruz. Música en vivo gratis — cumbia, vallenato, salsa. Noche de Feria en el barrio.',
-    'tipEN': '🎵 Stage in Comuna 2 · Santa Cruz. Free live music — cumbia, vallenato, salsa. Festival night in the neighborhood.'},
-  {'dia': 8, 'mes': 8, 'titulo': 'Tablado Corregimiento San Antonio de Prado', 'tituloEN': 'Stage Corregimiento San Antonio de Prado',
-    'lugar': 'Parque Principal de San Antonio de Prado', 'hora': 'Noche · desde 7:00 pm', 'emoji': '🪗', 'tipo': 'tablado', 'gratuito': true,
-    'transporte': '🚌 Bus desde Itagüí → 20 min', 'lat': 6.184931, 'lng': -75.656489,
-    'tip': '🎵 Tablado en Corregimiento San Antonio de Prado. Música en vivo gratis — cumbia, vallenato, salsa. Noche de Feria en el barrio.',
-    'tipEN': '🎵 Stage in Corregimiento San Antonio de Prado. Free live music — cumbia, vallenato, salsa. Festival night in the neighborhood.'},
-
-
-  {'dia': 1, 'mes': 8, 'titulo': 'Plaza de las Flores · Parques del Río (apertura)', 'tituloEN': 'Flowers Square · Parques del Río (opening)',
-    'lugar': 'Parques del Río', 'hora': '4:00 pm', 'emoji': '🌹', 'tipo': 'flores', 'gratuito': true,
-    'transporte': '🚇 Est. Industriales → caminata 5 min', 'lat': 6.243748, 'lng': -75.579924,
-    'tip': '🌹 Primera apertura de las Plazas de Flores 2026. El corazón floral de la Feria arranca hoy.',
-    'tipEN': '🌹 First opening of the 2026 Flores Plazas. The floral heart of the Festival starts today.'},
-
-  {'dia': 6, 'mes': 8, 'titulo': 'Placita de Flores MAMM', 'tituloEN': 'Placita de Flores MAMM',
-    'lugar': 'MAMM · Ciudad del Río', 'hora': 'Todo el día · 6 al 9 ago', 'emoji': '🌸', 'tipo': 'flores', 'gratuito': true,
-    'transporte': '🚇 Est. Industriales → caminata 8 min', 'lat': 6.223929, 'lng': -75.573422,
-    'tip': '🌸 La Placita de Flores en el MAMM combina arte contemporáneo con la tradición silletera. 6 al 9 de agosto.',
-    'tipEN': '🌸 Placita de Flores at MAMM combines contemporary art with the silletera tradition. Aug 6-9.'},
-
-  // ══ EVENTOS AGREGADOS — auditoría 24 jul vs PDF oficial Alcaldía ═══════
-
-  // Calle de Artistas día 2 (PDF: 1 y 2 ago)
-  {'dia': 2, 'mes': 8, 'titulo': 'Calle de Artistas · Plaza Botero', 'tituloEN': 'Artists Street · Plaza Botero',
-    'lugar': 'Plaza Botero · Peatonal Carabobo', 'hora': 'Todo el día', 'emoji': '🎨', 'tipo': 'especial', 'gratuito': true,
-    'transporte': '🚇 Est. Alpujarra → caminata 3 min', 'lat': 6.252310, 'lng': -75.567981,
-    'tip': '🎨 Segundo día de la Calle de Artistas. Artistas plásticos, músicos y artesanos en la Peatonal Carabobo.',
-    'tipEN': '🎨 Second day of Artists Street. Painters, musicians and artisans at Peatonal Carabobo.'},
-
-  // Constelaciones (PDF: 1 y 2 ago)
-  {'dia': 1, 'mes': 8, 'titulo': 'Constelaciones', 'tituloEN': 'Constelaciones — Light Show',
-    'lugar': 'Parque de las Luces', 'hora': 'Noche', 'emoji': '✨', 'tipo': 'especial', 'gratuito': true,
-    'transporte': '🚇 Est. Cisneros → caminata 2 min', 'lat': 6.245907, 'lng': -75.572735,
-    'tip': '✨ Espectáculo de luces y arte en el Parque de las Luces. 1 y 2 de agosto.',
-    'tipEN': '✨ Light and art spectacle at Parque de las Luces. August 1 and 2.'},
-  {'dia': 2, 'mes': 8, 'titulo': 'Constelaciones', 'tituloEN': 'Constelaciones — Light Show',
-    'lugar': 'Parque de las Luces', 'hora': 'Noche', 'emoji': '✨', 'tipo': 'especial', 'gratuito': true,
-    'transporte': '🚇 Est. Cisneros → caminata 2 min', 'lat': 6.245907, 'lng': -75.572735,
-    'tip': '✨ Segunda noche de Constelaciones. Arte y luces en el corazón del centro.',
-    'tipEN': '✨ Second night of Constelaciones. Art and lights in the heart of downtown.'},
-
-  // Desfile Avenida Primavera (PDF: dom 2 ago)
-  {'dia': 2, 'mes': 8, 'titulo': 'Desfile Avenida Primavera — 3ª edición', 'tituloEN': 'Avenida Primavera Parade — 3rd Edition',
-    'lugar': 'Avenida Regional', 'hora': 'Tarde', 'emoji': '🌷', 'tipo': 'desfile', 'gratuito': true, 'esEstrellaFeria': true,
-    'transporte': '🚇 Est. Exposiciones (L.A) → caminata 8 min', 'lat': 6.236639, 'lng': -75.575864,
-    'artistas': 'John Alex Castaño · Jorge Celedón · El Combo de las Estrellas',
-    'tip': '🌷 Desfile musical por la Avenida Regional con carrozas y artistas en vivo. ¡La Medellín creativa sale a la calle! 3ª edición.',
-    'tipEN': '🌷 Musical parade along Avenida Regional with floats and live artists. Creative Medellín hits the streets! 3rd edition.'},
-
-  // PCN Noche Colombiana (PDF: lun 3 ago)
-  {'dia': 3, 'mes': 8, 'titulo': 'Parque Cultural Nocturno — Noche Colombiana', 'tituloEN': 'Cultural Night Park — Colombian Night',
-    'lugar': 'Plaza Gardel', 'hora': '7:00 pm', 'emoji': '🇨🇴', 'tipo': 'concierto', 'gratuito': true,
-    'transporte': '🚇 Est. Exposiciones (L.A) → taxi o bus ~5 min hasta Plaza Gardel (Cra. 65 con Cl. 34)', 'lat': 6.2197, 'lng': -75.5897,
-    'tip': '🇨🇴 Noche dedicada a la música colombiana en todas sus expresiones. Plaza Gardel se convierte en el epicentro cultural de la Feria.',
-    'tipEN': '🇨🇴 A night dedicated to Colombian music in all its expressions. Plaza Gardel becomes the cultural epicenter of the Festival.'},
-
-  // PCN Homenaje Grupo Suramérica (PDF: mar 4 ago)
-  {'dia': 4, 'mes': 8, 'titulo': 'Parque Cultural Nocturno — Homenaje Grupo Suramérica', 'tituloEN': 'Cultural Night Park — Suramérica Tribute',
-    'lugar': 'Plaza Gardel', 'hora': '7:00 pm', 'emoji': '🎵', 'tipo': 'concierto', 'gratuito': true,
-    'transporte': '🚇 Est. Exposiciones (L.A) → taxi o bus ~5 min hasta Plaza Gardel (Cra. 65 con Cl. 34)', 'lat': 6.2197, 'lng': -75.5897,
-    'tip': '🎵 Homenaje al Grupo Suramérica — leyenda de la música tropical paisa. Una noche para celebrar el legado de la cumbia y el porro antioqueño.',
-    'tipEN': '🎵 Tribute to Grupo Suramérica — legend of paisa tropical music. A night to celebrate the legacy of cumbia and Antioquian porro.'},
-
-  // PCN Noche Son y Bolero (PDF: mié 5 ago)
-  {'dia': 5, 'mes': 8, 'titulo': 'Parque Cultural Nocturno — Noche de Son y Bolero', 'tituloEN': 'Cultural Night Park — Son & Bolero Night',
-    'lugar': 'Plaza Gardel', 'hora': '7:00 pm', 'emoji': '🎷', 'tipo': 'concierto', 'gratuito': true,
-    'transporte': '🚇 Est. Exposiciones (L.A) → taxi o bus ~5 min hasta Plaza Gardel (Cra. 65 con Cl. 34)', 'lat': 6.2197, 'lng': -75.5897,
-    'tip': '🎷 Son cubano y bolero romántico. La Plaza Gardel honra la tradición de la música de serenata bajo las estrellas.',
-    'tipEN': '🎷 Cuban son and romantic bolero. Plaza Gardel honors the tradition of serenade music under the stars.'},
-
-  // Trova Final (PDF: jue 6 ago, Plaza Gardel)
-  {'dia': 6, 'mes': 8, 'titulo': 'Final Festival de la Trova — Ciudad de Medellín', 'tituloEN': 'Trova Festival Final — City of Medellín',
-    'lugar': 'Plaza Gardel', 'hora': '6:00 pm', 'emoji': '🎤', 'tipo': 'trova', 'gratuito': true, 'esEstrellaFeria': true,
-    'transporte': '🚇 Est. Exposiciones (L.A) → taxi o bus ~5 min hasta Plaza Gardel (Cra. 65 con Cl. 34)', 'lat': 6.2197, 'lng': -75.5897,
-    'tip': '🎤 ¡La gran final de la Trova! Los mejores improvisadores de Colombia se enfrentan en Plaza Gardel. Humor, ingenio y rima en tiempo real.',
-    'tipEN': '🎤 The big Trova Final! Colombia\'s best improvisers face off at Plaza Gardel. Humor, wit and rhyme in real time.'},
-
-  // Desfile Autos Clásicos y Antiguos (PDF: vie 7 ago)
-  {'dia': 7, 'mes': 8, 'titulo': 'Desfile de Autos Clásicos y Antiguos', 'tituloEN': 'Classic & Antique Cars Parade',
-    'lugar': 'UPB Laureles · Cra 70 con Cl 48', 'hora': 'Mañana', 'emoji': '🚗', 'tipo': 'desfile', 'gratuito': true,
-    'transporte': '🚇 Est. Suramericana (L.B) → caminata 10 min por Cra. 70', 'lat': 6.242388, 'lng': -75.590207,
-    'tip': '🚗 Decenas de autos clásicos restaurados recorren las calles de Medellín. Un viaje en el tiempo sobre ruedas.',
-    'tipEN': '🚗 Dozens of restored classic cars cruise through Medellín\'s streets. A journey through time on wheels.'},
-
-  // Héroes de la Patria (PDF: sáb 8 ago)
-  {'dia': 8, 'mes': 8, 'titulo': 'Desfile Héroes de la Patria', 'tituloEN': 'Heroes of the Homeland Parade',
-    'lugar': 'Principales vías de Medellín', 'hora': 'Tarde', 'emoji': '🎖️', 'tipo': 'desfile', 'gratuito': true,
-    'transporte': '🚇 Est. Poblado (L.A) → Av. El Poblado', 'lat': 6.2100, 'lng': -75.5685,
-    'tip': '🎖️ Desfile cívico-militar con las Fuerzas Armadas de Colombia. Un homenaje a los héroes del país durante la Feria.',
-    'tipEN': '🎖️ Civic-military parade with Colombia\'s Armed Forces. A tribute to the country\'s heroes during the Festival.'},
-
-  // ══ DÍA 9 — Domingo 9 agosto · DESFILE DE SILLETEROS ═══════════════════
-
-  {'dia': 9, 'mes': 8, 'titulo': '🌹 69 Desfile de Silleteros', 'tituloEN': '🌹 69th Silleteros Parade',
-    'lugar': 'Av. El Poblado → Plaza Mayor · 530 silleteros', 'hora': '2:00 pm', 'emoji': '🌹', 'tipo': 'desfile', 'gratuito': true, 'esEstrellaFeria': true,
-    'transporte': '🚇 Est. Poblado (L.A) → Av. El Poblado entre Cl 9 y Cl 11 (mejor punto)\n🚇 Metro GRATIS todo el día\n🚌 Metroplús → Est. Industriales → caminata hacia Av. El Poblado', 'lat': 6.236639, 'lng': -75.575864,
-    'tip': '🌹 EL EVENTO DE LA FERIA. 530 silleteros de Santa Elena recorren la Av. El Poblado con sus silletas de flores. Llegá mínimo 2 HORAS antes — el mejor punto es entre Calles 9 y 11. Metro gratis hoy. Edición 69.',
-    'tipEN': '🌹 THE event of the Festival. 530 flower carriers from Santa Elena parade their silletas along Av. El Poblado. Arrive at least 2 HOURS early — best spot is between Calle 9 and Calle 11. Free Metro today. 69th edition.',
-    'curiosidad': '🧠 La tradición silletera viene de los campesinos de Santa Elena que bajaban flores a Medellín en sus espaldas. Hoy son Patrimonio Cultural de la Nación y están en proceso de reconocimiento por la UNESCO.',
-    'curiosidadEN': '🧠 The silletero tradition comes from Santa Elena farmers who carried flowers down to Medellín on their backs. Today it is National Cultural Heritage and under UNESCO recognition process.',
-    'reto': '🎯 Contá cuántas silletas del tipo \"monumental\" pasan. ¡Son las más grandes y pueden pesar hasta 80 kg!',
-    'retoEN': '🎯 Count how many \"monumental\" silletas pass by. They are the largest and can weigh up to 80 kg!'},
-
-  {'dia': 9, 'mes': 8, 'titulo': 'Fondas de mi Pueblo (cierre)', 'tituloEN': 'Fondas de mi Pueblo (closing)',
-    'lugar': 'Parqueadero Jumbo la 65 · Cl. 47D con Cra. 65', 'hora': 'Tarde/Noche', 'emoji': '🌽', 'tipo': 'tablado', 'gratuito': true,
-    'transporte': '🚇 Est. Estadio → caminata 10 min por Cra. 65', 'lat': 6.252708, 'lng': -75.584593,
-    'tip': '🌽 Último día de las Fondas. Ambiente de fonda antioqueña con arrieros, gastronomía y música de cuerda.',
-    'tipEN': '🌽 Last day of the Fondas. Antioquian fonda atmosphere with muleteers, food and string music.'},
-
-  {'dia': 9, 'mes': 8, 'titulo': 'Pueblito Paisa · Placita de Flores (cierre)', 'tituloEN': 'Pueblito Paisa · Placita de Flores (closing)',
-    'lugar': 'Pueblito Paisa · Cerro Nutibara', 'hora': 'Todo el día', 'emoji': '🏘️', 'tipo': 'flores', 'gratuito': true,
-    'transporte': '🚇 Est. Exposiciones → caminata 10 min', 'lat': 6.2362, 'lng': -75.5803,
-    'tip': '🏘️ Último día del Pueblito Paisa con Placita de Flores. Cierre perfecto después del Desfile de Silleteros.',
-    'tipEN': '🏘️ Last day of Pueblito Paisa with Placita de Flores. The perfect close after the Silleteros Parade.'},
-
-  {'dia': 9, 'mes': 8, 'titulo': 'Plaza de las Flores · Parques del Río (cierre)', 'tituloEN': 'Flowers Square · Parques del Río (closing)',
-    'lugar': 'Parques del Río', 'hora': 'Todo el día', 'emoji': '🌹', 'tipo': 'flores', 'gratuito': true,
-    'transporte': '🚇 Est. Industriales → caminata 5 min', 'lat': 6.243748, 'lng': -75.579924,
-    'tip': '🌹 Último día de la Plaza de Flores más grande de la Feria 2026. Silleteros en vivo, flores y gastronomía.',
-    'tipEN': '🌹 Last day of the largest Flores Plaza of Feria 2026. Live silleteros, flowers and gastronomy.'},
-
-  {'dia': 9, 'mes': 8, 'titulo': 'Placita de Flores MAMM (cierre)', 'tituloEN': 'Placita de Flores MAMM (closing)',
-    'lugar': 'MAMM · Ciudad del Río', 'hora': 'Todo el día', 'emoji': '🌸', 'tipo': 'flores', 'gratuito': true,
-    'transporte': '🚇 Est. Industriales → caminata 8 min', 'lat': 6.2388, 'lng': -75.5779,
-    'tip': '🌸 Cierre de la Placita de Flores en el MAMM. Arte y tradición silletera para despedir la Feria.',
-    'tipEN': '🌸 Closing of Placita de Flores at MAMM. Art and silletera tradition to bid the Festival farewell.'},
-
-  {'dia': 9, 'mes': 8, 'titulo': 'Florecer: Orquídeas (cierre)', 'tituloEN': 'Florecer: Orchids (closing)',
-    'lugar': 'Jardín Botánico de Medellín', 'hora': 'Todo el día', 'emoji': '🌸', 'tipo': 'flores', 'gratuito': true,
-    'transporte': '🚇 Est. Universidad → caminata 5 min', 'lat': 6.2685, 'lng': -75.5671,
-    'tip': '🌸 Último día de Florecer en el Jardín Botánico. Orquídeas, plantas nativas y talleres.',
-    'tipEN': '🌸 Last day of Florecer at the Botanical Garden. Orchids, native plants and workshops.'},
-
+  // ── Datos de agenda cargados desde Firestore (Admin) para Feria 2027 ──
 ];
-/// Tablados agrupados por zona — 21 tablados oficiales · gratuitos · 31 jul – 9 ago
+/// Tablados agrupados por zona — cargados desde Firestore para Feria 2027
 const List<Map<String, dynamic>> kFeriaZonasTablero = [
-  {
-    'zona': 'Zona Norte',
-    'emoji': '🏔️',
-    'color': Color(0xFF1A4A2A),
-    'lat': 6.2900, 'lng': -75.5580,
-    'transporte': '🚇 Est. Acevedo / Caribe → buseta hacia la zona',
-    'tablados': [
-      {'nombre': 'Manrique', 'barrio': 'Comuna 3', 'lat': 6.2720, 'lng': -75.5490, 'lugar': 'Parque La Cruz · Cra 45 #72'},
-      {'nombre': 'Popular', 'barrio': 'Comuna 1', 'lat': 6.3020, 'lng': -75.5530, 'lugar': 'Parque Principal de Popular'},
-      {'nombre': 'Santa Cruz', 'barrio': 'Comuna 2', 'lat': 6.2950, 'lng': -75.5470, 'lugar': 'Parque de Santa Cruz'},
-      {'nombre': 'Castilla', 'barrio': 'Comuna 5', 'lat': 6.3010, 'lng': -75.5870, 'lugar': 'Parque La Floresta · Cra 65'},
-      {'nombre': 'Aranjuez', 'barrio': 'Comuna 4', 'lat': 6.2840, 'lng': -75.5560, 'lugar': 'Parque principal Aranjuez'},
-    ],
-  },
-  {
-    'zona': 'Zona Centro',
-    'emoji': '🏛️',
-    'color': Color(0xFF3A2A1A),
-    'lat': 6.2518, 'lng': -75.5636,
-    'transporte': '🚇 Est. Alpujarra / Universidad / Hospital → caminata',
-    'tablados': [
-      {'nombre': 'La Candelaria', 'barrio': 'Comuna 10', 'lat': 6.2518, 'lng': -75.5650, 'lugar': 'Parque Bolívar · Centro histórico'},
-      {'nombre': 'Calle de los Artistas', 'barrio': 'Plaza Botero', 'lat': 6.2527, 'lng': -75.5647, 'lugar': 'Parque Botero · Peatonal Carabobo'},
-      {'nombre': 'Parque Gardel', 'barrio': 'Guayabal', 'lat': 6.2197, 'lng': -75.5897, 'lugar': 'Plaza Gardel · junto Aeropuerto Olaya'},
-      {'nombre': 'Parque de los Deseos', 'barrio': 'Aranjuez', 'lat': 6.268617, 'lng': -75.565699, 'lugar': 'Parque de los Deseos · junto Jardín Botánico'},
-      {'nombre': 'Buenos Aires', 'barrio': 'Comuna 9', 'lat': 6.2350, 'lng': -75.5540, 'lugar': 'Parque Buenos Aires'},
-      {'nombre': 'Villa Hermosa', 'barrio': 'Comuna 8', 'lat': 6.2250, 'lng': -75.5480, 'lugar': 'Parque principal Villa Hermosa'},
-    ],
-  },
-  {
-    'zona': 'Zona Occidente',
-    'emoji': '🌄',
-    'color': Color(0xFF2A1A3A),
-    'lat': 6.2610, 'lng': -75.6000,
-    'transporte': '🚇 Est. San Javier / Estadio → caminata o buseta',
-    'tablados': [
-      {'nombre': 'San Javier', 'barrio': 'Comuna 13', 'lat': 6.2548, 'lng': -75.5973, 'lugar': 'Parque principal San Javier'},
-      {'nombre': 'Robledo', 'barrio': 'Comuna 7', 'lat': 6.2880, 'lng': -75.5860, 'lugar': 'Parque San Martín de Robledo'},
-      {'nombre': 'La América', 'barrio': 'Comuna 12', 'lat': 6.255825, 'lng': -75.601519, 'lugar': 'Parque La Floresta, La América'},
-      {'nombre': 'Laureles', 'barrio': 'Comuna 11', 'lat': 6.2460, 'lng': -75.5940, 'lugar': 'Segundo Parque de Laureles'},
-      {'nombre': 'San Cristóbal', 'barrio': 'Corregimiento', 'lat': 6.2750, 'lng': -75.6180, 'lugar': 'Parque principal San Cristóbal'},
-      {'nombre': 'Altavista', 'barrio': 'Corregimiento', 'lat': 6.2010, 'lng': -75.6120, 'lugar': 'Parque central Altavista'},
-    ],
-  },
-  {
-    'zona': 'Zona Sur',
-    'emoji': '🌇',
-    'color': Color(0xFF1A2A3A),
-    'lat': 6.2100, 'lng': -75.5680,
-    'transporte': '🚇 Est. Poblado / Aguacatala → caminata · Sur: buseta',
-    'tablados': [
-      {'nombre': 'El Poblado', 'barrio': 'Comuna 14', 'lat': 6.210551, 'lng': -75.570433, 'lugar': 'Parque de El Poblado · El Poblado'},
-      {'nombre': 'Guayabal', 'barrio': 'Comuna 15', 'lat': 6.1980, 'lng': -75.5900, 'lugar': 'Parque principal Guayabal'},
-      {'nombre': 'San Antonio de Prado', 'barrio': 'Corregimiento', 'lat': 6.1180, 'lng': -75.6460, 'lugar': 'Parque de San Antonio de Prado'},
-    ],
-  },
-  {
-    'zona': 'Zona Rural',
-    'emoji': '🌺',
-    'color': Color(0xFF2A1A0A),
-    'lat': 6.2315, 'lng': -75.4950,
-    'transporte': '🚌 Bus directo desde Terminal Norte o taxi',
-    'tablados': [
-      {'nombre': 'Santa Elena', 'barrio': 'Corregimiento', 'lat': 6.2315, 'lng': -75.4950, 'lugar': 'Parque central Santa Elena · corazón silletero'},
-      {'nombre': 'San Sebastián de Palmitas', 'barrio': 'Corregimiento', 'lat': 6.3250, 'lng': -75.7020, 'lugar': 'Parque principal Palmitas'},
-    ],
-  },
+  // ── Zonas de tablados cargadas desde Admin / Firestore ──
 ];
-
 /// Rutas de la Feria — usadas por FeriaScreen
+
+/// Rutas de la Feria — estructura para Feria 2027 (datos desde Admin)
 const List<Map<String, dynamic>> kFeriaRutas = [
-  {
-    'id': 'feria_clasica',
-    'nombre': 'FERIA CLÁSICA',
-    'nombreEN': 'CLASSIC FESTIVAL',
-    'emoji': '🌹',
-    'desc': 'Los eventos más icónicos · Desfile, Trova, Autos, Silletas',
-    'descEN': 'The most iconic events · Parade, Trova, Cars, Silletas',
-    'sitios': 12,
-    'tiempo': '10 días',
-    'insignia': 'Silletero de Oro',
-    'insigniaEmoji': '🌹',
-    'color1': Color(0xFF1A0A10),
-    'color2': Color(0xFF2A1020),
-    'acento': Color(0xFFD05538),
-  },
-  // [eliminado] feria_silletera — reemplazada por GUARDIANES/SENDEROS/FINCA Y FONDA/VEREDAS
+  // ── Rutas de Feria cargadas desde Firestore ──
 ];
-
 /// Insignia colección completa
-const Map<String, dynamic> kFeriaColeccion = {
-  'nombre': 'Colección Feria 2026',
-  'emoji': '🏆',
-  'desc': 'Completa las 3 rutas de la Feria · Edición 69',
-  'rutas': ['feria_clasica'],
-};
 
+/// Insignia colección — actualizar desde Admin para cada año
+const Map<String, dynamic> kFeriaColeccion = {
+  'nombre': 'Colección Feria',
+  'emoji': '🏆',
+  'desc': '',
+  'rutas': <String>[],
+};
 const kGoldLight  = Color(0xFFE8C96A);
 const kDark       = Color(0xFF0D0D0D);
 const kDark2      = Color(0xFF111410);  // Verde oscuro paisa
@@ -2076,6 +1567,33 @@ class AuthService {
   static Future<void> signOut() async {
     await _googleSignIn.signOut();
     await _auth.signOut();
+  }
+
+  /// Sign in with Apple — requerido por Apple Guideline 4.8
+  static Future<UserCredential?> loginConApple() async {
+    try {
+      final appleCredential = await SignInWithApple.getAppleIDCredential(
+        scopes: [
+          AppleIDAuthorizationScopes.email,
+          AppleIDAuthorizationScopes.fullName,
+        ]);
+      final oauthCredential = OAuthProvider('apple.com').credential(
+        idToken: appleCredential.identityToken,
+        accessToken: appleCredential.authorizationCode);
+      final result = await _auth.signInWithCredential(oauthCredential);
+      if (result.additionalUserInfo?.isNewUser == true) {
+        final nombre = [
+          appleCredential.givenName ?? '',
+          appleCredential.familyName ?? '',
+        ].where((n) => n.isNotEmpty).join(' ');
+        if (nombre.isNotEmpty) await result.user?.updateDisplayName(nombre);
+        await _guardarUsuario(result.user!);
+      }
+      return result;
+    } catch (e) {
+      debugPrint('Error Sign in with Apple: $e');
+      return null;
+    }
   }
 
   // Guardar/actualizar usuario en Firestore
@@ -2271,39 +1789,36 @@ class _MainShellState extends State<MainShell> {
   /// Si hay una ruta activa guardada, navega automáticamente a ella
   /// con el progreso restaurado. El usuario puede salir si no quiere continuarla.
   void _restaurarRutaActiva() {
-    final nombreRuta = SesionManager().rutaActivaNombre;
-    if (nombreRuta == null || nombreRuta.isEmpty) return;
+    try {
+      final nombreRuta = SesionManager().rutaActivaNombre;
+      if (nombreRuta == null || nombreRuta.isEmpty) return;
 
-    // Buscar la ruta en el listado global
-    final ruta = RutasService().rutas.firstWhere(
-      (r) => r['nombre'] == nombreRuta,
-      orElse: () => <String, dynamic>{});
-    if (ruta.isEmpty) {
-      // FIX (19/05/2026): Ruta guardada ya no existe — limpiar sesión huérfana
-      SesionManager().limpiarRutaActiva();
-      return;
+      final ruta = RutasService().rutas.firstWhere(
+        (r) => r['nombre'] == nombreRuta,
+        orElse: () => <String, dynamic>{});
+      if (ruta.isEmpty) {
+        SesionManager().limpiarRutaActiva();
+        return;
+      }
+
+      final totalSitios = (ruta['sitiosList'] as List?)?.length ?? 0;
+      final progreso = SesionManager().ultimoSitioIndex ?? 0;
+
+      if (progreso <= 0 || progreso >= totalSitios) {
+        SesionManager().limpiarRutaActiva();
+        return;
+      }
+
+      _navKeys[0].currentState?.push(
+        MaterialPageRoute(builder: (_) => RouteDetailScreen(
+          ruta: ruta,
+          progresoInicial: progreso,
+        )),
+      );
+    } catch (e) {
+      debugPrint('⚠️ _restaurarRutaActiva error: $e');
+      try { SesionManager().limpiarRutaActiva(); } catch (_) {}
     }
-
-    final totalSitios = (ruta['sitiosList'] as List?)?.length ?? 0;
-    final progreso = SesionManager().ultimoSitioIndex ?? 0;
-
-    // FIX (19/05/2026): Validar que el índice guardado sea coherente con
-    // el total real de sitios de la ruta. Si el índice >= total, significa
-    // que la ruta ya fue completada o el dato está corrupto — limpiar y no restaurar.
-    // Esto previene el bug donde sitios se marcan como visitados al abrir la app
-    // sin haber estado en el lugar (índice de otra sesión aplicado incorrectamente).
-    if (progreso <= 0 || progreso >= totalSitios) {
-      SesionManager().limpiarRutaActiva();
-      return;
-    }
-
-    // Navegar a la pantalla de detalle de ruta usando el navegador del tab Home
-    _navKeys[0].currentState?.push(
-      MaterialPageRoute(builder: (_) => RouteDetailScreen(
-        ruta: ruta,
-        progresoInicial: progreso,
-      )),
-    );
   }
 
   @override
@@ -2964,18 +2479,12 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
   late Animation<double> _fadeAnim, _scaleAnim, _progressAnim;
   late Animation<double> _floatAnim;
 
-  // DEBUG iOS — overlay temporal para diagnosticar pantalla negra
-  String _debugMsg = 'Iniciando...';
-
-  void _updateDebug(String msg) {
-    debugPrint('🔴 iOS DEBUG: $msg');
-    if (mounted) setState(() => _debugMsg = msg);
-  }
+  // Debug iOS eliminado
 
   @override
   void initState() {
     super.initState();
-    _updateDebug('initState OK');
+    debugPrint('🟢 Splash initState OK');
     _ctrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 2200));
     _floatCtrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 2000))
       ..repeat(reverse: true);
@@ -2989,25 +2498,25 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
         .animate(CurvedAnimation(parent: _floatCtrl, curve: Curves.easeInOut));
 
     _ctrl.forward();
-    _updateDebug('Animaciones iniciadas');
+    debugPrint('🟢 Animaciones iniciadas');
 
     Future.delayed(const Duration(milliseconds: 3200), () async {
       if (!mounted) return;
-      _updateDebug('Verificando sesión...');
+      debugPrint('🟢 Verificando sesión...');
 
       User? usuarioActual = FirebaseAuth.instance.currentUser;
-      _updateDebug('currentUser: ${usuarioActual?.email ?? "null"}');
+      debugPrint('🟢 currentUser: ${usuarioActual?.email ?? "null"}');
 
       if (usuarioActual == null) {
-        _updateDebug('Esperando authStateChanges...');
+        debugPrint('🟢 Esperando authStateChanges...');
         try {
           usuarioActual = await FirebaseAuth.instance
             .authStateChanges()
             .first
             .timeout(const Duration(seconds: 5));
-          _updateDebug('authStateChanges: ${usuarioActual?.email ?? "null"}');
+          debugPrint('🟢 authStateChanges: ${usuarioActual?.email ?? "null"}');
         } catch (e) {
-          _updateDebug('Timeout/error: $e');
+          debugPrint('🔴 Timeout: $e');
           usuarioActual = null;
         }
       }
@@ -3015,7 +2524,7 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
       if (!mounted) return;
 
       if (usuarioActual != null) {
-        _updateDebug('→ Navegando a MainShell');
+        debugPrint('🟢 → Navegando a MainShell');
         Navigator.of(context).pushReplacement(PageRouteBuilder(
           pageBuilder: (_, __, ___) => const MainShell(),
           transitionsBuilder: (_, anim, __, child) => FadeTransition(opacity: anim, child: child),
@@ -3023,7 +2532,7 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
         ));
         return;
       }
-      _updateDebug('→ Navegando a LangSelect');
+      debugPrint('🟢 → Navegando a LangSelect');
       Navigator.of(context).pushReplacement(PageRouteBuilder(
         pageBuilder: (_, __, ___) => const LangSelectScreen(),
         transitionsBuilder: (_, anim, __, child) => FadeTransition(opacity: anim, child: child),
@@ -3201,18 +2710,7 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
                         fontSize: 8, letterSpacing: 0.5)),
                   ]),
 
-                  // DEBUG TEMPORAL — remover después del diagnóstico iOS
-                  const SizedBox(height: 12),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: Colors.black.withOpacity(0.7),
-                      borderRadius: BorderRadius.circular(8)),
-                    child: Text(_debugMsg,
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(
-                        color: Colors.yellow, fontSize: 10,
-                        fontFamily: 'monospace'))),
+                  // Debug overlay eliminado — iOS diagnóstico completado
 
                 ])))),
       ]),
@@ -3246,7 +2744,7 @@ class MisPremiosScreen extends StatelessWidget {
                 },
                 child: Container(width: 36, height: 36,
                   decoration: BoxDecoration(color: Colors.black.withOpacity(0.4), shape: BoxShape.circle),
-                  child: const Center(child: Text('←', style: TextStyle(color: RDSColor.textPrimary, fontSize: 16))))),
+                  child: const Center(child: Icon(RDSIcons.back, color: RDSColor.textPrimary, size: 18)))),
               const SizedBox(width: 14),
               Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Text(tMisPremiosTitle, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900,
@@ -3312,6 +2810,7 @@ class MisPremiosScreen extends StatelessWidget {
                             // Insignia ilustrada si existe
                             data['insigniaImg'] != null
                               ? Image.asset(data['insigniaImg'], width: 56, height: 56,
+                                  fit: BoxFit.contain,
                                   errorBuilder: (_, __, ___) =>
                                     Text(data['emoji'] ?? '🏆', style: const TextStyle(fontSize: 28)))
                               : Text(data['emoji'] ?? '🏆', style: const TextStyle(fontSize: 28)),
@@ -3644,7 +3143,7 @@ class _CompraScreenState extends State<CompraScreen> {
                   child: GestureDetector(onTap: () => Navigator.pop(context),
                     child: Container(width: 36, height: 36,
                       decoration: BoxDecoration(color: Colors.black.withOpacity(0.4), shape: BoxShape.circle),
-                      child: const Center(child: Text('←', style: TextStyle(color: RDSColor.textPrimary, fontSize: 16)))))),
+                      child: const Center(child: Icon(RDSIcons.back, color: RDSColor.textPrimary, size: 18))))),
                 Positioned(bottom: 20, left: 20, right: 20,
                   child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                     Text(tComprarRutaTitle, style: TextStyle(
@@ -3953,12 +3452,12 @@ class _LoginScreenState extends State<LoginScreen> {
 
             // Campo email
             _InputField(ctrl: _emailCtrl, hint: tCorreo,
-              emoji: '📧', keyboardType: TextInputType.emailAddress),
-            const SizedBox(height: 12),
+              icon: Icons.email_outlined, keyboardType: TextInputType.emailAddress),
+            const SizedBox(height: RDSSpace.sm),
 
             // Campo contraseña
             _InputField(ctrl: _passCtrl, hint: tContrasena,
-              emoji: '🔒', obscure: !_verPass,
+              icon: Icons.lock_outline_rounded, obscure: !_verPass,
               suffix: GestureDetector(
                 onTap: () => setState(() => _verPass = !_verPass),
                 child: Icon(_verPass ? Icons.visibility_off : Icons.visibility,
@@ -4008,6 +3507,36 @@ class _LoginScreenState extends State<LoginScreen> {
                   Text(tContinuarGoogleUp,
                     style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: RDSColor.textPrimary, letterSpacing: 1)),
                 ]))),
+            const SizedBox(height: RDSSpace.sm),
+
+            // ── Botón Sign in with Apple — Guideline 4.8 ──────────────
+            GestureDetector(
+              onTap: _cargando ? null : () async {
+                setState(() => _cargando = true);
+                final result = await AuthService.loginConApple();
+                if (!mounted) return;
+                if (result != null) {
+                  Navigator.of(context, rootNavigator: true).pushAndRemoveUntil(
+                    MaterialPageRoute(builder: (_) => const MainShell()), (r) => false);
+                } else {
+                  setState(() { _cargando = false; _error = t('Error con Apple ID','Apple ID error'); });
+                }
+              },
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: Colors.white.withOpacity(0.1))),
+                child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                  const Icon(Icons.apple, color: Colors.black, size: 20),
+                  const SizedBox(width: 10),
+                  Text(t('Continuar con Apple', 'Continue with Apple'),
+                    style: const TextStyle(
+                      fontSize: 13, fontWeight: FontWeight.w700,
+                      color: Colors.black, letterSpacing: 1)),
+                ]))),
             const SizedBox(height: 24),
 
             // Ir a registro
@@ -4049,6 +3578,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _emailCtrl = TextEditingController();
   final _passCtrl = TextEditingController();
   final _pass2Ctrl = TextEditingController();
+  final _hotelCtrl = TextEditingController();
   bool _cargando = false;
   String _error = '';
 
@@ -4120,7 +3650,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
         // ── Hero header cinematográfico ──
         Positioned(top: 0, left: 0, right: 0, height: 200,
           child: Stack(fit: StackFit.expand, children: [
-            Image.asset('assets/images/rutas/ruta_17_feria_flores.jpg',
+            Image.asset('assets/images/rutas/ruta_04_metrocable.jpg',
               fit: BoxFit.cover, cacheWidth: 600,
               errorBuilder: (_, __, ___) => Container(color: const Color(0xFF0D200A))),
             Container(decoration: const BoxDecoration(
@@ -4274,26 +3804,57 @@ Future<bool?> mostrarBottomSheetConversion(BuildContext context) async {
 class _InputField extends StatelessWidget {
   final TextEditingController ctrl;
   final String hint;
-  final String emoji;
+  final String? emoji;
+  final IconData? icon;
   final bool obscure;
   final TextInputType? keyboardType;
   final Widget? suffix;
-  const _InputField({required this.ctrl, required this.hint, required this.emoji,
+  const _InputField({
+    required this.ctrl, required this.hint,
+    this.emoji, this.icon,
     this.obscure = false, this.keyboardType, this.suffix});
   @override
   Widget build(BuildContext context) => Container(
-    decoration: BoxDecoration(color: RDSColor.card, borderRadius: BorderRadius.circular(14),
-      border: Border.all(color: Colors.white.withOpacity(0.08))),
+    decoration: BoxDecoration(
+      color: RDSColor.surface,
+      borderRadius: RDSRadius.bMd,
+      border: Border.all(color: RDSColor.borderSubtle)),
     child: TextField(
       controller: ctrl, obscureText: obscure, keyboardType: keyboardType,
       style: const TextStyle(color: RDSColor.textPrimary, fontSize: 14),
       decoration: InputDecoration(
-        hintText: hint, hintStyle: const TextStyle(color: RDSColor.textMuted, fontSize: 13),
-        prefixIcon: Padding(padding: const EdgeInsets.all(12),
-          child: Text(emoji, style: const TextStyle(fontSize: 16))),
-        suffixIcon: suffix != null ? Padding(padding: const EdgeInsets.all(12), child: suffix) : null,
+        hintText: hint,
+        hintStyle: const TextStyle(color: RDSColor.textMuted, fontSize: 13),
+        prefixIcon: icon != null
+          ? Icon(icon, color: RDSColor.textMuted, size: 18)
+          : Padding(padding: const EdgeInsets.all(12),
+              child: Text(emoji ?? '', style: const TextStyle(fontSize: 16))),
+        suffixIcon: suffix != null
+          ? Padding(padding: const EdgeInsets.all(12), child: suffix)
+          : null,
         border: InputBorder.none,
-        contentPadding: const EdgeInsets.symmetric(vertical: 14))));
+        contentPadding: const EdgeInsets.symmetric(vertical: RDSSpace.md))));
+}
+
+// ── WelcomeStatChip — chip de stat para WelcomeScreen ────────────────────
+class _WelcomeStatChip extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  const _WelcomeStatChip({required this.icon, required this.label});
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.symmetric(
+      horizontal: RDSSpace.md, vertical: RDSSpace.xs + 2),
+    decoration: BoxDecoration(
+      color: RDSColor.surface,
+      borderRadius: RDSRadius.bFull,
+      border: Border.all(color: RDSColor.borderSubtle)),
+    child: Row(mainAxisSize: MainAxisSize.min, children: [
+      Icon(icon, color: RDSColor.gold, size: 13),
+      const SizedBox(width: RDSSpace.xs),
+      Text(label, style: const TextStyle(fontFamily: 'SpaceGrotesk', fontSize: 10, fontWeight: FontWeight.w700, letterSpacing: 2.0, color: RDSColor.textMuted).copyWith(
+        color: RDSColor.textPrimary, fontSize: 11)),
+    ]));
 }
 
 // ─────────────────────────────────────────
@@ -4336,7 +3897,7 @@ class _LangSelectScreenState extends State<LangSelectScreen> {
         Positioned(top: 0, left: 0, right: 0,
           height: MediaQuery.of(context).size.height * 0.45,
           child: Row(children: [
-            Expanded(child: Image.asset('assets/images/rutas/ruta_17_feria_flores.jpg',
+            Expanded(child: Image.asset('assets/images/rutas/ruta_04_metrocable.jpg',
               fit: BoxFit.cover, cacheWidth: 400,
               errorBuilder: (_, __, ___) => Container(color: const Color(0xFF0D200A)))),
             const SizedBox(width: 2),
@@ -4620,26 +4181,24 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                   borderRadius: BorderRadius.circular(4))),
           ])),
 
-        // ── Botón principal ───────────────────────────────────────────────
+        // ── Botón principal ─────────────────────────────────────────
         if (_paginaActual < 3)
           Positioned(
-            bottom: 36, left: 24, right: 24,
-            child: _GoldButton(
-              label: t('Siguiente →', 'Next →'),
-              onTap: _siguiente,
-            )),
+            bottom: 36, left: RDSSpace.xl, right: RDSSpace.xl,
+            child: _RDSButtonPrimary(
+              label: t('Continuar', 'Continue'),
+              onTap: _siguiente)),
 
-        // ── Skip ─────────────────────────────────────────────────────────
+        // ── Skip — compacto ─────────────────────────────────────────
         if (_paginaActual < 3)
           Positioned(
-            top: MediaQuery.of(context).padding.top + 16,
-            right: 20,
+            top: MediaQuery.of(context).padding.top + RDSSpace.md,
+            right: RDSSpace.lg,
             child: GestureDetector(
               onTap: _irARegistro,
               child: Text(t('Saltar', 'Skip'),
-                style: TextStyle(
-                  color: Colors.white.withOpacity(0.5),
-                  fontSize: 14, fontWeight: FontWeight.w500)))),
+                style: RDSType.bodyMd.copyWith(
+                  color: Colors.white.withOpacity(0.45))))),
       ]),
     );
   }
@@ -4687,18 +4246,13 @@ class _Pagina1 extends StatelessWidget {
                 color: RDSColor.gold.withOpacity(0.15),
                 borderRadius: BorderRadius.circular(20),
                 border: Border.all(color: RDSColor.gold.withOpacity(0.4))),
-              child: Text('🌹 ${t("Medellín", "Medellín")}',
-                style: const TextStyle(
-                  color: RDSColor.gold, fontSize: 12, fontWeight: FontWeight.w700,
-                  letterSpacing: 0.5))),
+              child: Text(t('MEDELLÍN · COLOMBIA', 'MEDELLÍN · COLOMBIA'),
+                style: const TextStyle(fontFamily: 'SpaceGrotesk', fontSize: 10, fontWeight: FontWeight.w700, letterSpacing: 2.0, color: RDSColor.gold))),
             const SizedBox(height: 16),
             // Título
             Text(t('Medellín sin guía de turismo.', 'Medellín without a tour guide.'),
-              style: const TextStyle(
-                color: Colors.white, fontSize: 36,
-                fontWeight: FontWeight.w900, height: 1.1,
-                fontFamily: 'SpaceGrotesk',
-                letterSpacing: -0.5)),
+              style: RDSType3.displayXl.copyWith(
+                color: Colors.white, height: 1.1, fontSize: 28)),
             const SizedBox(height: 16),
             // Descripción
             Text(
@@ -4707,7 +4261,7 @@ class _Pagina1 extends StatelessWidget {
               style: TextStyle(
                 color: Colors.white.withOpacity(0.75),
                 fontSize: 16, height: 1.5)),
-            const SizedBox(height: 160),
+            const SizedBox(height: 80),
           ])),
     ]);
   }
@@ -4723,7 +4277,7 @@ class _Pagina2 extends StatelessWidget {
     final pasos = [
       {'emoji': '🗺️', 'es': 'Elegí una ruta',     'en': 'Choose a route'},
       {'emoji': '📍', 'es': 'Llegá al lugar',      'en': 'Get to the spot'},
-      {'emoji': '📸', 'es': 'Tomá tu foto',        'en': 'Take your photo'},
+      {'emoji': '📸', 'es': 'Validá con GPS',       'en': 'Validate with GPS'},
       {'emoji': '🏆', 'es': 'Ganás puntos',         'en': 'Earn points'},
     ];
     return Padding(
@@ -4734,10 +4288,7 @@ class _Pagina2 extends StatelessWidget {
         children: [
           const SizedBox(height: 80),
           Text(t('Así de simple.', 'This simple.'),
-            style: const TextStyle(
-              color: Colors.white, fontSize: 36,
-              fontWeight: FontWeight.w900, fontFamily: 'SpaceGrotesk',
-              letterSpacing: -0.5, height: 1.1)),
+              style: RDSType3.displayXl.copyWith(color: Colors.white, fontSize: 28)),
           const SizedBox(height: 8),
           Text(t('Explorá Medellín y conseguí recompensas reales.',
                  'Explore Medellín and get real rewards.'),
@@ -4763,7 +4314,7 @@ class _Pagina2 extends StatelessWidget {
                       borderRadius: BorderRadius.circular(14),
                       border: Border.all(
                         color: esPin ? RDSColor.gold.withOpacity(0.5) : Colors.white.withOpacity(0.1))),
-                    child: Center(child: Text(paso['emoji']!,
+                    child: Center(child: Text(paso['emoji'] ?? '•',
                       style: const TextStyle(fontSize: 22))))),
                 const SizedBox(width: 16),
                 Expanded(
@@ -4789,7 +4340,7 @@ class _Pagina2 extends StatelessWidget {
                             fontWeight: FontWeight.w700))))),
               ]));
           }),
-          const SizedBox(height: 100),
+          const SizedBox(height: 60),
         ]));
   }
 }
@@ -4801,11 +4352,11 @@ class _Pagina3 extends StatelessWidget {
   Widget build(BuildContext context) {
     final insignias = [
       'assets/images/insignias/insignia_feria_clasica.png',
-      'assets/images/insignias/insignia_guardian_silletero.png',
       'assets/images/insignias/insignia_huellas_vivas.png',
       'assets/images/insignias/insignia_paladar_paisa.png',
       'assets/images/insignias/insignia_explorador_45.png',
       'assets/images/insignias/insignia_noctambulo_paisa.png',
+      'assets/images/insignias/insignia_conquistador_piedra.png',
     ];
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 28),
@@ -4815,57 +4366,53 @@ class _Pagina3 extends StatelessWidget {
         children: [
           const SizedBox(height: 80),
           Text(t('Explorá. Ganá. Disfrutá.', 'Explore. Earn. Enjoy.'),
-            style: const TextStyle(
-              color: Colors.white, fontSize: 34,
-              fontWeight: FontWeight.w900, fontFamily: 'SpaceGrotesk',
-              letterSpacing: -0.5, height: 1.1)),
+              style: RDSType3.displayXl.copyWith(color: Colors.white, fontSize: 28)),
           const SizedBox(height: 8),
           Text(
             t('Insignias, descuentos y experiencias exclusivas te esperan.',
               'Badges, discounts and exclusive experiences await you.'),
             style: TextStyle(color: Colors.white.withOpacity(0.6), fontSize: 15)),
           const SizedBox(height: 36),
-          // Grid de insignias
+          // Grid de insignias — fondo transparente para no mostrar puntas blancas
           GridView.count(
             crossAxisCount: 3, shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
             mainAxisSpacing: 16, crossAxisSpacing: 16,
-            children: insignias.map((path) => Container(
-              decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.04),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: Colors.white.withOpacity(0.08))),
-              padding: const EdgeInsets.all(12),
-              child: Image.asset(path, fit: BoxFit.contain,
-                errorBuilder: (_, __, ___) =>
-                  const Icon(Icons.emoji_events, color: RDSColor.gold, size: 32)))).toList()),
+            children: insignias.map((path) => Image.asset(path,
+              fit: BoxFit.contain,
+              errorBuilder: (_, __, ___) =>
+                const Icon(Icons.emoji_events, color: RDSColor.gold, size: 32))).toList()),
           const SizedBox(height: 28),
           // Beneficios
-          Row(children: [
-            _BeneficioChip(emoji: '🏅', label: t('Insignias', 'Badges')),
-            const SizedBox(width: 8),
-            _BeneficioChip(emoji: '💸', label: t('Descuentos', 'Discounts')),
-            const SizedBox(width: 8),
-            _BeneficioChip(emoji: '🥇', label: t('Ranking', 'Ranking')),
+          Wrap(spacing: 8, runSpacing: 8, children: [
+            _BeneficioChip(icon: RDSIcons.metricPoints, color: RDSColor.gold, label: t('Insignias', 'Badges')),
+            _BeneficioChip(icon: Icons.local_offer_rounded, color: RDSColor.green, label: t('Descuentos', 'Discounts')),
+            _BeneficioChip(icon: Icons.emoji_events_rounded, color: RDSColor.orchid, label: t('Ranking', 'Ranking')),
           ]),
-          const SizedBox(height: 100),
+          const SizedBox(height: 60),
         ]));
   }
 }
 
 class _BeneficioChip extends StatelessWidget {
-  final String emoji, label;
-  const _BeneficioChip({required this.emoji, required this.label});
+  final IconData icon;
+  final String label;
+  final Color color;
+  const _BeneficioChip({required this.icon, required this.label,
+    this.color = Colors.white});
   @override
   Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+    padding: const EdgeInsets.symmetric(
+      horizontal: RDSSpace.md, vertical: RDSSpace.sm),
     decoration: BoxDecoration(
-      color: Colors.white.withOpacity(0.06),
-      borderRadius: BorderRadius.circular(20),
-      border: Border.all(color: Colors.white.withOpacity(0.12))),
-    child: Text('$emoji $label',
-      style: const TextStyle(color: Colors.white, fontSize: 12,
-        fontWeight: FontWeight.w600)));
+      color: color.withOpacity(0.08),
+      borderRadius: RDSRadius.bFull,
+      border: Border.all(color: color.withOpacity(0.2))),
+    child: Row(mainAxisSize: MainAxisSize.min, children: [
+      Icon(icon, color: color, size: 14),
+      const SizedBox(width: RDSSpace.xs),
+      Text(label, style: RDSType.labelSm.copyWith(color: color)),
+    ]));
 }
 
 // ── Pantalla 4 — Registro ─────────────────────────────────────────────────────
@@ -5826,6 +5373,15 @@ class _PlannerScreenState extends State<PlannerScreen> {
 
     final interesesStr   = _intereses.join(', ');
     final feriaStr       = _esFeria ? '\n- Las fechas coinciden con la Feria de las Flores 2026 (31 jul – 9 ago). Incluir eventos de Feria relevantes.' : '';
+    // Hotel partner — priorizar rutas del hotel en Felo
+    final hotelPartner = await HotelPartnerService.getHotelActivo();
+    final hotelStr = hotelPartner != null
+      ? '\n- El turista se hospeda en \${hotelPartner.nombre} (zona \${hotelPartner.zona}). Priorizar rutas cercanas: \${hotelPartner.rutasDestacadas.join(", ")}.'
+      : '';
+
+    final familiarStr    = _compania == 'Familia'
+      ? '\n- VIAJA CON FAMILIA Y NIÑOS: priorizar rutas marcadas como familiares. Evitar vida nocturna, bares y actividades largas. Incluir pausas cada 2 horas. Máx 2-3 sitios por bloque. Preferir Metrocable & Arví, Fincas, Parques, Transformación Urbana, Guatapé, Santa Fe de Antioquia, museos interactivos.'
+      : '';
     final descuentoStr   = _descuento != 'Ninguno' ? '\n- Descuento aplicable: $_descuento.' : '';
     final horarioStr     = '\n- Horario preferido: $_horarioPreferido.';
     final ritmoStr       = '\n- Ritmo: $_ritmo. ${_ritmo == 'Relajado' ? 'Máx 2 actividades/día.' : _ritmo == 'Intenso' ? 'Aprovechar cada franja.' : 'Balance actividad-pausa.'}';
@@ -5840,7 +5396,7 @@ Creá un itinerario personalizado de $_dias día(s) (versión GRATUITA: máximo 
 - Intereses: $interesesStr
 - Viaja: $_compania
 - Presupuesto: $_presupuesto (${_presupuesto == 'Bajo' ? r'$40K-120K COP/día' : _presupuesto == 'Medio' ? r'$120K-320K COP/día' : r'+$320K COP/día'})
-- Primera vez en Medellín: ${_primeraVez ? 'SÍ' : 'NO'}$feriaStr$descuentoStr$horarioStr$ritmoStr$transporteStr$experienciaStr
+- Primera vez en Medellín: ${_primeraVez ? 'SÍ' : 'NO'}$hotelStr$feriaStr$familiarStr$descuentoStr$horarioStr$ritmoStr$transporteStr$experienciaStr
 ${_horaSalida != 'No sé aún' ? '- Hora salida último día: $_horaSalida. Ajustá actividades para llegar a tiempo.' : ''}
 ${_primeraVez ? '\nIMPORTANTE: incluir íconos de Medellín mapeados a rutas Rutero: Provenza=HUELLAS VIVAS DE EL POBLADO, Pueblito Paisa=DEL ORIGEN PAISA A LA MEDELLIN MODERNA, Escaleras=RUTA TRANSFORMACION URBANA, Botero=DEL ORIGEN PAISA A LA MEDELLIN MODERNA. Si 2+ días incluir RUTA GUATAPE.' : ''}
 
@@ -5859,7 +5415,7 @@ Create a personalized ${_dias}-day itinerary (FREE version: max 2 days) for a tr
 - Interests: $interesesStr
 - Traveling: $_compania
 - Budget: $_presupuesto (${_presupuesto == 'Bajo' ? r'USD 10-30/day' : _presupuesto == 'Medio' ? r'USD 30-80/day' : r'over USD 80/day'})
-- First time in Medellín: ${_primeraVez ? 'YES' : 'NO'}$feriaStr$descuentoStr$horarioStr$ritmoStr$transporteStr$experienciaStr
+- First time in Medellín: ${_primeraVez ? 'YES' : 'NO'}$hotelStr$feriaStr$familiarStr$descuentoStr$horarioStr$ritmoStr$transporteStr$experienciaStr
 ${_horaSalida != 'No sé aún' ? '- Departure time last day: $_horaSalida. Adjust activities accordingly.' : ''}
 ${_primeraVez ? '\nIMPORTANT: include Medellín icons mapped to routes: Provenza=HUELLAS VIVAS DE EL POBLADO, Pueblito Paisa=DEL ORIGEN PAISA A LA MEDELLIN MODERNA, Comuna 13=RUTA TRANSFORMACION URBANA, Botero=DEL ORIGEN PAISA A LA MEDELLIN MODERNA. If 2+ days add RUTA GUATAPE.' : ''}
 
@@ -5894,53 +5450,65 @@ Respond ONLY with valid JSON (no markdown):
     return Scaffold(
       backgroundColor: RDSColor.base,
       body: Column(children: [
-        // Header
+        // ── Header conversacional — pregunta como protagonista ──────────
         Container(
-          decoration: BoxDecoration(
-            color: RDSColor.base,
-            border: Border(bottom: BorderSide(color: RDSColor.gold.withOpacity(0.1)))),
+          color: RDSColor.base,
           child: SafeArea(bottom: false, child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
+            padding: const EdgeInsets.fromLTRB(
+              RDSSpace.lg, RDSSpace.sm + 4, RDSSpace.lg, RDSSpace.md),
             child: Column(children: [
               Row(children: [
+                // Botón atrás
                 GestureDetector(
                   onTap: _anterior,
-                  child: Container(width: 36, height: 36,
+                  child: Container(
+                    width: 36, height: 36,
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.06), shape: BoxShape.circle,
-                      border: Border.all(color: RDSColor.gold.withOpacity(0.2))),
-                    child: const Center(
-                      child: Icon(RDSIcons.back, color: RDSColor.textPrimary, size: 18)))),
-                const SizedBox(width: 12),
-                Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text(t('RUTERO PLANNER', 'RUTERO PLANNER'),
-                    style: RDSType.displaySm.copyWith(color: RDSColor.gold)),
-                  Text(t('Tu itinerario personalizado con IA', 'Your AI-powered itinerary'),
-                    style: RDSType.caption),
+                      color: RDSColor.surface,
+                      shape: BoxShape.circle,
+                      border: Border.all(color: RDSColor.borderSubtle)),
+                    child: const Icon(RDSIcons.back,
+                      color: RDSColor.textPrimary, size: 18))),
+                const SizedBox(width: RDSSpace.md),
+                // Tag + nombre planner
+                Expanded(child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                  Text(t('✦ FELO', '✦ FELO'),
+                    style: const TextStyle(fontFamily: 'SpaceGrotesk', fontSize: 10, fontWeight: FontWeight.w700, letterSpacing: 2.0, color: RDSColor.textMuted).copyWith(
+                      color: RDSColor.gold, letterSpacing: 2.5)),
+                  const SizedBox(height: 2),
+                  Text(t('Tu aventura en Medellín',
+                         'Your Medellín adventure'),
+                    style: RDSType.bodyMd),
                 ])),
+                // Paso actual — compacto
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: RDSSpace.sm + 4, vertical: RDSSpace.xs + 2),
                   decoration: BoxDecoration(
-                    color: RDSColor.gold.withOpacity(0.12),
+                    color: RDSColor.gold.withOpacity(0.1),
                     borderRadius: RDSRadius.bFull,
-                    border: Border.all(color: RDSColor.gold.withOpacity(0.3))),
-                  child: Text('${_paso + 1} / $_totalPasos',
-                    style: RDSType.labelSm.copyWith(color: RDSColor.gold))),
+                    border: Border.all(
+                      color: RDSColor.gold.withOpacity(0.3))),
+                  child: Text('${_paso + 1}/$_totalPasos',
+                    style: RDSType.labelSm.copyWith(
+                      color: RDSColor.gold))),
               ]),
-              const SizedBox(height: 12),
-              Row(children: List.generate(_totalPasos, (i) => Expanded(child: AnimatedContainer(
-                duration: RDSDuration.fast, height: 3,
-                margin: EdgeInsets.only(right: i < _totalPasos - 1 ? 4 : 0),
-                decoration: BoxDecoration(
-                  color: i <= _paso ? RDSColor.gold : Colors.white.withOpacity(0.1),
-                  borderRadius: RDSRadius.bFull))))),
-              const SizedBox(height: 6),
-              Row(children: List.generate(_totalPasos, (i) => Expanded(
-                child: Text(pasoLabels[i], textAlign: TextAlign.center,
-                  style: RDSType.caption.copyWith(
-                    color: i == _paso ? RDSColor.gold : RDSColor.textMuted.withOpacity(0.5),
-                    fontWeight: i == _paso ? FontWeight.w700 : FontWeight.w400,
-                    fontSize: 9))))),
+              const SizedBox(height: RDSSpace.md),
+              // Barra de progreso — 5 segmentos
+              Row(children: List.generate(_totalPasos, (i) =>
+                Expanded(child: AnimatedContainer(
+                  duration: RDSDuration.fast, height: 2,
+                  margin: EdgeInsets.only(
+                    right: i < _totalPasos - 1 ? RDSSpace.xs : 0),
+                  decoration: BoxDecoration(
+                    color: i < _paso
+                      ? RDSColor.gold
+                      : i == _paso
+                        ? RDSColor.gold.withOpacity(0.6)
+                        : RDSColor.borderSubtle,
+                    borderRadius: RDSRadius.bFull))))),
             ])))),
 
         Expanded(child: SingleChildScrollView(
@@ -5948,58 +5516,42 @@ Respond ONLY with valid JSON (no markdown):
           child: Column(children: [
 
             // ── Banner itinerario previo ──────────────────────────────
+            // ── Banner itinerario previo — compacto y limpio ────────────
             if (!_cargandoPrevio && _itinerarioPrevio != null)
               GestureDetector(
                 onTap: () => Navigator.of(context).push(MaterialPageRoute(
                   builder: (_) => _PlannerResultScreen(
                     data: _itinerarioPrevio!, dias: _diasPrevio))),
                 child: Container(
-                  margin: const EdgeInsets.only(bottom: 20),
-                  padding: const EdgeInsets.all(16),
+                  margin: const EdgeInsets.only(bottom: RDSSpace.lg),
+                  padding: const EdgeInsets.all(RDSSpace.md),
                   decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [RDSColor.gold.withOpacity(0.14),
-                               RDSColor.green.withOpacity(0.08)],
-                      begin: Alignment.topLeft, end: Alignment.bottomRight),
-                    borderRadius: BorderRadius.circular(18),
-                    border: Border.all(color: RDSColor.gold.withOpacity(0.45)),
-                    boxShadow: [BoxShadow(
-                      color: RDSColor.gold.withOpacity(0.1),
-                      blurRadius: 16, offset: const Offset(0, 4))]),
+                    color: RDSColor.surface,
+                    borderRadius: RDSRadius.bLg,
+                    border: Border.all(
+                      color: RDSColor.gold.withOpacity(0.3))),
                   child: Row(children: [
-                    Container(width: 46, height: 46,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: RDSColor.gold.withOpacity(0.12),
-                        border: Border.all(color: RDSColor.gold.withOpacity(0.4))),
-                      child: const Center(child: Icon(
-                        Icons.calendar_today_rounded,
-                        color: RDSColor.gold, size: 20))),
-                    const SizedBox(width: 14),
+                    Icon(Icons.calendar_today_rounded,
+                      color: RDSColor.gold, size: 20),
+                    const SizedBox(width: RDSSpace.md),
                     Expanded(child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      Text(t('VER MI ITINERARIO', 'VIEW MY ITINERARY'),
-                        style: const TextStyle(
-                          fontFamily: 'SpaceGrotesk',
-                          fontSize: 11, fontWeight: FontWeight.w900,
-                          color: RDSColor.gold, letterSpacing: 1.5)),
-                      const SizedBox(height: 3),
-                      Text(t('Tu planificación guardada — tocá para consultarla',
-                             'Your saved plan — tap to view it'),
-                        style: const TextStyle(
-                          fontSize: 11, color: RDSColor.textMuted)),
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                      Text(t('Felo guardó un plan para vos',
+                             'Felo saved a plan for you'),
+                        style: RDSType.headlineMd.copyWith(
+                          color: RDSColor.gold)),
+                      Text(t('Tocá para verlo', 'Tap to view it'),
+                        style: RDSType.bodySm),
                     ])),
-                    const SizedBox(width: 8),
-                    Row(mainAxisSize: MainAxisSize.min, children: [
-                      GestureDetector(
-                        onTap: _borrarItinerarioPrevio,
-                        child: const Padding(
-                          padding: EdgeInsets.all(8),
-                          child: Icon(Icons.close_rounded,
-                            color: RDSColor.textMuted, size: 16))),
-                      const Icon(Icons.arrow_forward_ios_rounded,
-                        color: RDSColor.gold, size: 14),
-                    ]),
+                    GestureDetector(
+                      onTap: _borrarItinerarioPrevio,
+                      child: Padding(
+                        padding: const EdgeInsets.all(RDSSpace.sm),
+                        child: Icon(RDSIcons.close,
+                          color: RDSColor.textMuted, size: 16))),
+                    Icon(RDSIcons.actionExplore,
+                      color: RDSColor.gold, size: 16),
                   ]))),
 
             AnimatedSwitcher(
@@ -6016,9 +5568,15 @@ Respond ONLY with valid JSON (no markdown):
             color: RDSColor.base,
             border: Border(top: BorderSide(color: Colors.white.withOpacity(0.06)))),
           child: _RDSButtonPrimary(
-            label: _paso < 3 ? t('SIGUIENTE', 'NEXT') :
-                   _paso == 3 ? t('VER RESUMEN', 'SEE SUMMARY') :
-                   t('GENERAR MI ITINERARIO', 'GENERATE MY ITINERARY'),
+            label: _paso == 0
+              ? t('CONTINUAR', 'CONTINUE')
+              : _paso == 1
+                ? t('CONTINUAR', 'CONTINUE')
+                : _paso == 2
+                  ? t('CONTINUAR', 'CONTINUE')
+                  : _paso == 3
+                    ? t('VER MI RESUMEN', 'SEE MY SUMMARY')
+                    : t('✦ PREGUNTALE A FELO', '✦ ASK FELO'),
             onTap: _siguiente)),
       ]),
     );
@@ -6032,12 +5590,17 @@ Respond ONLY with valid JSON (no markdown):
       {'valor': 'Noche',  'emoji': '🌙', 'label': 'Noche',   'labelEN': 'Evening',   'sub': 'Después de las 6pm', 'subEN': 'After 6pm'},
     ];
     return Column(key: const ValueKey(0), crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Text(t('¿Cuándo y cuánto tiempo?', 'When and for how long?'), style: RDSType.displayMd),
-      const SizedBox(height: RDSSpace.sm),
-      Text(t('Versión gratuita: hasta 2 días', 'Free version: up to 2 days'),
-        style: RDSType.caption.copyWith(color: RDSColor.gold)),
+      // ── Pregunta conversacional ──────────────────────────────────────
+      Text(t('¿Cuándo llegás?', 'When are you arriving?'),
+        style: RDSType3.displayXl.copyWith(fontSize: 28, height: 1.1)),
+      const SizedBox(height: RDSSpace.xs),
+      Text(t('Versión gratuita hasta 2 días · Premium para más',
+             'Free version up to 2 days · Premium for more'),
+        style: RDSType.bodySm.copyWith(color: RDSColor.gold)),
       const SizedBox(height: RDSSpace.xl),
-      Text(t('¿Cuántos días tenés en Medellín?', 'How many days do you have?'), style: RDSType.headlineMd),
+      Text(t('¿Cuántos días en Medellín?',
+             'How many days in Medellín?'),
+        style: RDSType.headlineLg),
       const SizedBox(height: RDSSpace.md),
       ...List.generate(4, (i) {
         final n = i + 1; final sel = _dias == n;
@@ -6297,7 +5860,8 @@ Respond ONLY with valid JSON (no markdown):
     ];
 
     return Column(key: const ValueKey(2), crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Text(t('¿Qué querés vivir?', 'What do you want to experience?'), style: RDSType.displayMd),
+      Text(t('¿Qué querés vivir?', 'What do you want to experience?'),
+        style: RDSType3.displayXl.copyWith(fontSize: 28, height: 1.1)),
       const SizedBox(height: RDSSpace.xl),
       Text(t('¿Qué te interesa?', 'What are you into?'), style: RDSType.headlineMd),
       Text(t('Elegí todos los que quieras', 'Choose as many as you like'), style: RDSType.bodySm),
@@ -6644,16 +6208,16 @@ class _PlannerLoadingScreenState extends State<_PlannerLoadingScreen>
   late Animation<double> _anim;
   int _msgIdx = 0;
   final List<String> _msgs = [
-    'Analizando 45+ rutas de Medellín...',
-    'Calculando distancias desde tu hotel...',
-    'Combinando tus intereses...',
-    'Armando tu itinerario perfecto...',
+    'Felo está revisando tus preferencias...',
+    'Calculando distancias desde tu hospedaje...',
+    'Eligiendo las mejores rutas para vos...',
+    'Felo está armando tu plan...',
   ];
   final List<String> _msgsEN = [
-    'Analyzing 45+ Medellín routes...',
-    'Calculating distances from your hotel...',
-    'Matching your interests...',
-    'Building your perfect itinerary...',
+    'Felo is checking your preferences...',
+    'Calculating distances from your stay...',
+    'Picking the best routes for you...',
+    'Felo is building your plan...',
   ];
 
   @override
@@ -6717,43 +6281,77 @@ class _PlannerLoadingScreenState extends State<_PlannerLoadingScreen>
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: RDSColor.base,
-      body: Center(child: Padding(
-        padding: const EdgeInsets.all(40),
-        child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-          // Logo animado
-          AnimatedBuilder(animation: _anim, builder: (_, __) => Transform.rotate(
-            angle: _anim.value * 2 * 3.14159,
-            child: Container(width: 80, height: 80,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                border: Border.all(color: RDSColor.gold, width: 2),
-                boxShadow: [BoxShadow(color: RDSColor.gold.withOpacity(0.3), blurRadius: 20)]),
-              child: const Center(child: Icon(Icons.auto_awesome_rounded, color: RDSColor.gold, size: 36))))),
-          const SizedBox(height: 40),
-          Text(t('ARMANDO TU ITINERARIO', 'BUILDING YOUR ITINERARY'),
-            style: const TextStyle(fontFamily: 'PlayfairDisplay',
-              fontSize: 20, fontWeight: FontWeight.w900, color: RDSColor.gold,
-              letterSpacing: 1)),
-          const SizedBox(height: 8),
-          Text(t('con inteligencia artificial', 'with artificial intelligence'),
-            style: const TextStyle(fontSize: 12, color: RDSColor.textMuted)),
-          const SizedBox(height: 40),
-          AnimatedSwitcher(
-            duration: const Duration(milliseconds: 400),
-            child: Text(
-              kLang == 'en' ? _msgsEN[_msgIdx] : _msgs[_msgIdx],
-              key: ValueKey(_msgIdx),
-              textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 14, color: RDSColor.textPrimary, height: 1.5))),
-          const SizedBox(height: 32),
-          // Barra de progreso indeterminada
-          ClipRRect(
-            borderRadius: BorderRadius.circular(4),
-            child: const LinearProgressIndicator(
-              backgroundColor: Color(0xFF1A2A1A),
-              valueColor: AlwaysStoppedAnimation<Color>(RDSColor.gold),
-              minHeight: 3)),
-        ]))));
+      body: Stack(children: [
+        // Fondo radial — profundidad
+        Positioned.fill(child: DecoratedBox(
+          decoration: BoxDecoration(
+            gradient: RadialGradient(
+              center: Alignment.topCenter, radius: 1.5,
+              colors: [
+                RDSColor.gold.withOpacity(0.08),
+                RDSColor.base,
+              ])))),
+        // Contenido centrado
+        SafeArea(child: Center(child: Padding(
+          padding: const EdgeInsets.all(RDSSpace.xxl),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+            // Ícono giratorio — más elegante
+            AnimatedBuilder(
+              animation: _anim,
+              builder: (_, __) => Container(
+                width: 88, height: 88,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: RDSColor.gold.withOpacity(0.06),
+                  border: Border.all(
+                    color: RDSColor.gold.withOpacity(
+                      0.3 + 0.3 * _anim.value)),
+                  boxShadow: RDSElevation.glow(
+                    color: RDSColor.gold,
+                    opacity: 0.15 + 0.15 * _anim.value)),
+                child: const Center(child: Icon(
+                  RDSIcons.planner,
+                  color: RDSColor.gold, size: 36)))),
+            const SizedBox(height: RDSSpace.xxl),
+            // Título editorial
+            Text(
+              t('Felo está pensando tu plan', 'Felo is thinking your plan'),
+              style: RDSType3.displayXl.copyWith(
+                fontSize: 28, height: 1.1),
+              textAlign: TextAlign.center),
+            const SizedBox(height: RDSSpace.sm),
+            Text(
+              t('Conoce Medellín desde 2008',
+                'Exploring Medellín since 2008'),
+              style: RDSType.bodyMd),
+            const SizedBox(height: RDSSpace.xxl),
+            // Mensaje rotativo
+            AnimatedSwitcher(
+              duration: RDSDuration.normal,
+              transitionBuilder: (child, anim) =>
+                FadeTransition(opacity: anim, child: child),
+              child: Text(
+                kLang == 'en'
+                  ? _msgsEN[_msgIdx]
+                  : _msgs[_msgIdx],
+                key: ValueKey(_msgIdx),
+                textAlign: TextAlign.center,
+                style: RDSType.headlineMd.copyWith(
+                  color: RDSColor.textPrimary.withOpacity(0.8),
+                  height: 1.5))),
+            const SizedBox(height: RDSSpace.xl),
+            // Barra de progreso dorada
+            ClipRRect(
+              borderRadius: RDSRadius.bFull,
+              child: const LinearProgressIndicator(
+                backgroundColor: Color(0xFF1A2010),
+                valueColor: AlwaysStoppedAnimation<Color>(
+                  RDSColor.gold),
+                minHeight: 2)),
+          ]))))]),
+    );
   }
 }
 
@@ -8746,7 +8344,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> with SingleTickerProvider
                 fit: BoxFit.cover, cacheWidth: 400,
                 errorBuilder: (_, __, ___) => Container(color: const Color(0xFF0D1A0A)))),
               const SizedBox(width: 2),
-              Expanded(child: Image.asset('assets/images/rutas/ruta_17_feria_flores.jpg',
+              Expanded(child: Image.asset('assets/images/rutas/ruta_04_metrocable.jpg',
                 fit: BoxFit.cover, cacheWidth: 400,
                 errorBuilder: (_, __, ___) => Container(color: const Color(0xFF0A150A)))),
               const SizedBox(width: 2),
@@ -8829,16 +8427,26 @@ class _WelcomeScreenState extends State<WelcomeScreen> with SingleTickerProvider
 
                   const SizedBox(height: 16),
 
-                  // Chips de datos
-                  Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-                    _WelcomeChip(emoji: '🗺️', label: '${RutasService().rutas.where((r) => r['activa'] != false && r['pausada'] != true && !(r['esFeria'] == true) && !['FERIA CLÁSICA','FERIA DE LAS FLORES'].contains(r['nombre']?.toString())).length} ${t("rutas","routes")}'),
-                    const SizedBox(width: 8),
-                    _WelcomeChip(emoji: '📍', label: '${RutasService().rutas.fold<int>(0, (sum, r) { final sd = r['sitiosDetalle']; final gps = r['gpsSitios']; return sum + ((sd is List ? sd.length : 0) + (gps is List ? gps.length : 0) > 0 ? (sd is List ? sd.length : (gps is List ? gps.length : 0)) : 0); })} ${t("sitios","spots")}'),
-                    const SizedBox(width: 8),
-                    _WelcomeChip(emoji: '🏅', label: t('Premios reales','Real rewards')),
+                  // Chips de datos — Wrap para pantallas pequeñas
+                  Wrap(
+                    alignment: WrapAlignment.center,
+                    spacing: 8, runSpacing: 8,
+                    children: [
+                    _WelcomeChip(icon: RDSIcons.navExplore,
+                      label: '${RutasService().rutas.where((r) => r['activa'] != false && r['pausada'] != true && !(r['esFeria'] == true) && !['FERIA CLÁSICA','FERIA DE LAS FLORES'].contains(r['nombre']?.toString())).length} ${t("rutas","routes")}'),
+                    _WelcomeStatChip(icon: RDSIcons.metricSpots,
+                      label: '${RutasService().rutas.fold<int>(0, (sum, r) { final sd = r['sitiosDetalle']; final gps = r['gpsSitios']; return sum + ((sd is List ? sd.length : 0) + (gps is List ? gps.length : 0) > 0 ? (sd is List ? sd.length : (gps is List ? gps.length : 0)) : 0); })} ${t("sitios","spots")}'),
+                    _WelcomeStatChip(icon: Icons.emoji_events_rounded,
+                      label: t('Premios','Rewards')),
                   ]),
 
                   const SizedBox(height: 24),
+
+                  // ── Código de hotel aliado ──────────────────────────
+                  _HotelCodigoField(onActivado: () {
+                    if (mounted) setState(() {});
+                  }),
+                  const SizedBox(height: 16),
 
                   // CTA principal
                   _GoldButton(label: t('CREAR CUENTA','CREATE ACCOUNT'), onTap: _goToRegister),
@@ -8990,6 +8598,77 @@ class _BannerAliadosState extends State<_BannerAliados> {
 }
 // ─────────────────────────────────────────────────────────────────────────
 
+// ═══════════════════════════════════════════════════════════════════════════
+//  _HotelBanner — Banner reutilizable para hotel activo
+//  Aparece en Home, Perfil y RewardScreen cuando hay hotel activado
+// ═══════════════════════════════════════════════════════════════════════════
+class _HotelBanner extends StatefulWidget {
+  final EdgeInsetsGeometry? margin;
+  const _HotelBanner({this.margin});
+  @override
+  State<_HotelBanner> createState() => _HotelBannerState();
+}
+
+class _HotelBannerState extends State<_HotelBanner> {
+  HotelPartner? _hotel;
+
+  @override
+  void initState() {
+    super.initState();
+    HotelPartnerService.getHotelActivo().then((h) {
+      if (mounted) setState(() => _hotel = h);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_hotel == null) return const SizedBox.shrink();
+    return Container(
+      margin: widget.margin ?? const EdgeInsets.only(bottom: RDSSpace.lg),
+      padding: const EdgeInsets.all(RDSSpace.md),
+      decoration: BoxDecoration(
+        color: _hotel!.colorPrimario.withOpacity(0.08),
+        borderRadius: RDSRadius.bLg,
+        border: Border.all(color: _hotel!.colorPrimario.withOpacity(0.3))),
+      child: Row(children: [
+        Container(
+          width: 36, height: 36,
+          decoration: BoxDecoration(
+            color: _hotel!.colorPrimario.withOpacity(0.15),
+            borderRadius: RDSRadius.bMd),
+          child: Icon(Icons.hotel_rounded,
+            color: _hotel!.colorPrimario, size: 18)),
+        const SizedBox(width: RDSSpace.md),
+        Expanded(child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              kLang == 'en' ? 'Hotel Guest' : 'Huésped',
+              style: const TextStyle(
+                fontFamily: 'SpaceGrotesk', fontSize: 9,
+                fontWeight: FontWeight.w700, letterSpacing: 2.0,
+                color: RDSColor.textMuted)),
+            const SizedBox(height: 2),
+            Text(_hotel!.nombre,
+              style: RDSType.headlineMd.copyWith(
+                color: _hotel!.colorPrimario)),
+          ])),
+        Container(
+          padding: const EdgeInsets.symmetric(
+            horizontal: RDSSpace.sm, vertical: 4),
+          decoration: BoxDecoration(
+            color: _hotel!.colorPrimario.withOpacity(0.15),
+            borderRadius: RDSRadius.bFull),
+          child: Text(_hotel!.zona,
+            style: TextStyle(
+              fontFamily: 'SpaceGrotesk', fontSize: 9,
+              fontWeight: FontWeight.w700,
+              color: _hotel!.colorPrimario,
+              letterSpacing: 1.0))),
+      ]));
+  }
+}
+
 class HomeBody extends StatefulWidget {
   final Function(int)? onTabChange;
   const HomeBody({super.key, this.onTabChange});
@@ -9045,6 +8724,433 @@ class AliadoComercial {
 /// Mapeo: nombre del sitio en kRutasData → datos del aliado real
 /// Cuando un sitio tiene "(Aliado)" en su nombre, buscamos aquí
 /// la info real del aliado comercial.
+// ═══════════════════════════════════════════════════════════════════════════
+//  MODELO B2B — CANALES DE ADQUISICIÓN POR HOTEL / ALIADO
+//  Opción B: el turista ingresa un código al registrarse.
+//  El hotel ve cuántos turistas usaron su código → métricas B2B.
+// ═══════════════════════════════════════════════════════════════════════════
+
+class HotelPartner {
+  final String id;
+  final String nombre;
+  final String nombreCorto;
+  final String codigo;         // Código que el hotel da al turista
+  final String zona;           // Zona del hotel en Medellín
+  final String? logoAsset;
+  final Color colorPrimario;
+  final List<String> rutasDestacadas; // Rutas que el hotel quiere promover
+  final String bienvenida;     // Mensaje personalizado ES
+  final String bienvenidaEN;   // Mensaje personalizado EN
+  final bool activo;
+
+  const HotelPartner({
+    required this.id,
+    required this.nombre,
+    required this.nombreCorto,
+    required this.codigo,
+    required this.zona,
+    this.logoAsset,
+    required this.colorPrimario,
+    required this.rutasDestacadas,
+    required this.bienvenida,
+    required this.bienvenidaEN,
+    this.activo = true,
+  });
+}
+
+/// Catálogo de hoteles partner — se activan con código al registrarse
+const Map<String, HotelPartner> kHotelesPartner = {
+
+  // ── METROPOLITAN LIVING BY HOUSY (San Diego / Centro) ──
+  'METROPOLITAN2026': HotelPartner(
+    id: 'metropolitan_housy',
+    nombre: 'Metropolitan Living by HOUSY',
+    nombreCorto: 'Metropolitan HOUSY',
+    codigo: 'METROPOLITAN2026',
+    zona: 'San Diego',
+    colorPrimario: Color(0xFF1A3A5C),
+    rutasDestacadas: [
+      'DEL ORIGEN PAISA A LA MEDELLÍN MODERNA',
+      'RUTA PATRIMONIAL DEL CENTRO',
+      'HUELLAS VIVAS DE EL POBLADO',
+      'RUTA GUATAPÉ & LA PIEDRA',
+    ],
+    bienvenida: '¡Bienvenido a Medellín! Desde Metropolitan HOUSY tenés todo el Centro al alcance. Felo te guía.',
+    bienvenidaEN: 'Welcome to Medellín! From Metropolitan HOUSY the whole city is within reach. Felo is your guide.',
+  ),
+
+  // ── THE CHARLEE HOTEL (El Poblado) ──
+  'CHARLEE2026': HotelPartner(
+    id: 'the_charlee',
+    nombre: 'The Charlee Hotel',
+    nombreCorto: 'The Charlee',
+    codigo: 'CHARLEE2026',
+    zona: 'El Poblado',
+    logoAsset: 'assets/images/servicios/hotel_charlee.png',
+    colorPrimario: Color(0xFFC9A84C),
+    rutasDestacadas: [
+      'HUELLAS VIVAS DE EL POBLADO',
+      'NOCHE EN EL POBLADO',
+      'SABORES DE EL POBLADO',
+    ],
+    bienvenida: '¡Bienvenido, huésped de The Charlee! Tenemos rutas especiales en El Poblado para vos.',
+    bienvenidaEN: 'Welcome, Charlee Hotel guest! We have special routes in El Poblado for you.',
+  ),
+
+  // ── PERGAMINO CAFÉ (Laureles) ──
+  'PERGAMINO2026': HotelPartner(
+    id: 'pergamino',
+    nombre: 'Pergamino Café',
+    nombreCorto: 'Pergamino',
+    codigo: 'PERGAMINO2026',
+    zona: 'Laureles',
+    logoAsset: 'assets/images/servicios/pergamino.png',
+    colorPrimario: Color(0xFF8B5E3C),
+    rutasDestacadas: [
+      'VIVE LAURELES',
+      'NOCHE EN LAURELES',
+      'ENTRE SABORES RISAS Y MIL COLORES',
+    ],
+    bienvenida: '¡Hola! Gracias por venir a Pergamino. Explorá Laureles con Rutero MDE.',
+    bienvenidaEN: 'Hello! Thanks for visiting Pergamino. Explore Laureles with Rutero MDE.',
+  ),
+
+  // ── SLOT LIBRE — para siguiente aliado ──
+  // Agregar aquí cuando se confirme el próximo hotel
+};
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  SERVICIO DE HOTEL PARTNER
+// ═══════════════════════════════════════════════════════════════════════════
+
+// ── _HotelCodigoField — widget separado para evitar que el ctrl se recree ──
+class _HotelCodigoField extends StatefulWidget {
+  final VoidCallback onActivado;
+  const _HotelCodigoField({required this.onActivado});
+  @override
+  State<_HotelCodigoField> createState() => _HotelCodigoFieldState();
+}
+
+class _HotelCodigoFieldState extends State<_HotelCodigoField> {
+  final _ctrl = TextEditingController();
+  HotelPartner? _hotelActivo;
+  bool _cargando = false;
+
+  @override
+  void initState() {
+    super.initState();
+    HotelPartnerService.getHotelActivo().then((h) {
+      if (mounted) setState(() => _hotelActivo = h);
+    });
+  }
+
+  @override
+  void dispose() { _ctrl.dispose(); super.dispose(); }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_hotelActivo != null) {
+      return Container(
+        padding: const EdgeInsets.all(RDSSpace.md),
+        decoration: BoxDecoration(
+          color: _hotelActivo!.colorPrimario.withOpacity(0.1),
+          borderRadius: RDSRadius.bMd,
+          border: Border.all(
+            color: _hotelActivo!.colorPrimario.withOpacity(0.3))),
+        child: Row(children: [
+          Icon(Icons.hotel_rounded,
+            color: _hotelActivo!.colorPrimario, size: 16),
+          const SizedBox(width: RDSSpace.sm),
+          Expanded(child: Text(_hotelActivo!.nombre,
+            style: RDSType.headlineMd.copyWith(
+              color: _hotelActivo!.colorPrimario))),
+          GestureDetector(
+            onTap: () async {
+              await HotelPartnerService.limpiar();
+              if (mounted) setState(() => _hotelActivo = null);
+              widget.onActivado();
+            },
+            child: Icon(RDSIcons.close,
+              color: RDSColor.textMuted, size: 16)),
+        ]));
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+      _InputField(
+        ctrl: _ctrl,
+        hint: t('Código de hotel (opcional)', 'Hotel code (optional)'),
+        icon: Icons.hotel_rounded),
+      const SizedBox(height: 4),
+      GestureDetector(
+        onTap: _cargando ? null : () async {
+          final codigo = _ctrl.text.trim();
+          if (codigo.isEmpty) return;
+          setState(() => _cargando = true);
+          final ok = await HotelPartnerService.activarCodigo(codigo);
+          if (mounted) {
+            setState(() => _cargando = false);
+            if (ok) {
+              final hotel = await HotelPartnerService.getHotelActivo();
+              if (mounted && hotel != null) {
+                await Navigator.of(context).push(
+                  PageRouteBuilder(
+                    pageBuilder: (_, __, ___) => HotelBienvenidaScreen(
+                      hotel: hotel,
+                      onContinuar: () => Navigator.of(context).pop(),
+                    ),
+                    transitionsBuilder: (_, anim, __, child) =>
+                        FadeTransition(opacity: anim, child: child),
+                    transitionDuration: const Duration(milliseconds: 500),
+                  ),
+                );
+              }
+              if (mounted) widget.onActivado();
+            } else {
+              ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                content: Text(t('❌ Código no válido', '❌ Invalid code')),
+                backgroundColor: RDSColor.stateError));
+            }
+          }
+        },
+        child: _cargando
+          ? const SizedBox(width: 16, height: 16,
+              child: CircularProgressIndicator(strokeWidth: 2, color: RDSColor.gold))
+          : Text(t('Activar código →', 'Activate code →'),
+              style: RDSType.labelSm.copyWith(color: RDSColor.gold))),
+    ]);
+  }
+}
+
+class HotelPartnerService {
+  static const String _keyHotelCode = 'rutero_hotel_code';
+  static const String _keyHotelId   = 'rutero_hotel_id';
+
+  // Cache en memoria — evita releer SharedPreferences en cada FutureBuilder
+  static HotelPartner? _cache;
+
+  /// Guarda el código del hotel en SharedPreferences y Firestore
+  static Future<bool> activarCodigo(String codigo) async {
+    if (codigo.trim().isEmpty) return false;
+    final hotel = kHotelesPartner[codigo.trim().toUpperCase()];
+    if (hotel == null || !hotel.activo) return false;
+
+    // Guardar localmente
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_keyHotelCode, codigo.toUpperCase());
+    await prefs.setString(_keyHotelId, hotel.id);
+
+    // Registrar en Firestore para métricas B2B
+    final user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      await FirebaseFirestore.instance
+        .collection('hotel_activaciones').add({
+          'uid': user.uid,
+          'hotelId': hotel.id,
+          'hotelNombre': hotel.nombre,
+          'codigo': codigo.toUpperCase(),
+          'timestamp': FieldValue.serverTimestamp(),
+          'plataforma': 'android',
+        });
+    }
+    _cache = hotel; // Guardar en cache
+    return true;
+  }
+
+  /// Obtiene el hotel activo — primero desde cache, luego SharedPreferences
+  static Future<HotelPartner?> getHotelActivo() async {
+    if (_cache != null) return _cache; // Cache hit — instantáneo
+    final prefs = await SharedPreferences.getInstance();
+    final codigo = prefs.getString(_keyHotelCode);
+    if (codigo == null) return null;
+    _cache = kHotelesPartner[codigo];
+    return _cache;
+  }
+
+  /// Acceso síncrono al cache — solo disponible después de primera carga
+  static HotelPartner? get hotelActivoSync => _cache;
+
+  /// Limpia el hotel activo
+  static Future<void> limpiar() async {
+    _cache = null;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_keyHotelCode);
+    await prefs.remove(_keyHotelId);
+    await prefs.remove('rutero_hotel_bienvenida_mostrada');
+  }
+
+  /// Verificar si ya se mostró la bienvenida
+  static Future<bool> bienvenidaYaMostrada() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getBool('rutero_hotel_bienvenida_mostrada') ?? false;
+  }
+
+  /// Marcar bienvenida como mostrada
+  static Future<void> marcarBienvenidaMostrada() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('rutero_hotel_bienvenida_mostrada', true);
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+//  PANTALLA DE BIENVENIDA DEL HOTEL
+//  Aparece una sola vez cuando el turista activa el código del hotel
+// ══════════════════════════════════════════════════════════════════════════════
+class HotelBienvenidaScreen extends StatelessWidget {
+  final HotelPartner hotel;
+  final VoidCallback onContinuar;
+  const HotelBienvenidaScreen({
+    super.key, required this.hotel, required this.onContinuar});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: RDSColor.base,
+      body: Stack(
+        children: [
+          // Fondo con color del hotel
+          Positioned.fill(
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: RadialGradient(
+                  center: Alignment.topCenter,
+                  radius: 1.5,
+                  colors: [
+                    hotel.colorPrimario.withOpacity(0.2),
+                    RDSColor.base,
+                  ],
+                ),
+              ),
+            ),
+          ),
+          // Contenido
+          SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.all(RDSSpace.xl),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Spacer(),
+                  // Logo del hotel o ícono
+                  Container(
+                    width: 64,
+                    height: 64,
+                    decoration: BoxDecoration(
+                      color: hotel.colorPrimario.withOpacity(0.15),
+                      borderRadius: RDSRadius.bLg,
+                      border: Border.all(
+                        color: hotel.colorPrimario.withOpacity(0.4),
+                      ),
+                    ),
+                    child: Icon(Icons.hotel_rounded,
+                      color: hotel.colorPrimario, size: 32),
+                  ),
+                  const SizedBox(height: RDSSpace.xl),
+                  // Bienvenida
+                  Text(
+                    kLang == 'en'
+                      ? 'Welcome to Medellín'
+                      : 'Bienvenido a Medellín',
+                    style: RDSType.caption.copyWith(
+                      color: hotel.colorPrimario, letterSpacing: 2.0),
+                  ),
+                  const SizedBox(height: RDSSpace.sm),
+                  Text(
+                    kLang == 'en'
+                      ? 'Guest of ${hotel.nombre}'
+                      : 'Huésped de ${hotel.nombre}',
+                    style: RDSType3.displayXl.copyWith(height: 1.1),
+                  ),
+                  const SizedBox(height: RDSSpace.lg),
+                  // Mensaje personalizado
+                  Text(
+                    kLang == 'en'
+                      ? hotel.bienvenidaEN
+                      : hotel.bienvenida,
+                    style: RDSType.bodyMd.copyWith(height: 1.6),
+                  ),
+                  const SizedBox(height: RDSSpace.xl),
+                  // Rutas destacadas
+                  Text(
+                    kLang == 'en'
+                      ? 'RECOMMENDED ROUTES'
+                      : 'RUTAS RECOMENDADAS',
+                    style: const TextStyle(
+                      fontFamily: 'SpaceGrotesk',
+                      fontSize: 10,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 2.0,
+                      color: RDSColor.textMuted,
+                    ),
+                  ),
+                  const SizedBox(height: RDSSpace.md),
+                  ...hotel.rutasDestacadas.take(3).map((ruta) => Padding(
+                    padding: const EdgeInsets.only(bottom: RDSSpace.sm),
+                    child: Row(
+                      children: [
+                        Icon(Icons.route_rounded,
+                          color: hotel.colorPrimario, size: 16),
+                        const SizedBox(width: RDSSpace.sm),
+                        Expanded(
+                          child: Text(ruta, style: RDSType.headlineMd),
+                        ),
+                      ],
+                    ),
+                  )),
+                  const Spacer(),
+                  // Botón continuar
+                  GestureDetector(
+                    onTap: () async {
+                      await HotelPartnerService.marcarBienvenidaMostrada();
+                      onContinuar();
+                    },
+                    child: Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(
+                        vertical: RDSSpace.md + 2),
+                      decoration: BoxDecoration(
+                        color: hotel.colorPrimario,
+                        borderRadius: RDSRadius.bMd,
+                      ),
+                      child: Text(
+                        kLang == 'en'
+                          ? 'START EXPLORING'
+                          : 'EMPEZAR A EXPLORAR',
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          fontFamily: 'SpaceGrotesk',
+                          fontSize: 13,
+                          fontWeight: FontWeight.w900,
+                          color: Colors.white,
+                          letterSpacing: 1.5,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: RDSSpace.md),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// Rutas del Centro que activan el descuento Mobiplab al completarse
+const Set<String> kRutasMobiplab = {
+  'DEL ORIGEN PAISA A LA MEDELLÍN MODERNA',
+  'CENTRO ALTERNATIVO',
+  'TEATROS Y ESCENA DEL CENTRO',
+  'BARRIO PRADO — CULTURA Y BOHEMIA',
+  'CAFÉS Y CANTINAS HISTÓRICAS DEL CENTRO',
+  'MEMORIA Y DERECHOS HUMANOS',
+  'SABORES DEL CENTRO',
+};
+
 const Map<String, AliadoComercial> kAliadosFinales = {
 
   // ── RUTA TRANSFORMACIÓN URBANA (Comuna 13) ──
@@ -9134,6 +9240,19 @@ const Map<String, AliadoComercial> kAliadosReales = {
     notas: 'Categoría sensible — manejar con respeto',
     activo: true,
   ),
+  'mobiplab': AliadoComercial(
+    id: 'mobiplab',
+    nombre: 'Mobiplab',
+    tipo: 'reparacion_celulares',
+    ubicacion: 'Calle 50 N° 55-50 piso 2, Centro de Medellín',
+    beneficio: '20% descuento en mano de obra · Reparación iPhone · Repuestos por cuenta del cliente',
+    comisionPct: 0,
+    emoji: '🔧',
+    whatsapp: '+573001852758',
+    notas: 'ALIADO PILOTO — modelo B2B Rutero MDE. Repuestos por cuenta del cliente.',
+    activo: true,
+  ),
+
   'aquaxtreme': AliadoComercial(
     id: 'aquaxtreme',
     nombre: 'Aquaxtreme',
@@ -9334,6 +9453,7 @@ const Map<String, String> kComoLlegarPorRuta = {
 // ── Zona por ruta — fallback para rutas de Firestore sin campo 'zona' ────────
 const Map<String, String> kZonaPorRuta = {
   // Ciudad
+  'CORREDOR CULTURAL DE LA 45':           'Ciudad',
   'VIVE MANRIQUE':                        'Ciudad',
   'MANRIQUE CULTURA Y VIDA':              'Ciudad',
   'HUELLAS VIVAS DE EL POBLADO':          'Ciudad',
@@ -9355,7 +9475,7 @@ const Map<String, String> kZonaPorRuta = {
   'TURISMO CREATIVO':                     'Ciudad',
   'CENTRO ALTERNATIVO':                   'Ciudad',
   'ENTRE JUEGOS Y PALABRAS':              'Ciudad',
-  'ENTRE SABORES RISAS Y MIL COLORES':   'Ciudad',
+  'ENTRE SABORES RISAS Y MIL COLORES':   'Comida Urbana',
   'NOCHE EN LAURELES':                    'Ciudad',
   'OTROS CAMINOS LAURELES':              'Ciudad',
   'RINCONES ESCONDIDOS DE EL POBLADO':   'Ciudad',
@@ -9396,8 +9516,8 @@ const Map<String, String> kImagenPorRuta = {
   'DEL ORIGEN PAISA A LA MEDELLÍN MODERNA': 'assets/images/rutas/ruta_11_origen_paisa_moderno.jpg',
   'TRANVÍA CULTURAL': 'assets/images/rutas/ruta_12_tranvia_cultural.jpg',
   'RUTA GUATAPÉ & LA PIEDRA': 'assets/images/rutas/ruta_09_guatape.jpg',
-  'FERIA DE LAS FLORES': 'assets/images/rutas/ruta_17_feria_flores.jpg',
-  // [eliminado] 'TABLADOS Y RUMBA': 'assets/images/rutas/ruta_17_feria_flores.jpg',
+  'FERIA DE LAS FLORES': 'assets/images/rutas/ruta_04_metrocable.jpg',
+  // [eliminado] 'TABLADOS Y RUMBA': 'assets/images/rutas/ruta_04_metrocable.jpg',
   // ── Rutas nuevas Vive (Firestore) — imágenes propias ──
   'HUELLAS VIVAS DE EL POBLADO': 'assets/images/rutas/ruta_huellas_vivas_poblado.jpg',
   'EL POBLADO VERDE': 'assets/images/rutas/ruta_poblado_verde.jpg',
@@ -9500,307 +9620,9 @@ const Map<String, String> kInsigniaPorRuta = {
 
 /// Rutas completas de la Feria — se agregan a kRutasData en tiempo de ejecución
 final List<Map<String, dynamic>> kFeriaRutasCompletas = [
-  // ── FERIA CLÁSICA — todos los eventos icónicos ────────────────────────────
-  {
-    'nombre': 'FERIA CLÁSICA',
-    'nombreEN': 'CLASSIC FERIA',
-    'emoji': '🌹',
-    'zona': 'Temporada',
-    'ciudad': 'Medellín',
-    'pais': 'Colombia',
-    'subtitulo': 'Desfile · Trova · Autos · Silletas · Concierto · Bicis',
-    'subtituloEN': 'Parade · Trova · Cars · Silletas · Concert · Bikes',
-    'tag': '🌹 31 jul – 9 ago',
-    'tiempo': '10 días',
-    'dificultad': 'FÁCIL',
-    'transporte': '🚇 Metro + 🚶 Caminata según evento del día',
-    'mejorHora': 'Depende del evento — ver programación',
-    'tipoExperiencia': 'Festival Cultural',
-    'tipoExperienciaEN': 'Cultural Festival',
-    'temporadaMeses': [7, 8],
-    'temporadaInicio': [7, 31],
-    'temporadaFin': [8, 9],
-    'activa': true,
-    'hook': '"Medellín te quiere y florece para ti" — 10 días, 120+ eventos gratuitos, la fiesta más grande de Colombia',
-    'hookEN': '"Medellín loves you and blooms for you" — 10 days, 120+ free events, Colombia\'s biggest festival',
-    'descripcion': 'La guía oficial de los eventos más icónicos de la Feria de las Flores 2026. Organizá tu itinerario por día: qué ver, a qué hora, cómo llegar y qué esperar en cada evento. Edición 69 del Desfile de Silleteros — primera vez con silleteros neurodiversos (Proceso Silleteando Ando).',
-    'descripcionEN': 'The official guide to the most iconic events of Feria de las Flores 2026. Plan your day-by-day itinerary: what to see, when, how to get there and what to expect. 69th Silleteros Parade edition — first time with neurodiverse silleteros (Silleteando Ando Process).',
-    'momentoClave': 'Desfile de Silleteros — 9 ago, 2pm. Edición 69 con 530 silleteros y participación neurodiversa por primera vez.',
-    'momentoClaveEN': 'Silleteros Parade — Aug 9, 2pm. 69th edition with 530 silleteros and neurodiverse participation for the first time.',
-    'misionEpica': 'Asistí a mínimo 5 eventos diferentes de la Feria y desbloqueá la Insignia Silletero de Oro — la más difícil de obtener.',
-    'misionEpicaEN': 'Attend at least 5 different Feria events and unlock the Golden Silletero Badge — the hardest to earn.',
-    'sitiosDetalle': [
-      {
-        'nombre': 'Concierto Inaugural (Obelisco) — 31 jul',
-        'nombreEN': 'Opening Concert (Obelisco) — Jul 31',
-        'emoji': '🎤',
-        'orden': 1,
-        'lat': 6.257020, 'lng': -75.591759,
-        'horario': 'Martes 31 julio · Noche · Gratuito',
-        'tip': '🎤 Llegá 1 hora antes — el Obelisco se llena rápido. El mejor lugar es frente al escenario sobre la Carrera 70. Llevá agua y ropa abrigada por si refresca en la noche.',
-        'tipEN': '🎤 Arrive 1 hour early — the Obelisco fills fast. Best spot is in front of the stage on Carrera 70. Bring water and a light jacket in case it gets cool.',
-        'curiosidad': '🧠 El Concierto Inaugural marca el arranque oficial de la Feria desde los años 90. El Obelisco fue construido en 1947 como símbolo de modernización de Medellín. El lema oficial 2026 es "Medellín te quiere y florece para ti".',
-        'curiosidadEN': '🧠 The Opening Concert has officially kicked off the Feria since the 1990s. The Obelisco was built in 1947 as a symbol of Medellín\'s modernization. The 2026 official motto is "Medellín loves you and blooms for you".',
-        'reto': '🎯 Tomá una foto del escenario encendido con el Obelisco de fondo. ¿Cuántas personas estimás que hay en el concierto?',
-        'retoEN': '🎯 Take a photo of the lit stage with the Obelisco behind it. How many people do you estimate are at the concert?',
-        'puntosReto': 100,
-      },
-      {
-        'nombre': 'Feria a Ritmo de Bicicleta — 1 ago · 10am',
-        'nombreEN': 'Festival by Bicycle — Aug 1 · 10am',
-        'emoji': '🚴',
-        'orden': 2,
-        'lat': 6.2458, 'lng': -75.5722,
-        'horario': 'Sábado 1 agosto · 10:00 am · Gratuito',
-        'tip': '🚴 El recorrido es de 12 km desde el Edificio Inteligente de EPM hasta el Parque de Belén. Decorá tu bicicleta con flores — hay premios para la más creativa. El tramo por Parques del Río es el más fotogénico.',
-        'tipEN': '🚴 The route is 12 km from the EPM Intelligent Building to Belén Park. Decorate your bike with flowers — prizes for the most creative. The Parques del Río section is the most photogenic.',
-        'curiosidad': '🧠 La Feria a Ritmo de Bicicleta es una de las actividades más nuevas de la Feria (nació en 2012) y promueve la movilidad sostenible. Cada año convoca a más de 5.000 ciclistas de toda la ciudad.',
-        'curiosidadEN': '🧠 The Festival by Bicycle is one of the Feria\'s newest activities (born 2012) promoting sustainable mobility. Each year it draws over 5,000 cyclists from across the city.',
-        'reto': '🎯 Completá el recorrido de 12 km con tu bicicleta decorada. Tomá foto con la bici en el punto de llegada en el Parque de Belén.',
-        'retoEN': '🎯 Complete the 12 km route with your decorated bicycle. Take a photo with your bike at the finish point at Belén Park.',
-        'puntosReto': 150,
-      },
-      {
-        'nombre': 'Desfile Chivas y Flores — 1 ago',
-        'nombreEN': 'Chivas & Flowers Parade — Aug 1',
-        'emoji': '🚌',
-        'orden': 3,
-        'lat': 6.2448, 'lng': -75.5719, 'radioM': 400,
-        'horario': 'Sábado 1 agosto · 2:00 pm · Gratuito',
-        'tip': '🚌 El mejor punto para ver el desfile es en la Avenida del Ferrocarril cerca a la Alpujarra. Llevá cámara — las chivas decoradas con flores son increíblemente fotogénicas. Llegá 30 min antes para coger sitio.',
-        'tipEN': '🚌 Best viewing spot is on Avenida del Ferrocarril near Alpujarra. Bring a camera — chivas decorated with flowers are incredibly photogenic. Arrive 30 min early for a good spot.',
-        'curiosidad': '🧠 Las "chivas" o "buses escalera" son el transporte rural más icónico de Colombia. Pintadas de colores vivos y con barandas de madera, fueron el medio de transporte de los campesinos antioqueños por décadas. Durante la Feria, las decoran con flores de Santa Elena.',
-        'curiosidadEN': '🧠 "Chivas" or "escalera buses" are Colombia\'s most iconic rural transport. Painted in vivid colors with wooden railings, they were the main transport for Antioquian farmers for decades. During the Feria, they\'re decorated with Santa Elena flowers.',
-        'reto': '🎯 Fotografiá la chiva más colorida del desfile. ¿Podés contar cuántas flores lleva decorándola?',
-        'retoEN': '🎯 Photograph the most colorful chiva in the parade. Can you count how many flowers are decorating it?',
-        'puntosReto': 100,
-      },
-      {
-        'nombre': 'Desfile Avenida Primavera — 2 ago · 2pm',
-        'nombreEN': 'Primavera Avenue Parade — Aug 2 · 2pm',
-        'emoji': '🌸',
-        'orden': 4,
-        'lat': 6.2195, 'lng': -75.5750, 'radioM': 400,
-        'horario': 'Domingo 2 agosto · 2:00 pm · Gratuito',
-        'tip': '🌸 Tercera edición del desfile. El mejor punto de vista es la esquina de Carrera 43 con Av. El Poblado. Vestite con algo floral — hay ambiente muy festivo. El desfile dura aproximadamente 2 horas.',
-        'tipEN': '🌸 Third edition of the parade. Best viewing at the corner of Carrera 43 and Av. El Poblado. Dress in something floral — very festive atmosphere. The parade lasts approximately 2 hours.',
-        'curiosidad': '🧠 La Avenida Primavera es una de las vías de diseño y moda más importantes de Medellín. Este desfile surgió como una extensión de la Feria hacia El Poblado, mostrando la fusión de moda, flores y cultura paisa contemporánea.',
-        'curiosidadEN': '🧠 Primavera Avenue is one of Medellín\'s most important fashion and design streets. This parade emerged as a Feria extension into El Poblado, showcasing the fusion of fashion, flowers and contemporary paisa culture.',
-        'reto': '🎯 Vestite con algo floral y tomá foto en el desfile. Contá cuántos diseñadores locales participan en el evento.',
-        'retoEN': '🎯 Dress in something floral and take a photo at the parade. Count how many local designers participate in the event.',
-        'puntosReto': 100,
-      },
-      {
-        'nombre': 'Caminata Canina — 2 ago · 10am · Estadio',
-        'nombreEN': 'Dog Walk — Aug 3 · 10am · Stadium',
-        'emoji': '🐾',
-        'orden': 5,
-        'lat': 6.2552, 'lng': -75.5880,
-        'horario': 'Lunes 3 agosto · 10:00 am · Gratuito',
-        'tip': '🐾 Llevá tu mascota decorada con flores — hay premios para los disfraces más creativos. El recorrido es de 2 km, desde el Estadio Atanasio hasta Tierragro. Llevá agua para tu mascota y bolsas para recoger.',
-        'tipEN': '🐾 Bring your pet decorated with flowers — prizes for the most creative costumes. The walk is 2 km from Atanasio Stadium to Tierragro. Bring water for your pet and bags for cleanup.',
-        'curiosidad': '🧠 La Caminata Canina es uno de los eventos más queridos de la Feria y convoca a miles de mascotas. Medellín es considerada una de las ciudades más pet-friendly de Colombia — Laureles concentra la mayor cantidad de veterinarias y tiendas para mascotas del país.',
-        'curiosidadEN': '🧠 The Dog Walk is one of the Feria\'s most beloved events, drawing thousands of pets. Medellín is considered one of Colombia\'s most pet-friendly cities — Laureles has the country\'s highest concentration of vets and pet shops.',
-        'reto': '🎯 Decorá tu mascota con flores y participá en el concurso de disfraces. Si no tenés mascota, tomá foto de la más creativa que encuentres.',
-        'retoEN': '🎯 Decorate your pet with flowers and join the costume contest. If you don\'t have a pet, photograph the most creative one you find.',
-        'puntosReto': 100,
-      },
-      {
-        'nombre': 'Plaza de las Flores (Parque de los Deseos) — 31 jul al 4 ago',
-        'nombreEN': 'Flowers Plaza (Parque de los Deseos) — all Feria',
-        'emoji': '🌟',
-        'orden': 6,
-        'lat': 6.268617, 'lng': -75.565699,
-        'horario': '31 jul – 9 ago · Todo el día · Gratuito',
-        'tip': '🌟 NUEVA SEDE 2026 — primera vez que las Plazas de Flores llegan al Parque de los Deseos. El parque tiene la fuente interactiva más famosa de Medellín. Mejor hora: tarde cuando las flores están iluminadas.',
-        'tipEN': '🌹 Open throughout the Festival. Flower exhibitions, live silleteros, music and gastronomy every day. The best spot to see the flowers up close.',
-        'tipEN': '🌟 NEW 2026 VENUE — first time Flores Plazas come to Parque de los Deseos. The park has Medellín\'s most famous interactive fountain. Best time: evening when flowers are illuminated.',
-        'curiosidad': '🧠 El Parque de los Deseos fue inaugurado en 2003 como símbolo de la transformación urbana de Medellín. Este año las Plazas de Flores tienen 3 sedes por primera vez: Parques del Río, Ciudad del Río (MAMM) y Parque de los Deseos.',
-        'curiosidadEN': '🧠 Parque de los Deseos was inaugurated in 2003 as a symbol of Medellín\'s urban transformation. This year the Flores Plazas have 3 venues for the first time: Parques del Río, Ciudad del Río (MAMM) and Parque de los Deseos.',
-        'reto': '🎯 Tomá la foto clásica del Parque de los Deseos con flores de la Feria. Comparála con una foto normal del parque — ¿qué diferencia ves?',
-        'retoEN': '🎯 Take the classic Parque de los Deseos photo with Feria flowers. Compare it with a normal park photo — what differences do you see?',
-        'puntosReto': 75,
-      },
-      {
-        'nombre': 'Plaza de las Flores (Parques del Río) — toda la feria',
-        'nombreEN': 'Flowers Plaza (Parques del Río) — all Feria',
-        'emoji': '🌹',
-        'orden': 7,
-        'lat': 6.243748, 'lng': -75.579924,
-        'horario': '31 jul – 9 ago · Todo el día · Gratuito',
-        'tip': '🌹 Esta es la Plaza de Flores más grande — cubre varios módulos de Parques del Río con exhibición de silletas ganadoras, venta de flores de Santa Elena y shows de silleteros en vivo. Ideal para ver el trabajo de los silleteros de cerca.',
-        'tipEN': '🌺 The largest Flowers Square of the Festival at Parques del Río. Traditional food, silletero exhibitions, artisans and live music. All 10 days, free.',
-        'tipEN': '🌹 This is the largest Flores Plaza — covers several Parques del Río modules with winning silleta exhibition, Santa Elena flower market and live silletero shows. Ideal for seeing silletero craftsmanship up close.',
-        'curiosidad': '🧠 Los silleteros de Santa Elena cargan entre 60 y 80 kilos de flores en sus espaldas durante el desfile. Las silletas monumentales pueden tener más de 600 flores diferentes. Cada familia silletera tiene su propio diseño heredado de generación en generación.',
-        'curiosidadEN': '🧠 Santa Elena silleteros carry between 60 and 80 kilos of flowers on their backs during the parade. Monumental silletas can have over 600 different flowers. Each silletera family has their own design inherited through generations.',
-        'reto': '🎯 Comprá una flor a un silletero en la Plaza y preguntale de qué finca viene. Tomá foto con la flor y el silletero (con permiso).',
-        'retoEN': '🎯 Buy a flower from a silletero at the Plaza and ask which farm it comes from. Take a photo with the flower and the silletero (with permission).',
-        'puntosReto': 125,
-      },
-      {
-        'nombre': 'Parque Cultural Nocturno (Plaza Gardel) — 2 al 7 ago',
-        'nombreEN': 'Nocturnal Cultural Park (Plaza Gardel) — Aug 2-7',
-        'emoji': '🎭',
-        'orden': 8,
-        'lat': 6.2197, 'lng': -75.5897,
-        'horario': '2-7 agosto · 7:00 pm · Gratuito',
-        'tip': '🎭 6 noches temáticas consecutivas en Plaza Gardel: Afro (2 ago), Música Colombiana (3), Homenaje Grupo Suramérica (4), Son (5), Bolero (6), Tropical (7). Llegá temprano — la plaza se llena. Transporte: Metro Aguacatala + 15 min a pie.',
-        'tipEN': '🎭 6 consecutive themed nights at Plaza Gardel: Afro (Aug 2), Colombian Music (3), Grupo Suramérica Tribute (4), Son & Bolero (5), Tropical Night (7). Each show is a world-class spectacle.',
-        'tipEN': '🎭 6 consecutive themed nights at Plaza Gardel: Afro (Aug 2), Colombian Music (3), Grupo Suramérica tribute (4), Son (5), Bolero (6), Tropical (7). Arrive early — the plaza fills up. Transport: Metro Aguacatala + 15 min walk.',
-        'curiosidad': '🧠 Plaza Gardel lleva el nombre de Carlos Gardel, el rey del tango argentino que murió en un accidente de aviación en el Aeropuerto Olaya Herrera (al lado) en 1935. Los paisas lo adoptaron como propio y lo convirtieron en símbolo de Medellín.',
-        'curiosidadEN': '🧠 Plaza Gardel is named after Carlos Gardel, the Argentine tango king who died in a plane crash at Olaya Herrera Airport (next door) in 1935. Paisas adopted him as their own and made him a Medellín symbol.',
-        'reto': '🎯 Asistí a mínimo 2 noches temáticas diferentes. Tomá video de 15 segundos en cada una. ¿Cuál noche te gustó más?',
-        'retoEN': '🎯 Attend at least 2 different themed nights. Take a 15-second video at each. Which night did you prefer?',
-        'puntosReto': 200,
-      },
-      {
-        'nombre': 'Festival Nacional de la Trova — Final 6 ago · 6pm',
-        'nombreEN': 'National Trova Festival — Final Aug 6 · 6pm',
-        'emoji': '🎤',
-        'orden': 9,
-        'lat': 6.2197, 'lng': -75.5897,
-        'horario': 'Jueves 6 agosto · 6:00 pm · Gratuito · Plaza Gardel',
-        'tip': '🎤 La trova paisa es improvisación de versos musicales en tiempo real — los trovadores compiten en ingenio y humor. La final es el 6 de agosto pero hay semifinales el 31 jul y 1 ago en el Parque de los Deseos. Retá a un trovador — si acepta improvisar con tu nombre, ganás puntos.',
-        'tipEN': '🎤 The most anticipated trova night. The best juglares in the country compete for the title at Plaza Gardel. Arrive early to get a spot — it fills completely.',
-        'tipEN': '🎤 Paisa trova is real-time musical verse improvisation — trovadores compete in wit and humor. The final is Aug 6 but there are semifinals Jul 31 and Aug 1 at Parque de los Deseos. Challenge a trovador — if they improvise with your name, you earn bonus points.',
-        'curiosidad': '🧠 El Festival Nacional de la Trova Ciudad de Medellín lleva más de 60 años eligiendo al Rey o Reina de la Trova. La trova paisa es una tradición oral única en el mundo, declarada Patrimonio Cultural de Antioquia. Los grandes maestros son Salvo Ruiz y el "Ñito" Restrepo.',
-        'curiosidadEN': '🧠 The National Trova Festival of Medellín has been choosing the King or Queen of Trova for over 60 years. Paisa trova is a unique oral tradition in the world, declared Cultural Heritage of Antioquia. The great masters are Salvo Ruiz and "Ñito" Restrepo.',
-        'reto': '🎯 Retá a un trovador a inventar una copla con tu nombre. Si lo logra, tomá video. Bonus: aprendé una copla y recitala en voz alta.',
-        'retoEN': '🎯 Challenge a trovador to invent a verse with your name. If they do it, take a video. Bonus: learn a verse and recite it out loud.',
-        'puntosReto': 175,
-      },
-      {
-        'nombre': 'Desfile Autos Clásicos y Antiguos — 7 ago · 10am · UPB',
-        'nombreEN': 'Classic & Vintage Cars Parade — Aug 7 · 10am · UPB',
-        'emoji': '🚗',
-        'orden': 10,
-        'lat': 6.2572, 'lng': -75.5742, 'radioM': 400,
-        'horario': 'Viernes 7 agosto · 10:00 am · Gratuito · UPB → Estadio',
-        'tip': '🚗 El mejor punto para ver el desfile es en la Carrera 70 con Circular — ahí el recorrido es más lento y podés apreciar mejor los autos. Algunos modelos son de los años 30s en perfecto estado. Llegá a las 9:30am para coger lugar.',
-        'tipEN': '🚗 The most beautiful classic cars of Antioquia parade through Laureles. Some are over 80 years old and in perfect condition. Best viewing spot: Carrera 70 with Circular.',
-        'tipEN': '🚗 Best viewing at Carrera 70 with Circular — the route is slower there and you can better appreciate the cars. Some models are from the 1930s in perfect condition. Arrive at 9:30am for a good spot.',
-        'curiosidad': '🧠 El Desfile de Autos Clásicos y Antiguos lleva más de 30 años en la Feria. Los propietarios de estos autos los mantienen con recursos propios y los restauran durante todo el año. Algunos han ganado premios internacionales en ferias de autos de Estados Unidos y Europa.',
-        'curiosidadEN': '🧠 The Classic and Vintage Cars Parade has been part of the Feria for over 30 years. Owners maintain these cars with their own resources and restore them all year. Some have won international prizes at car shows in the US and Europe.',
-        'reto': '🎯 Encontrá el auto más antiguo del desfile y averiguá el año de fabricación. Tomá foto y conversá con el propietario.',
-        'retoEN': '🎯 Find the oldest car in the parade and find out the year it was manufactured. Take a photo and chat with the owner.',
-        'puntosReto': 125,
-      },
-      {
-        'nombre': 'Héroes de la Patria — 8 ago · 2pm',
-        'nombreEN': 'Heroes of the Homeland — Aug 8 · 2pm · Av. El Poblado',
-        'emoji': '🎖️',
-        'orden': 11,
-        'lat': 6.2150, 'lng': -75.5720, 'radioM': 400,
-        'horario': 'Sábado 8 agosto · 2:00 pm · Gratuito · Av. El Poblado',
-        'tip': '🎖️ Desfile con fuerzas militares y de policía de Antioquia. Poco conocido por turistas pero muy emotivo. El recorrido va por Avenida El Poblado. Es el único desfile de la Feria con participación activa de las fuerzas del Estado.',
-        'tipEN': '🎖️ Parade with the military and police forces of Antioquia. An emotional and little-known event for tourists, very meaningful for Medellín locals.',
-        'tipEN': '🎖️ Parade with Antioquia\'s military and police forces. Little-known by tourists but very moving. The route goes along Avenida El Poblado. It\'s the only Feria parade with active State forces participation.',
-        'curiosidad': '🧠 El desfile Héroes de la Patria se incorporó a la programación de la Feria como homenaje a los miembros de las fuerzas armadas y de policía de Antioquia. Es uno de los eventos más recientes del calendario oficial.',
-        'curiosidadEN': '🧠 The Héroes de la Patria parade was incorporated into the Feria program as a tribute to Antioquia\'s armed and police forces. It\'s one of the most recent additions to the official calendar.',
-        'reto': '🎯 Tomá foto del desfile y agradecele a un uniformado por su servicio. Compartí la foto en redes con #FeriaDeLasFlores2026.',
-        'retoEN': '🎯 Photograph the parade and thank a uniformed officer for their service. Share the photo on social media with #FeriaDeLasFlores2026.',
-        'puntosReto': 75,
-      },
-      {
-        'nombre': 'Súper Concierto (Estadio Atanasio) — 8 ago · 7pm',
-        'nombreEN': 'Super Concert (Atanasio Stadium) — Aug 8 · 7pm',
-        'emoji': '🎸',
-        'orden': 12,
-        'lat': 6.2554, 'lng': -75.5890,
-        'horario': 'Sábado 8 agosto · 7:00 pm · REQUIERE BOLETA',
-        'tip': '🎸 REQUIERE BOLETA — comprá con anticipación en taquillas oficiales. Artistas confirmados: Carin León, Grupo Niche, Silvestre Dangond, Felipe Peláez y más. El estadio tiene capacidad para 45.000 personas. Llegá 2 horas antes para la apertura de puertas.',
-        'tipEN': '🎸 The most anticipated event of the Festival. Official artists: John Alex Castaño, Jorge Celedón, El Combo de las Estrellas and more. Tickets required — buy in advance at official box offices.',
-        'tipEN': '🎸 TICKET REQUIRED — buy in advance at official ticket offices. Confirmed artists: Carin León, Grupo Niche, Silvestre Dangond, Felipe Peláez and more. The stadium holds 45,000 people. Arrive 2 hours early for door opening.',
-        'curiosidad': '🧠 El Estadio Atanasio Girardot fue sede de los Juegos Suramericanos 2010 y tiene capacidad para 45.943 personas. El Súper Concierto es el evento con boleta más esperado de la Feria y mezcla vallenato, salsa, música popular y regional en una sola noche.',
-        'curiosidadEN': '🧠 Atanasio Girardot Stadium hosted the 2010 South American Games with capacity for 45,943 people. The Super Concert is the Feria\'s most anticipated ticketed event, mixing vallenato, salsa, popular and regional music in one night.',
-        'reto': '🎯 Tomá foto del estadio lleno con el escenario encendido. ¿Cuántos artistas alcanzás a ver en la noche? Guardá la boleta como recuerdo.',
-        'retoEN': '🎯 Take a photo of the packed stadium with the lit stage. How many artists can you see in one night? Keep your ticket as a souvenir.',
-        'puntosReto': 200,
-      },
-      {
-        'nombre': 'Desfile de Silleteros — 9 ago · 2pm · Av. Regional',
-        'nombreEN': 'Silleteros Parade — Aug 9 · 2pm · Av. El Poblado',
-        'emoji': '🌹',
-        'orden': 13,
-        'lat': 6.2090, 'lng': -75.5734, 'radioM': 400,
-        'horario': 'Domingo 9 agosto · 2:00 pm · Gratuito · Av. El Poblado → Plaza Mayor',
-        'tip': '🌹 El evento más importante de la Feria — el cierre perfecto. Llegá 2 HORAS antes para conseguir sitio. El mejor punto de vista: Av. El Poblado entre Calles 9 y 11 (inicio del recorrido). Llevá sombrero y protector solar. El recorrido dura aprox. 3 horas.',
-        'tipEN': '🌹 530 silleteros carrying up to 80 kilos of flowers on their backs. The most colorful spectacle in Colombia. Standing viewing is completely free along Avenida del Río — arrive 2 hours early for a good spot.',
-        'tipEN': '🌹 The Feria\'s most important event — the perfect close. Arrive 2 HOURS early for a spot. Best viewing: Av. El Poblado between Calles 9 and 11 (route start). Bring a hat and sunscreen. The parade lasts approx. 3 hours.',
-        'curiosidad': '🧠 Edición 69. Este año por primera vez participan 10 silleteros neurodiversos del Proceso Silleteando Ando de la Corporación de Silleteros de Santa Elena (COSSE). Hay 5 categorías: Monumental (80+ kg), Emblemática, Clásica, Tradicional y Silleteritos. El ganador de 2025 fue Juan Pablo Sánchez en su participación 18.',
-        'curiosidadEN': '🧠 69th edition. This year for the first time, 10 neurodiverse silleteros from the Silleteando Ando Process of Santa Elena Silleteros Corporation (COSSE) participate. There are 5 categories: Monumental (80+ kg), Emblematic, Classic, Traditional and Silleteritos. The 2025 winner was Juan Pablo Sánchez in his 18th participation.',
-        'reto': '🎯 Encontrá a los 10 silleteros neurodiversos en el desfile y aplaudílos especialmente. Tomá foto de la silleta Monumental más grande que encuentres. ¿Cuántas flores estimás que tiene?',
-        'retoEN': '🎯 Find the 10 neurodiverse silleteros in the parade and give them a special cheer. Photograph the largest Monumental silleta you find. How many flowers do you estimate it has?',
-        'puntosReto': 250,
-      },
-    ],
-    'sitiosList': [
-      'Concierto Inaugural (Obelisco) — 31 jul',
-      'Feria a Ritmo de Bicicleta — 1 ago · 10am',
-      'Desfile Chivas y Flores — 1 ago',
-      'Desfile Avenida Primavera — 2 ago · 2pm',
-      'Caminata Canina — 2 ago · 10am · Estadio',
-      'Plaza de las Flores (Parque de los Deseos) — 31 jul al 4 ago',
-      'Plaza de las Flores (Parques del Río) — toda la feria',
-      'Parque Cultural Nocturno (Plaza Gardel) — 2 al 7 ago',
-      'Festival Nacional de la Trova — Final 6 ago · 6pm',
-      'Desfile Autos Clásicos y Antiguos — 7 ago · 10am · UPB',
-      'Desfile Chivas y Flores — 1 ago',
-      'Héroes de la Patria — 8 ago · 2pm',
-      'Súper Concierto (Estadio Atanasio) — 8 ago · 7pm',
-      'Desfile de Silleteros — 9 ago · 2pm · Av. Regional',
-    ],
-    'sitios': 14,
-    'consejos': [
-      '📅 PROGRAMACIÓN COMPLETA en feriadelasfloresmedellin.gov.co',
-      '🚇 Usá el Metro — el día del Desfile de Silleteros el metro es gratis',
-      '🌹 Llegá 2 horas antes al Desfile — las mejores sillas se agotan',
-      '💵 La mayoría de eventos son GRATUITOS — revisá cuáles requieren boleta',
-      '📸 Batería cargada siempre — cada evento es fotogénico',
-      '🌂 Llevá paraguas — agosto tiene lluvias en la tarde',
-      '👟 Zapatos cómodos — vas a caminar mucho',
-      '🎟️ Súper Concierto (8 ago) requiere boleta — comprá con anticipación',
-      '🏆 Sillas para rifar: 530 silleteros compiten por las categorías Monumental, Emblemática, Clásica, Tradicional y Silleteritos',
-    ],
-    'consejosEN': [
-      '📅 FULL PROGRAM at feriadelasfloresmedellin.gov.co',
-      '🚇 Use the Metro — on Silleteros Parade day the metro is FREE',
-      '🌹 Arrive 2 hours early to the Parade — best spots fill up fast',
-      '💵 Most events are FREE — check which require tickets',
-      '📸 Keep your battery charged — every event is photogenic',
-      '🌂 Bring an umbrella — August has afternoon rain',
-      '👟 Comfortable shoes — you will walk a lot',
-      '🎟️ Super Concert (Aug 8) requires ticket — buy in advance',
-      '🏆 Silletero competition: 530 silleteros compete in Monumental, Emblematic, Classic, Traditional and Silleteritos categories',
-    ],
-    'gpsSitios': [
-      {'nombre': 'Concierto Inaugural (Obelisco) — 31 jul', 'lat': 6.257020, 'lng': -75.591759},
-      {'nombre': 'Feria a Ritmo de Bicicleta — 1 ago · 10am', 'lat': 6.2458, 'lng': -75.5722},
-      {'nombre': 'Desfile Chivas y Flores — 1 ago', 'lat': 6.236639, 'lng': -75.575864, 'radioM': 400},
-      {'nombre': 'Desfile Avenida Primavera — 2 ago · 2pm', 'lat': 6.236639, 'lng': -75.575864, 'radioM': 400},
-      {'nombre': 'Caminata Canina — 2 ago · 10am · Estadio', 'lat': 6.2552, 'lng': -75.5880},
-      {'nombre': 'Plaza de las Flores (Parque de los Deseos) — 31 jul al 4 ago', 'lat': 6.268617, 'lng': -75.565699},
-      {'nombre': 'Plaza de las Flores (Parques del Río) — toda la feria', 'lat': 6.243748, 'lng': -75.579924},
-      {'nombre': 'Parque Cultural Nocturno (Plaza Gardel) — 2 al 7 ago', 'lat': 6.2197, 'lng': -75.5897},
-      {'nombre': 'Festival Nacional de la Trova — Final 6 ago · 6pm', 'lat': 6.2197, 'lng': -75.5897},
-      {'nombre': 'Desfile Autos Clásicos y Antiguos — 7 ago · 10am · UPB', 'lat': 6.2572, 'lng': -75.5742, 'radioM': 400},
-      {'nombre': 'Héroes de la Patria — 8 ago · 2pm', 'lat': 6.2150, 'lng': -75.5720, 'radioM': 400},
-      {'nombre': 'Súper Concierto (Estadio Atanasio) — 8 ago · 7pm', 'lat': 6.2554, 'lng': -75.5890},
-      {'nombre': 'Desfile de Silleteros — 9 ago · 2pm · Av. Regional', 'lat': 6.236639, 'lng': -75.575864, 'radioM': 400},
-    ],
-    'color1': const Color(0xFF1A0A10),
-    'color2': const Color(0xFF2A1020),
-    'acento': const Color(0xFFD05538),
-    'imagen': 'assets/images/rutas/ruta_feria_clasica.jpg',
-    'insignia': 'Silletero de Oro',
-    'insigniaImg': 'assets/images/insignias/insignia_feria_silletero_oro.png',
-    'personaje': '🌹',
-    'premio': 'Insignia Silletero de Oro',
-    'comoLlegar': '🚇 Cada evento tiene su punto de encuentro — ver agenda\n🎤 Concierto Inaugural: Sector Obelisco · Est. Suramericana (L.B) → 8 min\n🚴 Feria a Ritmo de Bici: Plaza Pies Descalzos · Est. Alpujarra (L.A) → 8 min\n🌹 Desfile Silleteros: Puente Guayaquil · Est. Exposiciones (L.A) → 10 min',
-    'antesDeSalir': '📅 Descargá la agenda completa en Tab Feria · 🚇 Metro y tarjeta Cívica · 💧 Agua y protector solar · 📱 Celular con Rutero MDE abierto para validar cada evento · 🎒 Solo lo esencial — habrá multitudes',
-  },
-  // [eliminado] RUTA SILLETERA — reemplazada por rutas Fincas Silleteras en Firestore
-  // [eliminado] TABLADOS Y RUMBA
+  // ── Rutas completas de Feria cargadas desde Firestore (Admin) para Feria 2027 ──
+  // ── Estructura de ejemplo:
+  // { 'nombre': 'FERIA CLÁSICA', 'zona': 'Temporada', 'ciudad': 'Medellín', ... }
 ];
 
 // ─────────────────────────────────────────
@@ -9817,7 +9639,9 @@ class RutasService {
   /// Rutas actuales — Firestore + rutas locales que no estén en Firestore
   /// Las rutas que están en Firestore (aunque se borren) NO se reinyectan desde local.
   List<Map<String, dynamic>> get rutas {
-    if (!_cargado || _rutas.isEmpty) return [...kFeriaRutasCompletas]; // fallback mientras carga Firestore
+    if (!_cargado || _rutas.isEmpty) {
+      try { return [...kFeriaRutasCompletas]; } catch (_) { return []; }
+    }
     // Merge: rutas de Firestore + rutas locales que Firestore no tiene
     // EXCLUIR rutas locales que ya fueron migradas a Firestore (para evitar zombis)
     final nombresFirestore = _rutas.map((r) => r['nombre']?.toString() ?? '').toSet();
@@ -10330,22 +10154,31 @@ class _HomeBodyState extends State<HomeBody> {
             gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight,
               colors: [Color(0xFF080C06), Color(0xFF0F1A08), Color(0xFF080C06)])),
           child: Stack(children: [
-            // Imagen panorámica como fondo del header — dinámica por ciudad
+            // ── Hero foto de ciudad — protagonista visual ──
             Positioned.fill(child: ClipRect(child: Image.asset(
               'assets/images/splash_bg.png',
               fit: BoxFit.cover,
               alignment: Alignment.topCenter,
+              frameBuilder: (ctx, child, frame, sync) =>
+                frame != null ? child : const SizedBox(),
               errorBuilder: (_, __, ___) => const SizedBox()))),
-            // Overlay oscuro para legibilidad del texto
-            Positioned.fill(child: Container(
-              decoration: const BoxDecoration(
+            // ── Scrim cinematográfico — texto legible sin perder la foto ──
+            Positioned.fill(child: DecoratedBox(
+              decoration: BoxDecoration(
                 gradient: LinearGradient(
                   begin: Alignment.topCenter, end: Alignment.bottomCenter,
-                  colors: [Color(0xAA000000), Color(0xDD080C06)])))),
+                  stops: const [0.0, 0.25, 0.75, 1.0],
+                  colors: [
+                    Colors.black.withOpacity(0.55),
+                    Colors.black.withOpacity(0.25),
+                    Colors.black.withOpacity(0.55),
+                    const Color(0xFF111410),
+                  ])))),
+            // ── Patrón sutil de identidad ──
             Positioned.fill(child: CustomPaint(painter: _LeafPatternPainter())),
             SafeArea(child: Padding(padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                // Header premium — saludo + ciudad + avatar/nivel
+                // Header editorial — saludo + ciudad + avatar
                 Row(mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   crossAxisAlignment: CrossAxisAlignment.start, children: [
                   Expanded(child: GestureDetector(
@@ -10382,30 +10215,39 @@ class _HomeBodyState extends State<HomeBody> {
                             }),
                         ]))),
                     child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      Text(_saludoHora(), style: TextStyle(
-                        fontSize: 10, color: RDSColor.gold.withOpacity(0.8),
-                        fontWeight: FontWeight.w600, letterSpacing: 1.5)),
-                      const SizedBox(height: 2),
+                      // Tag de saludo — sutil, uppercase, dorado
                       Row(children: [
+                        Container(width: 16, height: 1,
+                          color: RDSColor.gold.withOpacity(0.5)),
+                        const SizedBox(width: 6),
+                        Text(_saludoHora(),
+                          style: const TextStyle(fontFamily: 'SpaceGrotesk', fontSize: 10, fontWeight: FontWeight.w700, letterSpacing: 2.0, color: RDSColor.textMuted).copyWith(
+                            color: RDSColor.gold.withOpacity(0.9),
+                            letterSpacing: 2.0)),
+                      ]),
+                      const SizedBox(height: 6),
+                      // Ciudad — protagonista tipográfico
+                      Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
                         Flexible(child: Text(
                           (_ciudadDetectada?.ciudad ?? 'MEDELLÍN').toUpperCase(),
                           style: const TextStyle(
                             fontFamily: 'PlayfairDisplay',
-                            fontSize: 30, fontWeight: FontWeight.w900,
-                            color: RDSColor.gold, letterSpacing: 1, height: 1),
+                            fontSize: 34, fontWeight: FontWeight.w900,
+                            color: RDSColor.textPrimary,
+                            letterSpacing: 0.5, height: 1),
                           overflow: TextOverflow.ellipsis)),
-                        const SizedBox(width: 6),
-                        Text(_ciudadDetectada?.emoji ?? '🌸',
-                          style: const TextStyle(fontSize: 15)),
-                        const SizedBox(width: 2),
-                        const Icon(Icons.keyboard_arrow_down, color: RDSColor.gold, size: 15),
+                        const SizedBox(width: 8),
+                        Icon(RDSIcons.back,
+                          color: RDSColor.gold.withOpacity(0.6),
+                          size: 14),
                       ]),
-                      const SizedBox(height: 2),
+                      const SizedBox(height: 4),
+                      // Tagline — muted, pequeño
                       Text(
                         kLang == 'en'
                           ? (_ciudadDetectada?.taglineEN ?? tTaglineHome)
                           : (_ciudadDetectada?.taglineES ?? tTaglineHome),
-                        style: const TextStyle(fontSize: 10, letterSpacing: 0.8, color: RDSColor.textMuted)),
+                        style: RDSType.caption.copyWith(letterSpacing: 0.5)),
                     ]))),
                   const SizedBox(width: 12),
                   GestureDetector(
@@ -10424,113 +10266,164 @@ class _HomeBodyState extends State<HomeBody> {
 
         // Lista rutas
         Expanded(child: SingleChildScrollView(
+          physics: const BouncingScrollPhysics(),
           padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             // ── Banner Rutero Planner ─────────────────────────────────
+            // ── Banner Felo — editorial y premium ─────────────────────────
             GestureDetector(
               onTap: () => RuteroNav.push(context, const PlannerScreen()),
               child: Container(
-                margin: const EdgeInsets.only(bottom: 20),
-                padding: const EdgeInsets.all(16),
+                margin: const EdgeInsets.only(bottom: RDSSpace.xl),
                 decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFF0D2010), Color(0xFF1A3520)],
-                    begin: Alignment.topLeft, end: Alignment.bottomRight),
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: RDSColor.gold.withOpacity(0.4)),
-                  boxShadow: [BoxShadow(
-                    color: RDSColor.green.withOpacity(0.15),
-                    blurRadius: 20, offset: const Offset(0, 4))]),
-                child: Row(children: [
-                  Container(width: 48, height: 48,
-                    decoration: BoxDecoration(
-                      color: RDSColor.gold.withOpacity(0.12),
-                      shape: BoxShape.circle,
-                      border: Border.all(color: RDSColor.gold.withOpacity(0.45))),
-                    child: const Center(child: Icon(
-                      Icons.auto_awesome_rounded,
-                      color: RDSColor.gold, size: 22))),
-                  const SizedBox(width: 14),
-                  Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Text(t('RUTERO PLANNER IA', 'RUTERO PLANNER AI'),
-                      style: const TextStyle(
-                        fontFamily: 'SpaceGrotesk',
-                        fontSize: 11, fontWeight: FontWeight.w900,
-                        color: RDSColor.gold, letterSpacing: 1.5)),
-                    const SizedBox(height: 3),
-                    Text(
-                      t('Decinos cuándo llegás — nosotros te decimos qué hacer',
-                        'Tell us when you arrive — we tell you what to do'),
-                      style: TextStyle(fontSize: 11,
-                        color: RDSColor.textMuted.withOpacity(0.85), height: 1.4)),
-                  ])),
-                  const SizedBox(width: 8),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-                    decoration: BoxDecoration(
-                      gradient: const LinearGradient(
-                        colors: [RDSColor.gold, Color(0xFFE8C96B)]),
-                      borderRadius: BorderRadius.circular(12),
-                      boxShadow: [BoxShadow(
-                        color: RDSColor.gold.withOpacity(0.3),
-                        blurRadius: 8, offset: const Offset(0, 2))]),
-                    child: Text(t('Probar', 'Try it'),
-                      style: const TextStyle(
-                        fontFamily: 'SpaceGrotesk',
-                        color: Colors.black, fontSize: 11,
-                        fontWeight: FontWeight.w900))),
+                  color: RDSColor.surface,
+                  borderRadius: RDSRadius.bXl,
+                  border: Border.all(
+                    color: RDSColor.gold.withOpacity(0.25), width: 1.0)),
+                child: Stack(children: [
+                  // Glow sutil de fondo
+                  Positioned(right: -20, top: -20,
+                    child: Container(
+                      width: 120, height: 120,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        gradient: RadialGradient(colors: [
+                          RDSColor.green.withOpacity(0.08),
+                          Colors.transparent])))),
+                  Padding(
+                    padding: const EdgeInsets.all(RDSSpace.md),
+                    child: Row(children: [
+                      // Ícono — más integrado, menos "feature bubble"
+                      Container(
+                        width: 42, height: 42,
+                        decoration: BoxDecoration(
+                          color: RDSColor.gold.withOpacity(0.08),
+                          borderRadius: RDSRadius.bMd,
+                          border: Border.all(
+                            color: RDSColor.gold.withOpacity(0.3))),
+                        child: const Center(child: Icon(
+                          RDSIcons.planner,
+                          color: RDSColor.gold, size: 20))),
+                      const SizedBox(width: RDSSpace.md),
+                      Expanded(child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // Tag premium
+                          Text(t('✦ FELO', '✦ FELO'),
+                            style: const TextStyle(fontFamily: 'SpaceGrotesk', fontSize: 10, fontWeight: FontWeight.w700, letterSpacing: 2.0, color: RDSColor.textMuted).copyWith(
+                              color: RDSColor.gold, letterSpacing: 2.5)),
+                          const SizedBox(height: 3),
+                          Text(
+                            t('Tu itinerario perfecto en segundos',
+                              'Your perfect itinerary in seconds'),
+                            style: RDSType.headlineMd),
+                        ])),
+                      // CTA mínimo
+                      const SizedBox(width: RDSSpace.sm),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: RDSSpace.md, vertical: RDSSpace.sm - 2),
+                        decoration: BoxDecoration(
+                          color: RDSColor.gold,
+                          borderRadius: RDSRadius.bMd),
+                        child: Text(t('Preguntale', 'Ask him'),
+                          style: RDSType.labelSm.copyWith(
+                            color: Colors.black,
+                            fontWeight: FontWeight.w900))),
+                    ])),
                 ]))),
+            // ── Banner hotel activo ───────────────────────────────────────
+            const _HotelBanner(),
             // ─────────────────────────────────────────────────────────
-            Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+            // ── Header sección rutas — limpio y editorial ────────────────
+            Row(mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              crossAxisAlignment: CrossAxisAlignment.center, children: [
               Text(tRutasDisponibles,
-                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w900,
-                  color: RDSColor.textMuted, letterSpacing: 2)),
+                style: const TextStyle(fontFamily: 'SpaceGrotesk', fontSize: 10, fontWeight: FontWeight.w700, letterSpacing: 2.0, color: RDSColor.textMuted).copyWith(
+                  color: RDSColor.textMuted, letterSpacing: 2.5)),
               GestureDetector(
                 onTap: () => tabNotifier.value = 1,
                 child: Row(children: [
-                  Text(tVerMapa, style: const TextStyle(fontSize: 11, color: RDSColor.gold,
-                    fontWeight: FontWeight.w700)),
+                  Text(tVerMapa,
+                    style: RDSType.labelSm.copyWith(
+                      color: RDSColor.gold, fontWeight: FontWeight.w700)),
                   const SizedBox(width: 4),
-                  const Icon(Icons.map_rounded, color: RDSColor.gold, size: 14),
+                  const Icon(RDSIcons.navMap,
+                    color: RDSColor.gold, size: 14),
                 ])),
             ]),
-            const SizedBox(height: 14),
+            const SizedBox(height: RDSSpace.md),
 
-            // Buscador
-            Container(height: 42,
-              decoration: BoxDecoration(color: RDSColor.card, borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.white.withOpacity(0.08))),
+            // ── Buscador — limpio, tokens RDS ───────────────────────────
+            Container(
+              height: 44,
+              decoration: BoxDecoration(
+                color: RDSColor.surface,
+                borderRadius: RDSRadius.bMd,
+                border: Border.all(
+                  color: RDSColor.borderSubtle, width: 1.0)),
               child: TextField(
                 controller: _searchCtrl,
                 onChanged: (v) => setState(() => _busqueda = v),
-                style: const TextStyle(color: RDSColor.textPrimary, fontSize: 13),
+                style: RDSType.bodyLg,
                 decoration: InputDecoration(
                   hintText: t('Buscar ruta o sitio...','Search route or spot...'),
-                  hintStyle: const TextStyle(color: RDSColor.textMuted, fontSize: 13),
-                  prefixIcon: const Icon(Icons.search, color: RDSColor.textMuted, size: 18),
+                  hintStyle: RDSType.bodyMd,
+                  prefixIcon: Icon(Icons.search_rounded,
+                    color: RDSColor.textMuted, size: 18),
                   suffixIcon: _busqueda.isNotEmpty
                     ? GestureDetector(
-                        onTap: () { _searchCtrl.clear(); setState(() => _busqueda = ''); },
-                        child: const Icon(Icons.close, color: RDSColor.textMuted, size: 16))
+                        onTap: () {
+                          _searchCtrl.clear();
+                          setState(() => _busqueda = '');
+                        },
+                        child: Icon(RDSIcons.close,
+                          color: RDSColor.textMuted, size: 16))
                     : null,
                   border: InputBorder.none,
-                  contentPadding: const EdgeInsets.symmetric(vertical: 12)))),
-            const SizedBox(height: 10),
+                  contentPadding: const EdgeInsets.symmetric(vertical: 13)))),
+            const SizedBox(height: RDSSpace.sm),
 
-            // Chips de filtro
+            // ── Chips de filtro — CategoryChip RDS 3.0 ──────────────────
             SingleChildScrollView(
               scrollDirection: Axis.horizontal,
               child: Row(children: [
-                _FiltroChip(label: '🏙️ ${_ciudadDetectada?.ciudad ?? t("Medellín","Medellín")}', activo: _filtroActivo == 'Ciudad', onTap: () => setState(() => _filtroActivo = 'Ciudad')),
-                const SizedBox(width: 8),
-                _FiltroChip(label: '🗻 ${t("Alrededores","Surroundings")}', activo: _filtroActivo == 'Alrededores', onTap: () => setState(() => _filtroActivo = 'Alrededores')),
-                const SizedBox(width: 8),
-                _FiltroChip(label: '🎆 ${t("Temporada","Season")}', activo: _filtroActivo == 'Temporada', onTap: () => setState(() => _filtroActivo = 'Temporada')),
-                _FiltroChip(label: '🎬 ${t("Creadores","Creators")}', activo: _filtroActivo == 'Creadores', onTap: () => setState(() => _filtroActivo = 'Creadores')),
-                const SizedBox(width: 8),
-                _FiltroChip(label: '🍟 ${t("Urbana","Street Food")}', activo: _filtroActivo == 'Comida Urbana', onTap: () => setState(() => _filtroActivo = 'Comida Urbana')),
-                const SizedBox(width: 8),
-
+                CategoryChip(
+                  label: _ciudadDetectada?.ciudad ?? t('Medellín','Medellín'),
+                  icon: RDSIcons.navExplore,
+                  activo: _filtroActivo == 'Ciudad',
+                  onTap: () => setState(() => _filtroActivo = 'Ciudad')),
+                const SizedBox(width: RDSSpace.sm),
+                CategoryChip(
+                  label: t('Alrededores','Surroundings'),
+                  icon: RDSIcons.catNaturaleza,
+                  activo: _filtroActivo == 'Alrededores',
+                  onTap: () => setState(() => _filtroActivo = 'Alrededores')),
+                const SizedBox(width: RDSSpace.sm),
+                CategoryChip(
+                  label: t('Temporada','Season'),
+                  icon: Icons.event_rounded,
+                  activo: _filtroActivo == 'Temporada',
+                  onTap: () => setState(() => _filtroActivo = 'Temporada')),
+                const SizedBox(width: RDSSpace.sm),
+                CategoryChip(
+                  label: t('Creadores','Creators'),
+                  icon: Icons.video_camera_back_rounded,
+                  activo: _filtroActivo == 'Creadores',
+                  onTap: () => setState(() => _filtroActivo = 'Creadores')),
+                const SizedBox(width: RDSSpace.sm),
+                CategoryChip(
+                  label: t('Gastronomía','Food'),
+                  icon: RDSIcons.catGastrono,
+                  activo: _filtroActivo == 'Comida Urbana',
+                  onTap: () => setState(() => _filtroActivo = 'Comida Urbana')),
+                const SizedBox(width: RDSSpace.sm),
+                CategoryChip(
+                  label: t('Familiar','Family'),
+                  icon: Icons.family_restroom_rounded,
+                  color: RDSColor.green,
+                  activo: _filtroActivo == 'Familiar',
+                  onTap: () => setState(() => _filtroActivo = 'Familiar')),
               ])),
             const SizedBox(height: 16),
 
@@ -11207,92 +11100,110 @@ class _RouteDetailScreenState extends State<RouteDetailScreen> {
     return Scaffold(
       backgroundColor: RDSColor.base,
       body: Column(children: [
-        // ── HERO CINEMATOGRÁFICO ────────────────────────────────────────────
+        // ── HERO CINEMATOGRÁFICO 3.0 ────────────────────────────────────────
         Stack(children: [
-          // Fondo: imagen de ruta o gradiente
-          SizedBox(
-            width: double.infinity,
-            height: 280,
+          // Foto protagonista — altura adaptativa
+          AspectRatio(
+            aspectRatio: 16 / 9,
             child: widget.ruta['imagen'] != null
-              ? Image.asset(widget.ruta['imagen'], fit: BoxFit.cover,
-                  cacheWidth: 800,
+              ? Image.asset(widget.ruta['imagen'],
+                  fit: BoxFit.cover, cacheWidth: 900,
+                  frameBuilder: (ctx, child, frame, sync) =>
+                    frame != null ? child : Container(color: RDSColor.surface),
                   errorBuilder: (_, __, ___) => Container(
                     decoration: BoxDecoration(gradient: LinearGradient(
                       begin: Alignment.topLeft, end: Alignment.bottomRight,
-                      colors: [kRutaColor(widget.ruta['color1'], RDSColor.base),
-                               kRutaColor(widget.ruta['color2'], const Color(0xFF050A04))]))))
+                      colors: [kRutaColor(widget.ruta['color1'], RDSColor.surface),
+                               kRutaColor(widget.ruta['color2'], RDSColor.base)]))))
               : Container(decoration: BoxDecoration(gradient: LinearGradient(
                   begin: Alignment.topLeft, end: Alignment.bottomRight,
-                  colors: [kRutaColor(widget.ruta['color1'], RDSColor.base),
-                           kRutaColor(widget.ruta['color2'], const Color(0xFF050A04))]))),
+                  colors: [kRutaColor(widget.ruta['color1'], RDSColor.surface),
+                           kRutaColor(widget.ruta['color2'], RDSColor.base)]))),
           ),
-          // Gradiente oscuro — legibilidad
-          Positioned.fill(child: Container(
-            decoration: const BoxDecoration(gradient: LinearGradient(
-              begin: Alignment.topCenter, end: Alignment.bottomCenter,
-              stops: [0.0, 0.3, 0.7, 1.0],
-              colors: [Color(0x66000000), Colors.transparent, Color(0xBB000000), Color(0xFF0D1209)])))),
-          // Contenido del hero
-          SafeArea(child: SizedBox(height: 280, child: Stack(children: [
-            // Botón atrás
-            Positioned(top: 8, left: 12,
-              child: GestureDetector(onTap: () => Navigator.pop(context),
-                child: Container(width: 36, height: 36,
+          // Scrim cinematográfico — HeroOverlay del RDS 3.0
+          Positioned.fill(child: HeroOverlay(intensity: 1.0)),
+          // Degradado inferior al color base — fusión perfecta con el body
+          Positioned(left: 0, right: 0, bottom: 0, height: 120,
+            child: DecoratedBox(decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter, end: Alignment.bottomCenter,
+                colors: [Colors.transparent, RDSColor.base])))),
+          // Botón atrás — limpio con RDSIcons
+          SafeArea(child: Padding(
+            padding: const EdgeInsets.all(RDSSpace.md),
+            child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+              GestureDetector(
+                onTap: () => Navigator.pop(context),
+                child: Container(
+                  width: 38, height: 38,
                   decoration: BoxDecoration(
-                    color: Colors.black.withOpacity(0.45),
+                    color: Colors.black.withOpacity(0.5),
                     shape: BoxShape.circle,
-                    border: Border.all(color: Colors.white.withOpacity(0.2))),
-                  child: const Center(child: Text('←', style: TextStyle(color: RDSColor.textPrimary, fontSize: 16)))))),
-            // Badge puntos — arriba derecha
-            Positioned(top: 8, right: 12,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                    border: Border.all(
+                      color: Colors.white.withOpacity(0.15))),
+                  child: Icon(RDSIcons.back,
+                    color: RDSColor.textPrimary, size: 20))),
+              // Badge puntos — glassmorphism
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: RDSSpace.md, vertical: RDSSpace.xs + 2),
                 decoration: BoxDecoration(
-                  color: RDSColor.gold.withOpacity(0.15),
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: RDSColor.gold.withOpacity(0.5))),
-                child: Text('+${totalSitios * 30} pts',
-                  style: const TextStyle(
-                    fontFamily: 'SpaceGrotesk',
-                    color: RDSColor.gold, fontSize: 11, fontWeight: FontWeight.w700)))),
-            // Info inferior del hero
-            Positioned(left: 20, right: 20, bottom: 16,
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
-                // Tag + zona
-                Row(children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
-                    decoration: BoxDecoration(
-                      color: acento.withOpacity(0.25),
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: acento.withOpacity(0.6))),
-                    child: Text(widget.ruta['tag'] ?? '',
-                      style: TextStyle(fontSize: 9, color: acento,
-                        fontWeight: FontWeight.w700, letterSpacing: 1))),
-                ]),
-                const SizedBox(height: 6),
-                // Título en PlayfairDisplay
+                  color: Colors.black.withOpacity(0.45),
+                  borderRadius: RDSRadius.bFull,
+                  border: Border.all(
+                    color: RDSColor.gold.withOpacity(0.4))),
+                child: Row(mainAxisSize: MainAxisSize.min, children: [
+                  Icon(RDSIcons.metricPoints,
+                    color: RDSColor.gold, size: 13),
+                  const SizedBox(width: RDSSpace.xs),
+                  Text('+${totalSitios * 30} pts',
+                    style: RDSType.labelSm.copyWith(
+                      color: RDSColor.gold,
+                      fontWeight: FontWeight.w800)),
+                ])),
+            ]))),
+          // Info inferior del hero — editorial
+          Positioned(left: RDSSpace.lg, right: RDSSpace.lg, bottom: RDSSpace.md,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Tag zona — linea dorada + uppercase
+                if ((widget.ruta['tag'] ?? '').toString().isNotEmpty)
+                  Row(children: [
+                    Container(width: 14, height: 1.5,
+                      color: acento.withOpacity(0.8)),
+                    const SizedBox(width: RDSSpace.sm),
+                    Text((widget.ruta['tag'] ?? '').toString().toUpperCase(),
+                      style: const TextStyle(fontFamily: 'SpaceGrotesk', fontSize: 10, fontWeight: FontWeight.w700, letterSpacing: 2.0, color: RDSColor.textMuted).copyWith(
+                        color: acento, letterSpacing: 2.0)),
+                  ]),
+                const SizedBox(height: RDSSpace.sm),
+                // Título — DisplayXl editorial
                 Text(rNombre(widget.ruta),
-                  style: const TextStyle(
-                    fontFamily: 'PlayfairDisplay',
-                    fontSize: 26, fontWeight: FontWeight.w900,
-                    color: RDSColor.textPrimary, letterSpacing: 0, height: 1.1)),
-                const SizedBox(height: 3),
+                  style: RDSType3.displayXl.copyWith(height: 1.05),
+                  maxLines: 2, overflow: TextOverflow.ellipsis),
+                const SizedBox(height: RDSSpace.xs),
                 Text(rSubtitulo(widget.ruta),
-                  style: TextStyle(fontSize: 11, color: RDSColor.textPrimary.withOpacity(0.75))),
-                const SizedBox(height: 10),
-                // Barra de progreso integrada en el hero
-                ClipRRect(borderRadius: BorderRadius.circular(4),
-                  child: LinearProgressIndicator(
-                    value: totalSitios > 0 ? completados / totalSitios : 0,
-                    backgroundColor: Colors.white.withOpacity(0.15),
-                    valueColor: AlwaysStoppedAnimation<Color>(acento),
-                    minHeight: 4)),
-                const SizedBox(height: 4),
-                Text('$completados ${t("de","of")} $totalSitios ${t("sitios","spots")}',
-                  style: TextStyle(fontSize: 9, color: RDSColor.textPrimary.withOpacity(0.6))),
+                  style: RDSType.bodyMd.copyWith(
+                    color: RDSColor.textPrimary.withOpacity(0.7)),
+                  maxLines: 1, overflow: TextOverflow.ellipsis),
+                const SizedBox(height: RDSSpace.md),
+                // Progreso — integrado en el hero, sutil
+                Row(children: [
+                  Expanded(child: ClipRRect(
+                    borderRadius: RDSRadius.bFull,
+                    child: LinearProgressIndicator(
+                      value: totalSitios > 0 ? completados / totalSitios : 0,
+                      backgroundColor: Colors.white.withOpacity(0.12),
+                      valueColor: AlwaysStoppedAnimation<Color>(acento),
+                      minHeight: 3))),
+                  const SizedBox(width: RDSSpace.md),
+                  Text('$completados/$totalSitios',
+                    style: RDSType.labelSm.copyWith(
+                      color: Colors.white.withOpacity(0.6))),
+                ]),
               ])),
-          ]))),
         ]),
 
           // Avatar tip de bienvenida a la ruta
@@ -11306,51 +11217,51 @@ class _RouteDetailScreenState extends State<RouteDetailScreen> {
 
         Expanded(child: SingleChildScrollView(padding: const EdgeInsets.all(20), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
 
-          // Hook emocional — más prominente
+          // ── Hook emocional — ficha editorial ──────────────────────────
           if ((kLang == 'en' ? widget.ruta['hookEN'] : widget.ruta['hook']) != null) ...[
             Container(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.fromLTRB(
+                RDSSpace.md, RDSSpace.md, RDSSpace.md, RDSSpace.md),
               decoration: BoxDecoration(
-                color: acento.withOpacity(0.08),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: acento.withOpacity(0.2))),
-              child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text('✨', style: TextStyle(fontSize: 20)),
-                const SizedBox(width: 10),
-                Expanded(child: Text(
-                  (kLang == 'en' ? widget.ruta['hookEN'] : widget.ruta['hook']) ?? '',
-                  style: TextStyle(
-                    fontFamily: 'PlayfairDisplay',
-                    color: acento, fontSize: 14,
-                    fontWeight: FontWeight.w700,
-                    fontStyle: FontStyle.italic, height: 1.5))),
-              ])),
-            const SizedBox(height: 16),
+                color: RDSColor.surface,
+                borderRadius: RDSRadius.bLg,
+                border: Border(left: BorderSide(
+                  color: acento, width: 3))),
+              child: Text(
+                (kLang == 'en' ? widget.ruta['hookEN'] : widget.ruta['hook']) ?? '',
+                style: RDSType.displaySm.copyWith(
+                  color: RDSColor.textPrimary,
+                  fontStyle: FontStyle.italic,
+                  height: 1.45))),
+            const SizedBox(height: RDSSpace.lg),
           ],
 
-          // Info rápida
-          Wrap(spacing: 6, runSpacing: 6, children: [
-            _InfoPill(icon: '⏱', text: widget.ruta['tiempo']?.toString() ?? ''),
-            _InfoPill(icon: '📍', text: '$totalSitios ${t("sitios","spots")}'),
-            _InfoPill(icon: '', text: widget.ruta['transporte']?.toString() ?? ''),
+          // ── Meta info — chips con iconos ─────────────────────────────
+          Wrap(spacing: RDSSpace.xs, runSpacing: RDSSpace.xs, children: [
+            if ((widget.ruta['tiempo'] ?? '').toString().isNotEmpty)
+              _MetaChip(icon: RDSIcons.timer,
+                label: widget.ruta['tiempo']?.toString() ?? ''),
+            _MetaChip(icon: RDSIcons.metricSpots,
+              label: '$totalSitios ${t("sitios","spots")}'),
+            if ((widget.ruta['transporte'] ?? '').toString().isNotEmpty)
+              _MetaChip(icon: RDSIcons.transport,
+                label: widget.ruta['transporte']?.toString() ?? ''),
+            if (widget.ruta['tipoExperiencia'] != null)
+              _MetaChip(icon: RDSIcons.catArte,
+                label: (kLang == 'en'
+                  ? widget.ruta['tipoExperienciaEN']
+                  : widget.ruta['tipoExperiencia'])?.toString() ?? ''),
+            if (widget.ruta['mejorHora'] != null)
+              _MetaChip(icon: Icons.wb_sunny_outlined,
+                label: widget.ruta['mejorHora']?.toString() ?? ''),
           ]),
-          const SizedBox(height: 8),
+          const SizedBox(height: RDSSpace.md),
 
-          // Tipo experiencia + mejor hora + turismo responsable
-          if (widget.ruta['tipoExperiencia'] != null)
-            Wrap(spacing: 6, runSpacing: 6, children: [
-              _InfoPill(icon: '🎯', text: (kLang == 'en' ? widget.ruta['tipoExperienciaEN'] : widget.ruta['tipoExperiencia']?.toString() ?? '') ?? ''),
-              if (widget.ruta['mejorHora'] != null)
-                _InfoPill(icon: '🕐', text: widget.ruta['mejorHora']?.toString() ?? ''),
-              // 🚫 Turismo Responsable quitado — 30 mayo 2026
-            ]),
-          const SizedBox(height: 12),
-
-          // Descripción
+          // ── Descripción — limpia, muted, sin card ──────────────────────
           if ((kLang == 'en' ? widget.ruta['descripcionEN'] : widget.ruta['descripcion']) != null) ...[
             Text((kLang == 'en' ? widget.ruta['descripcionEN'] : widget.ruta['descripcion']) ?? '',
-              style: const TextStyle(color: RDSColor.textMuted, fontSize: 13, height: 1.6)),
-            const SizedBox(height: 16),
+              style: RDSType.bodyMd.copyWith(height: 1.65)),
+            const SizedBox(height: RDSSpace.lg),
           ],
 
           // ── CÓMO LLEGAR ──────────────────────────────────────────────────
@@ -11426,8 +11337,11 @@ class _RouteDetailScreenState extends State<RouteDetailScreen> {
                 decoration: BoxDecoration(shape: BoxShape.circle,
                   color: RDSColor.gold.withOpacity(0.1), border: Border.all(color: RDSColor.gold.withOpacity(0.4))),
                 child: widget.ruta['insigniaImg'] != null
-                  ? ClipOval(child: Image.asset(widget.ruta['insigniaImg'], width: 56, height: 56, fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => const Center(child: Text('🏆', style: TextStyle(fontSize: 22)))))
+                  ? Padding(
+                      padding: const EdgeInsets.all(4),
+                      child: Image.asset(widget.ruta['insigniaImg'],
+                        fit: BoxFit.contain,
+                        errorBuilder: (_, __, ___) => const Center(child: Text('🏆', style: TextStyle(fontSize: 22)))))
                   : const Center(child: Text('🏆', style: TextStyle(fontSize: 22)))),
               const SizedBox(width: 12),
               Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -11435,6 +11349,27 @@ class _RouteDetailScreenState extends State<RouteDetailScreen> {
                   style: TextStyle(color: RDSColor.gold, fontSize: 11, fontWeight: FontWeight.w700)),
                 const SizedBox(height: 2),
                 Text(premio, style: const TextStyle(color: RDSColor.textMuted, fontSize: 11, height: 1.4)),
+                // ── Premio Mobiplab — si la ruta lo activa ───────────────
+                if (kRutasMobiplab.contains(widget.ruta['nombre']?.toString() ?? '')) ...[
+                  const SizedBox(height: 6),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF1A2E1A),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: RDSColor.green.withOpacity(0.4))),
+                    child: Row(mainAxisSize: MainAxisSize.min, children: [
+                      const Icon(Icons.local_offer_rounded,
+                        size: 11, color: RDSColor.green),
+                      const SizedBox(width: 5),
+                      Flexible(child: Text(
+                        t('🎁 20% dcto. mano de obra en Mobiplab',
+                          '🎁 20% off labor at Mobiplab'),
+                        style: const TextStyle(
+                          color: RDSColor.green, fontSize: 10,
+                          fontWeight: FontWeight.w700))),
+                    ])),
+                ],
               ])),
             ])),
 
@@ -11498,51 +11433,67 @@ class _RouteDetailScreenState extends State<RouteDetailScreen> {
                   textAlign: TextAlign.center),
               ])),
 
-          // Lista de sitios reales de la ruta
-          // FIX UX (16/05/2026): Si el sitio es 'active', pasarle el callback
-          // que ANTES estaba en el botón gigante "GO TO" del final de la pantalla.
-          // Esto unifica las dos acciones (Maps + Validar) dentro de la card activa.
+          // ── Lista de sitios — SitioCard RDS 3.0 ──────────────────────
+          // Orden secuencial: bloqueado → próximo → en progreso → completado
           ...sitiosList.asMap().entries.map((e) {
             final int idx = e.key;
             final String nombre = e.value;
-            // Rutas demo de Feria — orden libre para que el usuario
-            // pueda explorar aunque haya perdido eventos anteriores
-            final bool esFeria = [
-              'FERIA CLÁSICA',
-            ].contains(widget.ruta['nombre']?.toString() ?? '');
-            // 🛠️ Modo developer: admin ve todos los sitios activos para validar coords
+            final bool esFeria = ['FERIA CLÁSICA']
+              .contains(widget.ruta['nombre']?.toString() ?? '');
             final bool esDev = esAdmin;
-            String estado;
+
+            // Determinar estado visual
+            SitioEstado estadoCard;
+            String estadoLegacy; // Para compatibilidad con lógica existente
             if (esFeria || esDev) {
-              // Orden libre: todos activos, los completados marcados como done
-              estado = _sitiosFeriaCompletados.contains(idx) ? 'done' : 'active';
+              estadoLegacy = _sitiosFeriaCompletados.contains(idx) ? 'done' : 'active';
+              estadoCard = _sitiosFeriaCompletados.contains(idx)
+                ? SitioEstado.completado : SitioEstado.proximo;
             } else {
-              // Orden secuencial normal
-              estado = 'locked';
-              if (idx < completados) estado = 'done';
-              if (idx == completados) estado = 'active';
+              estadoLegacy = 'locked';
+              if (idx < completados) estadoLegacy = 'done';
+              if (idx == completados) estadoLegacy = 'active';
+              estadoCard = idx < completados
+                ? SitioEstado.completado
+                : idx == completados
+                  ? SitioEstado.proximo
+                  : SitioEstado.bloqueado;
             }
-            return _SiteItem(
+
+            // Distancia solo para el sitio activo
+            final double? dist = estadoLegacy == 'active'
+              ? _distanciaAlSitioActivo : null;
+            final String? distLabel = dist != null
+              ? (dist >= 1000
+                  ? '${(dist / 1000).toStringAsFixed(1)} km'
+                  : '${dist.toStringAsFixed(0)} m')
+              : null;
+
+            // Descripción breve del sitio desde sitiosDetalle
+            String? descBreve;
+            final detalles = parseSitiosDetalle(widget.ruta['sitiosDetalle']);
+            for (final d in detalles) {
+              if (d is Map && d['nombre']?.toString() == nombre) {
+                descBreve = (kLang == 'en'
+                  ? d['descripcionEN'] : d['descripcion'])?.toString();
+                if (descBreve != null && descBreve.length > 60)
+                  descBreve = descBreve.substring(0, 60) + '…';
+                break;
+              }
+            }
+
+            return SitioCard(
               numero: idx + 1,
               nombre: nombre,
-              desc: estado == 'done'
-                ? tVisitado
-                : estado == 'active'
-                  ? (esFeria
-                    ? t('📍 Tocá para validar con GPS y foto','📍 Tap to validate with GPS and photo')
-                    : t('📍 Siguiente destino','📍 Next stop'))
-                  : tBloqueado,
-              estado: estado,
               emoji: _emojiParaSitio(nombre),
-              acento: acento,
-              onValidar: estado == 'active' ? (_rutaComprada
+              estado: estadoCard,
+              distancia: distLabel,
+              descripcionBreve: descBreve,
+              onTap: estadoLegacy == 'active' && _rutaComprada
                 ? (esFeria || esDev
-                  ? () => _irAValidarSitioFeria(idx)
-                  : _irAValidarSitio)
-                : null) : null,
-              rutaComprada: _rutaComprada,
-              distanciaMetros: estado == 'active' ? _distanciaAlSitioActivo : null,
-              rutaNombre: widget.ruta['nombre']?.toString(),
+                    ? () => _irAValidarSitioFeria(idx)
+                    : _irAValidarSitio)
+                : null,
             );
           }),
 
@@ -12160,16 +12111,14 @@ class _SitioInfoScreenState extends State<SitioInfoScreen> {
         Expanded(child: SingleChildScrollView(
           padding: const EdgeInsets.all(24),
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            // ── Nombre del sitio — protagonista editorial ─────────────
             Text(widget.sitioNombre,
-              style: const TextStyle(
-                fontFamily: 'PlayfairDisplay',
-                fontSize: 28, fontWeight: FontWeight.w900,
-                color: RDSColor.textPrimary, height: 1.1)),
-            const SizedBox(height: 12),
-            // ── Foto del sitio eliminada intencionalmente (21/05/2026)
-            // El turista descubre la fachada del lugar por sí mismo — es parte
-            // de la experiencia y la sorpresa. Sin costo de Google Places API.
-            const SizedBox(height: 4),
+              style: RDSType3.displayXl.copyWith(height: 1.05)),
+            const SizedBox(height: RDSSpace.sm),
+            // Emoji del sitio como acento visual
+            Text(widget.sitioEmoji,
+              style: const TextStyle(fontSize: 28)),
+            const SizedBox(height: RDSSpace.lg),
 
             // ── Avatar con narración del sitio actual ──
             if (tipsService.containsKey(widget.sitioNombre))
@@ -12209,149 +12158,114 @@ class _SitioInfoScreenState extends State<SitioInfoScreen> {
               ]);
             }),
 
-            const SizedBox(height: 16),
-            Container(padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(color: RDSColor.card, borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: acento.withOpacity(0.2))),
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Row(children: [const Text('📍', style: TextStyle(fontSize: 18)), const SizedBox(width: 8),
-                  Text(tComoLlegar, style: const TextStyle(color: RDSColor.textMuted, fontSize: 11, letterSpacing: 2))]),
-                const SizedBox(height: 8),
-                Text(t('Dirígete a ${widget.sitioNombre}. Una vez estés en el lugar, toma la foto para validar.', 'Head to ${widget.sitioNombre}. Once you are there, take a photo to validate.'),
-                  style: const TextStyle(color: RDSColor.textPrimary, fontSize: 13, height: 1.5)),
-                // FIX UX (16/05/2026): Botón "CÓMO LLEGAR (Google Maps)" eliminado de aquí.
-                // Anteriormente estaba al final de esta tarjeta de info, duplicando la
-                // función con el botón gigante de la pantalla anterior.
-                // Ahora vive ÚNICAMENTE en la card del sitio activo (_SiteItem),
-                // junto al botón "VALIDAR SITIO" en layout horizontal.
-                // El turista ya pulsó "VALIDAR SITIO" para llegar aquí, así que esta
-                // pantalla queda solo para la validación con foto + GPS.
+            const SizedBox(height: RDSSpace.md),
+            // ── Cómo llegar — limpio, sin card pesada ───────────────────
+            Container(
+              padding: const EdgeInsets.all(RDSSpace.md),
+              decoration: BoxDecoration(
+                color: RDSColor.surface,
+                borderRadius: RDSRadius.bLg,
+                border: Border.all(color: RDSColor.borderSubtle)),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                Row(children: [
+                  Icon(RDSIcons.walk, color: acento, size: 16),
+                  const SizedBox(width: RDSSpace.sm),
+                  Text(tComoLlegar,
+                    style: const TextStyle(fontFamily: 'SpaceGrotesk', fontSize: 10, fontWeight: FontWeight.w700, letterSpacing: 2.0, color: RDSColor.textMuted).copyWith(
+                      color: acento, letterSpacing: 2.0)),
+                ]),
+                const SizedBox(height: RDSSpace.sm),
+                Text(
+                  t('Dirígete a ${widget.sitioNombre}. Una vez estés en el lugar, activá la validación GPS.',
+                    'Head to ${widget.sitioNombre}. Once you are there, activate GPS validation.'),
+                  style: RDSType.bodyMd.copyWith(height: 1.6)),
+                if ((widget.ruta['transporte'] ?? '').toString().isNotEmpty) ...[
+                  const SizedBox(height: RDSSpace.sm),
+                  Row(children: [
+                    Icon(RDSIcons.transport,
+                      color: RDSColor.textMuted, size: 14),
+                    const SizedBox(width: RDSSpace.xs),
+                    Expanded(child: Text(
+                      widget.ruta['transporte']?.toString() ?? '',
+                      style: RDSType.bodySm)),
+                  ]),
+                ],
+                // ── Botón Google Maps ─────────────────────────────────────
+                if (widget.latitud != 0 && widget.longitud != 0) ...[
+                  const SizedBox(height: RDSSpace.md),
+                  GestureDetector(
+                    onTap: () async {
+                      final uri = Uri.parse(
+                        'https://www.google.com/maps/dir/?api=1'
+                        '&destination=${widget.latitud},${widget.longitud}'
+                        '&travelmode=walking');
+                      if (await canLaunchUrl(uri)) {
+                        await launchUrl(uri, mode: LaunchMode.externalApplication);
+                      }
+                    },
+                    child: Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(
+                        vertical: RDSSpace.sm + 2),
+                      decoration: BoxDecoration(
+                        color: acento.withOpacity(0.1),
+                        borderRadius: RDSRadius.bMd,
+                        border: Border.all(
+                          color: acento.withOpacity(0.35))),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                        Icon(Icons.map_rounded,
+                          color: acento, size: 16),
+                        const SizedBox(width: RDSSpace.sm),
+                        Text(t('Abrir en Google Maps', 'Open in Google Maps'),
+                          style: RDSType.labelSm.copyWith(
+                            color: acento,
+                            fontWeight: FontWeight.w700)),
+                      ])),
+                  ),
+                ],
               ])),
-            const SizedBox(height: 12),
-            Container(padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(color: RDSColor.card, borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: Colors.white.withOpacity(0.06))),
-              child: Row(children: [
-                const Text('🚗', style: TextStyle(fontSize: 22)),
-                const SizedBox(width: 12),
-                Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text(tTransporte, style: const TextStyle(color: RDSColor.textMuted, fontSize: 10)),
-                  Text(widget.ruta['transporte'] ?? '', style: const TextStyle(color: RDSColor.textPrimary, fontSize: 13, fontWeight: FontWeight.w600)),
-                ])),
-              ])),
-            const SizedBox(height: 12),
+            const SizedBox(height: RDSSpace.md),
+            // ── Indicador GPS — GpsRangeIndicator RDS 3.0 ────────────────
             _cargandoGps
               ? Container(
-                  padding: const EdgeInsets.all(16),
+                  padding: const EdgeInsets.all(RDSSpace.md),
                   decoration: BoxDecoration(
-                    color: RDSColor.card,
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: Colors.white.withOpacity(0.08))),
+                    color: RDSColor.surface,
+                    borderRadius: RDSRadius.bLg,
+                    border: Border.all(color: RDSColor.borderSubtle)),
                   child: Row(children: [
                     SizedBox(width: 20, height: 20,
-                      child: CircularProgressIndicator(strokeWidth: 2, color: acento)),
-                    const SizedBox(width: 12),
-                    Text(tVerificandoUbic,
-                      style: const TextStyle(color: RDSColor.textMuted, fontSize: 13)),
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2, color: acento)),
+                    const SizedBox(width: RDSSpace.md),
+                    Text(tVerificandoUbic, style: RDSType.bodyMd),
                   ]))
-              : Builder(
-                  builder: (context) => Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
-                    decoration: BoxDecoration(
-                      color: _dentroDelRango
-                        ? RDSColor.green.withOpacity(0.08)
-                        : RDSColor.accent.withOpacity(0.06),
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(
-                        color: _dentroDelRango
-                          ? RDSColor.green.withOpacity(0.4)
-                          : RDSColor.accent.withOpacity(0.25),
-                        width: 1.5),
-                      boxShadow: _dentroDelRango ? [
-                        BoxShadow(
-                          color: RDSColor.green.withOpacity(0.1),
-                          blurRadius: 20, spreadRadius: 2)
-                      ] : []),
-                    child: Row(children: [
-                      // Icono animado de estado
-                      Container(
-                        width: 44, height: 44,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: _dentroDelRango
-                            ? RDSColor.green.withOpacity(0.2)
-                            : RDSColor.accent.withOpacity(0.1),
-                          border: Border.all(
-                            color: _dentroDelRango
-                              ? RDSColor.green.withOpacity(0.5 + 0.2)
-                              : RDSColor.accent.withOpacity(0.3),
-                            width: 1.5),
-                          boxShadow: _dentroDelRango ? [
-                            BoxShadow(
-                              color: RDSColor.green.withOpacity(0.2),
-                              blurRadius: 12)
-                          ] : []),
-                        child: Icon(
-                          _dentroDelRango
-                            ? Icons.my_location_rounded
-                            : _errorGps
-                              ? Icons.location_off_rounded
-                              : Icons.location_searching_rounded,
-                          color: _dentroDelRango
-                            ? RDSColor.green
-                            : _errorGps
-                              ? const Color(0xFFE24B4A)
-                              : RDSColor.accent,
-                          size: 22)),
-                      const SizedBox(width: 12),
-                      Expanded(child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start, children: [
-                        Text(
-                          _dentroDelRango
-                            ? t('¡Estás en el lugar!', "You're at the spot!")
-                            : _errorGps
-                              ? t('Error de GPS', 'GPS Error')
-                              : t('Aún no estás en el lugar', "You're not there yet"),
-                          style: TextStyle(
-                            fontFamily: 'SpaceGrotesk',
-                            color: _dentroDelRango
-                              ? RDSColor.green
-                              : _errorGps
-                                ? const Color(0xFFE24B4A)
-                                : RDSColor.accent,
-                            fontSize: 13, fontWeight: FontWeight.w800)),
-                        const SizedBox(height: 2),
-                        Text(
-                          _dentroDelRango && _distanciaMetros != null
-                            ? t('A ${_distanciaMetros!.toInt()}m — listo para validar',
-                                'At ${_distanciaMetros!.toInt()}m — ready to validate')
-                            : _errorGps
-                              ? t('Activa GPS, espera y reintenta',
-                                  'Enable GPS, wait and retry')
-                              : _distanciaMetros != null
-                                ? t('Estás a ${_distanciaMetros!.toInt()}m · necesitas menos de ${_radio.toInt()}m',
-                                    'You are ${_distanciaMetros!.toInt()}m away · need less than ${_radio.toInt()}m')
-                                : t('Verificando ubicación...', 'Verifying location...'),
-                          style: const TextStyle(
-                            color: RDSColor.textMuted, fontSize: 11)),
-                      ])),
-                      if (!_dentroDelRango)
-                        GestureDetector(
-                          onTap: () {
-                            setState(() { _cargandoGps = true; _errorGps = false; });
-                            _verificarUbicacion();
-                          },
-                          child: Container(
-                            padding: const EdgeInsets.all(8),
-                            decoration: BoxDecoration(
-                              color: RDSColor.card,
-                              borderRadius: BorderRadius.circular(10),
-                              border: Border.all(color: Colors.white.withOpacity(0.1))),
-                            child: const Icon(Icons.refresh_rounded,
-                              color: RDSColor.textMuted, size: 18))),
-                    ]))),
-            const SizedBox(height: 24),
+              : GpsRangeIndicator(
+                  distanciaMetros: _distanciaMetros,
+                  radioMetros: _radio,
+                  errorGps: _errorGps),
+            // Botón reintentar GPS
+            if (!_cargandoGps && !_dentroDelRango)
+              Padding(
+                padding: const EdgeInsets.only(top: RDSSpace.sm),
+                child: GestureDetector(
+                  onTap: () {
+                    setState(() { _cargandoGps = true; _errorGps = false; });
+                    _verificarUbicacion();
+                  },
+                  child: Row(mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                    Icon(Icons.refresh_rounded,
+                      color: RDSColor.textMuted, size: 14),
+                    const SizedBox(width: RDSSpace.xs),
+                    Text(t('Actualizar ubicación', 'Update location'),
+                      style: RDSType.caption.copyWith(
+                        color: RDSColor.textMuted)),
+                  ]))),
+            const SizedBox(height: RDSSpace.lg),
 
             // ── Botón CTA principal — el "momento Pokémon GO" ──
             GestureDetector(
@@ -12682,30 +12596,19 @@ class _CameraScreenState extends State<CameraScreen> with SingleTickerProviderSt
           color: Color(0xFF0D0D0D),
           borderRadius: BorderRadius.vertical(top: Radius.circular(RDSRadius.xl))),
         child: Column(children: [
-          // Handle
-          Container(margin: const EdgeInsets.only(top: 12),
-            width: 40, height: 4,
-            decoration: BoxDecoration(color: Colors.white24,
-              borderRadius: BorderRadius.circular(2))),
-          const SizedBox(height: 16),
-          const Text('📸 PREVIEW', style: TextStyle(
-            color: RDSColor.textPrimary, fontSize: 14, fontWeight: FontWeight.w800, letterSpacing: 2)),
-          const SizedBox(height: 12),
-          // Aviso foto vertical
-          Container(
-            margin: const EdgeInsets.symmetric(horizontal: 16),
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          // ── Handle ──
+          Center(child: Container(
+            margin: const EdgeInsets.only(top: RDSSpace.md),
+            width: 36, height: 3,
             decoration: BoxDecoration(
-              color: RDSColor.gold.withOpacity(0.15),
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: RDSColor.gold.withOpacity(0.4))),
-            child: const Row(mainAxisSize: MainAxisSize.min, children: [
-              Text('📱', style: TextStyle(fontSize: 16)),
-              SizedBox(width: 8),
-              Flexible(child: Text('Para mejores resultados toma la foto en vertical',
-                style: TextStyle(color: RDSColor.gold, fontSize: 11, fontWeight: FontWeight.w600))),
-            ])),
-          const SizedBox(height: 10),
+              color: RDSColor.textMuted.withOpacity(0.3),
+              borderRadius: RDSRadius.bFull))),
+          const SizedBox(height: RDSSpace.md),
+          // Tag de pantalla — editorial
+          Text(t('PREVISUALIZACIÓN', 'PREVIEW'),
+            style: const TextStyle(fontFamily: 'SpaceGrotesk', fontSize: 10, fontWeight: FontWeight.w700, letterSpacing: 2.0, color: RDSColor.textMuted).copyWith(
+              color: RDSColor.textMuted, letterSpacing: 2.5)),
+          const SizedBox(height: RDSSpace.sm),
           // Foto con avatar superpuesto
           Expanded(
             child: Stack(children: [
@@ -12748,39 +12651,45 @@ class _CameraScreenState extends State<CameraScreen> with SingleTickerProviderSt
                     ])))),
             ])),
           const SizedBox(height: 16),
-          // Botones
-          Padding(padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+          // ── Botones — CTA principal dominante ──────────────────────
+          Padding(
+            padding: const EdgeInsets.fromLTRB(
+              RDSSpace.lg, 0, RDSSpace.lg, RDSSpace.xl),
             child: Row(children: [
-              // Repetir foto
-              Expanded(child: GestureDetector(
+              // Repetir — secundario, compacto
+              GestureDetector(
                 onTap: () => Navigator.pop(context, false),
                 child: Container(
-                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  width: 52, height: 52,
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.08),
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: Colors.white.withOpacity(0.15))),
-                  child: Column(children: [
-                    const Text('🔄', style: TextStyle(fontSize: 22)),
-                    const SizedBox(height: 4),
-                    Text(tRepetir, style: const TextStyle(
-                      color: RDSColor.textMuted, fontSize: 11, fontWeight: FontWeight.w700)),
-                  ])))),
-              const SizedBox(width: 12),
-              // Confirmar foto
-              Expanded(flex: 2, child: GestureDetector(
+                    shape: BoxShape.circle,
+                    color: RDSColor.surface,
+                    border: Border.all(color: RDSColor.borderSubtle)),
+                  child: Icon(Icons.refresh_rounded,
+                    color: RDSColor.textMuted, size: 22))),
+              const SizedBox(width: RDSSpace.md),
+              // USAR ESTA FOTO — protagonista absoluto
+              Expanded(child: GestureDetector(
                 onTap: () => Navigator.pop(context, true),
                 child: Container(
-                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  padding: const EdgeInsets.symmetric(
+                    vertical: RDSSpace.md + 2),
                   decoration: BoxDecoration(
-                    gradient: const LinearGradient(colors: [RDSColor.green, Color(0xFF00C853)]),
-                    borderRadius: BorderRadius.circular(14),
-                    boxShadow: [BoxShadow(color: RDSColor.green.withOpacity(0.4), blurRadius: 12)]),
-                  child: Column(children: [
-                    const Text('✅', style: TextStyle(fontSize: 22)),
-                    const SizedBox(height: 4),
-                    Text(tUsarEstaFoto, style: const TextStyle(
-                      color: Colors.white, fontSize: 11, fontWeight: FontWeight.w800)),
+                    gradient: const LinearGradient(
+                      colors: RDSColor.gradientPrimary),
+                    borderRadius: RDSRadius.bMd,
+                    boxShadow: RDSElevation.glow(
+                      color: RDSColor.green, opacity: 0.4)),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                    Icon(RDSIcons.check,
+                      color: Colors.white, size: 18),
+                    const SizedBox(width: RDSSpace.sm),
+                    Text(tUsarEstaFoto,
+                      style: RDSType.headlineMd.copyWith(
+                        color: Colors.white,
+                        letterSpacing: 0.5)),
                   ])))),
             ])),
         ])));
@@ -12908,102 +12817,151 @@ class _CameraScreenState extends State<CameraScreen> with SingleTickerProviderSt
                         Colors.transparent, acento.withOpacity(0.8), Colors.transparent]))))),
             ]))),
 
-        // Header
+        // ── Header misión — back + badge GPS ───────────────────────────
         SafeArea(child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-          child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-            GestureDetector(onTap: () => Navigator.pop(context),
-              child: Container(width: 36, height: 36,
-                decoration: BoxDecoration(color: Colors.black.withOpacity(0.5), shape: BoxShape.circle),
-                child: const Center(child: Text('←', style: TextStyle(color: Colors.white, fontSize: 16))))),
+          padding: const EdgeInsets.symmetric(
+            horizontal: RDSSpace.lg, vertical: RDSSpace.sm),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+            // Botón atrás
+            GestureDetector(
+              onTap: () => Navigator.pop(context),
+              child: Container(
+                width: 38, height: 38,
+                decoration: BoxDecoration(
+                  color: Colors.black.withOpacity(0.55),
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: Colors.white.withOpacity(0.15))),
+                child: Icon(RDSIcons.back,
+                  color: Colors.white, size: 20))),
+            // Badge GPS — indicador de modo
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              decoration: BoxDecoration(color: Colors.black.withOpacity(0.6), borderRadius: BorderRadius.circular(RDSRadius.xl)),
+              padding: const EdgeInsets.symmetric(
+                horizontal: RDSSpace.md, vertical: RDSSpace.xs + 2),
+              decoration: BoxDecoration(
+                color: Colors.black.withOpacity(0.6),
+                borderRadius: RDSRadius.bFull,
+                border: Border.all(
+                  color: (kModoDemo
+                    ? Colors.orange : RDSColor.green).withOpacity(0.5))),
               child: Row(children: [
                 Container(width: 6, height: 6,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     color: kModoDemo ? Colors.orange : RDSColor.green)),
-                const SizedBox(width: 6),
-                Text(kModoDemo ? '🧪 MODO DEMO' : '📍 GPS VERIFICADO',
-                  style: const TextStyle(color: Colors.white, fontSize: 10, letterSpacing: 1)),
+                const SizedBox(width: RDSSpace.sm),
+                Text(
+                  kModoDemo
+                    ? t('DEMO', 'DEMO')
+                    : t('GPS VERIFICADO', 'GPS VERIFIED'),
+                  style: const TextStyle(fontFamily: 'SpaceGrotesk', fontSize: 10, fontWeight: FontWeight.w700, letterSpacing: 2.0, color: RDSColor.textMuted).copyWith(
+                    color: Colors.white, letterSpacing: 1.5)),
               ])),
           ]))),
 
-        // Info del sitio
-        Positioned(bottom: 130, left: 0, right: 0,
+        // ── Info del sitio — editorial, sobre gradiente ────────────────
+        Positioned(bottom: 140, left: 0, right: 0,
           child: Column(children: [
-            Text(widget.sitioEmoji, style: const TextStyle(fontSize: 36)),
-            const SizedBox(height: 6),
-            Text(widget.sitioNombre.toUpperCase(),
-              textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900,
-                color: Colors.white, letterSpacing: 2,
-                shadows: [Shadow(color: Colors.black, blurRadius: 8)])),
-            const SizedBox(height: 4),
-            Text('${t("Sitio","Spot")} ${widget.sitioNumero} ${t("de","of")} ${widget.totalSitios} · ${rNombre(widget.ruta)}',
-              textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 11, color: Colors.white.withOpacity(0.7))),
-            const SizedBox(height: 6),
+            // Emoji del sitio — contenido narrativo, no UI
+            Text(widget.sitioEmoji,
+              style: const TextStyle(fontSize: 32)),
+            const SizedBox(height: RDSSpace.sm),
+            // Nombre del sitio — PlayfairDisplay
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: RDSSpace.xl),
+              child: Text(widget.sitioNombre,
+                textAlign: TextAlign.center,
+                style: RDSType.displaySm.copyWith(
+                  color: Colors.white, height: 1.15,
+                  shadows: [Shadow(
+                    color: Colors.black.withOpacity(0.8),
+                    blurRadius: 12)]))),
+            const SizedBox(height: RDSSpace.xs),
+            // Meta — ruta + contador
             Text(
-              _subiendo ? '⬆️ Subiendo foto...' :
-              _validando ? '✅ Validando...' :
-              t('Encuadra el sitio y toma la foto','Frame the spot and take the photo'),
-              style: TextStyle(fontSize: 11,
-                color: _validando ? acento : Colors.white.withOpacity(0.6))),
+              '${t("Sitio","Spot")} ${widget.sitioNumero}/${widget.totalSitios} · ${rNombre(widget.ruta)}',
+              textAlign: TextAlign.center,
+              style: RDSType.caption.copyWith(
+                color: Colors.white.withOpacity(0.6))),
+            const SizedBox(height: RDSSpace.sm),
+            // Estado — guía de acción
+            AnimatedSwitcher(
+              duration: RDSDuration.fast,
+              child: Text(
+                key: ValueKey(_validando),
+                _validando
+                  ? t('Validando visita...', 'Validating visit...')
+                  : _fotoTomada != null
+                    ? t('Foto lista — confirmá para validar',
+                        'Photo ready — confirm to validate')
+                    : t('Encuadrá el sitio y tomá la foto',
+                        'Frame the spot and take the photo'),
+                style: RDSType.labelSm.copyWith(
+                  color: _validando ? acento : Colors.white.withOpacity(0.55),
+                  letterSpacing: 0.5))),
           ])),
 
-        // Botones
+        // ── Controles de misión — bottom panel ──────────────────────────
         Positioned(bottom: 36, left: 0, right: 0,
           child: _validando
             ? Center(child: Column(children: [
-                if (_subiendo)
-                  const CircularProgressIndicator(color: Colors.white)
-                else
-                  const CircularProgressIndicator(color: Colors.green),
-                const SizedBox(height: 12),
-                Text(_subiendo ? tSubiendoFoto : t('Validando visita...','Validating visit...'),
-                  style: const TextStyle(color: Colors.white, fontSize: 13)),
+                SizedBox(width: 32, height: 32,
+                  child: CircularProgressIndicator(
+                    color: acento, strokeWidth: 2.5)),
+                const SizedBox(height: RDSSpace.md),
+                Text(t('Validando visita...', 'Validating visit...'),
+                  style: RDSType.labelSm.copyWith(color: Colors.white)),
               ]))
-            : Row(mainAxisAlignment: MainAxisAlignment.spaceEvenly, children: [
-                // Retomar
+            : Row(mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                // Repetir foto — secundario
                 if (_fotoTomada != null)
                   GestureDetector(
                     onTap: () => setState(() => _fotoTomada = null),
-                    child: Container(width: 52, height: 52,
-                      decoration: BoxDecoration(shape: BoxShape.circle,
-                        color: Colors.black.withOpacity(0.5),
-                        border: Border.all(color: Colors.white.withOpacity(0.3))),
-                      child: const Center(child: Text('🔄', style: TextStyle(fontSize: 22)))))
-                else
-                  const SizedBox(width: 52),
-                // Botón cámara principal
-                GestureDetector(
-                  onTap: _fotoTomada != null ? _validarFoto : _abrirCamara,
-                  child: Container(width: 76, height: 76,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      border: Border.all(color: acento, width: 3),
-                      boxShadow: [BoxShadow(color: acento.withOpacity(0.4), blurRadius: 20)]),
-                    child: Center(child: Container(width: 62, height: 62,
+                    child: Container(
+                      width: 50, height: 50,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        color: _fotoTomada != null ? acento : Colors.white),
-                      child: Center(child: Text(
-                        _fotoTomada != null ? '✓' : '📷',
-                        style: TextStyle(
-                          fontSize: _fotoTomada != null ? 28 : 22,
-                          color: _fotoTomada != null ? Colors.white : Colors.black))))))),
-                // Flash (decorativo)
+                        color: Colors.black.withOpacity(0.55),
+                        border: Border.all(
+                          color: Colors.white.withOpacity(0.2))),
+                      child: Icon(Icons.refresh_rounded,
+                        color: Colors.white.withOpacity(0.7), size: 22)))
+                else
+                  const SizedBox(width: 50),
+
+                // Botón principal — cámara o confirmar
                 GestureDetector(
-                  onTap: () {},
-                  child: Container(width: 52, height: 52,
-                    decoration: BoxDecoration(shape: BoxShape.circle,
-                      color: Colors.black.withOpacity(0.5),
-                      border: Border.all(color: Colors.white.withOpacity(0.3))),
-                    child: const Center(child: Text('⚡', style: TextStyle(fontSize: 22))))),
+                  onTap: _fotoTomada != null ? _validarFoto : _abrirCamara,
+                  child: AnimatedContainer(
+                    duration: RDSDuration.fast,
+                    width: 78, height: 78,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: _fotoTomada != null ? acento : Colors.white,
+                        width: 3),
+                      boxShadow: RDSElevation.glow(
+                        color: _fotoTomada != null ? acento : Colors.white,
+                        opacity: 0.3)),
+                    child: Center(
+                      child: Container(
+                        width: 64, height: 64,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: _fotoTomada != null ? acento : Colors.white),
+                        child: Icon(
+                          _fotoTomada != null ? RDSIcons.check : RDSIcons.camera,
+                          color: _fotoTomada != null ? Colors.white : Colors.black,
+                          size: _fotoTomada != null ? 28 : 26))))),
+
+                // Espacio simétrico
+                const SizedBox(width: 50),
               ])),
-          ]),
+      ]),
     );
   }
 }
@@ -13092,12 +13050,28 @@ class _RewardScreenState extends State<RewardScreen>
   }
 
   void _verificarYGenerarCodigoAliado() {
-    final aliado = kAliadosFinales[widget.sitioNombre];
-    if (aliado == null || !aliado.activo) return;
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
     final rutaNombre = widget.ruta['nombre']?.toString() ?? 'RUTA';
-    final codigo = generarCodigoAliado(rutaNombre: rutaNombre, aliadoId: aliado.id, userId: user.uid);
+    final esRutaCompleta = widget.sitioNumero >= widget.totalSitios;
+
+    // ── MOBIPLAB — aliado piloto B2B ─────────────────────────────
+    // Al completar ruta del Centro → código QR 20% descuento mano de obra
+    if (esRutaCompleta && kRutasMobiplab.contains(rutaNombre)) {
+      final aliado = kAliadosReales['mobiplab'];
+      if (aliado == null) return;
+      final codigo = generarCodigoAliado(
+        rutaNombre: rutaNombre, aliadoId: aliado.id, userId: user.uid);
+      setState(() { _codigoAliado = codigo; _aliadoActual = aliado; });
+      registrarCodigoAliado(codigo: codigo, aliado: aliado, rutaNombre: rutaNombre);
+      return;
+    }
+
+    // ── Otros aliados por sitio específico ────────────────────────
+    final aliado = kAliadosFinales[widget.sitioNombre];
+    if (aliado == null || !aliado.activo) return;
+    final codigo = generarCodigoAliado(
+      rutaNombre: rutaNombre, aliadoId: aliado.id, userId: user.uid);
     setState(() { _codigoAliado = codigo; _aliadoActual = aliado; });
     registrarCodigoAliado(codigo: codigo, aliado: aliado, rutaNombre: rutaNombre);
   }
@@ -13177,11 +13151,16 @@ class _RewardScreenState extends State<RewardScreen>
     return Scaffold(
       backgroundColor: RDSColor.base,
       body: Stack(children: [
-        // ── Fondo con gradiente radial ──
-        Positioned.fill(child: Container(
-          decoration: BoxDecoration(gradient: RadialGradient(
-            center: Alignment.topCenter, radius: 1.5,
-            colors: [acento.withOpacity(0.18), RDSColor.base, kDark])))),
+        // ── Fondo dramático — radial desde arriba ──────────────────────
+        Positioned.fill(child: DecoratedBox(
+          decoration: BoxDecoration(
+            gradient: RadialGradient(
+              center: Alignment.topCenter, radius: 1.8,
+              colors: [
+                acento.withOpacity(0.22),
+                RDSColor.base,
+                RDSColor.overlay,
+              ])))),
 
         // ── Confetti animado ──
         if (_particles.isNotEmpty)
@@ -13196,23 +13175,29 @@ class _RewardScreenState extends State<RewardScreen>
             padding: const EdgeInsets.fromLTRB(24, 20, 24, 32),
             child: Column(children: [
 
-              // Badge sitio actual
+              // ── Badge estado — StatusBadge RDS 3.0 ──────────────────
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: RDSSpace.lg, vertical: RDSSpace.xs + 2),
                 decoration: BoxDecoration(
-                  color: acento.withOpacity(0.15),
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: acento.withOpacity(0.4))),
-                child: Text(
-                  esUltimo
-                    ? t('🎊 RUTA COMPLETADA', '🎊 ROUTE COMPLETED')
-                    : t('✅ SITIO VALIDADO', '✅ SPOT VALIDATED'),
-                  style: TextStyle(
-                    fontFamily: 'SpaceGrotesk',
-                    fontSize: 11, color: acento,
-                    fontWeight: FontWeight.w700, letterSpacing: 1.5))),
-
-              const SizedBox(height: 24),
+                  color: acento.withOpacity(0.12),
+                  borderRadius: RDSRadius.bFull,
+                  border: Border.all(color: acento.withOpacity(0.35))),
+                child: Row(mainAxisSize: MainAxisSize.min, children: [
+                  Icon(
+                    esUltimo
+                      ? Icons.emoji_events_rounded
+                      : RDSIcons.check,
+                    color: acento, size: 14),
+                  const SizedBox(width: RDSSpace.xs),
+                  Text(
+                    esUltimo
+                      ? t('RUTA COMPLETADA', 'ROUTE COMPLETED')
+                      : t('SITIO VALIDADO', 'SPOT VALIDATED'),
+                    style: const TextStyle(fontFamily: 'SpaceGrotesk', fontSize: 10, fontWeight: FontWeight.w700, letterSpacing: 2.0, color: RDSColor.textMuted).copyWith(
+                      color: acento, letterSpacing: 2.0)),
+                ])),
+              const SizedBox(height: RDSSpace.xl),
 
               // ── Insignia con glow pulsante ──
               ScaleTransition(scale: _scaleAnim,
@@ -13242,43 +13227,47 @@ class _RewardScreenState extends State<RewardScreen>
 
               const SizedBox(height: 28),
 
-              // ── Título principal ──
+              // ── Título — editorial, impacto máximo ──────────────────
               Text(
                 esUltimo
-                  ? (widget.ruta['insignia']?.toString() ?? t('¡Ruta completada!', 'Route complete!'))
+                  ? (widget.ruta['insignia']?.toString()
+                      ?? t('Ruta completada', 'Route complete'))
                   : widget.sitioNombre,
-                style: const TextStyle(
-                  fontFamily: 'PlayfairDisplay',
-                  fontSize: 26, fontWeight: FontWeight.w900,
-                  color: RDSColor.textPrimary, height: 1.2),
+                style: RDSType3.displayXl.copyWith(
+                  height: 1.1, letterSpacing: -0.5),
                 textAlign: TextAlign.center),
-
-              const SizedBox(height: 8),
-
+              const SizedBox(height: RDSSpace.sm),
               Text(
                 esUltimo
-                  ? t('¡Completaste todos los sitios de esta ruta!',
-                      'You completed all spots on this route!')
-                  : '${widget.sitioEmoji} ${t("completado","completed")} · ${t("Sitio","Spot")} ${widget.sitioNumero} ${t("de","of")} ${widget.totalSitios}',
-                style: TextStyle(fontSize: 13, color: RDSColor.textPrimary.withOpacity(0.55), height: 1.4),
+                  ? t('Completaste todos los sitios',
+                      'You completed all spots')
+                  : t('Sitio ${widget.sitioNumero} de ${widget.totalSitios} · ${rNombre(widget.ruta)}',
+                      'Spot ${widget.sitioNumero} of ${widget.totalSitios} · ${rNombre(widget.ruta)}'),
+                style: RDSType.bodyMd,
                 textAlign: TextAlign.center),
 
               const SizedBox(height: 28),
 
-              // ── Stats ──
-              Row(mainAxisAlignment: MainAxisAlignment.spaceEvenly, children: [
+              // ── Stats — puntos como protagonista ──────────────────────
+              Row(mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
                 _RewardStat(
-                  label: t('Sitios','Spots'),
+                  label: t('Sitios', 'Spots'),
                   value: '${widget.sitioNumero}/${widget.totalSitios}',
                   color: acento),
+                // Puntos — destacado en el centro
+                Column(children: [
+                  Text('+${widget.sitioNumero * 30}',
+                    style: RDSType3.points),
+                  const SizedBox(height: 2),
+                  Text(t('puntos', 'points'),
+                    style: const TextStyle(fontFamily: 'SpaceGrotesk', fontSize: 10, fontWeight: FontWeight.w700, letterSpacing: 2.0, color: RDSColor.textMuted).copyWith(
+                      color: RDSColor.textMuted)),
+                ]),
                 _RewardStat(
-                  label: t('Progreso','Progress'),
+                  label: t('Progreso', 'Progress'),
                   value: '${((widget.sitioNumero / widget.totalSitios) * 100).toInt()}%',
-                  color: RDSColor.gold),
-                _RewardStat(
-                  label: t('Puntos','Points'),
-                  value: '+${widget.sitioNumero * 30}',
-                  color: RDSColor.orchid),
+                  color: RDSColor.green),
               ]),
 
               const SizedBox(height: 24),
@@ -13296,60 +13285,68 @@ class _RewardScreenState extends State<RewardScreen>
                     borderRadius: BorderRadius.circular(14),
                     child: Image.network(widget.urlFotoValidacion!, fit: BoxFit.cover))),
 
-              // ── Premio ──
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: RDSColor.card,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: RDSColor.gold.withOpacity(0.25)),
-                  boxShadow: [BoxShadow(color: RDSColor.gold.withOpacity(0.05), blurRadius: 16)]),
-                child: Row(children: [
-                  Container(width: 52, height: 52,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: acento.withOpacity(0.15),
-                      border: Border.all(color: acento.withOpacity(0.35))),
-                    child: Center(child: Text(
-                      widget.ruta['emoji']?.toString() ?? '🗺️',
-                      style: const TextStyle(fontSize: 26)))),
-                  const SizedBox(width: 12),
-                  Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Text(tPremioAlCompletarRuta,
-                      style: const TextStyle(color: RDSColor.textMuted, fontSize: 10,
-                        fontFamily: 'SpaceGrotesk', letterSpacing: 0.5)),
-                    const SizedBox(height: 2),
-                    Text((widget.ruta['premio'] ?? '').toString(),
-                      style: const TextStyle(
-                        color: RDSColor.gold, fontSize: 12,
-                        fontWeight: FontWeight.w700, height: 1.4)),
+              // ── Premio — card editorial con borde gold ────────────────
+              if ((widget.ruta['premio'] ?? '').toString().isNotEmpty)
+                Container(
+                  padding: const EdgeInsets.all(RDSSpace.md),
+                  decoration: BoxDecoration(
+                    color: RDSColor.surface,
+                    borderRadius: RDSRadius.bLg,
+                    border: Border(
+                      left: BorderSide(color: RDSColor.gold, width: 3))),
+                  child: Row(children: [
+                    // Emoji ruta como acento visual
+                    Text(widget.ruta['emoji']?.toString() ?? '🗺️',
+                      style: const TextStyle(fontSize: 28)),
+                    const SizedBox(width: RDSSpace.md),
+                    Expanded(child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                      Text(tPremioAlCompletarRuta,
+                        style: const TextStyle(fontFamily: 'SpaceGrotesk', fontSize: 10, fontWeight: FontWeight.w700, letterSpacing: 2.0, color: RDSColor.textMuted).copyWith(
+                          color: RDSColor.gold, letterSpacing: 2.0)),
+                      const SizedBox(height: RDSSpace.xs),
+                      Text((widget.ruta['premio'] ?? '').toString(),
+                        style: RDSType.headlineMd.copyWith(
+                          color: RDSColor.gold)),
+                    ])),
                   ])),
-                ])),
 
-              // ── Aliado Final ──
+              // ── Aliado Final — SponsorBadge RDS 3.0 ────────────────────
               if (_codigoAliado != null && _aliadoActual != null) ...[
-                const SizedBox(height: 16),
+                const SizedBox(height: RDSSpace.md),
                 _CardCodigoAliado(aliado: _aliadoActual!, codigo: _codigoAliado!),
               ],
 
               const SizedBox(height: 24),
 
-              // ── Botón compartir ──
+              // ── Hotel activo — solo al completar ruta ────────────────
+              if (esUltimo) ...[
+                const _HotelBanner(
+                  margin: EdgeInsets.only(bottom: RDSSpace.md)),
+              ],
+
+              // ── Botón compartir — secundario, limpio ─────────────────
               GestureDetector(
                 onTap: () => _compartirLogro(context),
                 child: Container(
                   width: double.infinity,
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  margin: const EdgeInsets.only(bottom: 12),
+                  padding: const EdgeInsets.symmetric(
+                    vertical: RDSSpace.md),
+                  margin: const EdgeInsets.only(bottom: RDSSpace.sm),
                   decoration: BoxDecoration(
-                    color: RDSColor.card,
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: acento.withOpacity(0.35))),
-                  child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-                    const Icon(Icons.share_rounded, color: Colors.white70, size: 20),
-                    const SizedBox(width: 8),
+                    color: RDSColor.surface,
+                    borderRadius: RDSRadius.bMd,
+                    border: Border.all(
+                      color: acento.withOpacity(0.25))),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                    Icon(RDSIcons.actionShare,
+                      color: RDSColor.textMuted, size: 18),
+                    const SizedBox(width: RDSSpace.sm),
                     Text(t('COMPARTIR LOGRO', 'SHARE ACHIEVEMENT'),
-                      style: TextStyle(
+                      style: RDSType.labelSm.copyWith(
                         fontFamily: 'Inter',
                         fontSize: 13, fontWeight: FontWeight.w800,
                         color: acento, letterSpacing: 1)),
@@ -13439,10 +13436,10 @@ class ProfileScreen extends StatelessWidget {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(RDSRadius.xl))),
       builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setModal) => Padding(
+        builder: (ctx, setModal) => SingleChildScrollView(
           padding: EdgeInsets.only(
             left: 24, right: 24, top: 24,
-            bottom: MediaQuery.of(context).viewInsets.bottom + 24),
+            bottom: MediaQuery.of(ctx).viewInsets.bottom + 32),
           child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
 
             Text(t('Editar perfil','Edit profile'),
@@ -13520,7 +13517,12 @@ class ProfileScreen extends StatelessWidget {
                 Text(tNoEditable, style: const TextStyle(color: RDSColor.textMuted, fontSize: 10)),
               ])),
 
-            const SizedBox(height: 20),
+            const SizedBox(height: RDSSpace.md),
+
+            // ── Código de hotel ─────────────────────────────────────────
+            _HotelCodigoField(onActivado: () => setModal(() {})),
+
+          const SizedBox(height: 20),
 
             _GoldButton(
               label: _guardando
@@ -13816,18 +13818,14 @@ class ProfileScreen extends StatelessWidget {
     return Scaffold(
       backgroundColor: RDSColor.base,
       body: SingleChildScrollView(child: Column(children: [
-        // Header con banner aliados integrado como fondo
-        Stack(children: [
-          // Banner aliados como fondo del header
-          const Positioned.fill(child: _BannerAliados()),
-          // Header paisa encima con transparencia
-          Container(width: double.infinity,
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight,
-                colors: [Color(0xCC080C06), Color(0xCC0F1A08), Color(0xCC080C06)])),
-            child: SafeArea(child: Stack(children: [
-              Positioned.fill(child: CustomPaint(painter: _LeafPatternPainter())),
-              Padding(padding: const EdgeInsets.fromLTRB(20, 24, 20, 28),
+        // ── Header editorial — foto de ciudad + datos usuario ────────────
+        Container(
+          color: RDSColor.base,
+          child: SafeArea(child: Stack(children: [
+            // Patrón sutil de identidad
+            Positioned.fill(child: CustomPaint(painter: _LeafPatternPainter())),
+            Padding(padding: const EdgeInsets.fromLTRB(
+              RDSSpace.lg, RDSSpace.xl, RDSSpace.lg, RDSSpace.xl),
               child: StreamBuilder<DocumentSnapshot>(
                 stream: AuthService.currentUser != null
                   ? FirebaseFirestore.instance.collection('usuarios').doc(AuthService.currentUser!.uid).snapshots()
@@ -13869,50 +13867,53 @@ class ProfileScreen extends StatelessWidget {
                             border: Border.all(color: RDSColor.gold.withOpacity(0.4), width: 1.5)),
                           child: Center(child: Text(nivelEmoji, style: const TextStyle(fontSize: 14)))),
                         const SizedBox(width: 4),
-                        // Lápiz
+                        // Botón editar — ícono sistema
                         GestureDetector(
                           onTap: () => _mostrarEditarPerfil(context),
                           child: Container(width: 30, height: 30,
-                            decoration: BoxDecoration(shape: BoxShape.circle, color: RDSColor.card,
-                              border: Border.all(color: RDSColor.gold.withOpacity(0.5), width: 1.5)),
-                            child: const Center(child: Text('✏️', style: TextStyle(fontSize: 14))))),
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: RDSColor.card,
+                              border: Border.all(
+                                color: RDSColor.gold.withOpacity(0.5),
+                                width: 1.5)),
+                            child: const Icon(
+                              Icons.edit_rounded,
+                              color: RDSColor.gold, size: 14))),
                       ]),
                     ]),
                     const SizedBox(height: 14),
-                    // Nombre en PlayfairDisplay
-                    Text(AuthService.currentUser?.displayName?.toUpperCase() ?? 'RUTERO MDE',
-                      style: const TextStyle(
-                        fontFamily: 'PlayfairDisplay',
-                        fontSize: 22, fontWeight: FontWeight.w900,
-                        color: RDSColor.textPrimary, letterSpacing: 1)),
-                    const SizedBox(height: 4),
-                    Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-                      const Text('📧', style: TextStyle(fontSize: 11)),
-                      const SizedBox(width: 4),
-                      Text(AuthService.currentUser?.email ?? '',
-                        style: TextStyle(fontSize: 10, color: RDSColor.textPrimary.withOpacity(0.45))),
-                    ]),
+                    // Nombre — PlayfairDisplay editorial
+                    Text(
+                      AuthService.currentUser?.displayName ?? 'Rutero MDE',
+                      style: RDSType3.displayXl.copyWith(
+                        fontSize: 24, letterSpacing: 0.5)),
+                    const SizedBox(height: RDSSpace.xs),
+                    Text(AuthService.currentUser?.email ?? '',
+                      style: RDSType.caption),
                     const SizedBox(height: 12),
-                    // Badge nivel dinámico
+                    // Badge nivel — compacto, tokens RDS ─────────────
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: RDSSpace.md, vertical: RDSSpace.xs + 2),
                       decoration: BoxDecoration(
                         color: RDSColor.gold.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: RDSColor.gold.withOpacity(0.4))),
+                        borderRadius: RDSRadius.bFull,
+                        border: Border.all(
+                          color: RDSColor.gold.withOpacity(0.35))),
                       child: Row(mainAxisSize: MainAxisSize.min, children: [
-                        Text(nivelEmoji, style: const TextStyle(fontSize: 13)),
-                        const SizedBox(width: 6),
-                        Text('NV. $nivelIdx · ${nombreNivel.toUpperCase()}',
-                          style: const TextStyle(
-                            fontFamily: 'SpaceGrotesk',
-                            fontSize: 10, color: RDSColor.gold,
-                            letterSpacing: 1.5, fontWeight: FontWeight.w700)),
+                        Text(nivelEmoji,
+                          style: const TextStyle(fontSize: 12)),
+                        const SizedBox(width: RDSSpace.xs),
+                        Text(
+                          'NV.$nivelIdx · ${nombreNivel.toUpperCase()}',
+                          style: const TextStyle(fontFamily: 'SpaceGrotesk', fontSize: 10, fontWeight: FontWeight.w700, letterSpacing: 2.0, color: RDSColor.textMuted).copyWith(
+                            color: RDSColor.gold,
+                            letterSpacing: 1.5)),
                       ])),
                   ]);
                 })),
           ]))),
-        ]),  // cierre Stack banner+header
 
         Padding(padding: const EdgeInsets.all(20), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           // Stats dinámicos desde subcolección 'progreso' (fuente confiable)
@@ -13936,20 +13937,34 @@ class ProfileScreen extends StatelessWidget {
                 if (data['completada'] == true) puntosTotales += 50;
               }
               return Row(children: [
-                _ProfileStat(valor: '$rutasCompletadas', label: t('Rutas\nCompletadas','Routes\nCompleted'), emoji: '🗺️'),
-                const SizedBox(width: 10),
-                _ProfileStat(valor: '$sitiosTotales', label: t('Sitios\nVisitados','Spots\nVisited'), emoji: '📍'),
-                const SizedBox(width: 10),
-                _ProfileStat(valor: '$puntosTotales', label: t('Puntos\nAcumulados','Points\nEarned'), emoji: '⭐'),
+                _ProfileStat(valor: '$rutasCompletadas',
+                  label: t('Rutas','Routes'),
+                  icon: RDSIcons.metricRoutes,
+                  color: RDSColor.green),
+                const SizedBox(width: RDSSpace.sm),
+                _ProfileStat(valor: '$sitiosTotales',
+                  label: t('Sitios','Spots'),
+                  icon: RDSIcons.metricSpots,
+                  color: RDSColor.orchid),
+                const SizedBox(width: RDSSpace.sm),
+                _ProfileStat(valor: '$puntosTotales',
+                  label: t('Puntos','Points'),
+                  icon: RDSIcons.metricPoints,
+                  color: RDSColor.gold),
               ]);
             }),
 
           const SizedBox(height: 24),
 
+          // ── Hotel activo ─────────────────────────────────────────────
+          const _HotelBanner(margin: EdgeInsets.only(bottom: RDSSpace.lg)),
+
           // Nivel dinámico
-          Text(tProgresoNivel,
-            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w900, color: RDSColor.textMuted, letterSpacing: 2)),
-          const SizedBox(height: 12),
+          // ── Mi aventura ─────────────────────────────────────────────
+          Text(t('MI AVENTURA', 'MY ADVENTURE'),
+            style: const TextStyle(fontFamily: 'SpaceGrotesk', fontSize: 10, fontWeight: FontWeight.w700, letterSpacing: 2.0, color: RDSColor.textMuted).copyWith(
+              color: RDSColor.textMuted, letterSpacing: 2.5)),
+          const SizedBox(height: RDSSpace.md),
           StreamBuilder<DocumentSnapshot>(
             stream: AuthService.currentUser != null
               ? FirebaseFirestore.instance.collection('usuarios').doc(AuthService.currentUser!.uid).snapshots()
@@ -14018,10 +14033,12 @@ class ProfileScreen extends StatelessWidget {
 
           const SizedBox(height: 24),
 
-          // Insignias
+          const SizedBox(height: RDSSpace.xl),
+          // ── Mis insignias ────────────────────────────────────────────
           Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-            Text(tInsigniasRecientes,
-              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w900, color: RDSColor.textMuted, letterSpacing: 2)),
+            Text(t('MIS INSIGNIAS', 'MY BADGES'),
+              style: const TextStyle(fontFamily: 'SpaceGrotesk', fontSize: 10, fontWeight: FontWeight.w700, letterSpacing: 2.0, color: RDSColor.textMuted).copyWith(
+                color: RDSColor.textMuted, letterSpacing: 2.5)),
             GestureDetector(
               onTap: () => Navigator.of(context, rootNavigator: false).push(MaterialPageRoute(builder: (_) => const AchievementsScreen())),
               child: Text(tVerTodas, style: const TextStyle(color: RDSColor.gold, fontSize: 11))),
@@ -14044,28 +14061,21 @@ class ProfileScreen extends StatelessWidget {
 
           const SizedBox(height: 24),
 
-          // Menú
-          Text(tConfiguracion,
-            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w900, color: RDSColor.textMuted, letterSpacing: 2)),
-          const SizedBox(height: 12),
-          GestureDetector(
-            onTap: () => Navigator.of(context, rootNavigator: false).push(MaterialPageRoute(builder: (_) => const MisPremiosScreen())),
-            child: Container(
-              margin: const EdgeInsets.only(bottom: 8),
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(color: RDSColor.card, borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: RDSColor.gold.withOpacity(0.3))),
-              child: Row(children: [
-                const Text('🏆', style: TextStyle(fontSize: 22)),
-                const SizedBox(width: 14),
-                Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text(tMisPremiosPerfil, style: const TextStyle(color: RDSColor.gold, fontSize: 14, fontWeight: FontWeight.w600)),
-                  Text(tCodigosQR, style: const TextStyle(color: RDSColor.textMuted, fontSize: 11)),
-                ])),
-                const Icon(Icons.chevron_right, color: RDSColor.textMuted, size: 18),
-              ]))),
+          const SizedBox(height: RDSSpace.xl),
+          // ── Configuración ────────────────────────────────────────────
+          Text(t('CONFIGURACIÓN', 'SETTINGS'),
+            style: const TextStyle(fontFamily: 'SpaceGrotesk', fontSize: 10, fontWeight: FontWeight.w700, letterSpacing: 2.0, color: RDSColor.textMuted).copyWith(
+              color: RDSColor.textMuted, letterSpacing: 2.5)),
+          const SizedBox(height: RDSSpace.md),
           _ProfileMenuItem(
-            emoji: '📸', label: t('Mis fotos','My photos'),
+            icon: Icons.emoji_events_rounded,
+            color: RDSColor.gold,
+            label: tMisPremiosPerfil,
+            sublabel: tCodigosQR,
+            onTap: () => Navigator.of(context, rootNavigator: false).push(
+              MaterialPageRoute(builder: (_) => const MisPremiosScreen()))),
+          _ProfileMenuItem(
+            icon: RDSIcons.camera, label: t('Mis fotos','My photos'),
             onTap: () => Navigator.of(context, rootNavigator: false).push(
               MaterialPageRoute(builder: (_) => const MisFotosScreen()))),
           _ProfileMenuItem(
@@ -14356,17 +14366,19 @@ class _InsigniaCell extends StatelessWidget {
         boxShadow: desbloqueada
           ? [BoxShadow(color: RDSColor.gold.withOpacity(0.1), blurRadius: 12)] : null),
       child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-        Container(width: 64, height: 64,
-          decoration: BoxDecoration(shape: BoxShape.circle,
-            color: desbloqueada ? Colors.transparent : const Color(0xFF050A04),
+        Container(width: 72, height: 72,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: desbloqueada ? const Color(0xFF0D1209) : const Color(0xFF050A04),
             border: Border.all(
-              color: desbloqueada ? Colors.transparent : Colors.white.withOpacity(0.08))),
+              color: desbloqueada ? RDSColor.gold.withOpacity(0.3) : Colors.white.withOpacity(0.08))),
           child: desbloqueada
-            ? Image.asset(insignia['insigniaImg'] ?? '',
-                fit: BoxFit.contain,
-                errorBuilder: (_, __, ___) => Center(
-                  child: Text(insignia['emoji'] ?? '🏅',
-                    style: const TextStyle(fontSize: 28))))
+            ? Padding(padding: const EdgeInsets.all(4),
+                child: Image.asset(insignia['insigniaImg'] ?? '',
+                  fit: BoxFit.contain,
+                  errorBuilder: (_, __, ___) => Center(
+                    child: Text(insignia['emoji'] ?? '🏅',
+                      style: const TextStyle(fontSize: 28)))))
             : const Center(child: Icon(Icons.lock_rounded, size: 26, color: RDSColor.textMuted))),
         const SizedBox(height: 8),
         Padding(padding: const EdgeInsets.symmetric(horizontal: 6),
@@ -15873,6 +15885,8 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
 
   void _onRutasCargadasMapa() {
     if (mounted) {
+      // Recargar rutas desbloqueadas — en kModoLanzamiento incluye todas las rutas de Firestore
+      _cargarRutasDesbloqueadas();
       setState(() {});
       WidgetsBinding.instance.addPostFrameCallback((_) => _reaplicarEstilo());
     }
@@ -16076,27 +16090,21 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
       return;
     }
     try {
-      // Leer rutas completadas — desde 'rutasCompletadas' Y desde 'progreso' (fallback para rutas antiguas)
       final snapC = await FirebaseFirestore.instance
         .collection('usuarios').doc(user.uid)
         .collection('rutasCompletadas').get();
       final completadas = snapC.docs.map((d) => d.id).toSet();
 
-      // También leer progreso antiguo donde completada == true
       final snapP = await FirebaseFirestore.instance
         .collection('usuarios').doc(user.uid)
         .collection('progreso')
         .where('completada', isEqualTo: true).get();
       final completadasProgreso = snapP.docs.map((d) => d.id).toSet();
 
-      // En modo lanzamiento también incluir rutas compradas (aunque Wompi esté off)
-      Set<String> compradas = {};
-      if (!kModoLanzamiento) {
-        final snapC = await FirebaseFirestore.instance
-          .collection('usuarios').doc(user.uid)
-          .collection('rutasCompradas').get();
-        compradas = snapC.docs.map((d) => d.id).toSet();
-      }
+      final snapR = await FirebaseFirestore.instance
+        .collection('usuarios').doc(user.uid)
+        .collection('rutasCompradas').get();
+      final compradas = snapR.docs.map((d) => d.id).toSet();
 
       if (mounted) setState(() {
         _rutasDesbloqueadas = {...rutasBase, ...completadas, ...completadasProgreso, ...compradas};
@@ -16107,12 +16115,34 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
     }
   }
 
-  // Verifica si un sitio está visible (primer sitio siempre, resto solo si compró)
+  // Verifica si un sitio está visible
+  // Ruta desbloqueada → todos sus sitios visibles
+  // Ruta bloqueada → solo el primer sitio (pin 🔒 en el punto de inicio de la ruta)
   bool _sitioVisible(_SitioMapa sitio) {
     if (_rutasDesbloqueadas.contains(sitio.ruta)) return true;
-    // Solo mostrar el primer sitio de cada ruta bloqueada
-    final sitiosDeRuta = kSitiosMapa.where((s) => s.ruta == sitio.ruta).toList();
-    return sitiosDeRuta.isNotEmpty && sitiosDeRuta.first.nombre == sitio.nombre;
+    // Buscar el primer sitio con coords de esta ruta en Firestore
+    final ruta = RutasService().rutas.firstWhere(
+      (r) => r['nombre']?.toString() == sitio.ruta,
+      orElse: () => <String, dynamic>{});
+    if (ruta.isEmpty) {
+      // Fallback: kSitiosMapa
+      final sitiosDeRuta = kSitiosMapa.where((s) => s.ruta == sitio.ruta).toList();
+      return sitiosDeRuta.isNotEmpty && sitiosDeRuta.first.nombre == sitio.nombre;
+    }
+    // Obtener primer sitio con coords válidas
+    final detalle = parseSitiosDetalle(ruta['sitiosDetalle']);
+    final gpsRaw = ruta['gpsSitios'];
+    final gpsList = gpsRaw is List ? gpsRaw : <dynamic>[];
+    final fuente = detalle.isNotEmpty ? detalle : gpsList;
+    for (final s in fuente) {
+      if (s is! Map) continue;
+      final lat = (s['lat'] as num?)?.toDouble();
+      final lng = (s['lng'] as num?)?.toDouble();
+      if (lat == null || lng == null) continue;
+      // Este es el primer sitio válido — es el único que debe mostrar el candado
+      return s['nombre']?.toString() == sitio.nombre;
+    }
+    return false;
   }
 
   bool _rutaBloqueada(String ruta) => !_rutasDesbloqueadas.contains(ruta);
@@ -16519,7 +16549,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
       'RUTA JARDÍN COLONIAL':                 'assets/images/rutas/ruta_12_jardin.jpg',
       'RUTA SANTA FE DE ANTIOQUIA':           'assets/images/rutas/ruta_13_santa_fe.jpg',
       'RUTA ENVIGADO NATURAL':                'assets/images/rutas/ruta_14_envigado.jpg',
-      'FERIA DE LAS FLORES':                  'assets/images/rutas/ruta_17_feria_flores.jpg',
+      'FERIA DE LAS FLORES':                  'assets/images/rutas/ruta_04_metrocable.jpg',
       'SENDEROS DEL ARRIERO Y LA MONTAÑA':    'assets/images/rutas/ruta_arriero_ciudad_bolivar.jpg',
       'VIVE EL POBLADO':                      'assets/images/rutas/ruta_vive_poblado.jpg',
       'DEL ORIGEN PAISA A LA MEDELLÍN MODERNA': 'assets/images/rutas/ruta_11_origen_paisa_moderno.jpg',
@@ -16768,7 +16798,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
     if (uid == null) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text(t('Iniciá sesión para ver tu Planner en el mapa',
+        content: Text(t('Iniciá sesión para ver el plan de Felo en el mapa',
                        'Sign in to see your Planner on the map')),
         backgroundColor: RDSColor.accent));
       return;
@@ -16782,7 +16812,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
         .get();
       if (snap.docs.isEmpty || !mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text(t('Todavía no tenés un itinerario generado',
+          content: Text(t('Todavía no le preguntaste a Felo',
                          'You haven\'t generated an itinerary yet')),
           backgroundColor: RDSColor.card));
         return;
@@ -16801,7 +16831,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
       });
       _mapController?.animateCamera(CameraUpdate.newLatLngZoom(_centerCiudad, 12));
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text(t('Mostrando tu itinerario en el mapa','Showing your itinerary on the map')),
+        content: Text(t('Mostrando el plan de Felo en el mapa','Showing Felo\'s plan on the map')),
         backgroundColor: RDSColor.green, duration: const Duration(seconds: 2)));
     } catch (e) {
       debugPrint('Planner mapa error: $e');
@@ -16846,7 +16876,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
           Row(children: [
             const Icon(RDSIcons.planner, size: 14, color: RDSColor.gold),
             const SizedBox(width: 4),
-            Text(t('Mi Planner', 'My Planner'), style: RDSType.labelSm.copyWith(color: RDSColor.gold)),
+            Text(t('Plan de Felo', 'Felo\'s Plan'), style: RDSType.labelSm.copyWith(color: RDSColor.gold)),
             const SizedBox(width: 8),
             GestureDetector(
               onTap: () => setState(() { _mostrarCapaPlannerActiva = false; _plannerDias = []; }),
@@ -17321,7 +17351,7 @@ class _MisFotosScreenState extends State<MisFotosScreen> {
                 GestureDetector(onTap: () => Navigator.of(context, rootNavigator: false).pop(),
                   child: Container(width: 36, height: 36,
                     decoration: BoxDecoration(color: Colors.black.withOpacity(0.4), shape: BoxShape.circle),
-                    child: const Center(child: Text('←', style: TextStyle(color: RDSColor.textPrimary, fontSize: 16))))),
+                    child: const Center(child: Icon(RDSIcons.back, color: RDSColor.textPrimary, size: 18)))),
                 const SizedBox(width: 14),
                 Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   Text(tMisFotos, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900,
@@ -17920,27 +17950,25 @@ class _AliadoRutaCard extends StatelessWidget {
 }
 
 class _WelcomeChip extends StatelessWidget {
-  final String emoji, label;
-  const _WelcomeChip({required this.emoji, required this.label});
-
-  IconData get _icon {
-    if (emoji.contains('🗺')) return Icons.map_rounded;
-    if (emoji.contains('📍')) return Icons.location_on_rounded;
-    if (emoji.contains('🏅')) return Icons.emoji_events_rounded;
-    return Icons.star_rounded;
-  }
-
+  final IconData? icon;
+  final String? emoji;
+  final String label;
+  const _WelcomeChip({this.icon, this.emoji, required this.label});
   @override
   Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+    padding: const EdgeInsets.symmetric(
+      horizontal: RDSSpace.md, vertical: RDSSpace.xs + 2),
     decoration: BoxDecoration(
-      color: RDSColor.green.withOpacity(0.1),
-      borderRadius: BorderRadius.circular(20),
-      border: Border.all(color: RDSColor.green.withOpacity(0.25))),
+      color: RDSColor.surface,
+      borderRadius: RDSRadius.bFull,
+      border: Border.all(color: RDSColor.borderSubtle)),
     child: Row(mainAxisSize: MainAxisSize.min, children: [
-      Icon(_icon, size: 12, color: RDSColor.green),
-      const SizedBox(width: 5),
-      Text(label, style: const TextStyle(color: RDSColor.textMuted, fontSize: 11)),
+      if (icon != null)
+        Icon(icon, color: RDSColor.green, size: 13)
+      else
+        Text(emoji ?? '', style: const TextStyle(fontSize: 13)),
+      const SizedBox(width: RDSSpace.xs),
+      Text(label, style: RDSType.labelSm),
     ]));
 }
 
@@ -18013,36 +18041,76 @@ class _HomeStatsRow extends StatelessWidget {
   Widget build(BuildContext context) {
     if (AuthService.currentUser == null) {
       return Row(children: [
-        _HeaderChip(emoji: '🗺️', label: '$rutasCount ${t("rutas","routes")}', color: RDSColor.gold),
-        const SizedBox(width: 8),
-        _HeaderChip(emoji: '⭐', label: '0 pts', color: RDSColor.green),
-        const SizedBox(width: 8),
+        _StatChip(icon: RDSIcons.metricRoutes,
+          label: '$rutasCount ${t("rutas","routes")}',
+          color: RDSColor.gold),
+        const SizedBox(width: RDSSpace.sm),
+        _StatChip(icon: RDSIcons.metricPoints,
+          label: '0 pts', color: RDSColor.green),
+        const SizedBox(width: RDSSpace.sm),
         if (kModoLanzamiento)
-          _HeaderChip(emoji: '🧪', label: t('BETA GRATIS','FREE BETA'), color: RDSColor.orchid),
+          _StatChip(icon: Icons.science_rounded,
+            label: t('BETA','BETA'), color: RDSColor.orchid),
       ]);
     }
+    // Calcular total de sitios reales sumando sitiosDetalle de cada ruta
+    final todasRutas = RutasService().rutas;
+    int sitiosTotalesApp = 0;
+    for (final r in todasRutas) {
+      final det = r['sitiosDetalle'];
+      final gps = r['gpsSitios'];
+      final detL = det is List ? det.length : 0;
+      final gpsL = gps is List ? gps.length : 0;
+      sitiosTotalesApp += detL > 0 ? detL : gpsL > 0 ? gpsL : (r['sitios'] ?? 0) as int;
+    }
+
     return StreamBuilder<DocumentSnapshot>(
       stream: FirebaseFirestore.instance
         .collection('usuarios').doc(AuthService.currentUser!.uid).snapshots(),
       builder: (ctx, snap) {
         final data = snap.data?.data() as Map<String, dynamic>? ?? {};
         final int puntos = (data['puntosTotal'] ?? 0) as int;
-        final int sitios = (data['sitiosVisitados'] ?? 0) as int;
         return Row(children: [
-          _HeaderChip(emoji: '🗺️', label: '$rutasCount ${t("rutas","routes")}', color: RDSColor.gold),
-          const SizedBox(width: 8),
-          _HeaderChip(emoji: '⭐',
-            label: '$puntos pts',
-            color: RDSColor.green),
-          const SizedBox(width: 8),
-          _HeaderChip(emoji: '📍',
-            label: '$sitios ${t("sitios","spots")}',
+          _StatChip(icon: RDSIcons.metricRoutes,
+            label: '$rutasCount ${t("rutas","routes")}',
+            color: RDSColor.gold),
+          const SizedBox(width: RDSSpace.sm),
+          _StatChip(icon: RDSIcons.metricPoints,
+            label: '$puntos pts', color: RDSColor.green),
+          const SizedBox(width: RDSSpace.sm),
+          _StatChip(icon: RDSIcons.metricSpots,
+            label: '$sitiosTotalesApp ${t("sitios","spots")}',
             color: RDSColor.orchid),
         ]);
       });
   }
 }
 
+// Chip de estadística — icono + label, sin emoji
+class _StatChip extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final Color color;
+  const _StatChip({required this.icon, required this.label, required this.color});
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.symmetric(
+      horizontal: RDSSpace.sm + 4, vertical: RDSSpace.xs + 2),
+    decoration: BoxDecoration(
+      color: color.withOpacity(0.08),
+      borderRadius: RDSRadius.bFull,
+      border: Border.all(color: color.withOpacity(0.2))),
+    child: Row(mainAxisSize: MainAxisSize.min, children: [
+      Icon(icon, size: 12, color: color),
+      const SizedBox(width: RDSSpace.xs),
+      Text(label,
+        style: RDSType.labelSm.copyWith(
+          color: color, fontWeight: FontWeight.w700)),
+    ]));
+}
+
+// _HeaderChip — alias de compatibilidad
 class _HeaderChip extends StatelessWidget {
   final String emoji, label; final Color color;
   const _HeaderChip({required this.emoji, required this.label, required this.color});
@@ -18294,9 +18362,16 @@ class _RouteCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final Color acento    = activa ? kRutaColor(ruta['acento'], RDSColor.gold) : RDSColor.textMuted;
     final bool esImperdible = ruta['imperdible'] == true || ruta['zona'] == 'Ciudad';
-    final int puntos      = ((ruta['sitios'] ?? 5) as int) * 30;
+    // Calcular puntos desde sitios reales de Firestore
+    final _detPuntos = ruta['sitiosDetalle'];
+    final _gpsPuntos = ruta['gpsSitios'];
+    final _detListP = _detPuntos is List ? _detPuntos : [];
+    final _gpsListP = _gpsPuntos is List ? _gpsPuntos : [];
+    final int _sitiosCount = _detListP.isNotEmpty ? _detListP.length : _gpsListP.isNotEmpty ? _gpsListP.length : (ruta['sitios'] ?? 5) as int;
+    final int puntos = _sitiosCount * 30;
 
-    return GestureDetector(
+    return RepaintBoundary(
+      child: GestureDetector(
       onTap: onTap,
       child: Container(
         margin: const EdgeInsets.only(bottom: RDSSpace.md),   // 16 → token
@@ -18317,6 +18392,10 @@ class _RouteCard extends StatelessWidget {
                 if (ruta['imagen'] != null)
                   Image.asset(ruta['imagen'], fit: BoxFit.cover,
                     cacheWidth: 600,
+                    frameBuilder: (ctx, child, frame, wasSynchronouslyLoaded) {
+                      if (wasSynchronouslyLoaded || frame != null) return child;
+                      return _CardGradientFallback(ruta: ruta);
+                    },
                     errorBuilder: (_, __, ___) => _CardGradientFallback(ruta: ruta))
                 else
                   _CardGradientFallback(ruta: ruta),
@@ -18431,7 +18510,15 @@ class _RouteCard extends StatelessWidget {
                         Row(children: [
                           _InfoPill(icon: '⏱', text: ruta['tiempo']?.toString() ?? ''),
                           const SizedBox(width: 6),
-                          _InfoPill(icon: '📍', text: '${(ruta["sitios"] ?? 0).toString()} ${t("sitios","spots")}'),
+                          Builder(builder: (_) {
+                            // Contar sitios reales desde sitiosDetalle o gpsSitios
+                            final det = ruta['sitiosDetalle'];
+                            final gps = ruta['gpsSitios'];
+                            final detList = det is List ? det : (det is String && det.isNotEmpty ? [] : []);
+                            final gpsList = gps is List ? gps : [];
+                            final count = detList.isNotEmpty ? detList.length : gpsList.isNotEmpty ? gpsList.length : (ruta['sitios'] ?? 0) as int;
+                            return _InfoPill(icon: '📍', text: '$count ${t("sitios","spots")}');
+                          }),
                           const Spacer(),
                           // Botón Explorar
                           Container(
@@ -18455,7 +18542,7 @@ class _RouteCard extends StatelessWidget {
           ),
         ),
       ),
-    );
+    )); // RepaintBoundary
   }
 }
 
@@ -18784,6 +18871,38 @@ class _InfoPill extends StatelessWidget {
     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
     decoration: BoxDecoration(color: Colors.white.withOpacity(0.05), borderRadius: BorderRadius.circular(10)),
     child: Text('$icon $text', style: const TextStyle(color: RDSColor.textMuted, fontSize: 10)));
+}
+
+// ── _MetaChip — reemplaza _InfoPill con iconos Material Symbols ──────────
+// Úsalo en RouteDetail para mostrar tiempo, sitios, transporte, etc.
+class _MetaChip extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  const _MetaChip({required this.icon, required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    if (label.trim().isEmpty) return const SizedBox.shrink();
+    return ConstrainedBox(
+      constraints: const BoxConstraints(maxWidth: 260),
+      child: Container(
+        padding: const EdgeInsets.symmetric(
+          horizontal: RDSSpace.sm + 4, vertical: RDSSpace.xs + 2),
+        decoration: BoxDecoration(
+          color: RDSColor.surface,
+          borderRadius: RDSRadius.bFull,
+          border: Border.all(color: RDSColor.borderSubtle)),
+        child: Row(mainAxisSize: MainAxisSize.min, children: [
+          Icon(icon, size: 12, color: RDSColor.textMuted),
+          const SizedBox(width: RDSSpace.xs),
+          Flexible(child: Text(label,
+            style: RDSType.caption.copyWith(
+              color: RDSColor.textMuted,
+              fontWeight: FontWeight.w500),
+            softWrap: true,
+            overflow: TextOverflow.visible)),
+        ])));
+  }
 }
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -19452,24 +19571,7 @@ class _SiteItem extends StatelessWidget {
   }
 }
 
-class _StatChip extends StatelessWidget {
-  final String label, value; final Color color;
-  const _StatChip({required this.label, required this.value, required this.color});
-  @override
-  Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-    decoration: BoxDecoration(
-      color: RDSColor.card,                            // RDSColor.card → token
-      borderRadius: RDSRadius.bMd,                    // circular(12) → token
-      border: Border.all(color: color.withOpacity(0.25))),
-    child: Column(children: [
-      Text(value,
-        style: RDSType.displaySm.copyWith(            // fontSize:18 → token displaySm
-          color: color, fontWeight: FontWeight.w800)),
-      const SizedBox(height: 2),
-      Text(label, style: RDSType.caption),            // fontSize:10 → token caption
-    ]));
-}
+// _StatChip — ver definición en sección Home
 
 // ── _RDSMetricChip — chip de métrica premium ──────────────────────────────
 // Reemplaza _HeaderChip con soporte de ícono (IconData) O emoji.
@@ -19557,12 +19659,13 @@ class _CardCodigoAliado extends StatelessWidget {
             color: RDSColor.card.withOpacity(0.6),
             borderRadius: BorderRadius.circular(10),
           ),
-          child: Row(children: [
-            const Text('🎁', style: TextStyle(fontSize: 18)),
-            const SizedBox(width: 10),
+          child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            const Text('🎁', style: TextStyle(fontSize: 16)),
+            const SizedBox(width: 8),
             Expanded(child: Text(
               aliado.beneficio,
-              style: const TextStyle(color: RDSColor.textPrimary, fontSize: 13, fontWeight: FontWeight.w600, height: 1.4),
+              style: const TextStyle(color: RDSColor.textPrimary, fontSize: 12, fontWeight: FontWeight.w600, height: 1.4),
+              maxLines: 3, overflow: TextOverflow.ellipsis,
             )),
           ]),
         ),
@@ -19609,6 +19712,34 @@ class _CardCodigoAliado extends StatelessWidget {
         ),
         const SizedBox(height: 10),
 
+        // QR Code — para Mobiplab (aliado piloto B2B)
+        if (aliado.id == 'mobiplab') ...[
+          const SizedBox(height: 8),
+          Center(child: Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12)),
+            child: QrImageView(
+              data: 'RUTERO-MOBIPLAB-$codigo',
+              version: QrVersions.auto,
+              size: 160,
+              backgroundColor: Colors.white,
+              eyeStyle: const QrEyeStyle(
+                eyeShape: QrEyeShape.square,
+                color: Colors.black),
+              dataModuleStyle: const QrDataModuleStyle(
+                dataModuleShape: QrDataModuleShape.square,
+                color: Colors.black)))),
+          const SizedBox(height: 6),
+          Center(child: Text(
+            kLang == 'en'
+              ? 'Show this QR at Mobiplab — Calle 50 N° 55-50, 2nd floor'
+              : 'Mostrá este QR en Mobiplab · Calle 50 N° 55-50 piso 2',
+            style: const TextStyle(color: RDSColor.textMuted, fontSize: 10),
+            textAlign: TextAlign.center)),
+        ],
+
         // Instrucciones
         Row(children: [
           const Text('📍', style: TextStyle(fontSize: 12)),
@@ -19654,32 +19785,32 @@ class _MapStat extends StatelessWidget {
 }
 
 class _ProfileStat extends StatelessWidget {
-  final String valor, label, emoji;
-  const _ProfileStat({required this.valor, required this.label, required this.emoji});
+  final String valor, label;
+  final IconData icon;
+  final Color color;
+  const _ProfileStat({
+    required this.valor, required this.label,
+    required this.icon, required this.color});
+
   @override
   Widget build(BuildContext context) => Expanded(child: Container(
-    padding: const EdgeInsets.symmetric(vertical: 16),
+    padding: const EdgeInsets.symmetric(vertical: RDSSpace.md),
     decoration: BoxDecoration(
-      color: RDSColor.card,
-      borderRadius: BorderRadius.circular(16),
-      border: Border.all(color: RDSColor.gold.withOpacity(0.2)),
-      boxShadow: [BoxShadow(color: RDSColor.gold.withOpacity(0.06), blurRadius: 12)]),
+      color: color.withOpacity(0.07),
+      borderRadius: RDSRadius.bLg,
+      border: Border.all(color: color.withOpacity(0.2))),
     child: Column(children: [
-      Text(emoji, style: const TextStyle(fontSize: 22)),
-      const SizedBox(height: 6),
+      Icon(icon, color: color, size: 18),
+      const SizedBox(height: RDSSpace.xs),
       TweenAnimationBuilder<double>(
         tween: Tween(begin: 0, end: double.tryParse(valor) ?? 0),
-        duration: const Duration(milliseconds: 800),
+        duration: RDSDuration.slow,
         curve: Curves.easeOutCubic,
         builder: (_, v, __) => Text(v.toInt().toString(),
-          style: const TextStyle(
-            fontFamily: 'SpaceGrotesk',
-            fontSize: 24, fontWeight: FontWeight.w700, color: RDSColor.gold))),
-      const SizedBox(height: 3),
+          style: RDSType.labelLg.copyWith(color: color, fontSize: 22))),
+      const SizedBox(height: 2),
       Text(label, textAlign: TextAlign.center,
-        style: const TextStyle(
-          fontFamily: 'Inter',
-          fontSize: 9, color: RDSColor.textMuted, height: 1.3)),
+        style: RDSType.caption),
     ])));
 }
 
@@ -19691,18 +19822,34 @@ class _BadgeChip extends StatelessWidget {
     required this.desbloqueado, this.insigniaImg});
   @override
   Widget build(BuildContext context) => Column(children: [
-    Container(width: 64, height: 64,
-      decoration: BoxDecoration(shape: BoxShape.circle,
-        color: desbloqueado ? RDSColor.green.withOpacity(0.1) : const Color(0xFF050A04),
-        border: Border.all(color: desbloqueado ? RDSColor.green.withOpacity(0.5) : Colors.white.withOpacity(0.08), width: 1.5),
-        boxShadow: desbloqueado ? [BoxShadow(color: RDSColor.green.withOpacity(0.2), blurRadius: 8)] : null),
+    Container(width: 68, height: 68,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: desbloqueado
+          ? RDSColor.gold.withOpacity(0.06)
+          : RDSColor.surface,
+        border: Border.all(
+          color: desbloqueado
+            ? RDSColor.gold.withOpacity(0.4)
+            : RDSColor.borderSubtle,
+          width: desbloqueado ? 1.5 : 1.0),
+        boxShadow: desbloqueado
+          ? RDSElevation.glow(color: RDSColor.gold, opacity: 0.15)
+          : null),
       child: desbloqueado && insigniaImg != null
-        ? Image.asset(insigniaImg!, width: 64, height: 64, fit: BoxFit.contain,
-            errorBuilder: (_, __, ___) => Center(child: Text(emoji, style: const TextStyle(fontSize: 24))))
-        : Center(child: Text(desbloqueado ? emoji : '🔒',
-            style: TextStyle(fontSize: 24, color: desbloqueado ? null : Colors.white24)))),
-    const SizedBox(height: 5),
-    Text(nombre, style: TextStyle(fontSize: 9, color: desbloqueado ? RDSColor.textMuted : Colors.white24, letterSpacing: 0.5)),
+        ? Padding(padding: const EdgeInsets.all(4),
+            child: Image.asset(insigniaImg!, fit: BoxFit.contain,
+              errorBuilder: (_, __, ___) => Center(
+                child: Text(emoji, style: const TextStyle(fontSize: 26)))))
+        : Center(child: desbloqueado
+            ? Text(emoji, style: const TextStyle(fontSize: 26))
+            : Icon(RDSIcons.actionLock,
+                color: RDSColor.textMuted.withOpacity(0.3), size: 22))),
+    const SizedBox(height: RDSSpace.xs),
+    Text(nombre,
+      textAlign: TextAlign.center,
+      style: RDSType.caption.copyWith(
+        color: desbloqueado ? RDSColor.textMuted : RDSColor.textMuted.withOpacity(0.3))),
   ]);
 }
 
@@ -19731,25 +19878,59 @@ class _SwitchTile extends StatelessWidget {
 }
 
 class _ProfileMenuItem extends StatelessWidget {
-  final String emoji, label;
+  final String? emoji;
+  final IconData? icon;
+  final Color? color;
+  final String label;
+  final String? sublabel;
   final bool isRed;
   final VoidCallback? onTap;
-  const _ProfileMenuItem({required this.emoji, required this.label,
+  const _ProfileMenuItem({
+    this.emoji, this.icon, this.color,
+    required this.label, this.sublabel,
     this.isRed = false, this.onTap});
+
   @override
-  Widget build(BuildContext context) => GestureDetector(
-    onTap: onTap,
-    child: Container(margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-      decoration: BoxDecoration(color: RDSColor.card, borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: isRed ? const Color(0xFFE05252).withOpacity(0.2) : Colors.white.withOpacity(0.05))),
-      child: Row(children: [
-        Text(emoji, style: const TextStyle(fontSize: 18)),
-        const SizedBox(width: 14),
-        Expanded(child: Text(label, style: TextStyle(color: isRed ? const Color(0xFFE05252) : RDSColor.textPrimary,
-          fontSize: 14, fontWeight: FontWeight.w500))),
-        Icon(Icons.chevron_right, color: isRed ? const Color(0xFFE05252).withOpacity(0.5) : RDSColor.textMuted.withOpacity(0.4), size: 18),
-      ])));
+  Widget build(BuildContext context) {
+    final Color c = isRed
+      ? const Color(0xFFE05252)
+      : color ?? RDSColor.textPrimary;
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        margin: const EdgeInsets.only(bottom: RDSSpace.xs + 2),
+        padding: const EdgeInsets.symmetric(
+          horizontal: RDSSpace.md, vertical: RDSSpace.md),
+        decoration: BoxDecoration(
+          color: RDSColor.surface,
+          borderRadius: RDSRadius.bMd,
+          border: Border.all(
+            color: isRed
+              ? const Color(0xFFE05252).withOpacity(0.2)
+              : RDSColor.borderSubtle)),
+        child: Row(children: [
+          // Ícono o emoji
+          if (icon != null)
+            Icon(icon, color: c.withOpacity(0.85), size: 20)
+          else if (emoji != null)
+            Text(emoji!, style: const TextStyle(fontSize: 18)),
+          const SizedBox(width: RDSSpace.md),
+          Expanded(child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+            Text(label,
+              style: RDSType.headlineMd.copyWith(color: c)),
+            if (sublabel != null)
+              Text(sublabel!,
+                style: RDSType.bodySm),
+          ])),
+          Icon(RDSIcons.actionExplore,
+            color: isRed
+              ? const Color(0xFFE05252).withOpacity(0.4)
+              : RDSColor.textMuted.withOpacity(0.35),
+            size: 16),
+        ])));
+  }
 }
 
 class _LogroCard extends StatelessWidget {
@@ -20230,11 +20411,10 @@ class _FeriaHeader extends StatelessWidget {
       return Stack(children: [
         // Fondo hero: ocupa todo el alto que defina el contenido
         Positioned.fill(
-          child: Image.asset('assets/images/feria_hero.jpg', fit: BoxFit.cover,
-            errorBuilder: (_, __, ___) => Container(
-              decoration: const BoxDecoration(gradient: LinearGradient(
-                begin: Alignment.topLeft, end: Alignment.bottomRight,
-                colors: [Color(0xFF1A0A10), Color(0xFF2A1020), Color(0xFF0D1209)])))),
+          child: Container(
+            decoration: const BoxDecoration(gradient: LinearGradient(
+              begin: Alignment.topLeft, end: Alignment.bottomRight,
+              colors: [Color(0xFF1A0A10), Color(0xFF2A1020), Color(0xFF0D1209)]))),
         ),
         // Gradiente oscuro encima de la imagen
         Positioned.fill(
@@ -20475,7 +20655,7 @@ class _FeriaGameStats extends StatelessWidget {
             borderRadius: BorderRadius.circular(16),
             border: Border.all(color: kFeriaDorado.withOpacity(0.25))),
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(t('Tu aventura en Medellín', 'Your Medellín adventure'),
+            Text(t('Tu guía personal de Medellín', 'Your personal Medellín guide'),
               style: const TextStyle(fontSize: 11, color: kFeriaDorado,
                 fontWeight: FontWeight.w700, letterSpacing: 0.5)),
             const SizedBox(height: 10),
