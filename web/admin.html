@@ -133,6 +133,7 @@
     <div class="nav-item" onclick="showTab('colaboradores',this)"><span class="icon">🎬</span> Colaboradores</div>
     <div class="nav-item" onclick="showTab('servicios',this)"><span class="icon">🧭</span> Servicios Viajeros</div>
     <div class="nav-item" onclick="showTab('codigos',this)"><span class="icon">🎫</span> Códigos Aliado</div>
+    <div class="nav-item" onclick="showTab('hoteles',this)"><span class="icon">🏨</span> Hoteles Partner</div>
     <div style="position:absolute;bottom:20px;left:0;right:0;padding:0 20px;">
       <button class="btn-sm btn-ghost" style="width:100%" onclick="doLogout()">🚪 Cerrar sesión</button>
     </div>
@@ -153,6 +154,8 @@
         <div class="stat-card"><div class="label">Premios canjeados</div><div class="value" style="color:#B85CAE" id="stat-canjeados">—</div><div class="sub">Validados por aliados</div></div>
         <div class="stat-card"><div class="label">Aliados activos</div><div class="value" style="color:#5BAAA0" id="stat-aliados">—</div><div class="sub">Establecimientos vinculados</div></div>
         <div class="stat-card"><div class="label">Ciudades activas</div><div class="value" style="color:var(--oro)">3</div><div class="sub">Medellín · Bogotá · Popayán</div></div>
+        <div class="stat-card"><div class="label">Instalaciones Android</div><div class="value" style="color:#5BAAA0" id="stat-instalaciones">31</div><div class="sub">93.5% retención · Play Store</div></div>
+        <div class="stat-card"><div class="label">Versión activa</div><div class="value" style="color:var(--verde);font-size:18px">1.0.15</div><div class="sub">Android +27 · iOS build 29 en revisión</div></div>
       </div>
       <div class="card">
         <div class="card-header"><h3>📈 Últimos usuarios registrados</h3></div>
@@ -296,43 +299,6 @@
     </div>
 
     <!-- SONDEO -->
-    <div id="tab-sondeo" class="tab-content" style="display:none!important">
-      <div class="stats-grid" style="grid-template-columns:repeat(4,1fr);margin-bottom:20px">
-        <div class="stat-card"><div class="label">Total respuestas</div><div class="value" style="color:var(--verde)" id="stat-sondeo-total">—</div></div>
-        <div class="stat-card"><div class="label">🔥 Muy interesados</div><div class="value" style="color:var(--oro)" id="stat-sondeo-interesados">—</div></div>
-        <div class="stat-card"><div class="label">Reciben turistas internac.</div><div class="value" style="color:var(--acento)" id="stat-sondeo-dispuestos">—</div></div>
-        <div class="stat-card"><div class="label">Hablan inglés</div><div class="value" style="color:#B85CAE" id="stat-sondeo-internet">—</div></div>
-      </div>
-      <div class="search-bar">
-        <input class="search-input" placeholder="🔍 Buscar por negocio, ubicación..." id="search-sondeo" oninput="filtrarSondeo()">
-        <select class="search-input" style="max-width:160px" id="filtro-tipo-negocio" onchange="filtrarSondeo()">
-          <option value="">Todos los tipos</option>
-          <option value="restaurante">🍽️ Restaurante / Café / Bar</option>
-          <option value="hospedaje">🏨 Hotel / Hostal / Airbnb</option>
-          <option value="museo_atraccion">🏛️ Museo / Atracción</option>
-          <option value="tienda_artesania">🎨 Tienda / Artesanías</option>
-          <option value="tour_experiencia">🚶 Tour / Experiencia</option>
-          <option value="transporte">🚗 Transporte</option>
-          <option value="spa_bienestar">💆 Spa / Bienestar / Deporte</option>
-          <option value="otro">✨ Otro</option>
-        </select>
-        <select class="search-input" style="max-width:160px" id="filtro-interes" onchange="filtrarSondeo()">
-          <option value="">Todos niveles interés</option>
-          <option value="alto">🔥 Muy interesados</option>
-          <option value="medio">👍 Interesados</option>
-          <option value="curioso">🤔 Curiosos</option>
-          <option value="no_aun">⏸️ No por ahora</option>
-        </select>
-        <button class="btn-sm btn-verde" onclick="exportarSondeoCSV()">📥 Exportar CSV</button>
-      </div>
-      <div class="card">
-        <div class="card-header">
-          <h3>📋 Respuestas del sondeo</h3>
-          <span style="font-size:12px;color:var(--muted)" id="count-sondeo"></span>
-        </div>
-        <div id="tabla-sondeo"><div class="loading"><div class="spinner"></div></div></div>
-      </div>
-    </div>
 
     <!-- PESTAÑA PIPELINE CRM -->
     <div id="tab-importar" class="tab-content">
@@ -628,6 +594,55 @@
   </div>
 </div>
 
+<div id="tab-hoteles" class="tab-content">
+  <div class="stats-grid" style="grid-template-columns:repeat(3,1fr);margin-bottom:20px">
+    <div class="stat-card"><div class="label">Hoteles activos</div><div class="value" style="color:var(--verde)" id="stat-hoteles-activos">3</div><div class="sub">Códigos activos en la app</div></div>
+    <div class="stat-card"><div class="label">Activaciones totales</div><div class="value" style="color:var(--oro)" id="stat-hoteles-activaciones">—</div><div class="sub">Turistas que activaron código</div></div>
+    <div class="stat-card"><div class="label">Último registro</div><div class="value" style="color:#5BAAA0;font-size:16px" id="stat-hoteles-ultimo">—</div><div class="sub">Fecha más reciente</div></div>
+  </div>
+
+  <!-- Hoteles en código (hardcoded en Flutter) -->
+  <div class="card" style="margin-bottom:20px">
+    <div class="card-header">
+      <h3>🏨 Hoteles Partner — Códigos activos en app</h3>
+      <span style="font-size:11px;color:var(--muted)">Definidos en kHotelesPartner (main.dart)</span>
+    </div>
+    <table>
+      <tr><th>Hotel</th><th>Código</th><th>Zona</th><th>Rutas destacadas</th><th>Estado</th></tr>
+      <tr>
+        <td><strong>Metropolitan Living by HOUSY</strong><br><span style="font-size:11px;color:var(--muted)">San Diego / Centro</span></td>
+        <td style="color:var(--oro);font-weight:900;letter-spacing:2px">METROPOLITAN2026</td>
+        <td><span class="badge badge-gris">Centro</span></td>
+        <td style="font-size:11px;color:var(--muted)">CENTRO ALTERNATIVO · DEL ORIGEN PAISA · CAFÉS Y CANTINAS</td>
+        <td><span class="badge badge-verde">🟢 Activo</span></td>
+      </tr>
+      <tr>
+        <td><strong>The Charlee Hotel</strong><br><span style="font-size:11px;color:var(--muted)">El Poblado</span></td>
+        <td style="color:var(--oro);font-weight:900;letter-spacing:2px">CHARLEE2026</td>
+        <td><span class="badge badge-gris">El Poblado</span></td>
+        <td style="font-size:11px;color:var(--muted)">HUELLAS VIVAS · VIVE EL POBLADO · NOCHE EN EL POBLADO</td>
+        <td><span class="badge badge-verde">🟢 Activo</span></td>
+      </tr>
+      <tr>
+        <td><strong>Pergamino Café</strong><br><span style="font-size:11px;color:var(--muted)">Laureles</span></td>
+        <td style="color:var(--oro);font-weight:900;letter-spacing:2px">PERGAMINO2026</td>
+        <td><span class="badge badge-gris">Laureles</span></td>
+        <td style="font-size:11px;color:var(--muted)">VIVE LAURELES · NOCHE EN LAURELES</td>
+        <td><span class="badge badge-verde">🟢 Activo</span></td>
+      </tr>
+    </table>
+  </div>
+
+  <!-- Activaciones desde Firestore -->
+  <div class="card">
+    <div class="card-header">
+      <h3>📋 Activaciones de código de hotel</h3>
+      <button class="btn-sm btn-ghost" onclick="loadHotelActivaciones()">🔄 Actualizar</button>
+    </div>
+    <div id="tabla-hotel-activaciones"><div class="loading"><div class="spinner"></div></div></div>
+  </div>
+</div>
+
 <div id="tab-pipeline" class="tab-content">
       <div class="stats-grid" style="grid-template-columns:repeat(4,1fr);margin-bottom:20px">
         <div class="stat-card"><div class="label">Total contactos</div><div class="value" style="color:var(--verde)" id="stat-pipe-total">—</div></div>
@@ -715,6 +730,10 @@
       <div class="form-group"><label>WHATSAPP</label><input id="pipe-whatsapp" placeholder="3001234567"></div>
       <div class="form-group"><label>COMISIÓN RECIBIDA (COP)</label><input id="pipe-revenue" type="number" placeholder="0"></div>
     </div>
+    <div class="form-row">
+      <div class="form-group"><label>ÚLTIMO CONTACTO (fecha)</label><input id="pipe-ultimo-contacto" type="date"></div>
+      <div class="form-group"><label>PRÓXIMO FOLLOW-UP</label><input id="pipe-proximo-followup" type="date"></div>
+    </div>
     <div class="form-group"><label>¿CÓMO LO CONOCÍ?</label>
       <select id="pipe-fuente">
         <option value="campo">📍 Viaje de campo</option>
@@ -793,10 +812,23 @@
     <!-- Tipo de experiencia + País -->
     <div class="form-row">
       <div class="form-group" style="flex:2"><label>TIPO DE EXPERIENCIA</label><input class="form-group" id="ruta-tipoExperiencia" placeholder="Patrimonio & Historia"></div>
+      <div class="form-group"><label>TIPO EXP. EN</label><input class="form-group" id="ruta-tipoExperienciaEN" placeholder="Heritage & History"></div>
       <div class="form-group"><label>PAÍS</label>
         <select class="form-group" id="ruta-pais">
           <option>Colombia</option><option>Perú</option><option>Ecuador</option><option>Venezuela</option><option>Otro</option>
         </select>
+      </div>
+    </div>
+    <!-- Familiar -->
+    <div class="form-row">
+      <div class="form-group"><label>APTA PARA FAMILIAS</label>
+        <select class="form-group" id="ruta-familiar">
+          <option value="false">No</option>
+          <option value="true">👨‍👩‍👧 Sí — apta para familias</option>
+        </select>
+      </div>
+      <div class="form-group" style="flex:3"><label>NOTA FAMILIAR <span style="color:var(--muted);font-weight:400;font-size:10px">(opcional — tip especial para familias)</span></label>
+        <input class="form-group" id="ruta-notaFamiliar" placeholder="Ideal para niños mayores de 6 años · actividades en familia">
       </div>
     </div>
     <!-- Colores -->
@@ -1046,6 +1078,7 @@ function showTab(tab, el) {
   if (tab === 'colaboradores') loadColaboradores();
   if (tab === 'servicios') loadServicios();
   if (tab === 'codigos') loadCodigos();
+  if (tab === 'hoteles') loadHotelActivaciones();
   document.getElementById('page-title').textContent = titles[tab] || tab;
 }
 
@@ -1247,6 +1280,52 @@ function eliminarDoc(coleccion, id, callback) {
 
 
 
+// ─── HOTELES PARTNER ───────────────────────────────────────────────────────
+async function loadHotelActivaciones() {
+  const cont = document.getElementById('tabla-hotel-activaciones');
+  if (!cont) return;
+  cont.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+  try {
+    const snap = await db.collection('hotel_activaciones')
+      .orderBy('fecha', 'desc').limit(50).get();
+    if (snap.empty) {
+      cont.innerHTML = '<div class="empty-state">Sin activaciones aún. Cuando un turista ingrese un código de hotel, aparecerá aquí.</div>';
+      document.getElementById('stat-hoteles-activaciones').textContent = '0';
+      return;
+    }
+    document.getElementById('stat-hoteles-activaciones').textContent = snap.size;
+    // Fecha más reciente
+    const primerDoc = snap.docs[0].data();
+    if (primerDoc.fecha) {
+      const f = new Date(primerDoc.fecha.seconds * 1000);
+      document.getElementById('stat-hoteles-ultimo').textContent =
+        f.toLocaleDateString('es-CO', {day:'2-digit', month:'short'});
+    }
+    const colorHotel = {
+      'METROPOLITAN2026': 'var(--oro)',
+      'CHARLEE2026': '#5BAAA0',
+      'PERGAMINO2026': 'var(--verde)',
+    };
+    let h = '<table><tr><th>Hotel</th><th>Código</th><th>Usuario</th><th>Ciudad</th><th>Fecha</th></tr>';
+    snap.forEach(d => {
+      const data = d.data();
+      const f = data.fecha ? new Date(data.fecha.seconds * 1000).toLocaleDateString('es-CO') : '—';
+      const color = colorHotel[data.codigoHotel] || 'var(--muted)';
+      h += `<tr>
+        <td><strong style="color:${color}">${data.hotelNombre || data.codigoHotel || '—'}</strong></td>
+        <td style="color:var(--oro);font-weight:700;letter-spacing:1px;font-size:11px">${data.codigoHotel || '—'}</td>
+        <td style="color:var(--muted);font-size:12px">${data.userId ? data.userId.substring(0,8)+'…' : '—'}</td>
+        <td><span class="badge badge-gris">${data.zona || '—'}</span></td>
+        <td style="color:var(--muted);font-size:12px">${f}</td>
+      </tr>`;
+    });
+    h += '</table>';
+    cont.innerHTML = h;
+  } catch(e) {
+    cont.innerHTML = '<div class="empty-state">Error: ' + e.message + '</div>';
+  }
+}
+
 // ─── DASHBOARD ───
 async function loadDashboard() {
   try {
@@ -1403,7 +1482,7 @@ function abrirModalRuta() {
   document.getElementById('ruta-id').value = '';
   document.getElementById('btn-eliminar-ruta').style.display = 'none';
   ['nombre','emoji','subtitulo','precio','tiempo','transporte','premio','insignia','personaje','hook','descripcion','mejorHora',
-   'misionEpica','momentoClave','tipoExperiencia','color1','color2','acento','tag','tagPausada','imagen','insigniaImg',
+   'misionEpica','momentoClave','tipoExperiencia','tipoExperienciaEN','notaFamiliar','color1','color2','acento','tag','tagPausada','imagen','insigniaImg',
    'nombreEN','subtituloEN','hookEN','descripcionEN','tempMesInicio','tempDiaInicio','tempMesFin','tempDiaFin'
   ].forEach(f => { const el = document.getElementById('ruta-'+f); if(el) el.value=''; });
   document.getElementById('ruta-sitios').value = '';
@@ -1445,6 +1524,9 @@ function editarRuta(id) {
   document.getElementById('ruta-misionEpica').value = r.misionEpica||'';
   document.getElementById('ruta-momentoClave').value = r.momentoClave||'';
   document.getElementById('ruta-tipoExperiencia').value = r.tipoExperiencia||'';
+  document.getElementById('ruta-tipoExperienciaEN').value = r.tipoExperienciaEN||'';
+  document.getElementById('ruta-familiar').value = String(r.familiar === true);
+  document.getElementById('ruta-notaFamiliar').value = r.notaFamiliar||'';
   document.getElementById('ruta-pais').value = r.pais||'Colombia';
   document.getElementById('ruta-color1').value = r.color1||'';
   document.getElementById('ruta-color2').value = r.color2||'';
@@ -1514,6 +1596,9 @@ async function guardarRuta() {
     misionEpica: document.getElementById('ruta-misionEpica').value,
     momentoClave: document.getElementById('ruta-momentoClave').value,
     tipoExperiencia: document.getElementById('ruta-tipoExperiencia').value,
+    tipoExperienciaEN: document.getElementById('ruta-tipoExperienciaEN').value,
+    familiar: document.getElementById('ruta-familiar').value === 'true',
+    notaFamiliar: document.getElementById('ruta-notaFamiliar').value,
     color1: document.getElementById('ruta-color1').value,
     color2: document.getElementById('ruta-color2').value,
     acento: document.getElementById('ruta-acento').value,
@@ -2383,10 +2468,18 @@ function filtrarUsuarios() {
 }
 function renderUsuarios(usuarios) {
   if (!usuarios.length) { document.getElementById('tabla-usuarios').innerHTML = '<div class="empty-state">Sin usuarios registrados aún</div>'; return; }
-  let h = '<table><tr><th>Nombre</th><th>Email</th><th>Rutas</th><th>Puntos</th><th>Registro</th></tr>';
+  let h = '<table><tr><th>Nombre</th><th>Email</th><th>Ciudad</th><th>Rutas</th><th>Puntos</th><th>Registro</th></tr>';
   usuarios.forEach(u => {
     const f = u.fechaRegistro ? new Date(u.fechaRegistro.seconds*1000).toLocaleDateString('es-CO') : '—';
-    h += `<tr><td>👤 <strong>${u.nombre||'Sin nombre'}</strong></td><td style="color:var(--muted)">${u.email||'—'}</td><td><span class="badge badge-verde">${u.rutasCompletadas||0}</span></td><td style="color:var(--oro);font-weight:700">${u.puntosTotal||0} pts</td><td style="color:var(--muted);font-size:12px">${f}</td></tr>`;
+    const ciudad = u.ciudad || u.ciudadDetectada || '—';
+    h += `<tr>
+      <td>👤 <strong>${u.nombre||'Sin nombre'}</strong></td>
+      <td style="color:var(--muted)">${u.email||'—'}</td>
+      <td><span class="badge badge-gris">${ciudad}</span></td>
+      <td><span class="badge badge-verde">${u.rutasCompletadas||0}</span></td>
+      <td style="color:var(--oro);font-weight:700">${u.puntosTotal||0} pts</td>
+      <td style="color:var(--muted);font-size:12px">${f}</td>
+    </tr>`;
   });
   document.getElementById('tabla-usuarios').innerHTML = h + '</table>';
 }
@@ -2500,10 +2593,21 @@ function filtrarPremios() {
 }
 function renderPremios(premios) {
   if (!premios.length) { document.getElementById('tabla-premios').innerHTML = '<div class="empty-state">Sin premios generados aún</div>'; return; }
-  let h = '<table><tr><th>Código</th><th>Ruta</th><th>Insignia</th><th>Estado</th><th>Fecha</th><th>Acción</th></tr>';
+  let h = '<table><tr><th>Código</th><th>Usuario</th><th>Ruta</th><th>Insignia</th><th>Estado</th><th>Fecha</th><th>Acción</th></tr>';
   premios.forEach(p => {
     const f = p.fecha ? new Date(p.fecha.seconds*1000).toLocaleDateString('es-CO') : '—';
-    h += `<tr><td style="font-weight:900;color:var(--oro);letter-spacing:2px;font-size:12px">${p.codigo||'—'}</td><td>${p.emoji||''} ${p.rutaNombre||'—'}</td><td style="color:var(--muted);font-size:12px">${p.insignia||'—'}</td><td><span class="badge ${p.canjeado?'badge-gris':'badge-verde'}">${p.canjeado?'Canjeado':'Disponible'}</span></td><td style="color:var(--muted);font-size:12px">${f}</td><td>${!p.canjeado?`<button class="btn-sm btn-oro" onclick="canjearDesdeTabla('${p.id}')">✅ Canjear</button>`:'—'}</td></tr>`;
+    // El userId viene del path: users/{userId}/premios/{premioId}
+    const uid = p.ref?.parent?.parent?.id || p.userId || '—';
+    const uidShort = uid !== '—' ? uid.substring(0,8)+'…' : '—';
+    h += `<tr>
+      <td style="font-weight:900;color:var(--oro);letter-spacing:2px;font-size:12px">${p.codigo||'—'}</td>
+      <td style="color:var(--muted);font-size:11px" title="${uid}">${uidShort}</td>
+      <td>${p.emoji||''} ${p.rutaNombre||'—'}</td>
+      <td style="color:var(--muted);font-size:12px">${p.insignia||'—'}</td>
+      <td><span class="badge ${p.canjeado?'badge-gris':'badge-verde'}">${p.canjeado?'Canjeado':'Disponible'}</span></td>
+      <td style="color:var(--muted);font-size:12px">${f}</td>
+      <td>${!p.canjeado?`<button class="btn-sm btn-oro" onclick="canjearDesdeTabla('${p.id}')">✅ Canjear</button>`:'—'}</td>
+    </tr>`;
   });
   document.getElementById('tabla-premios').innerHTML = h + '</table>';
 }
@@ -2672,6 +2776,16 @@ async function validarCodigo() {
       }
     }
 
+    // Si no está en consumos_aliados, buscar en hotel_activaciones (códigos de hotel)
+    if (!docEncontrado) {
+      const snapHotel = await db.collection('hotel_activaciones').where('codigo','==',codigo).get();
+      if (!snapHotel.empty) {
+        docEncontrado = snapHotel.docs[0];
+        datosEncontrados = docEncontrado.data();
+        coleccionOrigen = 'hotel_activaciones';
+      }
+    }
+
     if (!docEncontrado) {
       res.className = 'resultado-validacion resultado-err';
       res.innerHTML = `<div style="font-size:32px">❌</div><div style="font-size:16px;font-weight:700;margin:8px 0">Codigo no encontrado</div><div style="color:var(--muted);font-size:13px">"${codigo}" no existe en el sistema</div>`;
@@ -2832,172 +2946,6 @@ async function sincronizarRutas() {
   }
 }
 
-
-// ─── SONDEO ALIADOS ───
-let todasRespuestas = [];
-
-async function loadSondeo() {
-  try {
-    const snap = await db.collection('sondeo_aliados').orderBy('fecha_envio','desc').get();
-    todasRespuestas = [];
-    snap.forEach(d => todasRespuestas.push({id:d.id,...d.data()}));
-    actualizarStatsSondeo(todasRespuestas);
-    renderSondeo(todasRespuestas);
-  } catch(e) {
-    console.error('Error loadSondeo:', e);
-    document.getElementById('tabla-sondeo').innerHTML = '<div class="empty-state">Sin respuestas aún. Comparte el link del sondeo con los aliados.</div>';
-    document.getElementById('stat-sondeo-total').textContent = '0';
-    document.getElementById('stat-sondeo-interesados').textContent = '0';
-    document.getElementById('stat-sondeo-dispuestos').textContent = '0';
-    document.getElementById('stat-sondeo-internet').textContent = '0';
-  }
-}
-
-function actualizarStatsSondeo(resp) {
-  const total = resp.length;
-  // 🔥 Muy interesados = nivel alto
-  const interesados = resp.filter(r => r.interes === 'alto').length;
-  // Reciben turistas internacionales (muchos o algunos)
-  const dispuestos = resp.filter(r => r.turistas_actuales === 'muchos' || r.turistas_actuales === 'algunos').length;
-  // Hablan inglés (fluido o básico)
-  const internet = resp.filter(r => r.ingles === 'fluido' || r.ingles === 'basico').length;
-  document.getElementById('stat-sondeo-total').textContent = total;
-  document.getElementById('stat-sondeo-interesados').textContent = interesados;
-  document.getElementById('stat-sondeo-dispuestos').textContent = dispuestos;
-  document.getElementById('stat-sondeo-internet').textContent = internet;
-  document.getElementById('count-sondeo').textContent = `${total} respuestas`;
-}
-
-function filtrarSondeo() {
-  const q = document.getElementById('search-sondeo').value.toLowerCase();
-  const tipo = document.getElementById('filtro-tipo-negocio').value;
-  const interes = document.getElementById('filtro-interes').value;
-  const filtradas = todasRespuestas.filter(r => {
-    const mq = (r.nombre_negocio||'').toLowerCase().includes(q) || (r.ubicacion||'').toLowerCase().includes(q);
-    const mt = !tipo || r.tipo_negocio === tipo;
-    const mi = !interes || r.interes === interes;
-    return mq && mt && mi;
-  });
-  renderSondeo(filtradas);
-}
-
-function renderSondeo(resp) {
-  if (!resp.length) {
-    document.getElementById('tabla-sondeo').innerHTML = '<div class="empty-state">Sin respuestas que coincidan</div>';
-    return;
-  }
-  document.getElementById('count-sondeo').textContent = `${resp.length} respuestas`;
-
-  // Badge de nivel de interés
-  const interesBadge = v => {
-    if (v === 'alto') return '<span class="badge badge-verde">🔥 Muy interesado</span>';
-    if (v === 'medio') return '<span class="badge badge-oro">👍 Interesado</span>';
-    if (v === 'curioso') return '<span class="badge" style="background:rgba(184,92,174,0.15);color:#B85CAE">🤔 Curioso</span>';
-    if (v === 'no_aun') return '<span class="badge badge-gris">⏸️ No por ahora</span>';
-    return '<span class="badge badge-gris">—</span>';
-  };
-
-  // Badge de tipo de negocio (legible)
-  const tipoLabel = v => {
-    const map = {
-      'restaurante': '🍽️ Restaurante',
-      'hospedaje': '🏨 Hospedaje',
-      'museo_atraccion': '🏛️ Museo',
-      'tienda_artesania': '🎨 Tienda',
-      'tour_experiencia': '🚶 Tour',
-      'transporte': '🚗 Transporte',
-      'spa_bienestar': '💆 Spa',
-      'otro': '✨ Otro'
-    };
-    return map[v] || v || '—';
-  };
-
-  // Badge turistas
-  const turistasLabel = v => {
-    const map = {
-      'muchos': '🌍 Muchos',
-      'algunos': '✈️ Algunos',
-      'pocos': '🤷 Pocos',
-      'ninguno': '🇨🇴 Ninguno'
-    };
-    return map[v] || '—';
-  };
-
-  // Badge inglés
-  const inglesLabel = v => {
-    const map = {
-      'fluido': '🇬🇧 Fluido',
-      'basico': '🗣️ Básico',
-      'no_pero_queremos': '📚 Quiere aprender',
-      'no': '🇨🇴 No'
-    };
-    return map[v] || '—';
-  };
-
-  // Beneficios ofrecidos (array)
-  const beneficiosLabel = arr => {
-    if (!arr || !Array.isArray(arr) || arr.length === 0) return '—';
-    const map = {
-      'descuento': '🏷️', 'producto_gratis': '🎁', 'bebida_postre': '🥤',
-      'experiencia': '✨', 'combo': '📦', 'ninguno': '🚫', 'no_seguro': '🤔'
-    };
-    return arr.map(b => map[b] || b).join(' ');
-  };
-
-  let h = `<table><tr>
-    <th>Negocio</th><th>Ubicación</th><th>Tipo</th><th>Contacto</th>
-    <th>Turistas</th><th>Inglés</th><th>Beneficios</th>
-    <th>Interés</th><th>Fecha</th>
-  </tr>`;
-  resp.forEach(r => {
-    let fechaTxt = '—';
-    if (r.fecha_envio) {
-      if (r.fecha_envio.seconds) fechaTxt = new Date(r.fecha_envio.seconds*1000).toLocaleDateString('es-CO');
-      else if (r.fecha_envio.toDate) fechaTxt = r.fecha_envio.toDate().toLocaleDateString('es-CO');
-    }
-    const wa = (r.contacto_whatsapp||'').replace(/[^0-9]/g,'');
-    h += `<tr>
-      <td><strong>${r.nombre_negocio||'—'}</strong>${r.observaciones?`<div style="font-size:11px;color:var(--muted);margin-top:2px;font-style:italic">"${r.observaciones}"</div>`:''}</td>
-      <td style="color:var(--muted)">${r.ubicacion||'—'}</td>
-      <td><span class="badge badge-gris">${tipoLabel(r.tipo_negocio)}</span></td>
-      <td>
-        <div style="font-size:12px">${r.contacto_nombre||'—'}</div>
-        ${wa ? `<a href="https://wa.me/57${wa}" target="_blank" style="color:var(--verde);font-size:11px">📱 ${r.contacto_whatsapp}</a>` : '<span style="color:var(--muted);font-size:11px">Sin WhatsApp</span>'}
-      </td>
-      <td style="font-size:12px">${turistasLabel(r.turistas_actuales)}</td>
-      <td style="font-size:12px">${inglesLabel(r.ingles)}</td>
-      <td style="font-size:14px" title="${(r.beneficio||[]).join(', ')}">${beneficiosLabel(r.beneficio)}</td>
-      <td>${interesBadge(r.interes)}</td>
-      <td style="color:var(--muted);font-size:11px">${fechaTxt}</td>
-    </tr>`;
-  });
-  document.getElementById('tabla-sondeo').innerHTML = h + '</table>';
-}
-
-function exportarSondeoCSV() {
-  if (!todasRespuestas.length) { alert('Sin respuestas para exportar'); return; }
-  const cols = ['nombre_negocio','tipo_negocio','ubicacion','tiempo_operacion','turistas_actuales','beneficio','metodo_validacion','ingles','interes','contacto_nombre','contacto_whatsapp','contacto_email','observaciones'];
-  const headers = ['Negocio','Tipo','Ubicación','Tiempo operando','Turistas internac.','Beneficios','Validación','Inglés','Interés','Contacto','WhatsApp','Email','Observaciones','Fecha'];
-  let csv = headers.join(',') + String.fromCharCode(10);
-  todasRespuestas.forEach(function(r) {
-    let fechaTxt = '';
-    if (r.fecha_envio && r.fecha_envio.seconds) fechaTxt = new Date(r.fecha_envio.seconds*1000).toLocaleDateString('es-CO');
-    const row = cols.map(function(c) {
-      let v = r[c];
-      if (Array.isArray(v)) v = v.join('; ');
-      return '"' + (v||'').toString().replace(/"/g,'""') + '"';
-    });
-    row.push('"' + fechaTxt + '"');
-    csv += row.join(',') + String.fromCharCode(10);
-  });
-  const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = 'sondeo_aliados_rutero.csv';
-  a.click();
-  URL.revokeObjectURL(url);
-}
 
 // ═══════════════════════════════════════════════════════════
 //  PIPELINE CRM — Gestión de aliados
@@ -3160,11 +3108,17 @@ function renderPipeline(arr) {
 
   let h = `<table><tr>
     <th>Aliado</th><th>Categoría</th><th>Ubicación</th>
-    <th>Tier</th><th>Estado</th><th>Revenue</th><th>Fuente</th><th></th>
+    <th>Tier</th><th>Estado</th><th>Revenue</th><th>Follow-up</th><th>Fuente</th><th></th>
   </tr>`;
   arr.forEach(r => {
     const rev = r.revenue && r.revenue > 0 ? `<strong style="color:var(--verde)">$${Number(r.revenue).toLocaleString('es-CO')}</strong>` : '<span style="color:var(--muted)">—</span>';
     const wa = (r.whatsapp||'').replace(/[^0-9]/g,'');
+    const hoy = new Date().toISOString().split('T')[0];
+    const followupBadge = r.proximoFollowup
+      ? (r.proximoFollowup < hoy
+          ? `<span class="badge badge-rojo" title="Vencido">⚠️ ${r.proximoFollowup}</span>`
+          : `<span class="badge badge-gris">📅 ${r.proximoFollowup}</span>`)
+      : '<span style="color:var(--muted);font-size:11px">—</span>';
     h += `<tr>
       <td>
         <strong>${r.nombre||'—'}</strong>
@@ -3176,6 +3130,7 @@ function renderPipeline(arr) {
       <td>${tierBadge(r.tier)}</td>
       <td>${estadoBadge(r.estado)}</td>
       <td>${rev}</td>
+      <td>${followupBadge}</td>
       <td style="font-size:11px;color:var(--muted)">${fuenteLabel(r.fuente)}${wa?`<br><a href="https://wa.me/57${wa}" target="_blank" style="color:var(--verde);font-size:10px">📱 WhatsApp</a>`:''}</td>
       <td><button class="btn-sm btn-ghost" onclick="editarPipe('${r.id}')">✏️</button></td>
     </tr>`;
@@ -3192,6 +3147,8 @@ function nuevoAliado() {
   document.getElementById('pipe-tier').value = 'tier2';
   document.getElementById('pipe-estado').value = 'por_contactar';
   document.getElementById('pipe-fuente').value = 'campo';
+  document.getElementById('pipe-ultimo-contacto').value = '';
+  document.getElementById('pipe-proximo-followup').value = '';
   document.getElementById('btn-pipe-delete').style.display = 'none';
   document.getElementById('modal-pipe').classList.add('open');
 }
@@ -3211,6 +3168,8 @@ function editarPipe(id) {
   document.getElementById('pipe-revenue').value = r.revenue || '';
   document.getElementById('pipe-fuente').value = r.fuente || 'campo';
   document.getElementById('pipe-notas').value = r.notas || '';
+  document.getElementById('pipe-ultimo-contacto').value = r.ultimoContacto || '';
+  document.getElementById('pipe-proximo-followup').value = r.proximoFollowup || '';
   document.getElementById('btn-pipe-delete').style.display = 'inline-block';
   document.getElementById('modal-pipe').classList.add('open');
 }
@@ -3235,7 +3194,9 @@ async function guardarPipe() {
     whatsapp: document.getElementById('pipe-whatsapp').value.trim(),
     revenue: parseInt(document.getElementById('pipe-revenue').value) || 0,
     fuente: document.getElementById('pipe-fuente').value,
-    notas: document.getElementById('pipe-notas').value.trim()
+    notas: document.getElementById('pipe-notas').value.trim(),
+    ultimoContacto: document.getElementById('pipe-ultimo-contacto').value || '',
+    proximoFollowup: document.getElementById('pipe-proximo-followup').value || ''
   };
   if (!datos.nombre) { alert('El nombre del aliado es obligatorio'); return; }
   try {

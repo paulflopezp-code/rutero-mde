@@ -1,6 +1,18 @@
 // ════════════════════════════════════════════════════════════════════════════
-//  RUTERO MDE — Design System v1.0
-//  Fase 1: Foundation
+//  RUTERO MDE — Design System v3.0
+//  Fase 1: Foundation (v1.0) + Fase B: Premium 3.0
+//
+//  NUEVO EN v3.0 (Sección 8)
+//  ─────────────────────────
+//  8.1  RDSColor3       — tokens color adicionales (borders, scrims, badges)
+//  8.2  RDSType3        — tipografía hero, points, distance, tag
+//  8.3  RDSGradient     — gradientes cinematográficos
+//  8.4  HeroOverlay     — overlay foto reutilizable
+//  8.5  SitioCard       — card de sitio con 4 estados
+//  8.6  CategoryChip    — chip de filtro para Explorar y Mapa
+//  8.7  StatusBadge     — badge insignia con 4 niveles
+//  8.8  SponsorBadge    — logo patrocinador B2B
+//  8.9  GpsRangeIndicator — indicador distancia GPS
 //
 //  Este archivo es la fuente de verdad de todos los tokens visuales.
 //  Importarlo en main.dart y en cualquier pantalla nueva:
@@ -397,7 +409,534 @@ abstract final class RDSIcons {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-//  SECCIÓN 8 — LEGACY ALIASES
+//  SECCIÓN 8 — RDS 3.0 — NUEVOS TOKENS Y COMPONENTES
+//  Fase B del rediseño premium. Agrega tokens faltantes y componentes
+//  reutilizables para las 7 pantallas prioritarias.
+//  NO modifica tokens existentes — solo extiende.
+// ─────────────────────────────────────────────────────────────────────────────
+
+// ── 8.1 TOKENS DE COLOR ADICIONALES ──────────────────────────────────────────
+extension RDSColor3 on RDSColor {
+  // Surface elevado — nivel intermedio entre surface y card
+  // Úsalo en sheets y modales sobre RDSColor.surface
+  static const Color surfaceElevated = Color(0xFF20251C);
+
+  // Bordes con opacidad fija (evita .withOpacity() inline)
+  static const Color borderGold10  = Color(0x1AC9A84C); // 10% gold
+  static const Color borderGold20  = Color(0x33C9A84C); // 20% gold
+  static const Color borderGold35  = Color(0x59C9A84C); // 35% gold
+  static const Color borderWhite8  = Color(0x14FFFFFF); // 8% white
+  static const Color borderWhite12 = Color(0x1FFFFFFF); // 12% white
+
+  // Scrim cinematográfico — overlay de foto en hero
+  static const Color scrimHero = Color(0xCC000000);     // 80% negro
+  static const Color scrimCard = Color(0x99000000);     // 60% negro
+
+  // Estado insignia
+  static const Color badgeLocked    = Color(0xFF2A2E22); // Gris oscuro
+  static const Color badgeAvailable = Color(0xFF1C2E1C); // Verde muy oscuro
+  static const Color badgeCompleted = Color(0xFFC9A84C); // Gold
+  static const Color badgeMastered  = Color(0xFFE8C96A); // Gold claro brillante
+
+  // Sponsor — neutro para logos de patrocinadores
+  static const Color sponsorBg     = Color(0xFF1C2018); // = card
+  static const Color sponsorBorder = Color(0x33C9A84C); // = borderGold20
+}
+
+// ── 8.2 TIPOGRAFÍA ADICIONAL ─────────────────────────────────────────────────
+extension RDSType3 on RDSType {
+  // Display heroico — para SplashScreen y pantallas de celebración
+  static const TextStyle displayHero = TextStyle(
+    fontFamily: RDSType.familyDisplay, fontSize: 48, fontWeight: FontWeight.w900,
+    color: RDSColor.textPrimary, letterSpacing: -1.0, height: 1.0);
+
+  // Display extra grande — nombre de ruta en hero de RouteDetail
+  static const TextStyle displayXl = TextStyle(
+    fontFamily: RDSType.familyDisplay, fontSize: 36, fontWeight: FontWeight.w900,
+    color: RDSColor.textPrimary, letterSpacing: -0.8, height: 1.05);
+
+  // Tag / etiqueta de categoría — SpaceGrotesk uppercase
+  static const TextStyle tag = TextStyle(
+    fontFamily: RDSType.familyData, fontSize: 10, fontWeight: FontWeight.w700,
+    color: RDSColor.textMuted, letterSpacing: 2.0, height: 1.2);
+
+  // Puntos grandes — RewardScreen
+  static const TextStyle points = TextStyle(
+    fontFamily: RDSType.familyData, fontSize: 42, fontWeight: FontWeight.w700,
+    color: RDSColor.gold, letterSpacing: -0.5, height: 1.0);
+
+  // Distancia GPS — SitioInfoScreen
+  static const TextStyle distance = TextStyle(
+    fontFamily: RDSType.familyData, fontSize: 28, fontWeight: FontWeight.w700,
+    color: RDSColor.textPrimary, letterSpacing: -0.3, height: 1.1);
+}
+
+// ── 8.3 GRADIENTES ADICIONALES ───────────────────────────────────────────────
+// Usar en _HeroOverlay y RouteDetailScreen
+class RDSGradient {
+  // Scrim cinematográfico inferior — foto de ruta con texto encima
+  static const LinearGradient heroScrim = LinearGradient(
+    begin: Alignment.topCenter, end: Alignment.bottomCenter,
+    stops: [0.0, 0.35, 1.0],
+    colors: [Colors.transparent, Color(0x44000000), Color(0xEE000000)]);
+
+  // Scrim lateral izquierdo — para texto sobre foto en landscape
+  static const LinearGradient heroScrimLeft = LinearGradient(
+    begin: Alignment.centerRight, end: Alignment.centerLeft,
+    colors: [Colors.transparent, Color(0xCC000000)]);
+
+  // Gradiente de celebración — RewardScreen
+  static const LinearGradient reward = LinearGradient(
+    begin: Alignment.topLeft, end: Alignment.bottomRight,
+    colors: [Color(0xFF1A1A0A), Color(0xFF0A1A0A), Color(0xFF1A0A0A)]);
+
+  // Gradiente GPS cerca — SitioInfoScreen estado "dentro del radio"
+  static const LinearGradient gpsActive = LinearGradient(
+    begin: Alignment.topLeft, end: Alignment.bottomRight,
+    colors: [Color(0xFF0A1A0A), Color(0xFF1A2A1A)]);
+}
+
+// ── 8.4 COMPONENTE: _HeroOverlay ─────────────────────────────────────────────
+// Overlay cinematográfico reutilizable para fotos de rutas.
+// Uso: Stack([Image.asset(...), _HeroOverlay()])
+//
+// Ejemplo en RouteDetailScreen:
+//   Stack(children: [
+//     Image.asset(ruta['imagen'], fit: BoxFit.cover),
+//     _HeroOverlay(),
+//     Positioned(bottom: 0, child: _HeroContent(...)),
+//   ])
+class HeroOverlay extends StatelessWidget {
+  final double intensity; // 0.0 a 1.0 — qué tan oscuro el scrim
+  final AlignmentGeometry begin;
+  final AlignmentGeometry end;
+
+  const HeroOverlay({
+    super.key,
+    this.intensity = 1.0,
+    this.begin = Alignment.topCenter,
+    this.end = Alignment.bottomCenter,
+  });
+
+  @override
+  Widget build(BuildContext context) => DecoratedBox(
+    decoration: BoxDecoration(
+      gradient: LinearGradient(
+        begin: begin, end: end,
+        stops: const [0.0, 0.3, 1.0],
+        colors: [
+          Colors.transparent,
+          Colors.black.withOpacity(0.3 * intensity),
+          Colors.black.withOpacity(0.88 * intensity),
+        ])));
+}
+
+// ── 8.5 COMPONENTE: _SitioCard ────────────────────────────────────────────────
+// Card de sitio en RouteDetailScreen. 4 estados visuales.
+// Úsalo para reemplazar los Container inline de la lista de sitios.
+//
+// Uso:
+//   SitioCard(
+//     numero: 1, nombre: 'Parque Prado', emoji: '🌳',
+//     estado: SitioEstado.proximo, onTap: _irASitio)
+enum SitioEstado { bloqueado, proximo, enProgreso, completado }
+
+class SitioCard extends StatelessWidget {
+  final int numero;
+  final String nombre;
+  final String emoji;
+  final SitioEstado estado;
+  final VoidCallback? onTap;
+  final String? distancia;
+  final String? descripcionBreve;
+
+  const SitioCard({
+    super.key,
+    required this.numero,
+    required this.nombre,
+    required this.emoji,
+    this.estado = SitioEstado.bloqueado,
+    this.onTap,
+    this.distancia,
+    this.descripcionBreve,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final bool activo = estado == SitioEstado.proximo || estado == SitioEstado.enProgreso;
+    final bool hecho  = estado == SitioEstado.completado;
+    final bool lock   = estado == SitioEstado.bloqueado;
+
+    final Color acento = hecho
+        ? RDSColor.gold
+        : activo
+            ? RDSColor.green
+            : RDSColor.borderSubtle;
+
+    return GestureDetector(
+      onTap: lock ? null : onTap,
+      child: AnimatedContainer(
+        duration: RDSDuration.fast,
+        margin: const EdgeInsets.only(bottom: RDSSpace.sm),
+        padding: const EdgeInsets.all(RDSSpace.md),
+        decoration: BoxDecoration(
+          color: activo
+              ? RDSColor.green.withOpacity(0.07)
+              : hecho
+                  ? RDSColor.gold.withOpacity(0.05)
+                  : RDSColor.surface,
+          borderRadius: RDSRadius.bLg,
+          border: Border.all(
+            color: acento.withOpacity(activo ? 0.35 : hecho ? 0.25 : 0.08),
+            width: activo ? 1.5 : 1.0),
+          boxShadow: activo
+              ? RDSElevation.glow(color: RDSColor.green, opacity: 0.15)
+              : null),
+        child: Row(children: [
+          // Número / estado
+          Container(
+            width: 36, height: 36,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: hecho
+                  ? RDSColor.gold.withOpacity(0.15)
+                  : activo
+                      ? RDSColor.green.withOpacity(0.15)
+                      : RDSColor.borderSubtle.withOpacity(0.5),
+              border: Border.all(color: acento.withOpacity(0.4))),
+            child: Center(child: hecho
+                ? Icon(RDSIcons.check, size: 16, color: RDSColor.gold)
+                : lock
+                    ? Icon(RDSIcons.actionLock, size: 14, color: RDSColor.textMuted)
+                    : Text('$numero',
+                        style: RDSType.labelMd.copyWith(
+                          color: activo ? RDSColor.green : RDSColor.textMuted))),
+          ),
+          const SizedBox(width: RDSSpace.md),
+          // Contenido
+          Expanded(child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Row(children: [
+                Text(emoji, style: const TextStyle(fontSize: 14)),
+                const SizedBox(width: RDSSpace.xs),
+                Expanded(child: Text(nombre,
+                  style: RDSType.headlineMd.copyWith(
+                    color: lock ? RDSColor.textMuted : RDSColor.textPrimary),
+                  maxLines: 1, overflow: TextOverflow.ellipsis)),
+              ]),
+              if (descripcionBreve != null && !lock) ...[
+                const SizedBox(height: 2),
+                Text(descripcionBreve!,
+                  style: RDSType.bodySm,
+                  maxLines: 1, overflow: TextOverflow.ellipsis),
+              ],
+              if (activo && distancia != null) ...[
+                const SizedBox(height: 4),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: RDSSpace.sm, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: RDSColor.green.withOpacity(0.12),
+                    borderRadius: RDSRadius.bFull),
+                  child: Text(distancia!,
+                    style: RDSType.labelSm.copyWith(color: RDSColor.green))),
+              ],
+            ])),
+          // Flecha o check
+          if (!lock)
+            Icon(
+              hecho ? RDSIcons.check : RDSIcons.actionExplore,
+              size: 16,
+              color: hecho ? RDSColor.gold : RDSColor.textMuted),
+        ])));
+  }
+}
+
+// ── 8.6 COMPONENTE: CategoryChip ─────────────────────────────────────────────
+// Chip de filtro para Explorar y Mapa.
+// Reemplaza los _FiltroChip inline en HomeBody y MapScreen.
+//
+// Uso:
+//   CategoryChip(label: 'Ciudad', activo: true, onTap: () => ...)
+class CategoryChip extends StatelessWidget {
+  final String label;
+  final bool activo;
+  final VoidCallback onTap;
+  final IconData? icon;
+  final Color? color;
+
+  const CategoryChip({
+    super.key,
+    required this.label,
+    required this.activo,
+    required this.onTap,
+    this.icon,
+    this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final Color c = color ?? RDSColor.green;
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: RDSDuration.fast,
+        padding: const EdgeInsets.symmetric(
+          horizontal: RDSSpace.md, vertical: RDSSpace.sm - 2),
+        decoration: BoxDecoration(
+          color: activo ? c.withOpacity(0.15) : RDSColor.surface,
+          borderRadius: RDSRadius.bFull,
+          border: Border.all(
+            color: activo ? c.withOpacity(0.5) : RDSColor.borderSubtle,
+            width: activo ? 1.5 : 1.0),
+          boxShadow: activo
+              ? RDSElevation.glow(color: c, opacity: 0.12) : null),
+        child: Row(mainAxisSize: MainAxisSize.min, children: [
+          if (icon != null) ...[
+            Icon(icon, size: 14,
+              color: activo ? c : RDSColor.textMuted),
+            const SizedBox(width: RDSSpace.xs),
+          ],
+          Text(label,
+            style: RDSType.labelSm.copyWith(
+              color: activo ? c : RDSColor.textMuted,
+              fontWeight: activo ? FontWeight.w700 : FontWeight.w500)),
+        ])));
+  }
+}
+
+// ── 8.7 COMPONENTE: StatusBadge ───────────────────────────────────────────────
+// Badge de estado de insignia — 4 niveles.
+// Uso en AchievementsScreen y InsigniaCell.
+//
+// Uso:
+//   StatusBadge(estado: InsigniaEstado.completado)
+enum InsigniaEstado { locked, available, completed, mastered }
+
+class StatusBadge extends StatelessWidget {
+  final InsigniaEstado estado;
+  final String? label;
+
+  const StatusBadge({super.key, required this.estado, this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    final Map<InsigniaEstado, _BadgeStyle> styles = {
+      InsigniaEstado.locked:    _BadgeStyle('BLOQUEADA', RDSColor.textMuted, RDSColor.surface),
+      InsigniaEstado.available: _BadgeStyle('DISPONIBLE', RDSColor.green, RDSColor3.badgeAvailable),
+      InsigniaEstado.completed: _BadgeStyle('COMPLETADA', RDSColor.gold, RDSColor3.badgeLocked),
+      InsigniaEstado.mastered:  _BadgeStyle('MAESTRA', RDSColor.goldLight, RDSColor3.badgeLocked),
+    };
+    final style = styles[estado]!;
+    final text = label ?? style.label;
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: RDSSpace.sm, vertical: 2),
+      decoration: BoxDecoration(
+        color: style.bg,
+        borderRadius: RDSRadius.bFull,
+        border: Border.all(color: style.color.withOpacity(0.3))),
+      child: Text(text,
+        style: const TextStyle(fontFamily: 'SpaceGrotesk', fontSize: 10, fontWeight: FontWeight.w700, letterSpacing: 2.0, color: RDSColor.textMuted).copyWith(
+          color: style.color, letterSpacing: 1.5)));
+  }
+}
+
+class _BadgeStyle {
+  final String label;
+  final Color color;
+  final Color bg;
+  const _BadgeStyle(this.label, this.color, this.bg);
+}
+
+// ── 8.8 COMPONENTE: SponsorBadge ─────────────────────────────────────────────
+// Logo de patrocinador para Splash, RewardScreen, RouteDetail.
+// Respeta la jerarquía: nunca compite con el contenido principal.
+//
+// Uso en Splash (logo pequeño, esquina inferior):
+//   SponsorBadge(logoAsset: 'assets/images/servicios/hotel_x.png',
+//                label: 'Con el apoyo de')
+//
+// Uso en Reward (card de beneficio):
+//   SponsorBadge.card(logoAsset: '...', label: 'Beneficio Rutero',
+//                     beneficio: '10% de descuento')
+class SponsorBadge extends StatelessWidget {
+  final String? logoAsset;
+  final String label;
+  final String? beneficio;
+  final bool asCard;
+
+  const SponsorBadge({
+    super.key,
+    this.logoAsset,
+    required this.label,
+    this.beneficio,
+    this.asCard = false,
+  });
+
+  const SponsorBadge.card({
+    super.key,
+    this.logoAsset,
+    required this.label,
+    this.beneficio,
+  }) : asCard = true;
+
+  @override
+  Widget build(BuildContext context) {
+    if (asCard) {
+      return Container(
+        padding: const EdgeInsets.all(RDSSpace.md),
+        decoration: BoxDecoration(
+          color: RDSColor.card,
+          borderRadius: RDSRadius.bLg,
+          border: Border.all(color: RDSColor.gold.withOpacity(0.2))),
+        child: Row(children: [
+          if (logoAsset != null)
+            Container(
+              width: 40, height: 40,
+              decoration: BoxDecoration(
+                color: RDSColor.surface,
+                borderRadius: RDSRadius.bSm),
+              child: ClipRRect(
+                borderRadius: RDSRadius.bSm,
+                child: Image.asset(logoAsset!,
+                  fit: BoxFit.contain,
+                  errorBuilder: (_, __, ___) =>
+                    Icon(RDSIcons.info, color: RDSColor.textMuted)))),
+          const SizedBox(width: RDSSpace.md),
+          Expanded(child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(label, style: const TextStyle(fontFamily: 'SpaceGrotesk', fontSize: 10, fontWeight: FontWeight.w700, letterSpacing: 2.0, color: RDSColor.textMuted).copyWith(color: RDSColor.gold)),
+              if (beneficio != null)
+                Text(beneficio!, style: RDSType.headlineMd),
+            ])),
+          Icon(RDSIcons.actionExplore,
+            size: 16, color: RDSColor.gold),
+        ]));
+    }
+
+    // Versión compacta (splash, esquina de pantalla)
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: RDSSpace.sm + 4, vertical: RDSSpace.xs + 2),
+      decoration: BoxDecoration(
+        color: RDSColor.card.withOpacity(0.85),
+        borderRadius: RDSRadius.bMd,
+        border: Border.all(color: RDSColor.gold.withOpacity(0.15))),
+      child: Row(mainAxisSize: MainAxisSize.min, children: [
+        Text(label, style: RDSType.caption.copyWith(
+          color: RDSColor.textMuted)),
+        if (logoAsset != null) ...[
+          const SizedBox(width: RDSSpace.xs),
+          Image.asset(logoAsset!, height: 16,
+            errorBuilder: (_, __, ___) => const SizedBox.shrink()),
+        ],
+      ]));
+  }
+}
+
+// ── 8.9 COMPONENTE: GpsRangeIndicator ────────────────────────────────────────
+// Indicador de distancia GPS para SitioInfoScreen.
+// 3 estados visuales con transición animada.
+//
+// Uso:
+//   GpsRangeIndicator(distanciaMetros: _distancia, radioMetros: 30)
+class GpsRangeIndicator extends StatelessWidget {
+  final double? distanciaMetros;
+  final double radioMetros;
+  final bool errorGps;
+
+  const GpsRangeIndicator({
+    super.key,
+    required this.distanciaMetros,
+    this.radioMetros = 30,
+    this.errorGps = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    if (errorGps) return _estado(
+      color: RDSColor.stateError,
+      icon: RDSIcons.warning,
+      label: 'GPS no disponible',
+      sublabel: 'Verifica tu conexión');
+
+    if (distanciaMetros == null) return _estado(
+      color: RDSColor.textMuted,
+      icon: RDSIcons.info,
+      label: 'Localizando...',
+      sublabel: 'Buscando señal GPS');
+
+    final bool dentro = distanciaMetros! <= radioMetros;
+    final bool cerca  = distanciaMetros! <= radioMetros * 5;
+
+    if (dentro) return _estadoDentro();
+    if (cerca)  return _estado(
+      color: RDSColor.gold,
+      icon: RDSIcons.metricSpots,
+      label: '${distanciaMetros!.toStringAsFixed(0)} m',
+      sublabel: '¡Casi llegás!');
+
+    return _estado(
+      color: RDSColor.textMuted,
+      icon: RDSIcons.walk,
+      label: distanciaMetros! >= 1000
+          ? '${(distanciaMetros! / 1000).toStringAsFixed(1)} km'
+          : '${distanciaMetros!.toStringAsFixed(0)} m',
+      sublabel: 'Dirigite al sitio');
+  }
+
+  Widget _estado({
+    required Color color,
+    required IconData icon,
+    required String label,
+    required String sublabel,
+  }) => Container(
+    padding: const EdgeInsets.all(RDSSpace.md),
+    decoration: BoxDecoration(
+      color: color.withOpacity(0.08),
+      borderRadius: RDSRadius.bLg,
+      border: Border.all(color: color.withOpacity(0.2))),
+    child: Row(children: [
+      Icon(icon, color: color, size: 22),
+      const SizedBox(width: RDSSpace.md),
+      Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text(label, style: RDSType3.distance.copyWith(
+          color: color, fontSize: 22)),
+        Text(sublabel, style: RDSType.bodySm),
+      ]),
+    ]));
+
+  Widget _estadoDentro() => Container(
+    padding: const EdgeInsets.all(RDSSpace.md),
+    decoration: BoxDecoration(
+      color: RDSColor.green.withOpacity(0.12),
+      borderRadius: RDSRadius.bLg,
+      border: Border.all(color: RDSColor.green.withOpacity(0.4), width: 1.5),
+      boxShadow: RDSElevation.glow(color: RDSColor.green, opacity: 0.2)),
+    child: Row(children: [
+      Container(
+        width: 36, height: 36,
+        decoration: BoxDecoration(
+          color: RDSColor.green.withOpacity(0.2),
+          shape: BoxShape.circle),
+        child: Icon(RDSIcons.check, color: RDSColor.green, size: 20)),
+      const SizedBox(width: RDSSpace.md),
+      Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text('ESTÁS EN EL LUGAR',
+          style: const TextStyle(fontFamily: 'SpaceGrotesk', fontSize: 10, fontWeight: FontWeight.w700, letterSpacing: 2.0, color: RDSColor.textMuted).copyWith(
+            color: RDSColor.green, letterSpacing: 2.0)),
+        Text('Podés validar tu visita',
+          style: RDSType.headlineMd.copyWith(color: RDSColor.textPrimary)),
+      ]),
+    ]));
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  SECCIÓN 10 — LEGACY ALIASES
 //  Permite que main.dart siga compilando con los viejos kXxx durante
 //  la migración. No usar en código nuevo.
 //  Una vez que un componente migre, elimina el alias correspondiente.
