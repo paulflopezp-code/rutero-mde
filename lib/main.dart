@@ -2481,12 +2481,18 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
   late Animation<double> _fadeAnim, _scaleAnim, _progressAnim;
   late Animation<double> _floatAnim;
 
-  // Debug iOS eliminado
+  // DEBUG iOS — overlay temporal para diagnosticar
+  String _debugMsg = 'Iniciando...';
+
+  void _updateDebug(String msg) {
+    debugPrint('🔴 iOS DEBUG: $msg');
+    if (mounted) setState(() => _debugMsg = msg);
+  }
 
   @override
   void initState() {
     super.initState();
-    debugPrint('🟢 Splash initState OK');
+    _updateDebug('initState OK');
     _ctrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 2200));
     _floatCtrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 2000))
       ..repeat(reverse: true);
@@ -2500,43 +2506,16 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
         .animate(CurvedAnimation(parent: _floatCtrl, curve: Curves.easeInOut));
 
     _ctrl.forward();
-    debugPrint('🟢 Animaciones iniciadas');
+    _updateDebug('Animaciones iniciadas');
 
     Future.delayed(const Duration(milliseconds: 3200), () async {
       if (!mounted) return;
-      debugPrint('🟢 Verificando sesión...');
+      _updateDebug('Verificando sesión...');
 
-      User? usuarioActual = FirebaseAuth.instance.currentUser;
-      debugPrint('🟢 currentUser: ${usuarioActual?.email ?? "null"}');
-
-      if (usuarioActual == null) {
-        debugPrint('🟢 Esperando authStateChanges...');
-        try {
-          usuarioActual = await FirebaseAuth.instance
-            .authStateChanges()
-            .first
-            .timeout(const Duration(seconds: 5));
-          debugPrint('🟢 authStateChanges: ${usuarioActual?.email ?? "null"}');
-        } catch (e) {
-          debugPrint('🔴 Timeout: $e');
-          usuarioActual = null;
-        }
-      }
-
-      if (!mounted) return;
-
-      if (usuarioActual != null) {
-        debugPrint('🟢 → Navegando a MainShell');
-        Navigator.of(context).pushReplacement(PageRouteBuilder(
-          pageBuilder: (_, __, ___) => const MainShell(),
-          transitionsBuilder: (_, anim, __, child) => FadeTransition(opacity: anim, child: child),
-          transitionDuration: const Duration(milliseconds: 700),
-        ));
-        return;
-      }
-      debugPrint('🟢 → Navegando a LangSelect');
+      // BYPASS TEMPORAL PARA PRUEBA EN iPHONE — quitar antes de App Store
+      _updateDebug('→ Bypass directo a MainShell');
       Navigator.of(context).pushReplacement(PageRouteBuilder(
-        pageBuilder: (_, __, ___) => const LangSelectScreen(),
+        pageBuilder: (_, __, ___) => const MainShell(),
         transitionsBuilder: (_, anim, __, child) => FadeTransition(opacity: anim, child: child),
         transitionDuration: const Duration(milliseconds: 700),
       ));
@@ -2711,7 +2690,18 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
                         fontSize: 8, letterSpacing: 0.5)),
                   ]),
 
-                  // Debug overlay eliminado — iOS diagnóstico completado
+                  // Debug overlay — iOS diagnóstico
+                  const SizedBox(height: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withOpacity(0.5),
+                      borderRadius: BorderRadius.circular(8)),
+                    child: Text(_debugMsg,
+                      style: const TextStyle(
+                        color: Colors.greenAccent,
+                        fontSize: 10,
+                        fontFamily: 'SpaceGrotesk'))),
 
                 ])))),
       ]),
