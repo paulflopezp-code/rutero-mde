@@ -1216,7 +1216,10 @@ void main() async {
     );
     await FirebaseAppCheck.instance.activate(
       androidProvider: AndroidProvider.playIntegrity,
-      appleProvider: const bool.fromEnvironment('dart.vm.product')
+      // debug: funciona en desarrollo y TestFlight
+      // deviceCheck: solo para App Store (producción real)
+      // String.fromEnvironment distingue App Store del resto
+      appleProvider: const String.fromEnvironment('APP_ENV') == 'production'
           ? AppleProvider.deviceCheck
           : AppleProvider.debug,
     );
@@ -1773,17 +1776,19 @@ class _MainShellState extends State<MainShell> {
   @override
   void initState() {
     super.initState();
-    AudioManager().iniciarMusicaPrincipal();
-    // Escuchar cambios de tab desde cualquier widget via tabNotifier
+    // Audio con try/catch — en iPadOS puede fallar sin crashear la app
+    try { AudioManager().iniciarMusicaPrincipal(); } catch (e) {
+      debugPrint('⚠️ AudioManager init error: $e');
+    }
     tabNotifier.addListener(_onTabNotifier);
-    // Notificación de bienvenida al abrir la app (después de 3 segundos)
     Future.delayed(const Duration(seconds: 3), () {
-      NotificationManager().bienvenidaDeVuelta();
+      try { NotificationManager().bienvenidaDeVuelta(); } catch (_) {}
     });
-    // 🗺️ Si el usuario tenía una ruta activa, restaurarla automáticamente.
-    // Resuelve: cuando el usuario cierra la app por seguridad o accidente,
-    // al volver a abrirla no debe perder el contexto de la ruta que hacía.
-    WidgetsBinding.instance.addPostFrameCallback((_) => _restaurarRutaActiva());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      try { _restaurarRutaActiva(); } catch (e) {
+        debugPrint('⚠️ postFrameCallback error: $e');
+      }
+    });
   }
 
   /// Si hay una ruta activa guardada, navega automáticamente a ella
@@ -2525,6 +2530,9 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
 
       if (usuarioActual != null) {
         debugPrint('🟢 → Navegando a MainShell');
+        // Precarga SesionManager antes de montar MainShell para evitar crash en iPad
+        try { await SesionManager().cargarRutaActiva(); } catch (_) {}
+        if (!mounted) return;
         Navigator.of(context).pushReplacement(PageRouteBuilder(
           pageBuilder: (_, __, ___) => const MainShell(),
           transitionsBuilder: (_, anim, __, child) => FadeTransition(opacity: anim, child: child),
@@ -3634,9 +3642,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800)))),
             ]));
         if (mounted) {
-          Navigator.of(context, rootNavigator: true).pushAndRemoveUntil(
-            MaterialPageRoute(builder: (_) => const MainShell()),
-            (route) => false);
+          try { await SesionManager().cargarRutaActiva(); } catch (_) {}
+          if (mounted) {
+            Navigator.of(context, rootNavigator: true).pushAndRemoveUntil(
+              MaterialPageRoute(builder: (_) => const MainShell()),
+              (route) => false);
+          }
         }
       }
     }
@@ -17736,6 +17747,7 @@ class _PremioCardState extends State<_PremioCard> {
         // Insignia ilustrada o emoji fallback
         if (widget.ruta['insigniaImg'] != null)
           Image.asset(widget.ruta['insigniaImg'], width: 140, height: 140,
+            fit: BoxFit.contain,
             errorBuilder: (_, __, ___) =>
               Text(widget.ruta['personaje'] ?? '🏆', style: const TextStyle(fontSize: 52)))
         else
