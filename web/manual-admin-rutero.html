@@ -1,0 +1,830 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Manual Admin — Rutero MDE</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700;900&family=Inter:wght@400;500&display=swap');
+
+  :root {
+    --base: #0A0A0A;
+    --surface: #111111;
+    --card: #181818;
+    --card2: #1E1E1E;
+    --borde: #2A2A2A;
+    --oro: #C9A84C;
+    --oro-dim: rgba(201,168,76,0.12);
+    --verde: #4CAF7D;
+    --verde-dim: rgba(76,175,125,0.12);
+    --acento: #5BAAA0;
+    --rojo: #E05555;
+    --texto: #F0F0F0;
+    --muted: #888;
+    --muted2: #555;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--base);
+    color: var(--texto);
+    font-family: 'Inter', sans-serif;
+    font-size: 14px;
+    line-height: 1.6;
+  }
+
+  /* ── Sidebar ── */
+  .layout { display: flex; min-height: 100vh; }
+
+  .sidebar {
+    width: 260px;
+    min-width: 260px;
+    background: var(--surface);
+    border-right: 1px solid var(--borde);
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    overflow-y: auto;
+    padding: 24px 0;
+  }
+
+  .sidebar-logo {
+    padding: 0 20px 20px;
+    border-bottom: 1px solid var(--borde);
+    margin-bottom: 16px;
+  }
+
+  .sidebar-logo .rutero {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 22px;
+    font-weight: 900;
+    color: var(--oro);
+    letter-spacing: 3px;
+  }
+
+  .sidebar-logo .sub {
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 2px;
+    font-weight: 700;
+    margin-top: 2px;
+  }
+
+  .sidebar-section {
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    color: var(--muted2);
+    padding: 12px 20px 6px;
+    text-transform: uppercase;
+  }
+
+  .sidebar a {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 9px 20px;
+    color: var(--muted);
+    text-decoration: none;
+    font-size: 13px;
+    font-weight: 500;
+    border-left: 2px solid transparent;
+    transition: all 0.15s;
+  }
+
+  .sidebar a:hover,
+  .sidebar a.active {
+    color: var(--texto);
+    background: var(--card);
+    border-left-color: var(--oro);
+  }
+
+  .sidebar a .icon { font-size: 15px; width: 20px; text-align: center; }
+
+  /* ── Main ── */
+  .main {
+    flex: 1;
+    padding: 40px 48px;
+    max-width: 900px;
+  }
+
+  /* ── Header de sección ── */
+  .section-header {
+    margin-bottom: 32px;
+  }
+
+  .eyebrow {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 3px;
+    color: var(--oro);
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+
+  h1 {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 32px;
+    font-weight: 900;
+    letter-spacing: -0.5px;
+    line-height: 1.1;
+  }
+
+  h2 {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--texto);
+    margin-bottom: 16px;
+    padding-top: 40px;
+    border-top: 1px solid var(--borde);
+  }
+
+  h2:first-of-type { border-top: none; padding-top: 0; }
+
+  h3 {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--acento);
+    letter-spacing: 1px;
+    margin-bottom: 10px;
+    margin-top: 24px;
+  }
+
+  p { color: #C0C0C0; margin-bottom: 12px; }
+
+  /* ── Cards ── */
+  .card {
+    background: var(--card);
+    border: 1px solid var(--borde);
+    border-radius: 12px;
+    padding: 20px 24px;
+    margin-bottom: 16px;
+  }
+
+  .card-oro {
+    background: var(--oro-dim);
+    border-color: rgba(201,168,76,0.3);
+  }
+
+  .card-verde {
+    background: var(--verde-dim);
+    border-color: rgba(76,175,125,0.3);
+  }
+
+  .card-rojo {
+    background: rgba(224,85,85,0.08);
+    border-color: rgba(224,85,85,0.3);
+  }
+
+  /* ── Tabla de campos ── */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 20px;
+    font-size: 13px;
+  }
+
+  th {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    color: var(--muted);
+    text-align: left;
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--borde);
+    text-transform: uppercase;
+  }
+
+  td {
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--borde);
+    color: #C0C0C0;
+    vertical-align: top;
+  }
+
+  tr:last-child td { border-bottom: none; }
+
+  td:first-child {
+    font-family: 'Space Grotesk', sans-serif;
+    font-weight: 700;
+    color: var(--texto);
+    white-space: nowrap;
+    width: 180px;
+  }
+
+  /* ── Badges ── */
+  .badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 10px;
+    font-weight: 700;
+    font-family: 'Space Grotesk', sans-serif;
+    letter-spacing: 0.5px;
+  }
+
+  .b-verde { background: var(--verde-dim); color: var(--verde); }
+  .b-oro { background: var(--oro-dim); color: var(--oro); }
+  .b-rojo { background: rgba(224,85,85,0.12); color: var(--rojo); }
+  .b-gris { background: #222; color: var(--muted); }
+
+  /* ── Steps ── */
+  .steps { counter-reset: step; margin-bottom: 20px; }
+
+  .step {
+    display: flex;
+    gap: 16px;
+    margin-bottom: 14px;
+    align-items: flex-start;
+  }
+
+  .step-num {
+    counter-increment: step;
+    background: var(--oro-dim);
+    border: 1px solid rgba(201,168,76,0.3);
+    color: var(--oro);
+    font-family: 'Space Grotesk', sans-serif;
+    font-weight: 900;
+    font-size: 11px;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+
+  .step-content { padding-top: 4px; color: #C0C0C0; }
+  .step-content strong { color: var(--texto); }
+
+  /* ── Tip box ── */
+  .tip {
+    background: var(--verde-dim);
+    border: 1px solid rgba(76,175,125,0.3);
+    border-radius: 8px;
+    padding: 12px 16px;
+    margin-bottom: 16px;
+    font-size: 13px;
+    color: #A8D8C0;
+  }
+
+  .tip::before { content: '💡 '; }
+
+  .warn {
+    background: rgba(201,168,76,0.08);
+    border: 1px solid rgba(201,168,76,0.25);
+    border-radius: 8px;
+    padding: 12px 16px;
+    margin-bottom: 16px;
+    font-size: 13px;
+    color: #D4B96A;
+  }
+
+  .warn::before { content: '⚠️ '; }
+
+  /* ── Divider ── */
+  hr {
+    border: none;
+    border-top: 1px solid var(--borde);
+    margin: 32px 0;
+  }
+
+  /* ── Code inline ── */
+  code {
+    background: #222;
+    border: 1px solid var(--borde);
+    border-radius: 4px;
+    padding: 1px 6px;
+    font-family: monospace;
+    font-size: 12px;
+    color: var(--acento);
+  }
+
+  /* ── Tab label ── */
+  .tab-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--card2);
+    border: 1px solid var(--borde);
+    border-radius: 6px;
+    padding: 4px 10px;
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--texto);
+    margin-bottom: 12px;
+  }
+
+  /* ── TOC ── */
+  .toc {
+    background: var(--card);
+    border: 1px solid var(--borde);
+    border-radius: 12px;
+    padding: 20px 24px;
+    margin-bottom: 40px;
+  }
+
+  .toc-title {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    color: var(--muted);
+    margin-bottom: 12px;
+    text-transform: uppercase;
+  }
+
+  .toc a {
+    display: block;
+    color: var(--muted);
+    text-decoration: none;
+    padding: 4px 0;
+    font-size: 13px;
+    border-bottom: 1px solid var(--borde);
+    transition: color 0.1s;
+  }
+
+  .toc a:last-child { border-bottom: none; }
+  .toc a:hover { color: var(--oro); }
+  .toc a .toc-icon { margin-right: 8px; }
+
+  /* ── Responsive ── */
+  @media (max-width: 768px) {
+    .sidebar { display: none; }
+    .main { padding: 24px 20px; }
+  }
+
+  /* ── Print ── */
+  @media print {
+    .sidebar { display: none; }
+    .main { padding: 0; max-width: 100%; }
+    body { background: #fff; color: #000; }
+  }
+
+  /* ── Scroll suave ── */
+  html { scroll-behavior: smooth; }
+
+  /* ── Anchor offset ── */
+  [id] { scroll-margin-top: 24px; }
+</style>
+</head>
+<body>
+
+<div class="layout">
+
+  <!-- ── SIDEBAR ── -->
+  <nav class="sidebar">
+    <div class="sidebar-logo">
+      <div class="rutero">RUTERO</div>
+      <div class="sub">MDE — ADMIN PANEL</div>
+    </div>
+
+    <div class="sidebar-section">Navegación</div>
+    <a href="#intro"><span class="icon">📖</span> Introducción</a>
+    <a href="#acceso"><span class="icon">🔐</span> Acceso</a>
+
+    <div class="sidebar-section">Tabs del panel</div>
+    <a href="#dashboard"><span class="icon">📊</span> Dashboard</a>
+    <a href="#rutas"><span class="icon">🗺️</span> Rutas</a>
+    <a href="#usuarios"><span class="icon">👤</span> Usuarios</a>
+    <a href="#premios"><span class="icon">🎁</span> Premios</a>
+    <a href="#aliados"><span class="icon">🤝</span> Aliados</a>
+    <a href="#hoteles"><span class="icon">🏨</span> Hoteles Partner</a>
+    <a href="#codigos"><span class="icon">🎫</span> Códigos Aliado</a>
+    <a href="#pipeline"><span class="icon">📋</span> Pipeline CRM</a>
+    <a href="#eventos"><span class="icon">🎭</span> Eventos</a>
+    <a href="#validar"><span class="icon">✅</span> Validar Código</a>
+    <a href="#ia"><span class="icon">🤖</span> Generador IA</a>
+
+    <div class="sidebar-section">Referencia</div>
+    <a href="#estados-ruta"><span class="icon">🔄</span> Estados de ruta</a>
+    <a href="#estados-pipeline"><span class="icon">📈</span> Estados pipeline</a>
+    <a href="#glosario"><span class="icon">📚</span> Glosario</a>
+  </nav>
+
+  <!-- ── MAIN ── -->
+  <main class="main">
+
+    <!-- INTRO -->
+    <div class="section-header" id="intro">
+      <div class="eyebrow">Manual de usuario</div>
+      <h1>Panel de Administración<br>Rutero MDE</h1>
+      <p style="margin-top:16px;color:var(--muted)">Versión del admin: agosto 2026 · Solo para uso interno</p>
+    </div>
+
+    <div class="toc">
+      <div class="toc-title">Contenido de este manual</div>
+      <a href="#acceso"><span class="toc-icon">🔐</span>Acceso al panel</a>
+      <a href="#dashboard"><span class="toc-icon">📊</span>Dashboard — métricas generales</a>
+      <a href="#rutas"><span class="toc-icon">🗺️</span>Rutas — crear, editar, activar, pausar</a>
+      <a href="#usuarios"><span class="toc-icon">👤</span>Usuarios — ver actividad y ciudad</a>
+      <a href="#premios"><span class="toc-icon">🎁</span>Premios — validar y canjear</a>
+      <a href="#aliados"><span class="toc-icon">🤝</span>Aliados — gestión de socios</a>
+      <a href="#hoteles"><span class="toc-icon">🏨</span>Hoteles Partner — activaciones</a>
+      <a href="#codigos"><span class="toc-icon">🎫</span>Códigos Aliado — prefijos QR</a>
+      <a href="#pipeline"><span class="toc-icon">📋</span>Pipeline CRM — seguimiento comercial</a>
+      <a href="#eventos"><span class="toc-icon">🎭</span>Eventos — Feria y temporadas</a>
+      <a href="#validar"><span class="toc-icon">✅</span>Validar Código — canjeo manual</a>
+      <a href="#ia"><span class="toc-icon">🤖</span>Generador IA — importar rutas</a>
+      <a href="#glosario"><span class="toc-icon">📚</span>Glosario de términos</a>
+    </div>
+
+    <!-- ══════════════════════════════════════════════════════ -->
+    <h2 id="acceso">🔐 Acceso al panel</h2>
+
+    <p>El panel de administración está disponible en:</p>
+
+    <div class="card card-oro" style="margin-bottom:20px">
+      <strong style="color:var(--oro);font-family:'Space Grotesk',sans-serif;letter-spacing:1px">
+        rutero-mde.web.app/admin.html
+      </strong>
+    </div>
+
+    <div class="tip">Solo usuarios con email autorizado en Firebase Authentication pueden ingresar. Si al abrir el panel no ves los datos, es porque tu sesión expiró — recarga la página y vuelve a ingresar con la cuenta de Google autorizada.</div>
+
+    <div class="warn">El panel escribe directamente en Firestore (base de datos de producción). Cualquier cambio es inmediato y visible en la app. No existe un modo "borrador" ni papelera de reciclaje para rutas.</div>
+
+    <!-- ══════════════════════════════════════════════════════ -->
+    <h2 id="dashboard">📊 Dashboard</h2>
+
+    <p>La pantalla de inicio muestra un resumen en tiempo real del estado del proyecto.</p>
+
+    <h3>Tarjetas de métricas</h3>
+
+    <table>
+      <tr><th>Métrica</th><th>Qué mide</th><th>Fuente</th></tr>
+      <tr><td>Usuarios</td><td>Total de cuentas registradas en la app (Android + iOS)</td><td>Firestore / colección <code>usuarios</code></td></tr>
+      <tr><td>Rutas activas</td><td>Rutas con <code>activa: true</code> y <code>pausada: false</code></td><td>Firestore / colección <code>rutas</code></td></tr>
+      <tr><td>Premios generados</td><td>Códigos QR creados al completar rutas</td><td>Firestore / subcolección <code>premios</code></td></tr>
+      <tr><td>Premios canjeados</td><td>Códigos marcados como <code>canjeado: true</code></td><td>Firestore</td></tr>
+      <tr><td>Aliados activos</td><td>Aliados en la colección <code>aliados</code> con estado activo</td><td>Firestore</td></tr>
+      <tr><td>Ciudades activas</td><td>Número fijo (3): Medellín, Bogotá, Popayán</td><td>Hardcodeado</td></tr>
+      <tr><td>Instalaciones Android</td><td>Número actualizado manualmente — refleja Play Console</td><td>Manual</td></tr>
+      <tr><td>Versión activa</td><td>Versión publicada actualmente en Play Store y App Store</td><td>Manual</td></tr>
+    </table>
+
+    <div class="tip">Las métricas de instalaciones y versión activa son manuales — no se actualizan solas. Cuando publiques una nueva versión, actualiza estos valores en el código del admin.</div>
+
+    <!-- ══════════════════════════════════════════════════════ -->
+    <h2 id="rutas">🗺️ Rutas</h2>
+
+    <p>El tab de rutas es el núcleo del admin. Desde aquí creás, editás, pausás y activás todas las rutas que aparecen en la app.</p>
+
+    <h3>Vista de la tabla</h3>
+    <p>La tabla muestra todas las rutas de Firestore con columnas: Nombre, Zona, Ciudad, Sitios, Dificultad, Estado y botón Editar. Podés filtrar por zona usando los chips en la parte superior.</p>
+
+    <h3>Crear una ruta nueva</h3>
+    <div class="steps">
+      <div class="step"><div class="step-num">1</div><div class="step-content">Hacé clic en <strong>"+ Nueva ruta"</strong>. Se abre el formulario vacío.</div></div>
+      <div class="step"><div class="step-num">2</div><div class="step-content">Completá los campos obligatorios: <strong>Nombre, Zona, Emoji, Subtítulo, Descripción, Tiempo, Transporte, Premio e Insignia</strong>.</div></div>
+      <div class="step"><div class="step-num">3</div><div class="step-content">En <strong>Sitios (lista)</strong> escribí uno por línea el nombre de cada sitio de la ruta.</div></div>
+      <div class="step"><div class="step-num">4</div><div class="step-content">Opcionales pero recomendados: coordenadas GPS, imagen de portada, misión épica, tipo de experiencia y si es apta para familias.</div></div>
+      <div class="step"><div class="step-num">5</div><div class="step-content">Marcá <strong>Activa: Sí</strong> para que aparezca en la app inmediatamente, o <strong>No</strong> para guardarla en borrador.</div></div>
+      <div class="step"><div class="step-num">6</div><div class="step-content">Hacé clic en <strong>"💾 Guardar ruta"</strong>. La ruta aparece en Firestore y en la app en segundos.</div></div>
+    </div>
+
+    <h3>Campos del formulario</h3>
+    <table>
+      <tr><th>Campo</th><th>Descripción</th><th>Obligatorio</th></tr>
+      <tr><td>Nombre</td><td>Nombre exacto de la ruta en mayúsculas. Este es el ID en Firestore — no cambiar después de publicar.</td><td><span class="badge b-rojo">Sí</span></td></tr>
+      <tr><td>Zona</td><td>Categoría interna: Ciudad, El Poblado, Laureles, etc.</td><td><span class="badge b-rojo">Sí</span></td></tr>
+      <tr><td>Ciudad</td><td>Medellín, Bogotá o Popayán.</td><td><span class="badge b-rojo">Sí</span></td></tr>
+      <tr><td>Emoji</td><td>Emoji representativo que aparece en la card de la ruta.</td><td><span class="badge b-rojo">Sí</span></td></tr>
+      <tr><td>Subtítulo</td><td>Frase corta que aparece bajo el nombre en la card.</td><td><span class="badge b-rojo">Sí</span></td></tr>
+      <tr><td>Descripción</td><td>Texto completo que describe la ruta en la pantalla de detalle.</td><td><span class="badge b-rojo">Sí</span></td></tr>
+      <tr><td>Tiempo estimado</td><td>Duración en horas. Ej: <code>3 horas</code>.</td><td><span class="badge b-rojo">Sí</span></td></tr>
+      <tr><td>Transporte sugerido</td><td>Metro, bus, a pie, Uber, etc. Aparece como chip en detalle de ruta.</td><td><span class="badge b-rojo">Sí</span></td></tr>
+      <tr><td>Premio</td><td>Texto del premio al completar la ruta. Ej: <code>Insignia Guardián del Patrimonio</code>.</td><td><span class="badge b-rojo">Sí</span></td></tr>
+      <tr><td>Insignia</td><td>Nombre de la insignia desbloqueada.</td><td><span class="badge b-rojo">Sí</span></td></tr>
+      <tr><td>Insignia (imagen)</td><td>Ruta del asset en la app. Ej: <code>assets/images/insignias/insignia_memoria_viva.png</code>. No incluye la imagen en sí — debe existir en el código Flutter.</td><td><span class="badge b-gris">No</span></td></tr>
+      <tr><td>Tipo de experiencia</td><td>Etiqueta temática: <em>Patrimonio & Historia</em>, <em>Cultura Urbana</em>, etc.</td><td><span class="badge b-gris">No</span></td></tr>
+      <tr><td>Tipo exp. EN</td><td>Versión en inglés del tipo de experiencia.</td><td><span class="badge b-gris">No</span></td></tr>
+      <tr><td>Apta para familias</td><td>Si está en Sí, la ruta aparece con el badge 👨‍👩‍👧 en la app y el filtro familiar la incluye.</td><td><span class="badge b-gris">No</span></td></tr>
+      <tr><td>Nota familiar</td><td>Tip especial para viajeros con niños. Aparece en el detalle de la ruta.</td><td><span class="badge b-gris">No</span></td></tr>
+      <tr><td>Sitios (lista)</td><td>Nombres de los sitios, uno por línea. Determina el conteo de sitios.</td><td><span class="badge b-oro">Recom.</span></td></tr>
+      <tr><td>Coordenadas GPS</td><td>JSON con coordenadas de cada sitio. Necesario para la validación GPS en la app.</td><td><span class="badge b-oro">Recom.</span></td></tr>
+      <tr><td>Activa</td><td>Sí: visible en la app. No: oculta (borrador).</td><td><span class="badge b-rojo">Sí</span></td></tr>
+      <tr><td>Dificultad</td><td>FÁCIL, MEDIA o DIFÍCIL. Aparece como chip en la card.</td><td><span class="badge b-rojo">Sí</span></td></tr>
+      <tr><td>Misión épica</td><td>Frase motivacional larga para la pantalla de inicio de ruta.</td><td><span class="badge b-gris">No</span></td></tr>
+      <tr><td>Momento clave</td><td>El sitio o momento cumbre de la ruta. Aparece en la tarjeta de detalle.</td><td><span class="badge b-gris">No</span></td></tr>
+    </table>
+
+    <h3>Pausar / Activar una ruta</h3>
+    <p>En la tabla de rutas, el badge de estado <span class="badge b-verde">🟢 Activa</span> o <span class="badge b-gris">⏸️ Pausada</span> es <strong>clickeable</strong>. Un clic alterna el estado directamente en Firestore. No necesitás abrir el formulario de edición.</p>
+
+    <div class="tip">Usá "Pausar" en lugar de eliminar cuando una ruta esté incompleta o en revisión. La ruta queda guardada en Firestore pero no aparece en la app.</div>
+
+    <h3>Eliminar una ruta</h3>
+    <p>Desde el formulario de edición, botón rojo <strong>"🗑️ Eliminar"</strong>. Esta acción es permanente e irreversible. Preferí pausar si hay dudas.</p>
+
+    <h3>Filtros por zona</h3>
+    <p>Los chips en la parte superior (Todas, Ciudad, El Poblado, Laureles...) filtran la tabla de rutas por zona. No afectan la app.</p>
+
+    <!-- ══════════════════════════════════════════════════════ -->
+    <h2 id="usuarios">👤 Usuarios</h2>
+
+    <p>Muestra todos los usuarios registrados en la app, ordenados por fecha de registro más reciente.</p>
+
+    <table>
+      <tr><th>Columna</th><th>Descripción</th></tr>
+      <tr><td>Nombre</td><td>Nombre de perfil del usuario en la app.</td></tr>
+      <tr><td>Email</td><td>Correo con el que se registró (Google, Apple o email/contraseña).</td></tr>
+      <tr><td>Ciudad</td><td>Ciudad detectada automáticamente por la app al abrirla (GPS). Puede ser Medellín, Bogotá, Popayán o desconocida.</td></tr>
+      <tr><td>Rutas completadas</td><td>Número de rutas finalizadas con GPS validado.</td></tr>
+      <tr><td>Puntos</td><td>Total de puntos acumulados en la app.</td></tr>
+      <tr><td>Registro</td><td>Fecha en que creó su cuenta.</td></tr>
+    </table>
+
+    <p>La barra de búsqueda filtra por nombre o email en tiempo real.</p>
+
+    <div class="tip">El admin no tiene acción de eliminación de usuarios. Si necesitás eliminar una cuenta, hacelo desde la consola de Firebase Authentication.</div>
+
+    <!-- ══════════════════════════════════════════════════════ -->
+    <h2 id="premios">🎁 Premios</h2>
+
+    <p>Los premios son los códigos QR generados automáticamente cuando un usuario completa una ruta. Desde este tab los gestionás y canjeás.</p>
+
+    <h3>Tabla de premios</h3>
+    <table>
+      <tr><th>Columna</th><th>Descripción</th></tr>
+      <tr><td>Código</td><td>Código único alfanumérico generado para el usuario. Es lo que el aliado escanea o revisa.</td></tr>
+      <tr><td>Usuario</td><td>ID abreviado del usuario que generó el código (primeros 8 caracteres del UID de Firebase). Pasá el cursor para ver el ID completo.</td></tr>
+      <tr><td>Ruta</td><td>Nombre de la ruta completada.</td></tr>
+      <tr><td>Insignia</td><td>Nombre de la insignia desbloqueada.</td></tr>
+      <tr><td>Estado</td><td><span class="badge b-verde">Disponible</span> o <span class="badge b-gris">Canjeado</span>.</td></tr>
+      <tr><td>Fecha</td><td>Cuándo se generó el código.</td></tr>
+      <tr><td>Acción</td><td>Botón <strong>"✅ Canjear"</strong> solo aparece si el código está disponible.</td></tr>
+    </table>
+
+    <h3>Canjear un premio desde el admin</h3>
+    <div class="steps">
+      <div class="step"><div class="step-num">1</div><div class="step-content">Buscá el código en la barra de búsqueda (arriba del tab).</div></div>
+      <div class="step"><div class="step-num">2</div><div class="step-content">Verificá que el estado sea <span class="badge b-verde">Disponible</span>.</div></div>
+      <div class="step"><div class="step-num">3</div><div class="step-content">Hacé clic en <strong>"✅ Canjear"</strong> y confirmá. El estado cambia a <span class="badge b-gris">Canjeado</span> instantáneamente.</div></div>
+    </div>
+
+    <div class="warn">Para el flujo habitual de canje (aliado escanea el QR del turista), usá el tab <strong>Validar Código</strong> — es más rápido y busca en todas las colecciones.</div>
+
+    <!-- ══════════════════════════════════════════════════════ -->
+    <h2 id="aliados">🤝 Aliados</h2>
+
+    <p>Los aliados son los negocios que ofrecen descuentos, servicios o experiencias a los turistas que completan rutas. Están en la colección <code>aliados</code> de Firestore.</p>
+
+    <h3>Diferencia entre Aliados y Códigos Aliado</h3>
+    <div class="card">
+      <p><strong style="color:var(--verde)">Aliados (este tab):</strong> Negocios integrados en la lógica de recompensas de la app. Cuando el turista completa una ruta específica, la app genera automáticamente un código QR vinculado a este aliado.</p>
+      <p style="margin:0"><strong style="color:var(--acento)">Códigos Aliado (otro tab):</strong> Negocios con un prefijo de código fijo. El código no se vincula a una ruta específica sino que el aliado lo gestiona por su cuenta.</p>
+    </div>
+
+    <h3>Campos del aliado</h3>
+    <table>
+      <tr><th>Campo</th><th>Descripción</th></tr>
+      <tr><td>Nombre</td><td>Nombre del negocio como aparece en la app.</td></tr>
+      <tr><td>Descripción</td><td>Texto corto que describe el beneficio para el turista.</td></tr>
+      <tr><td>Tipo</td><td>Categoría del aliado: restaurante, museo, transporte, etc.</td></tr>
+      <tr><td>WhatsApp</td><td>Número de contacto del aliado. Aparece como enlace directo.</td></tr>
+      <tr><td>Activo</td><td>Si está inactivo, no genera códigos aunque la ruta se complete.</td></tr>
+    </table>
+
+    <!-- ══════════════════════════════════════════════════════ -->
+    <h2 id="hoteles">🏨 Hoteles Partner</h2>
+
+    <p>Los hoteles partner son establecimientos de alojamiento cuyos huéspedes reciben rutas personalizadas y acceso prioritario a Felo (el Planner IA).</p>
+
+    <h3>Hoteles activos en la app</h3>
+    <div class="card" style="margin-bottom:12px">
+      <table style="margin:0">
+        <tr><th>Hotel</th><th>Código</th><th>Zona</th></tr>
+        <tr>
+          <td>Metropolitan Living by HOUSY</td>
+          <td><code>METROPOLITAN2026</code></td>
+          <td>Centro / San Diego</td>
+        </tr>
+        <tr>
+          <td>The Charlee Hotel</td>
+          <td><code>CHARLEE2026</code></td>
+          <td>El Poblado</td>
+        </tr>
+        <tr>
+          <td>Pergamino Café</td>
+          <td><code>PERGAMINO2026</code></td>
+          <td>Laureles</td>
+        </tr>
+      </table>
+    </div>
+
+    <div class="warn">Los códigos de hotel están definidos directamente en el código Flutter (<code>kHotelesPartner</code> en <code>main.dart</code>). Para agregar un nuevo hotel o cambiar un código, hay que hacer un nuevo build de la app.</div>
+
+    <h3>Cómo funciona el flujo de hotel</h3>
+    <div class="steps">
+      <div class="step"><div class="step-num">1</div><div class="step-content">El hotel entrega el código al turista en el check-in (tarjeta, QR, sobre de bienvenida).</div></div>
+      <div class="step"><div class="step-num">2</div><div class="step-content">El turista abre la app por primera vez → ve la pantalla de bienvenida (WelcomeScreen) → escribe el código en el campo de hotel.</div></div>
+      <div class="step"><div class="step-num">3</div><div class="step-content">Aparece la pantalla de bienvenida del hotel con rutas recomendadas según la zona del alojamiento.</div></div>
+      <div class="step"><div class="step-num">4</div><div class="step-content">En adelante, Felo (Planner IA) prioriza rutas cercanas al hotel en sus itinerarios.</div></div>
+      <div class="step"><div class="step-num">5</div><div class="step-content">Cada activación queda registrada en Firestore (<code>hotel_activaciones</code>) y es visible en este tab.</div></div>
+    </div>
+
+    <h3>Tabla de activaciones</h3>
+    <p>Muestra los últimos 50 registros de turistas que activaron un código de hotel, con: nombre del hotel, código usado, ID de usuario, zona y fecha.</p>
+
+    <!-- ══════════════════════════════════════════════════════ -->
+    <h2 id="codigos">🎫 Códigos Aliado</h2>
+
+    <p>Los códigos aliado son prefijos fijos asignados a negocios que quieren integrarse con Rutero pero sin vincularse a una ruta específica. Ideal para aliados del tipo "descuento permanente".</p>
+
+    <h3>Cómo funciona</h3>
+    <p>Cada aliado tiene un <strong>prefijo único</strong> (ej: <code>MOB</code>). La app genera códigos únicos con ese prefijo más un número aleatorio de 4 dígitos: <code>MOB-7432</code>. El aliado valida ese código en el momento del canje.</p>
+
+    <h3>Crear un aliado con código</h3>
+    <table>
+      <tr><th>Campo</th><th>Descripción</th></tr>
+      <tr><td>Nombre del aliado</td><td>Razón social o nombre del negocio.</td></tr>
+      <tr><td>Nombre comercial</td><td>Nombre que verá el turista en la app.</td></tr>
+      <tr><td>Prefijo del código</td><td>2–5 letras mayúsculas únicas. Ej: <code>MOB</code>, <code>CHA</code>, <code>PER</code>. No usar el mismo que otro aliado.</td></tr>
+      <tr><td>WhatsApp</td><td>Número de contacto del aliado para resolver dudas.</td></tr>
+      <tr><td>% Comisión</td><td>Porcentaje de comisión acordado con Rutero sobre cada canje.</td></tr>
+      <tr><td>Ruta</td><td>Nombre de la ruta asociada, si aplica.</td></tr>
+      <tr><td>Sitio</td><td>Nombre del sitio específico, si aplica.</td></tr>
+      <tr><td>Notas</td><td>Contexto interno: condiciones, vigencia, acuerdos informales.</td></tr>
+    </table>
+
+    <p>El botón <strong>"🎲 Previsualizar código de ejemplo"</strong> genera una muestra de cómo quedaría un código con el prefijo ingresado.</p>
+
+    <!-- ══════════════════════════════════════════════════════ -->
+    <h2 id="pipeline">📋 Pipeline CRM</h2>
+
+    <p>El pipeline CRM rastrea el proceso de negociación con cada aliado potencial. Va desde el primer contacto hasta la alianza activa.</p>
+
+    <h3>Estados del pipeline</h3>
+    <div id="estados-pipeline"></div>
+    <table>
+      <tr><th>Estado</th><th>Cuándo usarlo</th></tr>
+      <tr><td><span class="badge b-gris">🟣 Por contactar</span></td><td>El aliado está identificado pero aún no hemos iniciado conversación.</td></tr>
+      <tr><td><span class="badge b-oro">📤 Mensaje enviado</span></td><td>Se envió el primer mensaje (WhatsApp, email o en persona). Esperando respuesta.</td></tr>
+      <tr><td><span class="badge b-verde">📝 Sondeo llenado</span></td><td>El aliado completó el formulario de interés.</td></tr>
+      <tr><td><span class="badge b-verde">📞 En conversación</span></td><td>Hay diálogo activo — negociación, preguntas, revisión de propuesta.</td></tr>
+      <tr><td><span class="badge b-verde">🤝 Alianza activa</span></td><td>Acuerdo firmado o verbal confirmado. El aliado está operativo en la app.</td></tr>
+      <tr><td><span class="badge b-rojo">❌ Descartado</span></td><td>No hubo respuesta, rechazó la propuesta o no es viable.</td></tr>
+    </table>
+
+    <h3>Tiers de aliados</h3>
+    <table>
+      <tr><th>Tier</th><th>Descripción</th></tr>
+      <tr><td><span class="badge b-verde">🥇 Tier 1</span></td><td>Aliado de alto impacto — reconocido, con tráfico propio, ideal para pitch institucional.</td></tr>
+      <tr><td><span class="badge b-oro">🥈 Tier 2</span></td><td>Aliado estándar — negocio local relevante para los turistas de la ruta.</td></tr>
+      <tr><td><span class="badge b-gris">🏆 Sponsor</span></td><td>Empresa o marca que financia la operación a cambio de visibilidad.</td></tr>
+    </table>
+
+    <h3>Campos de seguimiento</h3>
+    <table>
+      <tr><th>Campo</th><th>Descripción</th></tr>
+      <tr><td>Último contacto</td><td>Fecha del último mensaje o reunión. Usalo para saber cuándo fue el último follow-up.</td></tr>
+      <tr><td>Próximo follow-up</td><td>Fecha límite para volver a contactar. Si la fecha ya pasó, aparece en rojo en la tabla como recordatorio.</td></tr>
+      <tr><td>Fuente</td><td>Cómo llegamos al aliado: <em>Campo</em> (contacto directo), <em>Uber</em> (conversación en viaje), <em>Referido</em>, <em>Redes</em>.</td></tr>
+      <tr><td>Comisión recibida</td><td>Monto en COP recibido hasta la fecha. Sirve para el cálculo de revenue real.</td></tr>
+      <tr><td>Notas</td><td>Contexto libre: lo que dijo el aliado, condiciones especiales, quién lo atendió.</td></tr>
+    </table>
+
+    <div class="tip">El campo "Próximo follow-up" es el más importante del pipeline. Si lo completás cada vez que hacés contacto, la tabla funciona como agenda de ventas — los vencidos en rojo te dicen quién necesita atención hoy.</div>
+
+    <!-- ══════════════════════════════════════════════════════ -->
+    <h2 id="eventos">🎭 Eventos</h2>
+
+    <p>El tab de eventos gestiona la agenda de la Feria de las Flores y otras temporadas especiales que aparecen en la sección de eventos de la app.</p>
+
+    <h3>Campos de un evento</h3>
+    <table>
+      <tr><th>Campo</th><th>Descripción</th></tr>
+      <tr><td>Nombre del evento</td><td>Título que aparece en la card del evento.</td></tr>
+      <tr><td>Fecha y hora</td><td>Cuándo ocurre. Usá el selector de fecha/hora del formulario.</td></tr>
+      <tr><td>Ubicación</td><td>Nombre del lugar. Ej: <em>Jardín Botánico, Medellín</em>.</td></tr>
+      <tr><td>Coordenadas GPS</td><td>Latitud y longitud del lugar para mostrar en el mapa.</td></tr>
+      <tr><td>Descripción</td><td>Texto corto visible en el detalle del evento.</td></tr>
+      <tr><td>Transporte</td><td>Cómo llegar al evento (Metro línea A, bus, etc.).</td></tr>
+      <tr><td>Activo</td><td>Sí: visible en la app. No: oculto.</td></tr>
+    </table>
+
+    <div class="warn">Los eventos de la Feria de las Flores 2026 fueron cargados con coordenadas GPS validadas en campo. No cambies las coordenadas sin verificar presencialmente — la app las usa para guiar al turista.</div>
+
+    <!-- ══════════════════════════════════════════════════════ -->
+    <h2 id="validar">✅ Validar Código</h2>
+
+    <p>Este tab es el punto de atención rápida para cuando un aliado, un turista o el equipo necesita verificar si un código es válido y canjearlo en el momento.</p>
+
+    <h3>Cómo usar el validador</h3>
+    <div class="steps">
+      <div class="step"><div class="step-num">1</div><div class="step-content">Ingresá el código exacto en el campo de texto. El código distingue mayúsculas/minúsculas — asegurate de copiarlo tal cual aparece en la app del turista.</div></div>
+      <div class="step"><div class="step-num">2</div><div class="step-content">Hacé clic en <strong>"🔍 Verificar código"</strong>. El sistema busca en tres colecciones de Firestore: <code>premios</code>, <code>consumos_aliados</code> y <code>hotel_activaciones</code>.</div></div>
+      <div class="step"><div class="step-num">3</div><div class="step-content">Si el código existe y está disponible, aparece la información completa: ruta, aliado, fecha de generación y estado.</div></div>
+      <div class="step"><div class="step-num">4</div><div class="step-content">Hacé clic en <strong>"✅ MARCAR COMO CANJEADO"</strong> para registrar el canje. Esta acción no se puede deshacer.</div></div>
+    </div>
+
+    <h3>Resultados posibles</h3>
+    <table>
+      <tr><th>Resultado</th><th>Qué significa</th><th>Qué hacer</th></tr>
+      <tr><td><span class="badge b-verde">Código válido</span></td><td>El código existe y está disponible para canje.</td><td>Confirmar identidad del turista y canjear.</td></tr>
+      <tr><td><span class="badge b-gris">Ya canjeado</span></td><td>El código fue usado anteriormente.</td><td>No canjear de nuevo. Mostrar fecha del canje anterior.</td></tr>
+      <tr><td><span class="badge b-rojo">No encontrado</span></td><td>El código no existe en ninguna colección.</td><td>Pedir al turista que muestre el código directamente en su app.</td></tr>
+    </table>
+
+    <div class="tip">Si el turista dice que tiene un código de hotel (ej: METROPOLITAN2026), el validador también lo va a encontrar en la colección <code>hotel_activaciones</code>. Es diferente de los premios de ruta — sirve para confirmar que el turista está registrado como huésped.</div>
+
+    <!-- ══════════════════════════════════════════════════════ -->
+    <h2 id="ia">🤖 Generador IA de rutas</h2>
+
+    <p>El generador IA permite crear el contenido completo de una ruta (descripción, tips, curiosidades, retos por sitio) a partir de un formulario, usando Claude como motor de redacción.</p>
+
+    <h3>Cuándo usarlo</h3>
+    <p>Cuando quieras agregar una ruta nueva a Firestore pero no tenés tiempo de escribir todo el contenido manualmente. El generador crea un borrador que luego podés editar en el formulario de rutas.</p>
+
+    <h3>Flujo de generación</h3>
+    <div class="steps">
+      <div class="step"><div class="step-num">1</div><div class="step-content">Completá el formulario: nombre de la ruta, sitios que incluye, zona, idioma (ES/EN) y contexto especial.</div></div>
+      <div class="step"><div class="step-num">2</div><div class="step-content">Hacé clic en <strong>"✨ Generar con IA"</strong>. La IA redacta el contenido usando Claude.</div></div>
+      <div class="step"><div class="step-num">3</div><div class="step-content">Revisá el resultado en el panel de previsualización. Si algo no está bien, podés regenerar o editar manualmente el JSON.</div></div>
+      <div class="step"><div class="step-num">4</div><div class="step-content">Hacé clic en <strong>"📥 Importar a Firestore"</strong> para guardar la ruta directamente en la base de datos.</td></div></div>
+    </div>
+
+    <div class="warn">El contenido generado por IA es un punto de partida. Siempre revisalo antes de publicar — especialmente coordenadas GPS, horarios y nombres de sitios. La IA puede inventar datos que suenan plausibles pero son incorrectos.</div>
+
+    <!-- ══════════════════════════════════════════════════════ -->
+    <h2 id="estados-ruta">🔄 Estados posibles de una ruta</h2>
+
+    <table>
+      <tr><th>Estado</th><th>activa</th><th>pausada</th><th>Visible en app</th></tr>
+      <tr>
+        <td><span class="badge b-verde">🟢 Activa</span></td>
+        <td><code>true</code></td><td><code>false</code></td>
+        <td><span class="badge b-verde">Sí</span></td>
+      </tr>
+      <tr>
+        <td><span class="badge b-gris">⏸️ Pausada</span></td>
+        <td><code>true</code></td><td><code>true</code></td>
+        <td><span class="badge b-rojo">No</span></td>
+      </tr>
+      <tr>
+        <td><span class="badge b-rojo">❌ Inactiva</span></td>
+        <td><code>false</code></td><td><code>false</code></td>
+        <td><span class="badge b-rojo">No</span></td>
+      </tr>
+    </table>
+
+    <p>El toggle del badge en la tabla solo cambia <code>activa</code>. Para cambiar <code>pausada</code> usá el formulario de edición.</p>
+
+    <!-- ══════════════════════════════════════════════════════ -->
+    <h2 id="glosario">📚 Glosario</h2>
+
+    <table>
+      <tr><th>Término</th><th>Definición</th></tr>
+      <tr><td>Firestore</td><td>Base de datos en la nube donde viven las rutas, usuarios y premios. El admin escribe directamente aquí.</td></tr>
+      <tr><td>kRutasData</td><td>Datos de rutas antiguos que vivían en el código Flutter. Ahora casi vacío — todo está en Firestore.</td></tr>
+      <tr><td>migradasAFirestore</td><td>Lista interna en el código Flutter de rutas que ya están en Firestore. Las rutas en esta lista no se leen del código local.</td></tr>
+      <tr><td>Felo</td><td>El Planner IA de Rutero — genera itinerarios personalizados con Claude. Puede conocer el hotel del turista para priorizar rutas cercanas.</td></tr>
+      <tr><td>kHotelesPartner</td><td>Mapa de códigos de hotel en el código Flutter. Requiere un nuevo build para agregar o cambiar hoteles.</td></tr>
+      <tr><td>kRutasMobiplab</td><td>Lista de rutas del Centro cuya finalización activa el descuento del 20% en Mobiplab. Actualmente 7 rutas.</td></tr>
+      <tr><td>sitiosDetalle</td><td>Campo de Firestore con el detalle completo de cada sitio: tip, curiosidad, reto, coordenadas y horarios.</td></tr>
+      <tr><td>gpsSitios</td><td>Array de coordenadas lat/lng para cada sitio de la ruta. Necesario para la validación GPS en campo.</td></tr>
+      <tr><td>Premio</td><td>Código QR generado automáticamente cuando un usuario completa todos los sitios GPS de una ruta.</td></tr>
+      <tr><td>Insignia</td><td>Imagen/badge desbloqueada al completar una ruta. Se guarda en <code>assets/images/insignias/</code> dentro del código Flutter.</td></tr>
+      <tr><td>Tier</td><td>Clasificación de un aliado según su impacto potencial en la app: Tier 1 (alto), Tier 2 (estándar), Sponsor.</td></tr>
+      <tr><td>Zona</td><td>Categoría geográfica interna de una ruta: Ciudad, El Poblado, Laureles, Temporada, Comida Urbana, etc.</td></tr>
+      <tr><td>hotel_activaciones</td><td>Colección de Firestore donde se registra cada vez que un turista activa un código de hotel en la app.</td></tr>
+    </table>
+
+    <hr>
+
+    <div class="card" style="text-align:center;margin-top:8px">
+      <div style="font-family:'Space Grotesk',sans-serif;font-size:10px;font-weight:700;letter-spacing:3px;color:var(--muted);margin-bottom:4px">RUTERO MDE</div>
+      <div style="color:var(--muted2);font-size:12px">Manual de administración · Agosto 2026 · Solo uso interno</div>
+    </div>
+
+  </main>
+</div>
+
+<script>
+  // Highlight active sidebar link on scroll
+  const sections = document.querySelectorAll('[id]');
+  const links = document.querySelectorAll('.sidebar a');
+
+  const observer = new IntersectionObserver(entries => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        links.forEach(l => l.classList.remove('active'));
+        const active = document.querySelector(`.sidebar a[href="#${entry.target.id}"]`);
+        if (active) active.classList.add('active');
+      }
+    });
+  }, { threshold: 0.3, rootMargin: '-80px 0px -60% 0px' });
+
+  sections.forEach(s => observer.observe(s));
+</script>
+
+</body>
+</html>
