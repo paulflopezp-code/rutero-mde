@@ -1216,12 +1216,9 @@ void main() async {
     );
     await FirebaseAppCheck.instance.activate(
       androidProvider: AndroidProvider.playIntegrity,
-      // debug: funciona en desarrollo y TestFlight
-      // deviceCheck: solo para App Store (producción real)
-      // String.fromEnvironment distingue App Store del resto
-      appleProvider: const String.fromEnvironment('APP_ENV') == 'production'
-          ? AppleProvider.deviceCheck
-          : AppleProvider.debug,
+      // debug: funciona en desarrollo, TestFlight y App Store
+      // Nota: cambiar a deviceCheck cuando Apple lo exija explícitamente
+      appleProvider: AppleProvider.debug,
     );
     await cargarModoDemo();
     await cargarIdiomaGuardado();
@@ -2530,9 +2527,6 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
 
       if (usuarioActual != null) {
         debugPrint('🟢 → Navegando a MainShell');
-        // Precarga SesionManager antes de montar MainShell para evitar crash en iPad
-        try { await SesionManager().cargarRutaActiva(); } catch (_) {}
-        if (!mounted) return;
         Navigator.of(context).pushReplacement(PageRouteBuilder(
           pageBuilder: (_, __, ___) => const MainShell(),
           transitionsBuilder: (_, anim, __, child) => FadeTransition(opacity: anim, child: child),
@@ -2552,7 +2546,6 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
   @override
   void dispose() { _ctrl.dispose(); _floatCtrl.dispose(); super.dispose(); }
 
-  @override
   @override
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
@@ -3642,12 +3635,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800)))),
             ]));
         if (mounted) {
-          try { await SesionManager().cargarRutaActiva(); } catch (_) {}
-          if (mounted) {
-            Navigator.of(context, rootNavigator: true).pushAndRemoveUntil(
-              MaterialPageRoute(builder: (_) => const MainShell()),
-              (route) => false);
-          }
+          Navigator.of(context, rootNavigator: true).pushAndRemoveUntil(
+            MaterialPageRoute(builder: (_) => const MainShell()),
+            (route) => false);
         }
       }
     }
@@ -8626,9 +8616,12 @@ class _HotelBannerState extends State<_HotelBanner> {
   @override
   void initState() {
     super.initState();
-    HotelPartnerService.getHotelActivo().then((h) {
+    HotelPartnerService.getHotelActivo().timeout(
+      const Duration(seconds: 5),
+      onTimeout: () => null,
+    ).then((h) {
       if (mounted) setState(() => _hotel = h);
-    });
+    }).catchError((_) {});
   }
 
   @override
@@ -8850,9 +8843,12 @@ class _HotelCodigoFieldState extends State<_HotelCodigoField> {
   @override
   void initState() {
     super.initState();
-    HotelPartnerService.getHotelActivo().then((h) {
+    HotelPartnerService.getHotelActivo().timeout(
+      const Duration(seconds: 5),
+      onTimeout: () => null,
+    ).then((h) {
       if (mounted) setState(() => _hotelActivo = h);
-    });
+    }).catchError((_) {});
   }
 
   @override
