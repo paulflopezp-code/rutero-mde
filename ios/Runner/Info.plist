@@ -9,9 +9,11 @@
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>Esta app usa tu ubicación para mostrarte rutas y puntos cercanos.</string>
 	<key>NSUserNotificationUsageDescription</key>
-	<string>Rutero MDE te envía recordatorios de tus rutas y eventos de la Feria de las Flores.</string>
+	<string>Rutero MDE te envía recordatorios de tus rutas y eventos especiales.</string>
 	<key>NSCameraUsageDescription</key>
 	<string>Esta app necesita acceso a la cámara para validar sitios en tus rutas.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Esta app usa el micrófono para reproducir audio en las rutas.</string>
 	<key>GIDClientID</key>
 	<string>300771058852-ea6r1gjc59rskb69jba2uhpoa94k8duv.apps.googleusercontent.com</string>
 	<key>CADisableMinimumFrameDurationOnPhone</key>
@@ -47,6 +49,15 @@
 			</array>
 		</dict>
 	</array>
+	<key>LSApplicationQueriesSchemes</key>
+	<array>
+		<string>googlegmail</string>
+		<string>googleplus</string>
+		<string>googlechrome</string>
+		<string>comgooglemaps</string>
+	</array>
+	<key>FlutterDeepLinkingEnabled</key>
+	<true/>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
 	<key>LSRequiresIPhoneOS</key>
