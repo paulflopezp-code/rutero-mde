@@ -47,7 +47,7 @@ import 'dart:ui' as ui;
 import 'package:path_provider/path_provider.dart';
 import 'package:firebase_app_check/firebase_app_check.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:gal/gal.dart';
+// import 'package:gal/gal.dart'; // REMOVIDO - crashea iOS 26
 import 'package:audioplayers/audioplayers.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:app_links/app_links.dart';
@@ -2523,10 +2523,37 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
       if (!mounted) return;
       _updateDebug('Verificando sesión...');
 
-      // BYPASS TEMPORAL PARA PRUEBA EN iPHONE — quitar antes de App Store
-      _updateDebug('→ Bypass directo a MainShell');
+      User? usuarioActual = FirebaseAuth.instance.currentUser;
+      _updateDebug('currentUser: \${usuarioActual?.email ?? "null"}');
+
+      if (usuarioActual == null) {
+        _updateDebug('Esperando authStateChanges...');
+        try {
+          usuarioActual = await FirebaseAuth.instance
+            .authStateChanges()
+            .first
+            .timeout(const Duration(seconds: 5));
+          _updateDebug('authStateChanges: \${usuarioActual?.email ?? "null"}');
+        } catch (e) {
+          _updateDebug('Timeout/error: \$e');
+          usuarioActual = null;
+        }
+      }
+
+      if (!mounted) return;
+
+      if (usuarioActual != null) {
+        _updateDebug('→ Navegando a MainShell');
+        Navigator.of(context).pushReplacement(PageRouteBuilder(
+          pageBuilder: (_, __, ___) => const MainShell(),
+          transitionsBuilder: (_, anim, __, child) => FadeTransition(opacity: anim, child: child),
+          transitionDuration: const Duration(milliseconds: 700),
+        ));
+        return;
+      }
+      _updateDebug('→ Navegando a LangSelect');
       Navigator.of(context).pushReplacement(PageRouteBuilder(
-        pageBuilder: (_, __, ___) => const MainShell(),
+        pageBuilder: (_, __, ___) => const LangSelectScreen(),
         transitionsBuilder: (_, anim, __, child) => FadeTransition(opacity: anim, child: child),
         transitionDuration: const Duration(milliseconds: 700),
       ));
@@ -7226,8 +7253,8 @@ class _CapturasDeCampoScreenState extends State<CapturasDeCampoScreen> {
     // Guardar en galería del celular
     bool guardadaEnGaleria = false;
     try {
-      await Gal.putImage(pathFinal, album: 'Rutero MDE');
-      guardadaEnGaleria = true;
+      // await Gal.putImage(pathFinal, album: 'Rutero MDE'); // REMOVIDO - gal crashea iOS 26
+      guardadaEnGaleria = false; // Sin guardado en galería por ahora
     } catch (e) {
       debugPrint('⚠️ No se pudo guardar en galería: $e');
     }
@@ -12574,8 +12601,8 @@ class _CameraScreenState extends State<CameraScreen> with SingleTickerProviderSt
       final archivo = File('${ruteroDir.path}/rutero_$timestamp.png');
       await archivo.writeAsBytes(composedBytes);
 
-      // Guardar en galería del sistema (aparece en Fotos del celular)
-      await Gal.putImage(archivo.path, album: 'Rutero MDE');
+      // Guardar en galería del sistema (deshabilitado - gal crashea iOS 26)
+      // await Gal.putImage(archivo.path, album: 'Rutero MDE');
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(

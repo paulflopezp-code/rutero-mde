@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CLIENT_ID</key>
+	<string>300771058852-ea6r1gjc59rskb69jba2uhpoa94k8duv.apps.googleusercontent.com</string>
+	<key>REVERSED_CLIENT_ID</key>
+	<string>com.googleusercontent.apps.300771058852-ea6r1gjc59rskb69jba2uhpoa94k8duv</string>
+	<key>ANDROID_CLIENT_ID</key>
+	<string>300771058852-7cfi9lunobkmje6ask429c3g0nu2lr1u.apps.googleusercontent.com</string>
+	<key>API_KEY</key>
+	<string>AIzaSyC4D3nwkeJqNr8jof0l7gB__1GNs1OKe80</string>
+	<key>GCM_SENDER_ID</key>
+	<string>300771058852</string>
+	<key>PLIST_VERSION</key>
+	<string>1</string>
+	<key>BUNDLE_ID</key>
+	<string>com.ruteromde.app</string>
+	<key>PROJECT_ID</key>
+	<string>rutero-mde</string>
+	<key>STORAGE_BUCKET</key>
+	<string>rutero-mde.firebasestorage.app</string>
+	<key>IS_ADS_ENABLED</key>
+	<false></false>
+	<key>IS_ANALYTICS_ENABLED</key>
+	<false></false>
+	<key>IS_APPINVITE_ENABLED</key>
+	<true></true>
+	<key>IS_GCM_ENABLED</key>
+	<true></true>
+	<key>IS_SIGNIN_ENABLED</key>
+	<true></true>
+	<key>GOOGLE_APP_ID</key>
+	<string>1:300771058852:ios:16dd3a6e39468f25fc3231</string>
+</dict>
+</plist>
