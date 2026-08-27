@@ -22,6 +22,7 @@
 // ════════════════════════════════════════════════════════════════════════════
 
 import 'firebase_options.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
@@ -154,6 +155,11 @@ class AudioManager {
   }
 
   Future<void> iniciarMusicaPrincipal() async {
+    // DESHABILITADO EN iOS — audioplayers causa SIGABRT en iOS 26
+    if (defaultTargetPlatform == TargetPlatform.iOS) {
+      debugPrint('⚠️ Audio deshabilitado en iOS');
+      return;
+    }
     if (_musicaIniciada) return;
     _musicaIniciada = true;
     try {
@@ -1216,13 +1222,18 @@ void main() async {
     );
     await FirebaseAppCheck.instance.activate(
       androidProvider: AndroidProvider.playIntegrity,
-      // debug: funciona en desarrollo, TestFlight y App Store
-      // Nota: cambiar a deviceCheck cuando Apple lo exija explícitamente
-      appleProvider: AppleProvider.debug,
+      // kDebugMode = true solo cuando corres desde Xcode con debugger
+      // TestFlight y App Store siempre usan deviceCheck
+      appleProvider: kDebugMode
+          ? AppleProvider.debug
+          : AppleProvider.deviceCheck,
     );
     await cargarModoDemo();
     await cargarIdiomaGuardado();
-    await AudioManager().cargarPreferencias();
+    // Audio deshabilitado en iOS — audioplayers causa SIGABRT
+    if (defaultTargetPlatform != TargetPlatform.iOS) {
+      await AudioManager().cargarPreferencias();
+    }
     await SesionManager().cargarRutaActiva();
     RutasService().cargarEnBackground();
     AliadosService().cargarEnBackground();
