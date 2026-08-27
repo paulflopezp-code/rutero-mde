@@ -47,7 +47,7 @@ import 'dart:ui' as ui;
 import 'package:path_provider/path_provider.dart';
 import 'package:firebase_app_check/firebase_app_check.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-// import 'package:gal/gal.dart'; // REMOVIDO - crashea iOS 26
+import 'package:gal/gal.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:app_links/app_links.dart';
@@ -155,11 +155,6 @@ class AudioManager {
   }
 
   Future<void> iniciarMusicaPrincipal() async {
-    // DESHABILITADO EN iOS — audioplayers causa SIGABRT en iOS 26
-    if (defaultTargetPlatform == TargetPlatform.iOS) {
-      debugPrint('⚠️ Audio deshabilitado en iOS');
-      return;
-    }
     if (_musicaIniciada) return;
     _musicaIniciada = true;
     try {
@@ -1230,10 +1225,7 @@ void main() async {
     );
     await cargarModoDemo();
     await cargarIdiomaGuardado();
-    // Audio deshabilitado en iOS — audioplayers causa SIGABRT
-    if (defaultTargetPlatform != TargetPlatform.iOS) {
-      await AudioManager().cargarPreferencias();
-    }
+    await AudioManager().cargarPreferencias();
     await SesionManager().cargarRutaActiva();
     RutasService().cargarEnBackground();
     AliadosService().cargarEnBackground();
@@ -7253,8 +7245,8 @@ class _CapturasDeCampoScreenState extends State<CapturasDeCampoScreen> {
     // Guardar en galería del celular
     bool guardadaEnGaleria = false;
     try {
-      // await Gal.putImage(pathFinal, album: 'Rutero MDE'); // REMOVIDO - gal crashea iOS 26
-      guardadaEnGaleria = false; // Sin guardado en galería por ahora
+      await Gal.putImage(pathFinal, album: 'Rutero MDE');
+      guardadaEnGaleria = true;
     } catch (e) {
       debugPrint('⚠️ No se pudo guardar en galería: $e');
     }
@@ -12601,8 +12593,8 @@ class _CameraScreenState extends State<CameraScreen> with SingleTickerProviderSt
       final archivo = File('${ruteroDir.path}/rutero_$timestamp.png');
       await archivo.writeAsBytes(composedBytes);
 
-      // Guardar en galería del sistema (deshabilitado - gal crashea iOS 26)
-      // await Gal.putImage(archivo.path, album: 'Rutero MDE');
+      // Guardar en galería del sistema (aparece en Fotos del celular)
+      await Gal.putImage(archivo.path, album: 'Rutero MDE');
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
