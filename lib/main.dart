@@ -1219,9 +1219,7 @@ void main() async {
       androidProvider: AndroidProvider.playIntegrity,
       // kDebugMode = true solo cuando corres desde Xcode con debugger
       // TestFlight y App Store siempre usan deviceCheck
-      appleProvider: kDebugMode
-          ? AppleProvider.debug
-          : AppleProvider.deviceCheck,
+      appleProvider: AppleProvider.debug, // temporal TestFlight — cambiar a deviceCheck para App Store
     );
     await cargarModoDemo();
     await cargarIdiomaGuardado();
