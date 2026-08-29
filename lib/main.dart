@@ -2484,18 +2484,10 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
   late Animation<double> _fadeAnim, _scaleAnim, _progressAnim;
   late Animation<double> _floatAnim;
 
-  // DEBUG iOS — overlay temporal para diagnosticar
-  String _debugMsg = 'Iniciando...';
-
-  void _updateDebug(String msg) {
-    debugPrint('🔴 iOS DEBUG: $msg');
-    if (mounted) setState(() => _debugMsg = msg);
-  }
 
   @override
   void initState() {
     super.initState();
-    _updateDebug('initState OK');
     _ctrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 2200));
     _floatCtrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 2000))
       ..repeat(reverse: true);
@@ -2509,42 +2501,34 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
         .animate(CurvedAnimation(parent: _floatCtrl, curve: Curves.easeInOut));
 
     _ctrl.forward();
-    _updateDebug('Animaciones iniciadas');
 
     Future.delayed(const Duration(milliseconds: 3200), () async {
       if (!mounted) return;
-      _updateDebug('Verificando sesión...');
-
+  
       User? usuarioActual = FirebaseAuth.instance.currentUser;
-      _updateDebug('currentUser: \${usuarioActual?.email ?? "null"}');
-
+  
       if (usuarioActual == null) {
-        _updateDebug('Esperando authStateChanges...');
-        try {
+            try {
           usuarioActual = await FirebaseAuth.instance
             .authStateChanges()
             .first
             .timeout(const Duration(seconds: 5));
-          _updateDebug('authStateChanges: \${usuarioActual?.email ?? "null"}');
-        } catch (e) {
-          _updateDebug('Timeout/error: \$e');
-          usuarioActual = null;
+              } catch (e) {
+                usuarioActual = null;
         }
       }
 
       if (!mounted) return;
 
       if (usuarioActual != null) {
-        _updateDebug('→ Navegando a MainShell');
-        Navigator.of(context).pushReplacement(PageRouteBuilder(
+            Navigator.of(context).pushReplacement(PageRouteBuilder(
           pageBuilder: (_, __, ___) => const MainShell(),
           transitionsBuilder: (_, anim, __, child) => FadeTransition(opacity: anim, child: child),
           transitionDuration: const Duration(milliseconds: 700),
         ));
         return;
       }
-      _updateDebug('→ Navegando a LangSelect');
-      Navigator.of(context).pushReplacement(PageRouteBuilder(
+        Navigator.of(context).pushReplacement(PageRouteBuilder(
         pageBuilder: (_, __, ___) => const LangSelectScreen(),
         transitionsBuilder: (_, anim, __, child) => FadeTransition(opacity: anim, child: child),
         transitionDuration: const Duration(milliseconds: 700),
@@ -2720,18 +2704,6 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
                         fontSize: 8, letterSpacing: 0.5)),
                   ]),
 
-                  // Debug overlay — iOS diagnóstico
-                  const SizedBox(height: 8),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: Colors.black.withOpacity(0.5),
-                      borderRadius: BorderRadius.circular(8)),
-                    child: Text(_debugMsg,
-                      style: const TextStyle(
-                        color: Colors.greenAccent,
-                        fontSize: 10,
-                        fontFamily: 'SpaceGrotesk'))),
 
                 ])))),
       ]),
@@ -10444,13 +10416,7 @@ class _HomeBodyState extends State<HomeBody> {
                   icon: RDSIcons.catGastrono,
                   activo: _filtroActivo == 'Comida Urbana',
                   onTap: () => setState(() => _filtroActivo = 'Comida Urbana')),
-                const SizedBox(width: RDSSpace.sm),
-                CategoryChip(
-                  label: t('Familiar','Family'),
-                  icon: Icons.family_restroom_rounded,
-                  color: RDSColor.green,
-                  activo: _filtroActivo == 'Familiar',
-                  onTap: () => setState(() => _filtroActivo = 'Familiar')),
+
               ])),
             const SizedBox(height: 16),
 
@@ -16831,30 +16797,65 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
       return;
     }
     try {
-      final snap = await FirebaseFirestore.instance
-        .collection('planner_metricas')
-        .where('uid', isEqualTo: uid)
-        .orderBy('timestamp', descending: true)
-        .limit(1)
-        .get();
-      if (snap.docs.isEmpty || !mounted) {
+      // Leer itinerario real de Felo desde SharedPreferences
+      final prefs = await SharedPreferences.getInstance();
+      final jsonStr = prefs.getString('planner_ultimo_itinerario');
+      if (jsonStr == null || !mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
           content: Text(t('Todavía no le preguntaste a Felo',
                          'You haven\'t generated an itinerary yet')),
           backgroundColor: RDSColor.card));
         return;
       }
-      final rutasPlanner = RutasService().rutas
-        .where((r) => r['activa'] != false && r['pausada'] != true)
-        .take(3).toList();
+
+      final itinerario = jsonDecode(jsonStr) as Map<String, dynamic>;
+      final dias = itinerario['dias'] as List<dynamic>? ?? [];
+
+      if (dias.isEmpty || !mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(t('El itinerario de Felo no tiene rutas con coordenadas',
+                         'Felo\'s itinerary has no routes with coordinates')),
+          backgroundColor: RDSColor.card));
+        return;
+      }
+
+      // Mapear rutas del itinerario a rutas reales con coordenadas
+      final todasRutas = RutasService().rutas;
+      final plannerDias = <Map<String, dynamic>>[];
+
+      for (int i = 0; i < dias.length && i < 4; i++) {
+        final dia = dias[i] as Map<String, dynamic>;
+        final actividades = dia['actividades'] as List<dynamic>? ?? [];
+        for (final act in actividades) {
+          if (act is! Map) continue;
+          final nombreRuta = act['ruta']?.toString() ?? act['nombre']?.toString() ?? '';
+          if (nombreRuta.isEmpty) continue;
+          final rutaReal = todasRutas.firstWhere(
+            (r) => (r['nombre']?.toString() ?? '').toLowerCase().contains(nombreRuta.toLowerCase()) ||
+                   nombreRuta.toLowerCase().contains((r['nombre']?.toString() ?? '').toLowerCase()),
+            orElse: () => <String, dynamic>{});
+          if (rutaReal.isNotEmpty && rutaReal.containsKey('sitiosDetalle')) {
+            plannerDias.add({
+              'dia': i + 1,
+              'ruta': rutaReal,
+              'color': _coloresDia[plannerDias.length % _coloresDia.length],
+            });
+            break; // Una ruta por día
+          }
+        }
+      }
+
       if (!mounted) return;
       setState(() {
         _mostrarCapaPlannerActiva = true;
-        _plannerDias = rutasPlanner.asMap().entries.map((e) => {
-          'dia': e.key + 1,
-          'ruta': e.value,
-          'color': _coloresDia[e.key % _coloresDia.length],
-        }).toList();
+        _plannerDias = plannerDias.isEmpty
+          // Fallback: primeras rutas con sitiosDetalle
+          ? todasRutas.where((r) => r['activa'] != false && r['pausada'] != true && r.containsKey('sitiosDetalle'))
+              .take(3).toList().asMap().entries.map((e) => {
+                'dia': e.key + 1, 'ruta': e.value,
+                'color': _coloresDia[e.key % _coloresDia.length],
+              }).toList()
+          : plannerDias;
       });
       _mapController?.animateCamera(CameraUpdate.newLatLngZoom(_centerCiudad, 12));
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
@@ -17596,43 +17597,52 @@ class _MisFotosScreenState extends State<MisFotosScreen> {
 
     showDialog(context: context, builder: (_) => Dialog(
       backgroundColor: Colors.transparent,
+      insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 40),
       child: Column(mainAxisSize: MainAxisSize.min, children: [
         ClipRRect(
           borderRadius: BorderRadius.circular(20),
-          child: Stack(children: [
-            (() {
-              final localPath = data['localPath']?.toString();
-              if (url != null) {
-                return Image.network(url, fit: BoxFit.cover,
-                  errorBuilder: (_, __, ___) => localPath != null && File(localPath).existsSync()
-                    ? Image.file(File(localPath), fit: BoxFit.cover)
-                    : _placeholderFoto(emoji, acento));
-              } else if (localPath != null && File(localPath).existsSync()) {
-                return Image.file(File(localPath), fit: BoxFit.cover);
-              }
-              return _placeholderFoto(emoji, acento);
-            })(),
-            // Info overlay
-            Positioned(bottom: 0, left: 0, right: 0,
-              child: Container(
-                padding: const EdgeInsets.all(16),
-                decoration: const BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.bottomCenter, end: Alignment.topCenter,
-                    colors: [Colors.black87, Colors.transparent])),
-                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text('$emoji $sitio',
-                    style: const TextStyle(color: RDSColor.textPrimary, fontSize: 16, fontWeight: FontWeight.w800)),
-                  Text(ruta, style: TextStyle(color: acento, fontSize: 12)),
-                ]))),
-          ])),
-        const SizedBox(height: 12),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              maxHeight: MediaQuery.of(context).size.height * 0.65,
+              maxWidth: MediaQuery.of(context).size.width,
+            ),
+            child: Stack(children: [
+              (() {
+                final localPath = data['localPath']?.toString();
+                if (url != null) {
+                  return Image.network(url, fit: BoxFit.cover, width: double.infinity,
+                    errorBuilder: (_, __, ___) => localPath != null && File(localPath).existsSync()
+                      ? Image.file(File(localPath), fit: BoxFit.cover, width: double.infinity)
+                      : _placeholderFoto(emoji, acento));
+                } else if (localPath != null && File(localPath).existsSync()) {
+                  return Image.file(File(localPath), fit: BoxFit.cover, width: double.infinity);
+                }
+                return _placeholderFoto(emoji, acento);
+              })(),
+              // Info overlay
+              Positioned(bottom: 0, left: 0, right: 0,
+                child: Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: const BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.bottomCenter, end: Alignment.topCenter,
+                      colors: [Colors.black87, Colors.transparent])),
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text('$emoji $sitio',
+                      style: const TextStyle(color: RDSColor.textPrimary, fontSize: 16, fontWeight: FontWeight.w800),
+                      maxLines: 2, overflow: TextOverflow.ellipsis),
+                    Text(ruta, style: TextStyle(color: acento, fontSize: 12),
+                      maxLines: 1, overflow: TextOverflow.ellipsis),
+                  ]))),
+            ])),
+        ),
+        const SizedBox(height: 16),
         Row(mainAxisAlignment: MainAxisAlignment.center, children: [
           // Compartir
           GestureDetector(
             onTap: () { Navigator.of(context, rootNavigator: true).pop(); _compartirFoto(data); },
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
               decoration: BoxDecoration(
                 color: RDSColor.green.withOpacity(0.2),
                 borderRadius: BorderRadius.circular(20),
@@ -17644,13 +17654,14 @@ class _MisFotosScreenState extends State<MisFotosScreen> {
           GestureDetector(
             onTap: () => Navigator.of(context, rootNavigator: true).pop(),
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
               decoration: BoxDecoration(
                 color: Colors.white.withOpacity(0.08),
                 borderRadius: BorderRadius.circular(RDSRadius.xl)),
               child: const Text('✕ Cerrar',
                 style: TextStyle(color: RDSColor.textMuted, fontWeight: FontWeight.w700)))),
         ]),
+        const SizedBox(height: 8),
       ])));
   }
 
@@ -17669,9 +17680,13 @@ class _MisFotosScreenState extends State<MisFotosScreen> {
         'Discover Medellín in a gamified way! 🗺️\nrutero-mde.web.app');
 
       // Intentar compartir imagen si existe localmente
+      // En iOS solo funciona desde directorio temporal
       if (localPath != null && File(localPath).existsSync()) {
+        final tempDir = await getTemporaryDirectory();
+        final tempShare = File('${tempDir.path}/rutero_share_${DateTime.now().millisecondsSinceEpoch}.jpg');
+        await File(localPath).copy(tempShare.path);
         await Share.shareXFiles(
-          [XFile(localPath)],
+          [XFile(tempShare.path)],
           text: texto,
           subject: 'Rutero MDE — $sitio');
         return;
@@ -19205,8 +19220,9 @@ class _TransporteAliadoCardState extends State<_TransporteAliadoCard> {
 
 bool _tieneAliadoMuseoEscobar(Map<String, dynamic> ruta) {
   final nombre = (ruta['nombre']?.toString() ?? '').toUpperCase();
-  // Solo en RUTA MEMORIA Y REFLEXIÓN — no en MEMORIA Y DERECHOS HUMANOS
+  // Solo en RUTA MEMORIA Y REFLEXIÓN — no en MEMORIA Y DERECHOS HUMANOS ni TRANSFORMACIÓN
   if (nombre.contains('DERECHOS')) return false;
+  if (nombre.contains('TRANSFORMACI')) return false;
   return nombre.contains('MEMORIA') || nombre.contains('REFLEXI');
 }
 
