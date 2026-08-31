@@ -12713,21 +12713,6 @@ class _CameraScreenState extends State<CameraScreen> with SingleTickerProviderSt
           'acento': (kRutaColor(widget.ruta['acento'], RDSColor.green)).value,
           'fecha': FieldValue.serverTimestamp(),
         }).catchError((e) => debugPrint('⚠️ validación Firestore: $e'));
-
-      // Guardar también en colección fotos para MisFotosScreen
-      FirebaseFirestore.instance
-        .collection('usuarios')
-        .doc(AuthService.currentUser!.uid)
-        .collection('fotos')
-        .add({
-          'sitio': widget.sitioNombre,
-          'ruta': widget.ruta['nombre'],
-          'emoji': widget.sitioEmoji,
-          'rutaEmoji': widget.ruta['emoji'] ?? '🗺️',
-          'acento': (kRutaColor(widget.ruta['acento'], RDSColor.green)).value,
-          'fecha': FieldValue.serverTimestamp(),
-          'localPath': '',
-        }).catchError((e) => debugPrint('⚠️ fotos Firestore: $e'));
     }
     setState(() { _subiendo = false; _validando = false; });
 
@@ -13112,7 +13097,46 @@ class _RewardScreenState extends State<RewardScreen>
         '🌿 Download Rutero MDE: rutero-mde.web.app\n'
         '#RuteroMDE #Medellin';
     final texto = kLang == 'en' ? textoEN : textoES;
-    Share.share(texto, subject: t('Rutero MDE — Logro desbloqueado', 'Rutero MDE — Achievement unlocked'));
+    Share.share(texto,
+      subject: t('Rutero MDE — Logro desbloqueado', 'Rutero MDE — Achievement unlocked'),
+      sharePositionOrigin: Rect.fromLTWH(
+        MediaQuery.of(context).size.width / 4,
+        MediaQuery.of(context).size.height / 2,
+        MediaQuery.of(context).size.width / 2, 100));
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        backgroundColor: RDSColor.card,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(RDSRadius.xl)),
+        title: Row(children: [
+          const Text('📤', style: TextStyle(fontSize: 22)),
+          const SizedBox(width: 8),
+          Text(t('Compartir logro', 'Share achievement'),
+            style: const TextStyle(color: RDSColor.textPrimary, fontSize: 16, fontWeight: FontWeight.w800)),
+        ]),
+        content: Column(mainAxisSize: MainAxisSize.min, children: [
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: RDSColor.surface, borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: RDSColor.green.withOpacity(0.2))),
+            child: Text(texto,
+              style: const TextStyle(color: RDSColor.textPrimary, fontSize: 13, height: 1.5))),
+        ]),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context),
+            child: Text(t('Cerrar','Close'), style: const TextStyle(color: RDSColor.textMuted))),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                content: Text(t('¡Listo! Copia el texto y pégalo en tus redes 🚀',
+                  'Done! Copy the text and paste it on your socials 🚀')),
+                backgroundColor: RDSColor.green, duration: const Duration(seconds: 3)));
+            },
+            child: Text(t('¡LISTO!','DONE!'),
+              style: const TextStyle(color: RDSColor.green, fontWeight: FontWeight.w800))),
+        ]));
   }
 
   @override
@@ -17577,23 +17601,16 @@ class _MisFotosScreenState extends State<MisFotosScreen> {
     showDialog(context: context, builder: (_) => Dialog(
       backgroundColor: Colors.transparent,
       insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 40),
-      child: Container(
-        decoration: BoxDecoration(
-          color: RDSColor.card,
-          borderRadius: BorderRadius.circular(24)),
-        clipBehavior: Clip.antiAlias,
-        child: Column(mainAxisSize: MainAxisSize.min, children: [
+      child: Column(mainAxisSize: MainAxisSize.min, children: [
         ClipRRect(
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+          borderRadius: BorderRadius.circular(20),
           child: ConstrainedBox(
             constraints: BoxConstraints(
-              maxHeight: MediaQuery.of(context).size.height * 0.55,
-              maxWidth: double.infinity,
+              maxHeight: MediaQuery.of(context).size.height * 0.65,
+              maxWidth: MediaQuery.of(context).size.width,
             ),
             child: Stack(children: [
-              SizedBox(
-                width: double.infinity,
-                child: (() {
+              (() {
                 final localPath = data['localPath']?.toString();
                 if (url != null) {
                   return Image.network(url, fit: BoxFit.cover, width: double.infinity,
@@ -17604,7 +17621,7 @@ class _MisFotosScreenState extends State<MisFotosScreen> {
                   return Image.file(File(localPath), fit: BoxFit.cover, width: double.infinity);
                 }
                 return _placeholderFoto(emoji, acento);
-              })()),
+              })(),
               // Info overlay
               Positioned(bottom: 0, left: 0, right: 0,
                 child: Container(
@@ -17622,35 +17639,33 @@ class _MisFotosScreenState extends State<MisFotosScreen> {
                   ]))),
             ])),
         ),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
-          child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+        const SizedBox(height: 16),
+        Row(mainAxisAlignment: MainAxisAlignment.center, children: [
           // Compartir
-          Expanded(
-            child: GestureDetector(
-              onTap: () { Navigator.of(context, rootNavigator: true).pop(); _compartirFoto(data); },
-              child: Container(
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                decoration: BoxDecoration(
-                  color: RDSColor.green.withOpacity(0.15),
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: RDSColor.green.withOpacity(0.5))),
-                child: const Center(child: Text('↗️ Compartir',
-                  style: TextStyle(color: RDSColor.green, fontWeight: FontWeight.w700)))))),
+          GestureDetector(
+            onTap: () { Navigator.of(context, rootNavigator: true).pop(); _compartirFoto(data); },
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              decoration: BoxDecoration(
+                color: RDSColor.green.withOpacity(0.2),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: RDSColor.green.withOpacity(0.5))),
+              child: const Text('↗️ Compartir',
+                style: TextStyle(color: RDSColor.green, fontWeight: FontWeight.w700)))),
           const SizedBox(width: 12),
           // Cerrar
-          Expanded(
-            child: GestureDetector(
-              onTap: () => Navigator.of(context, rootNavigator: true).pop(),
-              child: Container(
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.08),
-                  borderRadius: BorderRadius.circular(14)),
-                child: const Center(child: Text('✕ Cerrar',
-                  style: TextStyle(color: RDSColor.textMuted, fontWeight: FontWeight.w700)))))),
-        ])),
-      ]))));
+          GestureDetector(
+            onTap: () => Navigator.of(context, rootNavigator: true).pop(),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.08),
+                borderRadius: BorderRadius.circular(RDSRadius.xl)),
+              child: const Text('✕ Cerrar',
+                style: TextStyle(color: RDSColor.textMuted, fontWeight: FontWeight.w700)))),
+        ]),
+        const SizedBox(height: 8),
+      ])));
   }
 
   Future<void> _compartirFoto(Map<String, dynamic> data) async {
@@ -17676,7 +17691,12 @@ class _MisFotosScreenState extends State<MisFotosScreen> {
         await Share.shareXFiles(
           [XFile(tempShare.path)],
           text: texto,
-          subject: 'Rutero MDE — $sitio');
+          subject: 'Rutero MDE — $sitio',
+          sharePositionOrigin: Rect.fromLTWH(
+            MediaQuery.of(context).size.width / 4,
+            MediaQuery.of(context).size.height / 2,
+            MediaQuery.of(context).size.width / 2,
+            100));
         return;
       }
 
@@ -17696,13 +17716,24 @@ class _MisFotosScreenState extends State<MisFotosScreen> {
           await Share.shareXFiles(
             [XFile(tempFile.path)],
             text: texto,
-            subject: 'Rutero MDE — $sitio');
+            subject: 'Rutero MDE — $sitio',
+            sharePositionOrigin: Rect.fromLTWH(
+              MediaQuery.of(context).size.width / 4,
+              MediaQuery.of(context).size.height / 2,
+              MediaQuery.of(context).size.width / 2,
+              100));
           return;
         }
       }
 
       // Fallback: compartir solo texto
-      await Share.share(texto, subject: 'Rutero MDE — $sitio');
+      await Share.share(texto,
+        subject: 'Rutero MDE — $sitio',
+        sharePositionOrigin: Rect.fromLTWH(
+          MediaQuery.of(context).size.width / 4,
+          MediaQuery.of(context).size.height / 2,
+          MediaQuery.of(context).size.width / 2,
+          100));
 
     } catch (e) {
       if (mounted) {
