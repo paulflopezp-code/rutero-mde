@@ -1593,7 +1593,7 @@ class AuthService {
       return result;
     } catch (e) {
       debugPrint('Error Sign in with Apple: $e');
-      return null;
+      rethrow; // exponer el error real para diagnóstico
     }
   }
 
@@ -3504,13 +3504,18 @@ class _LoginScreenState extends State<LoginScreen> {
             GestureDetector(
               onTap: _cargando ? null : () async {
                 setState(() => _cargando = true);
-                final result = await AuthService.loginConApple();
-                if (!mounted) return;
-                if (result != null) {
-                  Navigator.of(context, rootNavigator: true).pushAndRemoveUntil(
-                    MaterialPageRoute(builder: (_) => const MainShell()), (r) => false);
-                } else {
-                  setState(() { _cargando = false; _error = t('Error con Apple ID','Apple ID error'); });
+                try {
+                  final result = await AuthService.loginConApple();
+                  if (!mounted) return;
+                  if (result != null) {
+                    Navigator.of(context, rootNavigator: true).pushAndRemoveUntil(
+                      MaterialPageRoute(builder: (_) => const MainShell()), (r) => false);
+                  } else {
+                    setState(() { _cargando = false; _error = 'Apple: resultado null'; });
+                  }
+                } catch (e) {
+                  if (!mounted) return;
+                  setState(() { _cargando = false; _error = 'Apple error: ${e.toString()}'; });
                 }
               },
               child: Container(
