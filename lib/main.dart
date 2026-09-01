@@ -6,7 +6,7 @@
 //  C.C.:         80.173.002
 //  Contacto:     paulflopezp@gmail.com  ·  +57 319 484 0611
 //  Inicio:       21 de octubre de 2025
-//  Versión:      1.0.2-Beta — Android
+//  Versión:      1.0.15 — Android & iOS
 //
 //  Este código fuente es obra original del autor y está protegido por las
 //  leyes colombianas e internacionales de Derechos de Autor (Ley 23 de 1982,
@@ -15,7 +15,7 @@
 //  Queda prohibida la reproducción, distribución, modificación o uso
 //  comercial de este software sin autorización expresa y escrita del autor.
 //
-//  Registro DNDA en trámite — derechodeautor.gov.co
+//  Registro DNDA: 1-2025-110420 — derechodeautor.gov.co
 //  Programa Créame — Alcaldía de Medellín (2026)
 //
 //  🌿 Rutero MDE — Donde el viaje se vuelve aventura
@@ -3441,47 +3441,6 @@ class _LoginScreenState extends State<LoginScreen> {
             const SizedBox(height: 28),
             Padding(padding: const EdgeInsets.symmetric(horizontal: 28), child: Column(children: [
 
-            // Campo email
-            _InputField(ctrl: _emailCtrl, hint: tCorreo,
-              icon: Icons.email_outlined, keyboardType: TextInputType.emailAddress),
-            const SizedBox(height: RDSSpace.sm),
-
-            // Campo contraseña
-            _InputField(ctrl: _passCtrl, hint: tContrasena,
-              icon: Icons.lock_outline_rounded, obscure: !_verPass,
-              suffix: GestureDetector(
-                onTap: () => setState(() => _verPass = !_verPass),
-                child: Icon(_verPass ? Icons.visibility_off : Icons.visibility,
-                  color: RDSColor.textMuted, size: 18))),
-            const SizedBox(height: 8),
-
-            // Error
-            if (_error.isNotEmpty)
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: RDSColor.accent.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: RDSColor.accent.withOpacity(0.3))),
-                child: Text(_error, style: const TextStyle(color: RDSColor.accent, fontSize: 12))),
-            const SizedBox(height: 20),
-
-            // Botón login email
-            _GoldButton(
-              label: _cargando ? t('Entrando...','Signing in...') : t('ENTRAR CON EMAIL','SIGN IN WITH EMAIL'),
-              onTap: _cargando ? () {} : _loginEmail),
-            const SizedBox(height: 12),
-
-            // Divider
-            Row(children: [
-              Expanded(child: Divider(color: Colors.white.withOpacity(0.1))),
-              const Padding(padding: EdgeInsets.symmetric(horizontal: 12),
-                child: Text('o', style: TextStyle(color: RDSColor.textMuted, fontSize: 12))),
-              Expanded(child: Divider(color: Colors.white.withOpacity(0.1))),
-            ]),
-            const SizedBox(height: 12),
-
             // Botón Google
             GestureDetector(
               onTap: _cargando ? null : _loginGoogle,
@@ -3528,18 +3487,48 @@ class _LoginScreenState extends State<LoginScreen> {
                       fontSize: 13, fontWeight: FontWeight.w700,
                       color: Colors.black, letterSpacing: 1)),
                 ]))),
-            const SizedBox(height: 24),
+            const SizedBox(height: 16),
 
-            // Ir a registro
-            Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-              Text(tNoTienesCuenta, style: const TextStyle(color: RDSColor.textMuted, fontSize: 13)),
-              GestureDetector(
-                onTap: () => Navigator.of(context).push(
-                  MaterialPageRoute(builder: (_) => const RegisterScreen())),
-                child: Text(tCrearCuenta,
-                  style: const TextStyle(color: RDSColor.green, fontSize: 13, fontWeight: FontWeight.w700))),
+            // Divider
+            Row(children: [
+              Expanded(child: Divider(color: Colors.white.withOpacity(0.1))),
+              const Padding(padding: EdgeInsets.symmetric(horizontal: 12),
+                child: Text('o', style: TextStyle(color: RDSColor.textMuted, fontSize: 12))),
+              Expanded(child: Divider(color: Colors.white.withOpacity(0.1))),
             ]),
             const SizedBox(height: 16),
+
+            // Campo email
+            _InputField(ctrl: _emailCtrl, hint: tCorreo,
+              icon: Icons.email_outlined, keyboardType: TextInputType.emailAddress),
+            const SizedBox(height: RDSSpace.sm),
+
+            // Campo contraseña
+            _InputField(ctrl: _passCtrl, hint: tContrasena,
+              icon: Icons.lock_outline_rounded, obscure: !_verPass,
+              suffix: GestureDetector(
+                onTap: () => setState(() => _verPass = !_verPass),
+                child: Icon(_verPass ? Icons.visibility_off : Icons.visibility,
+                  color: RDSColor.textMuted, size: 18))),
+            const SizedBox(height: 8),
+
+            // Error
+            if (_error.isNotEmpty)
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: RDSColor.accent.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: RDSColor.accent.withOpacity(0.3))),
+                child: Text(_error, style: const TextStyle(color: RDSColor.accent, fontSize: 12))),
+            const SizedBox(height: 20),
+
+            // Botón login email
+            _GoldButton(
+              label: _cargando ? t('Entrando...','Signing in...') : t('ENTRAR CON EMAIL','SIGN IN WITH EMAIL'),
+              onTap: _cargando ? () {} : _loginEmail),
+            const SizedBox(height: 24),
 
             // Explorar sin cuenta
             GestureDetector(
@@ -3870,7 +3859,7 @@ class _LangSelectScreenState extends State<LangSelectScreen> {
     final visto = _checkOnboardingVisto();
     // FIX 30/06/2026: se elimina BetaWelcomeScreen del flujo — va directo a login.
     // Causaba bug de botón tapado por barra de navegación en Android 15 (3 botones).
-    final destino = visto ? const WelcomeScreen() : const OnboardingScreen();
+    final destino = visto ? const LoginScreen() : const OnboardingScreen();
     Navigator.of(context).pushReplacement(PageRouteBuilder(
       pageBuilder: (_, __, ___) => destino,
       transitionsBuilder: (_, anim, __, child) => FadeTransition(opacity: anim, child: child),
@@ -4128,7 +4117,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
     await prefs.setBool('onboarding_visto', true);
     if (!mounted) return;
     Navigator.of(context).pushReplacement(
-      MaterialPageRoute(builder: (_) => const WelcomeScreen()));
+      MaterialPageRoute(builder: (_) => const LoginScreen()));
   }
 
   void _onPageChanged(int idx) {
@@ -4554,7 +4543,7 @@ class _BetaWelcomeScreenState extends State<BetaWelcomeScreen>
 
   void _continuar() => Navigator.of(context).pushReplacement(
     PageRouteBuilder(
-      pageBuilder: (_, __, ___) => const WelcomeScreen(),
+      pageBuilder: (_, __, ___) => const LoginScreen(),
       transitionsBuilder: (_, anim, __, child) => FadeTransition(opacity: anim, child: child),
       transitionDuration: const Duration(milliseconds: 600)));
 
@@ -12446,10 +12435,12 @@ class _CameraScreenState extends State<CameraScreen> with SingleTickerProviderSt
         ]);
         if (confirmar == true && mounted) {
           setState(() => _fotoTomada = File(foto.path));
-          _guardarEnGaleria(File(foto.path)).timeout(
-            const Duration(seconds: 12),
-            onTimeout: () => debugPrint('⚠️ Timeout galería'),
-          ).catchError((e) => debugPrint('⚠️ Error galería: \$e'));
+          // Esperar que la galería procese la foto y obtener el path local
+          // antes de validar para que Mis Fotos muestre la imagen real
+          _localFotoPath = await _guardarEnGaleria(File(foto.path)).timeout(
+            const Duration(seconds: 15),
+            onTimeout: () { debugPrint('⚠️ Timeout galería'); return null; },
+          ).catchError((e) { debugPrint('⚠️ Error galería: $e'); return null; });
           await _validarFoto();
         }
       }
@@ -12463,7 +12454,7 @@ class _CameraScreenState extends State<CameraScreen> with SingleTickerProviderSt
   }
 
   // Componer foto con avatar y guardar en galería
-  Future<void> _guardarEnGaleria(File foto) async {
+  Future<String?> _guardarEnGaleria(File foto) async {
     try {
       final fotoBytes = await foto.readAsBytes();
       final fotoImg = await decodeImageFromList(fotoBytes);
@@ -12559,6 +12550,7 @@ class _CameraScreenState extends State<CameraScreen> with SingleTickerProviderSt
 
       // Guardar en galería del sistema (aparece en Fotos del celular)
       await Gal.putImage(archivo.path, album: 'Rutero MDE');
+      return archivo.path; // retornar path local para MisFotosScreen
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
@@ -12688,6 +12680,7 @@ class _CameraScreenState extends State<CameraScreen> with SingleTickerProviderSt
 
   // Validar y subir foto a Firebase Storage
   // FIX B: Guarda foto en Firestore PRIMERO (con localPath) ANTES de intentar subir.
+  String? _localFotoPath; // path local de la foto para MisFotosScreen
   //        Si la subida a Storage falla, al menos hay registro y la foto queda
   //        disponible localmente en la galería.
   // FIX C: Si la subida falla, muestra snackbar amarillo informativo al usuario.
@@ -12713,6 +12706,23 @@ class _CameraScreenState extends State<CameraScreen> with SingleTickerProviderSt
           'acento': (kRutaColor(widget.ruta['acento'], RDSColor.green)).value,
           'fecha': FieldValue.serverTimestamp(),
         }).catchError((e) => debugPrint('⚠️ validación Firestore: $e'));
+    }
+
+    // Guardar en colección fotos para MisFotosScreen — funciona con y sin modo demo
+    if (AuthService.currentUser != null) {
+      FirebaseFirestore.instance
+        .collection('usuarios')
+        .doc(AuthService.currentUser!.uid)
+        .collection('fotos')
+        .add({
+          'sitio': widget.sitioNombre,
+          'ruta': widget.ruta['nombre'],
+          'emoji': widget.sitioEmoji,
+          'rutaEmoji': widget.ruta['emoji'] ?? '🗺️',
+          'acento': (kRutaColor(widget.ruta['acento'], RDSColor.green)).value,
+          'fecha': FieldValue.serverTimestamp(),
+          'localPath': _localFotoPath ?? '',
+        }).catchError((e) => debugPrint('⚠️ fotos Firestore: $e'));
     }
     setState(() { _subiendo = false; _validando = false; });
 
@@ -17601,28 +17611,30 @@ class _MisFotosScreenState extends State<MisFotosScreen> {
     showDialog(context: context, builder: (_) => Dialog(
       backgroundColor: Colors.transparent,
       insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 40),
-      child: Column(mainAxisSize: MainAxisSize.min, children: [
+      child: Container(
+        decoration: BoxDecoration(
+          color: RDSColor.card,
+          borderRadius: BorderRadius.circular(24)),
+        clipBehavior: Clip.antiAlias,
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
         ClipRRect(
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
           child: ConstrainedBox(
             constraints: BoxConstraints(
-              maxHeight: MediaQuery.of(context).size.height * 0.65,
-              maxWidth: MediaQuery.of(context).size.width,
-            ),
+              maxHeight: MediaQuery.of(context).size.height * 0.55,
+              maxWidth: double.infinity),
             child: Stack(children: [
-              (() {
-                final localPath = data['localPath']?.toString();
-                if (url != null) {
-                  return Image.network(url, fit: BoxFit.cover, width: double.infinity,
-                    errorBuilder: (_, __, ___) => localPath != null && File(localPath).existsSync()
-                      ? Image.file(File(localPath), fit: BoxFit.cover, width: double.infinity)
-                      : _placeholderFoto(emoji, acento));
-                } else if (localPath != null && File(localPath).existsSync()) {
-                  return Image.file(File(localPath), fit: BoxFit.cover, width: double.infinity);
-                }
-                return _placeholderFoto(emoji, acento);
-              })(),
-              // Info overlay
+              SizedBox(width: double.infinity,
+                child: (() {
+                  final localPath = data['localPath']?.toString();
+                  if (localPath != null && localPath.isNotEmpty && File(localPath).existsSync()) {
+                    return Image.file(File(localPath), fit: BoxFit.cover, width: double.infinity);
+                  } else if (url != null) {
+                    return Image.network(url, fit: BoxFit.cover, width: double.infinity,
+                      errorBuilder: (_, __, ___) => _placeholderFoto(emoji, acento));
+                  }
+                  return _placeholderFoto(emoji, acento);
+                })()),
               Positioned(bottom: 0, left: 0, right: 0,
                 child: Container(
                   padding: const EdgeInsets.all(16),
@@ -17637,35 +17649,34 @@ class _MisFotosScreenState extends State<MisFotosScreen> {
                     Text(ruta, style: TextStyle(color: acento, fontSize: 12),
                       maxLines: 1, overflow: TextOverflow.ellipsis),
                   ]))),
-            ])),
-        ),
-        const SizedBox(height: 16),
-        Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-          // Compartir
-          GestureDetector(
-            onTap: () { Navigator.of(context, rootNavigator: true).pop(); _compartirFoto(data); },
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-              decoration: BoxDecoration(
-                color: RDSColor.green.withOpacity(0.2),
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: RDSColor.green.withOpacity(0.5))),
-              child: const Text('↗️ Compartir',
-                style: TextStyle(color: RDSColor.green, fontWeight: FontWeight.w700)))),
-          const SizedBox(width: 12),
-          // Cerrar
-          GestureDetector(
-            onTap: () => Navigator.of(context, rootNavigator: true).pop(),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-              decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.08),
-                borderRadius: BorderRadius.circular(RDSRadius.xl)),
-              child: const Text('✕ Cerrar',
-                style: TextStyle(color: RDSColor.textMuted, fontWeight: FontWeight.w700)))),
-        ]),
-        const SizedBox(height: 8),
-      ])));
+            ]))),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+          child: Row(children: [
+            Expanded(
+              child: GestureDetector(
+                onTap: () { Navigator.of(context, rootNavigator: true).pop(); _compartirFoto(data); },
+                child: Container(
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  decoration: BoxDecoration(
+                    color: RDSColor.green.withOpacity(0.15),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: RDSColor.green.withOpacity(0.5))),
+                  child: const Center(child: Text('↗️ Compartir',
+                    style: TextStyle(color: RDSColor.green, fontWeight: FontWeight.w700)))))),
+            const SizedBox(width: 12),
+            Expanded(
+              child: GestureDetector(
+                onTap: () => Navigator.of(context, rootNavigator: true).pop(),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.08),
+                    borderRadius: BorderRadius.circular(14)),
+                  child: const Center(child: Text('✕ Cerrar',
+                    style: TextStyle(color: RDSColor.textMuted, fontWeight: FontWeight.w700)))))),
+          ])),
+      ]))));
   }
 
   Future<void> _compartirFoto(Map<String, dynamic> data) async {
@@ -17695,8 +17706,7 @@ class _MisFotosScreenState extends State<MisFotosScreen> {
           sharePositionOrigin: Rect.fromLTWH(
             MediaQuery.of(context).size.width / 4,
             MediaQuery.of(context).size.height / 2,
-            MediaQuery.of(context).size.width / 2,
-            100));
+            MediaQuery.of(context).size.width / 2, 100));
         return;
       }
 
@@ -17720,8 +17730,7 @@ class _MisFotosScreenState extends State<MisFotosScreen> {
             sharePositionOrigin: Rect.fromLTWH(
               MediaQuery.of(context).size.width / 4,
               MediaQuery.of(context).size.height / 2,
-              MediaQuery.of(context).size.width / 2,
-              100));
+              MediaQuery.of(context).size.width / 2, 100));
           return;
         }
       }
@@ -17732,8 +17741,7 @@ class _MisFotosScreenState extends State<MisFotosScreen> {
         sharePositionOrigin: Rect.fromLTWH(
           MediaQuery.of(context).size.width / 4,
           MediaQuery.of(context).size.height / 2,
-          MediaQuery.of(context).size.width / 2,
-          100));
+          MediaQuery.of(context).size.width / 2, 100));
 
     } catch (e) {
       if (mounted) {
