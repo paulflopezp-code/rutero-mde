@@ -40,7 +40,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:cloud_firestore/cloud_firestore.dart' as fs show Source;
+import 'package:cloud_firestore/cloud_firestore.dart' as cf;
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 import 'dart:ui' as ui;
@@ -78,7 +78,7 @@ class TipsService {
     try {
       final snapshot = await FirebaseFirestore.instance
           .collection('tips_por_sitio')
-          .get(GetOptions(source: fs.Source.serverAndCache));
+          .get(GetOptions(source: cf.Source.serverAndCache));
       for (final doc in snapshot.docs) {
         final data = doc.data();
         final nombre = data['nombre']?.toString() ?? doc.id;
@@ -1215,12 +1215,13 @@ void main() async {
       persistenceEnabled: true,
       cacheSizeBytes: Settings.CACHE_SIZE_UNLIMITED,
     );
-    await FirebaseAppCheck.instance.activate(
-      androidProvider: AndroidProvider.playIntegrity,
-      // kDebugMode = true solo cuando corres desde Xcode con debugger
-      // TestFlight y App Store siempre usan deviceCheck
-      appleProvider: AppleProvider.debug, // temporal TestFlight — cambiar a deviceCheck para App Store
-    );
+    // App Check: solo en release (debug usa placeholder automático)
+    if (!kDebugMode) {
+      await FirebaseAppCheck.instance.activate(
+        androidProvider: AndroidProvider.playIntegrity,
+        appleProvider: AppleProvider.deviceCheck,
+      );
+    }
     await cargarModoDemo();
     await cargarIdiomaGuardado();
     await AudioManager().cargarPreferencias();
@@ -1620,7 +1621,7 @@ class AuthService {
   // - puntosTotal: +30 puntos por sitio individual
   // - rutasCompletadas: +1 solo al completar la ruta entera
   // - puntosTotal extra: +50 puntos de BONO al completar ruta (incentivo completista)
-  static Future<void> guardarProgreso(String rutaNombre, int sitiosCompletados, int totalSitios) async {
+  static Future<void> guardarProgreso(String rutaNombre, int sitiosCompletados, int totalSitios, {String? sitioNombre}) async {
     if (currentUser == null) return;
     final docRef = _db.collection('usuarios').doc(currentUser!.uid);
 
@@ -1630,21 +1631,30 @@ class AuthService {
       'totalSitios': totalSitios,
       'ultimaActividad': FieldValue.serverTimestamp(),
       'completada': sitiosCompletados >= totalSitios,
-    });
+    }, SetOptions(merge: true));
+
+    // 1b. Guardar nombre del sitio validado para persistencia individual
+    if (sitioNombre != null && sitioNombre.isNotEmpty) {
+      debugPrint('💾 Guardando sitio: $sitioNombre en ruta: $rutaNombre');
+      await docRef.collection('progreso').doc(rutaNombre)
+        .collection('sitios').doc(sitioNombre).set({
+          'validado': true,
+          'fecha': FieldValue.serverTimestamp(),
+        });
+    }
 
     // 2. Incrementar contadores globales del usuario por CADA sitio validado
-    // Esto resuelve el bug donde "sitiosVisitados" siempre estaba en 0
-    await docRef.update({
+    await docRef.set({
       'sitiosVisitados': FieldValue.increment(1),
-      'puntosTotal': FieldValue.increment(30),  // 30 puntos por sitio individual
-    });
+      'puntosTotal': FieldValue.increment(30),
+    }, SetOptions(merge: true));
 
     // 3. Bono extra al completar la ruta entera (+1 ruta completa, +50 puntos bono)
     if (sitiosCompletados >= totalSitios) {
-      await docRef.update({
+      await docRef.set({
         'rutasCompletadas': FieldValue.increment(1),
         'puntosTotal': FieldValue.increment(50),
-      });
+      }, SetOptions(merge: true));
       // Guardar en colección 'rutasCompletadas' para que el mapa pueda desbloquear la ruta
       await docRef.collection('rutasCompletadas').doc(rutaNombre).set({
         'fechaCompletada': FieldValue.serverTimestamp(),
@@ -1687,6 +1697,74 @@ class AuthService {
       .collection('progreso').doc(rutaNombre).get();
     if (!doc.exists) return 0;
     return doc.data()?['sitiosCompletados'] ?? 0;
+  }
+
+  // Obtener lista de sitios validados individualmente
+  static Future<List<String>> obtenerSitiosValidados(String rutaNombre) async {
+    if (currentUser == null) return [];
+    try {
+      final snap = await _db.collection('usuarios').doc(currentUser!.uid)
+        .collection('progreso').doc(rutaNombre)
+        .collection('sitios').get();
+      return snap.docs.map((d) => d.id).toList();
+    } catch (_) { return []; }
+  }
+
+  // Eliminar cuenta completa (Google y Apple)
+  static Future<void> eliminarCuenta() async {
+    final user = _auth.currentUser;
+    if (user == null) throw Exception('No hay usuario activo');
+    final uid = user.uid;
+
+    // 1. Re-autenticar PRIMERO (Firebase exige sesión reciente para delete)
+    final proveedores = user.providerData.map((p) => p.providerId).toList();
+    if (proveedores.contains('google.com')) {
+      try {
+        // Intentar silencioso primero, si falla forzar interactivo
+        GoogleSignInAccount? googleUser = await _googleSignIn.signInSilently();
+        googleUser ??= await _googleSignIn.signIn();
+        if (googleUser == null) throw Exception('Re-autenticación cancelada');
+        final googleAuth = await googleUser.authentication;
+        final cred = GoogleAuthProvider.credential(
+          accessToken: googleAuth.accessToken,
+          idToken: googleAuth.idToken);
+        await user.reauthenticateWithCredential(cred);
+      } catch (e) {
+        if (e.toString().contains('cancelada')) rethrow;
+        // Si falla re-autenticación, intentar delete directo (sesión reciente)
+        debugPrint('⚠️ Re-auth Google falló: $e — intentando delete directo');
+      }
+    } else if (proveedores.contains('apple.com')) {
+      final appleCredential = await SignInWithApple.getAppleIDCredential(
+        scopes: [AppleIDAuthorizationScopes.email, AppleIDAuthorizationScopes.fullName]);
+      final oauthCred = OAuthProvider('apple.com').credential(
+        idToken: appleCredential.identityToken,
+        accessToken: appleCredential.authorizationCode);
+      await user.reauthenticateWithCredential(oauthCred);
+    }
+
+    // 2. Borrar subcolecciones de Firestore
+    final docRef = _db.collection('usuarios').doc(uid);
+    for (final sub in ['progreso', 'insignias', 'premios', 'rutasCompletadas']) {
+      final snap = await docRef.collection(sub).get();
+      for (final doc in snap.docs) {
+        if (sub == 'progreso') {
+          final sitios = await doc.reference.collection('sitios').get();
+          for (final s in sitios.docs) { await s.reference.delete(); }
+        }
+        await doc.reference.delete();
+      }
+    }
+    await docRef.delete();
+
+    // 3. Eliminar cuenta de Firebase Auth
+    await user.delete();
+    await _auth.signOut();
+    try {
+      final gs = GoogleSignIn();
+      await gs.signOut();
+      await gs.disconnect();
+    } catch (_) {} // ignorar si no hay sesión Google activa
   }
 }
 
@@ -9777,7 +9855,7 @@ class RutasService {
         // borrados que aún estén en la caché local persistente del SDK.
         snap = await FirebaseFirestore.instance
             .collection('rutas')
-            .get(const GetOptions(source: fs.Source.serverAndCache))
+            .get(const GetOptions(source: cf.Source.serverAndCache))
             .timeout(const Duration(seconds: 15));
       } catch (e) {
         debugPrint('⚠️ RutasService: server falló, intentando caché. ' + e.toString());
@@ -10695,6 +10773,7 @@ class RouteDetailScreen extends StatefulWidget {
 
 class _RouteDetailScreenState extends State<RouteDetailScreen> {
   late int _completados;
+  final Set<String> _sitiosValidadosSet = {};
   bool _rutaComprada = false;   // true si el turista ya pagó esta ruta
   bool _verificandoCompra = false; // false por defecto — se actualiza async
   bool _mostrarTipAvatar = true;
@@ -10824,6 +10903,7 @@ class _RouteDetailScreenState extends State<RouteDetailScreen> {
         longitud: lngSitio,
       )));
     if (validado == true && mounted) {
+      debugPrint('✅ Sitio validado: $sitioActivo — guardando progreso...');
       setState(() {
         _completados++;
         final sitios = parseSitiosList(widget.ruta);
@@ -10846,7 +10926,7 @@ class _RouteDetailScreenState extends State<RouteDetailScreen> {
           _poseActual = 'celebracion';
         }
       });
-      AuthService.guardarProgreso(widget.ruta['nombre'], _completados + 1, totalSitios);
+      AuthService.guardarProgreso(widget.ruta['nombre'], _completados, totalSitios, sitioNombre: sitioActivo);
     }
   }
 
@@ -11001,11 +11081,17 @@ class _RouteDetailScreenState extends State<RouteDetailScreen> {
     final nombreRuta = widget.ruta['nombre']?.toString() ?? '';
     if (nombreRuta.isEmpty) return;
     try {
-      final progresoGuardado = await AuthService.obtenerProgreso(nombreRuta)
-          .timeout(const Duration(seconds: 5));
-      if (progresoGuardado > _completados && mounted) {
+      final results = await Future.wait([
+        AuthService.obtenerProgreso(nombreRuta),
+        AuthService.obtenerSitiosValidados(nombreRuta),
+      ]).timeout(const Duration(seconds: 5));
+      final progresoGuardado = results[0] as int;
+      final sitiosGuardados = results[1] as List<String>;
+      if (mounted && (progresoGuardado > _completados || sitiosGuardados.isNotEmpty)) {
         setState(() {
-          _completados = progresoGuardado;
+          if (sitiosGuardados.isNotEmpty) _sitiosValidadosSet.addAll(sitiosGuardados);
+          if (_sitiosValidadosSet.length > _completados) _completados = _sitiosValidadosSet.length;
+          if (progresoGuardado > _completados) _completados = progresoGuardado;
           final esFeria = ['FERIA CLÁSICA']
             .contains(widget.ruta['nombre']?.toString() ?? '');
           if (esFeria && progresoGuardado > 0) {
@@ -14169,6 +14255,53 @@ class ProfileScreen extends StatelessWidget {
             label: t('Dar mi opinión · Beta', 'Share feedback · Beta'),
             onTap: () => Navigator.of(context, rootNavigator: false).push(
               MaterialPageRoute(builder: (_) => const FeedbackBetaScreen()))),
+          const SizedBox(height: 4),
+          _ProfileMenuItem(
+            emoji: '🗑️',
+            label: t('Eliminar cuenta', 'Delete account'),
+            isRed: true,
+            onTap: () async {
+              final confirm = await showDialog<bool>(
+                context: context,
+                builder: (ctx) => AlertDialog(
+                  title: Text(t('¿Eliminar cuenta?', 'Delete account?')),
+                  content: Text(t(
+                    'Se borrarán permanentemente tu cuenta y todos tus datos. Esta acción no se puede deshacer.',
+                    'Your account and all your data will be permanently deleted. This action cannot be undone.')),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(ctx, false),
+                      child: Text(t('Cancelar', 'Cancel'))),
+                    TextButton(
+                      onPressed: () => Navigator.pop(ctx, true),
+                      style: TextButton.styleFrom(foregroundColor: Colors.red),
+                      child: Text(t('Eliminar', 'Delete'))),
+                  ]));
+              if (confirm == true && context.mounted) {
+                try {
+                  await AuthService.eliminarCuenta();
+                  if (context.mounted) {
+                    Navigator.of(context, rootNavigator: true).pushAndRemoveUntil(
+                      PageRouteBuilder(
+                        pageBuilder: (_, __, ___) => const SplashScreen(),
+                        transitionsBuilder: (_, anim, __, child) =>
+                          FadeTransition(opacity: anim, child: child),
+                        transitionDuration: const Duration(milliseconds: 500)),
+                      (route) => false);
+                  }
+                } catch (e) {
+                  debugPrint('🔴 Error eliminarCuenta: $e');
+                  if (context.mounted) {
+                    final msg = e.toString().contains('cancelada')
+                      ? t('Debes confirmar con tu cuenta Google para eliminar.', 'You must confirm with your Google account to delete.')
+                      : 'Error: ${e.toString().substring(0, e.toString().length.clamp(0, 120))}';
+                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                      content: Text(msg),
+                      duration: const Duration(seconds: 6)));
+                  }
+                }
+              }
+            }),
           const SizedBox(height: 4),
           _ProfileMenuItem(
             emoji: '🚪', label: tCerrarSesion, isRed: true,
