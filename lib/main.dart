@@ -381,14 +381,14 @@ class DeepLinkManager {
   /// Genera un link compartible para una ruta
   static String linkRuta(String rutaNombre) {
     final slug = rutaNombre.replaceAll(' ', '_').toUpperCase();
-    return 'https://rutero.app/ruta/$slug';
+    return 'https://rutero-mde.web.app/ruta/$slug';
   }
 
   /// Genera un link compartible para un logro
   static String linkLogro(String usuario, String insignia) {
     final u = Uri.encodeComponent(usuario);
     final i = Uri.encodeComponent(insignia);
-    return 'https://rutero.app/logro/$u/$i';
+    return 'https://rutero-mde.web.app/logro/$u/$i';
   }
 
   /// Genera un link compartible para un perfil público
@@ -3537,7 +3537,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 ]))),
             const SizedBox(height: RDSSpace.sm),
 
-            // ── Botón Sign in with Apple — Guideline 4.8 ──────────────
+            // ── Botón Sign in with Apple — Guideline 4.0 (igual jerarquía que Google) ──
             GestureDetector(
               onTap: _cargando ? null : () async {
                 setState(() => _cargando = true);
@@ -3554,16 +3554,16 @@ class _LoginScreenState extends State<LoginScreen> {
                 width: double.infinity,
                 padding: const EdgeInsets.symmetric(vertical: 14),
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: RDSColor.card,
                   borderRadius: BorderRadius.circular(14),
                   border: Border.all(color: Colors.white.withOpacity(0.1))),
                 child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-                  const Icon(Icons.apple, color: Colors.black, size: 20),
+                  const Icon(Icons.apple, color: RDSColor.textPrimary, size: 22),
                   const SizedBox(width: 10),
-                  Text(t('Continuar con Apple', 'Continue with Apple'),
+                  Text(t('CONTINUAR CON APPLE', 'CONTINUE WITH APPLE'),
                     style: const TextStyle(
                       fontSize: 13, fontWeight: FontWeight.w700,
-                      color: Colors.black, letterSpacing: 1)),
+                      color: RDSColor.textPrimary, letterSpacing: 1)),
                 ]))),
             const SizedBox(height: 16),
 
@@ -5241,7 +5241,7 @@ class ServiciosScreen extends StatelessWidget {
 // ═══════════════════════════════════════════════════════════════════════════
 //  🗓️ RUTERO PLANNER IA
 //  Itinerario personalizado generado por Claude según fechas, intereses y
-//  presupuesto del viajero. Versión gratuita: hasta 2 días.
+//  presupuesto del viajero. Acceso gratuito durante el lanzamiento.
 // ═══════════════════════════════════════════════════════════════════════════
 
 // ── Modelo de itinerario ─────────────────────────────────────────────────
@@ -5426,7 +5426,12 @@ class _PlannerScreenState extends State<PlannerScreen> {
 
     final rutasDisponibles = RutasService().rutas
       .where((r) => r['activa'] != false && r['pausada'] != true)
-      .map((r) => '- ${r['nombre']}: ${r['subtitulo'] ?? ''} (${r['tiempo'] ?? ''}, ${r['zona'] ?? ''})')
+      .map((r) {
+        final presupuesto = r['presupuesto'] != null ? ', presupuesto:${r['presupuesto']}' : '';
+        final familiar = r['familiar'] == true ? ', familiar:sí' : '';
+        final tipo = r['tipoExperiencia'] != null ? ', tipo:${r['tipoExperiencia']}' : '';
+        return '- ${r['nombre']}: ${r['subtitulo'] ?? ''} (${r['tiempo'] ?? ''}, ${r['zona'] ?? ''}$presupuesto$familiar$tipo)';
+      })
       .take(30).join('\n');
 
     final interesesStr   = _intereses.join(', ');
@@ -5447,13 +5452,13 @@ class _PlannerScreenState extends State<PlannerScreen> {
     final experienciaStr = '\n- Tipo de experiencia: $_tipoExperiencia.';
 
     final promptES = '''
-Sos Rutero MDE, la IA de turismo de Medellín, Colombia.
-Creá un itinerario personalizado de $_dias día(s) (versión GRATUITA: máximo 2 días) para un viajero con estos datos:
+Sos Felo, la IA de turismo de Medellín, Colombia.
+Creá un itinerario personalizado de $_dias día(s) para un viajero con estos datos:
 - Llegada: ${_formatFecha(_llegada)}, Salida: ${_formatFecha(_salida)}, Hora llegada: $_horaLlegada, Hora salida último día: $_horaSalida
 - Zona alojamiento: $_zonaHotel, Tipo: $_alojamiento
 - Intereses: $interesesStr
 - Viaja: $_compania
-- Presupuesto: $_presupuesto (${_presupuesto == 'Bajo' ? r'$40K-120K COP/día' : _presupuesto == 'Medio' ? r'$120K-320K COP/día' : r'+$320K COP/día'})
+- Presupuesto: $_presupuesto (${_presupuesto == 'Bajo' ? r'$40K-120K COP/día' : _presupuesto == 'Medio' ? r'$120K-320K COP/día' : r'+$320K COP/día'}). Seleccionar rutas cuyo campo "presupuesto" coincida con este nivel. Presupuesto Bajo: rutas gratuitas o económicas. Medio: restaurantes y actividades pagadas. Alto: experiencias premium.
 - Primera vez en Medellín: ${_primeraVez ? 'SÍ' : 'NO'}$hotelStr$feriaStr$familiarStr$descuentoStr$horarioStr$ritmoStr$transporteStr$experienciaStr
 ${_horaSalida != 'No sé aún' ? '- Hora salida último día: $_horaSalida. Ajustá actividades para llegar a tiempo.' : ''}
 ${_primeraVez ? '\nIMPORTANTE: incluir íconos de Medellín mapeados a rutas Rutero: Provenza=HUELLAS VIVAS DE EL POBLADO, Pueblito Paisa=DEL ORIGEN PAISA A LA MEDELLIN MODERNA, Escaleras=RUTA TRANSFORMACION URBANA, Botero=DEL ORIGEN PAISA A LA MEDELLIN MODERNA. Si 2+ días incluir RUTA GUATAPE.' : ''}
@@ -5466,13 +5471,13 @@ Respondé SOLO con JSON válido (sin markdown):
 ''';
 
     final promptEN = '''
-You are Rutero MDE, a tourism AI for Medellín, Colombia.
-Create a personalized ${_dias}-day itinerary (FREE version: max 2 days) for a traveler:
+You are Felo, the tourism AI for Medellín, Colombia.
+Create a personalized ${_dias}-day itinerary for a traveler:
 - Arrival: ${_formatFecha(_llegada)}, Departure: ${_formatFecha(_salida)}, Arrival time: $_horaLlegada, Departure time last day: $_horaSalida
 - Accommodation zone: $_zonaHotel, Type: $_alojamiento
 - Interests: $interesesStr
 - Traveling: $_compania
-- Budget: $_presupuesto (${_presupuesto == 'Bajo' ? r'USD 10-30/day' : _presupuesto == 'Medio' ? r'USD 30-80/day' : r'over USD 80/day'})
+- Budget: $_presupuesto (${_presupuesto == 'Bajo' ? r'USD 10-30/day' : _presupuesto == 'Medio' ? r'USD 30-80/day' : r'over USD 80/day'}). Select routes whose "presupuesto" field matches this level. Low: free or budget routes. Medium: paid restaurants and activities. High: premium experiences.
 - First time in Medellín: ${_primeraVez ? 'YES' : 'NO'}$hotelStr$feriaStr$familiarStr$descuentoStr$horarioStr$ritmoStr$transporteStr$experienciaStr
 ${_horaSalida != 'No sé aún' ? '- Departure time last day: $_horaSalida. Adjust activities accordingly.' : ''}
 ${_primeraVez ? '\nIMPORTANT: include Medellín icons mapped to routes: Provenza=HUELLAS VIVAS DE EL POBLADO, Pueblito Paisa=DEL ORIGEN PAISA A LA MEDELLIN MODERNA, Comuna 13=RUTA TRANSFORMACION URBANA, Botero=DEL ORIGEN PAISA A LA MEDELLIN MODERNA. If 2+ days add RUTA GUATAPE.' : ''}
@@ -5652,8 +5657,8 @@ Respond ONLY with valid JSON (no markdown):
       Text(t('¿Cuándo llegás?', 'When are you arriving?'),
         style: RDSType3.displayXl.copyWith(fontSize: 28, height: 1.1)),
       const SizedBox(height: RDSSpace.xs),
-      Text(t('Versión gratuita hasta 2 días · Premium para más',
-             'Free version up to 2 days · Premium for more'),
+      Text(t('Felo arma tu itinerario completo · Gratis durante el lanzamiento',
+             'Felo builds your full itinerary · Free during launch'),
         style: RDSType.bodySm.copyWith(color: RDSColor.gold)),
       const SizedBox(height: RDSSpace.xl),
       Text(t('¿Cuántos días en Medellín?',
@@ -5686,8 +5691,6 @@ Respond ONLY with valid JSON (no markdown):
                               t('Experiencia completa','Full experience'),
                   style: RDSType.bodySm),
               ])),
-              if (n > 2) _RDSBadge(label: t('Premium','Premium'),
-                color: RDSColor.orchid.withOpacity(0.15), textColor: RDSColor.orchid),
               if (sel) ...[
                 const SizedBox(width: 8),
                 Container(width: 22, height: 22,
@@ -9210,7 +9213,7 @@ const Set<String> kRutasMobiplab = {
   'CENTRO ALTERNATIVO',
   'TEATROS Y ESCENA DEL CENTRO',
   'BARRIO PRADO — CULTURA Y BOHEMIA',
-  'CAFÉS Y CANTINAS HISTÓRICAS DEL CENTRO',
+  'LA BOHEMIA DEL CENTRO',
   'MEMORIA Y DERECHOS HUMANOS',
   'SABORES DEL CENTRO',
 };
@@ -9548,8 +9551,10 @@ const Map<String, String> kZonaPorRuta = {
   'TRANSFORMACIÓN MEMORIA E HISTORIA':    'Ciudad',
   'BARRIO PRADO — CULTURA Y BOHEMIA':     'Ciudad',
   'MEMORIA Y DERECHOS HUMANOS':           'Ciudad',
-  'CAFÉS Y CANTINAS HISTÓRICAS DEL CENTRO':'Ciudad',
-  'TEATROS Y ESCENA DEL CENTRO':           'Ciudad',
+  'LA BOHEMIA DEL CENTRO':               'Ciudad',
+  'TEATROS Y ESCENA DEL CENTRO':         'Ciudad',
+  'RUTA CENTRO REPUBLICANO':             'Ciudad',
+  'RUTA PATRIMONIAL DEL CENTRO':         'Ciudad',
   'FINCAS SILLETERAS':                    'Ciudad',
   'FINCAS AGROTURÍSTICAS':               'Ciudad',
   'DISEÑO MODA Y COMPRAS':               'Ciudad',
@@ -9603,7 +9608,7 @@ const Map<String, String> kImagenPorRuta = {
   // ── Rutas Centro nuevas (29 jul) ──
   'BARRIO PRADO — CULTURA Y BOHEMIA':       'assets/images/rutas/ruta_barrio_prado.jpg',
   'MEMORIA Y DERECHOS HUMANOS':             'assets/images/rutas/ruta_memoria_derechos_humanos.jpg',
-  'CAFÉS Y CANTINAS HISTÓRICAS DEL CENTRO': 'assets/images/rutas/ruta_cafes_cantinas_centro.jpg',
+  'LA BOHEMIA DEL CENTRO': 'assets/images/rutas/ruta_cafes_cantinas_centro.jpg',
   'TEATROS Y ESCENA DEL CENTRO':             'assets/images/rutas/ruta_teatro_escena_centro.jpg',
   'DISEÑO MODA Y COMPRAS':           'assets/images/rutas/ruta_corredor_45.jpg',
   // ── Rutas Fincas Silleteras temáticas (28 jul) — imágenes diferenciadas ──
@@ -9616,6 +9621,9 @@ const Map<String, String> kImagenPorRuta = {
   'ENTRE SABORES RISAS Y MIL COLORES':   'assets/images/rutas/ruta_entre_sabores_risas.jpg',
   'OTROS CAMINOS LAURELES':              'assets/images/rutas/ruta_noche_laureles.jpg',
   'NOCHE EN LAURELES':                   'assets/images/rutas/ruta_noche_laureles.jpg',
+  // ── Rutas Centro nuevas (12 sep 2026) ──
+  'RUTA CENTRO REPUBLICANO':             'assets/images/rutas/ruta_02b_republicano.jpg',
+  'RUTA PATRIMONIAL DEL CENTRO':         'assets/images/rutas/ruta_02b_patrimonio.jpg',
   // ── Rutas El Poblado adicionales ──
   'CENTRO ALTERNATIVO':                  'assets/images/rutas/ruta_centro_alternativo.jpg',
   'RINCONES ESCONDIDOS DE EL POBLADO':   'assets/images/rutas/ruta_rincones_poblado.jpg',
@@ -9661,10 +9669,13 @@ const Map<String, String> kInsigniaPorRuta = {
   'TURISMO CREATIVO':                            'assets/images/insignias/insignia_espiritu_creativo.png',
   'TRANSFORMACIÓN MEMORIA E HISTORIA':           'assets/images/insignias/insignia_memoria_viva.png',
   'DISEÑO MODA Y COMPRAS':                       'assets/images/insignias/insignia_explorador_45.png',
-  // ── Rutas Centro nuevas (29 jul) ──
+  // ── Rutas Centro nuevas (12 sep 2026) ──
+  'RUTA CENTRO REPUBLICANO':                     'assets/images/insignias/insignia_guardian_patrimonio.png',
+  'RUTA PATRIMONIAL DEL CENTRO':                 'assets/images/insignias/insignia_guardian_patrimonio.png',
+  // ── Rutas Centro (29 jul) ──
   'BARRIO PRADO — CULTURA Y BOHEMIA':            'assets/images/insignias/insignia_bohemia_centro.png',
   'MEMORIA Y DERECHOS HUMANOS':                  'assets/images/insignias/insignia_memoria_viva.png',
-  'CAFÉS Y CANTINAS HISTÓRICAS DEL CENTRO':      'assets/images/insignias/insignia_guardian_patrimonio.png',
+  'LA BOHEMIA DEL CENTRO':      'assets/images/insignias/insignia_guardian_patrimonio.png',
   'TEATROS Y ESCENA DEL CENTRO':                 'assets/images/insignias/insignia_guardian_patrimonio.png',
   // ── Rutas Laureles y Poblado adicionales ──
   'ENTRE JUEGOS Y PALABRAS':                     'assets/images/insignias/insignia_vecino_laureles.png',
@@ -9750,8 +9761,10 @@ class RutasService {
       'NOCHE EN LAURELES',
       'BARRIO PRADO — CULTURA Y BOHEMIA',
       'MEMORIA Y DERECHOS HUMANOS',
-      'CAFÉS Y CANTINAS HISTÓRICAS DEL CENTRO',
+      'LA BOHEMIA DEL CENTRO',
       'TEATROS Y ESCENA DEL CENTRO',
+      'RUTA CENTRO REPUBLICANO',
+      'RUTA PATRIMONIAL DEL CENTRO',
       'ENTRE JUEGOS Y PALABRAS',
       'ENTRE SABORES RISAS Y MIL COLORES',
       'OTROS CAMINOS LAURELES',
@@ -12053,7 +12066,7 @@ class _SitioInfoScreenState extends State<SitioInfoScreen> {
       } catch (_) {}
     }
     // Fallback: radio de la ruta
-    return (widget.ruta['radioGps'] as num?)?.toDouble() ?? 30.0;
+    return (widget.ruta['radioGps'] as num?)?.toDouble() ?? 50.0;
   }
 
   @override
@@ -13193,12 +13206,8 @@ class _RewardScreenState extends State<RewardScreen>
         '🌿 Download Rutero MDE: rutero-mde.web.app\n'
         '#RuteroMDE #Medellin';
     final texto = kLang == 'en' ? textoEN : textoES;
-    Share.share(texto,
-      subject: t('Rutero MDE — Logro desbloqueado', 'Rutero MDE — Achievement unlocked'),
-      sharePositionOrigin: Rect.fromLTWH(
-        MediaQuery.of(context).size.width / 4,
-        MediaQuery.of(context).size.height / 2,
-        MediaQuery.of(context).size.width / 2, 100));
+    // Dialog primero — evita que Share.share() en iOS bloquee el contexto
+    // y deje el dialog sin respuesta (bug conocido share_plus en iOS)
     showDialog(
       context: context,
       builder: (_) => AlertDialog(
@@ -13225,12 +13234,10 @@ class _RewardScreenState extends State<RewardScreen>
           TextButton(
             onPressed: () {
               Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                content: Text(t('¡Listo! Copia el texto y pégalo en tus redes 🚀',
-                  'Done! Copy the text and paste it on your socials 🚀')),
-                backgroundColor: RDSColor.green, duration: const Duration(seconds: 3)));
+              Share.share(texto,
+                subject: t('Rutero MDE — Logro desbloqueado', 'Rutero MDE — Achievement unlocked'));
             },
-            child: Text(t('¡LISTO!','DONE!'),
+            child: Text(t('¡COMPARTIR!','SHARE!'),
               style: const TextStyle(color: RDSColor.green, fontWeight: FontWeight.w800))),
         ]));
   }
@@ -13375,7 +13382,9 @@ class _RewardScreenState extends State<RewardScreen>
                     boxShadow: [BoxShadow(color: acento.withOpacity(0.2), blurRadius: 16)]),
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(14),
-                    child: Image.network(widget.urlFotoValidacion!, fit: BoxFit.cover))),
+                    child: Image.network(widget.urlFotoValidacion!, fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => const Center(
+                        child: Text('📸', style: TextStyle(fontSize: 48)))))),
 
               // ── Premio — card editorial con borde gold ────────────────
               if ((widget.ruta['premio'] ?? '').toString().isNotEmpty)
@@ -14317,7 +14326,8 @@ class ProfileScreen extends StatelessWidget {
                   (route) => false);
               }
             }),
-          const SizedBox(height: 80),
+          // Padding extra para iPad y dispositivos con home indicator
+          SizedBox(height: MediaQuery.of(context).padding.bottom + 100),
         ])),
       ])),
     );
@@ -16024,10 +16034,8 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
 
   void _onRutasCargadasMapa() {
     if (mounted) {
-      // Recargar rutas desbloqueadas — en kModoLanzamiento incluye todas las rutas de Firestore
       _cargarRutasDesbloqueadas();
       setState(() {});
-      WidgetsBinding.instance.addPostFrameCallback((_) => _reaplicarEstilo());
     }
   }
 
@@ -16862,7 +16870,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
       _FabOpcion(icon: RDSIcons.navExplore,  label: t('Rutas cercanas','Nearby routes'), color: RDSColor.gold,
         onTap: () { setState(() => _fabExpandido = false); _mostrarRutasCercanas(); }),
       _FabOpcion(icon: RDSIcons.transport,   label: _mostrarEnCicla ? t('Ocultar EnCicla','Hide EnCicla') : t('Ver EnCicla','Show EnCicla'), color: const Color(0xFF0066CC),
-        onTap: () => setState(() { _fabExpandido = false; _mostrarEnCicla = !_mostrarEnCicla; _reaplicarEstilo(); })),
+        onTap: () => setState(() { _fabExpandido = false; _mostrarEnCicla = !_mostrarEnCicla; })),
       _FabOpcion(icon: RDSIcons.planner,     label: t('Ver Planner','View Planner'),    color: RDSColor.orchid,
         onTap: () { setState(() => _fabExpandido = false); _mostrarCapaPlanner(); }),
     ];
@@ -16954,7 +16962,16 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
         return;
       }
 
-      final itinerario = jsonDecode(jsonStr) as Map<String, dynamic>;
+      Map<String, dynamic> itinerario;
+      try {
+        itinerario = jsonDecode(jsonStr) as Map<String, dynamic>;
+      } catch (_) {
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(t('Error leyendo el itinerario. Generá uno nuevo.',
+                         'Error reading itinerary. Generate a new one.')),
+          backgroundColor: RDSColor.accent));
+        return;
+      }
       final dias = itinerario['dias'] as List<dynamic>? ?? [];
 
       if (dias.isEmpty || !mounted) {
@@ -16971,11 +16988,25 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
 
       for (int i = 0; i < dias.length && i < 4; i++) {
         final dia = dias[i] as Map<String, dynamic>;
-        final actividades = dia['actividades'] as List<dynamic>? ?? [];
-        for (final act in actividades) {
-          if (act is! Map) continue;
-          final nombreRuta = act['ruta']?.toString() ?? act['nombre']?.toString() ?? '';
+        // El JSON de Felo usa 'bloques'; fallback a 'actividades' por compatibilidad
+        final bloques = (dia['bloques'] as List<dynamic>?)
+            ?? (dia['actividades'] as List<dynamic>?)
+            ?? [];
+        // Color fijo por día — todas las rutas del mismo día comparten color
+        final colorDia = _coloresDia[i % _coloresDia.length];
+        for (final bloque in bloques) {
+          if (bloque is! Map) continue;
+          // El JSON usa 'rutaNombre'; fallback a 'ruta' / 'nombre'
+          final nombreRuta = bloque['rutaNombre']?.toString()
+              ?? bloque['ruta']?.toString()
+              ?? bloque['nombre']?.toString()
+              ?? '';
           if (nombreRuta.isEmpty) continue;
+          // Evitar duplicar la misma ruta si Felo la repite en el mismo día
+          final yaAgregada = plannerDias.any((d) =>
+            d['dia'] == i + 1 &&
+            (d['ruta'] as Map)['nombre'] == nombreRuta);
+          if (yaAgregada) continue;
           final rutaReal = todasRutas.firstWhere(
             (r) => (r['nombre']?.toString() ?? '').toLowerCase().contains(nombreRuta.toLowerCase()) ||
                    nombreRuta.toLowerCase().contains((r['nombre']?.toString() ?? '').toLowerCase()),
@@ -16984,24 +17015,24 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
             plannerDias.add({
               'dia': i + 1,
               'ruta': rutaReal,
-              'color': _coloresDia[plannerDias.length % _coloresDia.length],
+              'color': colorDia,
             });
-            break; // Una ruta por día
+            // Sin break — pintamos todas las rutas del día
           }
         }
       }
 
       if (!mounted) return;
+      if (plannerDias.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(t('Felo no encontró rutas con coordenadas para mostrar en el mapa',
+                         'Felo couldn\'t find routes with coordinates to show on the map')),
+          backgroundColor: RDSColor.card));
+        return;
+      }
       setState(() {
         _mostrarCapaPlannerActiva = true;
-        _plannerDias = plannerDias.isEmpty
-          // Fallback: primeras rutas con sitiosDetalle
-          ? todasRutas.where((r) => r['activa'] != false && r['pausada'] != true && r.containsKey('sitiosDetalle'))
-              .take(3).toList().asMap().entries.map((e) => {
-                'dia': e.key + 1, 'ruta': e.value,
-                'color': _coloresDia[e.key % _coloresDia.length],
-              }).toList()
-          : plannerDias;
+        _plannerDias = plannerDias;
       });
       _mapController?.animateCamera(CameraUpdate.newLatLngZoom(_centerCiudad, 12));
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
@@ -17015,10 +17046,13 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
   Set<Polyline> get _polylinaesPlanner {
     if (!_mostrarCapaPlannerActiva || _plannerDias.isEmpty) return {};
     final lines = <Polyline>{};
-    for (final dia in _plannerDias) {
+    for (int idx = 0; idx < _plannerDias.length; idx++) {
+      final dia    = _plannerDias[idx];
       final ruta   = dia['ruta'] as Map<String, dynamic>;
       final color  = dia['color'] as Color;
       final numDia = dia['dia'] as int;
+      final nombreRuta = (ruta['nombre']?.toString() ?? 'r$idx')
+          .replaceAll(' ', '_').toLowerCase();
       final detalle = parseSitiosDetalle(ruta['sitiosDetalle']);
       final puntos  = <LatLng>[];
       for (final s in detalle) {
@@ -17028,9 +17062,11 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
         if (lat != null && lng != null) puntos.add(LatLng(lat, lng));
       }
       if (puntos.length < 2) continue;
-      lines.add(Polyline(polylineId: PolylineId('planner_glow_dia$numDia'),
+      // ID único por ruta (día + índice + nombre) — evita colisión cuando hay
+      // múltiples rutas en el mismo día
+      lines.add(Polyline(polylineId: PolylineId('pg${numDia}i$idx'),
         points: puntos, color: color.withOpacity(0.30), width: 10));
-      lines.add(Polyline(polylineId: PolylineId('planner_dia$numDia'),
+      lines.add(Polyline(polylineId: PolylineId('pl${numDia}i$idx'),
         points: puntos, color: color.withOpacity(0.95), width: 4));
     }
     return lines;
@@ -17057,19 +17093,35 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
               child: const Icon(RDSIcons.close, size: 14, color: RDSColor.textMuted)),
           ]),
           const SizedBox(height: 6),
-          ..._plannerDias.map((dia) {
-            final color = dia['color'] as Color;
-            final ruta  = dia['ruta'] as Map<String, dynamic>;
-            return Padding(
-              padding: const EdgeInsets.only(bottom: 4),
-              child: Row(mainAxisSize: MainAxisSize.min, children: [
-                Container(width: 12, height: 3,
-                  decoration: BoxDecoration(color: color, borderRadius: RDSRadius.bFull)),
-                const SizedBox(width: 6),
-                Text('Día ${dia['dia']}: ${(ruta['nombre']?.toString() ?? '').split(' ').take(3).join(' ')}',
-                  style: RDSType.caption.copyWith(color: RDSColor.textPrimary)),
-              ]));
-          }),
+          ...(() {
+            // Agrupar rutas por día para la leyenda
+            final Map<int, List<Map<String, dynamic>>> porDia = {};
+            for (final dia in _plannerDias) {
+              final numDia = dia['dia'] as int;
+              porDia.putIfAbsent(numDia, () => []).add(dia);
+            }
+            return porDia.entries.map((entry) {
+              final numDia = entry.key;
+              final rutas  = entry.value;
+              final color  = rutas.first['color'] as Color;
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 6),
+                child: Row(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Container(width: 12, height: 3, margin: const EdgeInsets.only(top: 6),
+                    decoration: BoxDecoration(color: color, borderRadius: RDSRadius.bFull)),
+                  const SizedBox(width: 6),
+                  Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
+                    Text(t('Día $numDia', 'Day $numDia'),
+                      style: RDSType.labelSm.copyWith(color: color)),
+                    ...rutas.map((r) {
+                      final nombre = (r['ruta'] as Map)['nombre']?.toString() ?? '';
+                      return Text('· ${nombre.split(' ').take(3).join(' ')}',
+                        style: RDSType.caption.copyWith(color: RDSColor.textPrimary));
+                    }),
+                  ]),
+                ]));
+            }).toList();
+          })(),
         ])));
   }
 
@@ -17139,8 +17191,14 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
             polylines: {..._polylines, ..._polylinaesPlanner},
             onMapCreated: (c) {
               _mapController = c;
-              c.setMapStyle(_mapStyle);
-              Future.delayed(const Duration(milliseconds: 300), () => c.setMapStyle(_mapStyle));
+              // Primer intento — 600ms
+              Future.delayed(const Duration(milliseconds: 600), () {
+                if (mounted) _reaplicarEstilo();
+              });
+              // Segundo intento — por si el primero llega antes de que el mapa esté listo
+              Future.delayed(const Duration(milliseconds: 1500), () {
+                if (mounted) _reaplicarEstilo();
+              });
             },
             onTap: (_) => setState(() { _sitioSeleccionado = null; _fabExpandido = false; }),
             onCameraMove: (pos) {
