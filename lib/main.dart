@@ -46,6 +46,7 @@ import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 import 'dart:ui' as ui;
 import 'package:path_provider/path_provider.dart';
 import 'package:firebase_app_check/firebase_app_check.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:gal/gal.dart';
 import 'package:audioplayers/audioplayers.dart';
@@ -650,15 +651,15 @@ const List<_CiudadRegistrada> kCiudadesRegistradas = [
   // Al activar una ciudad, sus rutas se filtran automáticamente por ciudad/depto/país.
   // Categorías por ciudad: Urbana · Alrededores · Temporada (Feria, festivales).
 
-  // ── Bogotá — activar cuando haya rutas ──────────────────────
-  // _CiudadRegistrada(
-  //   ciudad: 'Bogotá', pais: 'Colombia',
-  //   lat: 4.7110, lng: -74.0721, radioKm: 35,
-  //   codigo: 'BTA', emoji: '🏔️',
-  //   nombreApp: 'RUTERO BTA',
-  //   taglineES: 'La ciudad que nunca deja de sorprender 🏔️',
-  //   taglineEN: 'The city that never stops surprising 🏔️',
-  // ),
+  // ── Bogotá ──────────────────────────────────────────────────
+  _CiudadRegistrada(
+    ciudad: 'Bogotá', pais: 'Colombia',
+    lat: 4.7110, lng: -74.0721, radioKm: 35,
+    codigo: 'BTA', emoji: '🏔️',
+    nombreApp: 'RUTERO BTA',
+    taglineES: 'La ciudad que nunca deja de sorprender 🏔️',
+    taglineEN: 'The city that never stops surprising 🏔️',
+  ),
 
   // ── Popayán — activar cuando haya rutas ─────────────────────
   // _CiudadRegistrada(
@@ -751,19 +752,19 @@ List<Map<String, dynamic>> filtrarRutasPorCiudad(_CiudadRegistrada? ciudad) {
   if (esAdmin) return rutasActivas;
   if (ciudad == null) return rutasActivas;
   return rutasActivas.where((r) {
-    final rutaCiudad = r['ciudad']?.toString() ?? 'Medellín';
-    final rutaPais = r['pais']?.toString();
+    final rutaCiudad = (r['ciudad']?.toString() ?? 'Medellín').trim();
+    final rutaPais = r['pais']?.toString().trim();
     // Rutas de temporada de Feria (Santa Elena, corregimientos) → siempre en Medellín
     final tempMeses = r['temporadaMeses'];
     if (tempMeses is List && tempMeses.contains(7) || tempMeses is List && tempMeses.contains(8)) {
-      if (rutaPais == 'Colombia' && (rutaCiudad == 'Medellín' || rutaCiudad == 'Santa Elena')) {
+      if ((rutaPais == null || rutaPais.isEmpty || rutaPais.toLowerCase() == 'colombia') &&
+          (rutaCiudad == 'Medellín' || rutaCiudad == 'Santa Elena')) {
         return ciudad.ciudad == 'Medellín';
       }
     }
-    if (rutaPais == null || rutaPais.isEmpty) {
-      return rutaCiudad == ciudad.ciudad;
-    }
-    return rutaCiudad == ciudad.ciudad && rutaPais == ciudad.pais;
+    if (rutaCiudad.toLowerCase() != ciudad.ciudad.toLowerCase()) return false;
+    if (rutaPais == null || rutaPais.isEmpty) return true;
+    return rutaPais.toLowerCase() == ciudad.pais.toLowerCase();
   }).toList();
 }
 // ─────────────────────────────────────────────────────────────────────────
@@ -1191,6 +1192,26 @@ const Map<String, String> kTipsPorRutaEN = {
   'FERIA DE LAS FLORES': '🌹 The most iconic festival in Colombia! "Medellín loves you and blooms for you" — the 69th Silleteros Parade, 120+ free events, 21 stages across all 16 communes, and for the first time: neurodiverse silleteros. July 31 to August 9, 2026. Everything is better with a Rutero route. 🌺',
   'VIVE EL POBLADO': "Discover the other side of El Poblado — beyond the bars and restaurants, this community route reveals the neighborhood's soul: public libraries on the hilltops, local farmers' markets, and streets with 400 years of history. 🌿",
 };
+
+Future<void> _inicializarFCM() async {
+  final messaging = FirebaseMessaging.instance;
+  final settings = await messaging.requestPermission(alert: true, badge: true, sound: true);
+  if (settings.authorizationStatus == AuthorizationStatus.authorized ||
+      settings.authorizationStatus == AuthorizationStatus.provisional) {
+    final token = await messaging.getToken();
+    if (token != null) await _guardarFCMToken(token);
+    FirebaseMessaging.instance.onTokenRefresh.listen(_guardarFCMToken);
+  }
+}
+
+Future<void> _guardarFCMToken(String token) async {
+  final uid = FirebaseAuth.instance.currentUser?.uid;
+  if (uid == null) return;
+  await FirebaseFirestore.instance.collection('usuarios').doc(uid).set(
+    {'fcmToken': token, 'lastActive': FieldValue.serverTimestamp()},
+    SetOptions(merge: true),
+  );
+}
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -5401,6 +5422,43 @@ class _PlannerScreenState extends State<PlannerScreen> {
   }
 
   // ── Generación ─────────────────────────────────────────────────────
+  /// Traduce un valor del Planner de ES a EN para la pantalla de resumen
+  String _plannerValorEN(String valorES) {
+    const Map<String, String> _mapa = {
+      // Hora llegada
+      'Mañana': 'Morning', 'Tarde': 'Afternoon', 'Noche': 'Night',
+      'No sé aún': 'Not sure yet',
+      // Hora salida
+      'Antes del mediodía': 'Before noon', 'Después del mediodía': 'After noon',
+      'Noche (después de las 8pm)': 'Night (after 8pm)',
+      // Ritmo
+      'Relajado': 'Relaxed', 'Moderado': 'Moderate', 'Intenso': 'Intense',
+      // Tipo experiencia
+      'Turista clásico': 'Classic tourist', 'Aventurero': 'Adventurer',
+      'Cultural': 'Cultural', 'Gastronómico': 'Gastronomic',
+      'Nocturno': 'Nightlife', 'Familiar': 'Family', 'Naturaleza': 'Nature',
+      'Mochilero': 'Backpacker', 'Fotógrafo': 'Photographer',
+      // Horario preferido
+      'Mañanero': 'Early bird', 'Vespertino': 'Afternoon person',
+      'Nocturno/a': 'Night owl', 'Flexible': 'Flexible',
+      // Compañía
+      'Solo': 'Solo', 'Pareja': 'Couple', 'Amigos': 'Friends',
+      'Familia': 'Family', 'Grupo': 'Group',
+      // Presupuesto
+      'Bajo': 'Low', 'Medio': 'Medium', 'Alto': 'High',
+      // Transporte
+      'Metro': 'Metro', 'A pie': 'Walking', 'Mix': 'Mix',
+      'Taxi/Uber': 'Taxi/Uber', 'Bicicleta': 'Bicycle',
+      // Descuento
+      'Estudiante': 'Student', 'Adulto mayor': 'Senior',
+      'Discapacidad': 'Disability', 'Ninguno': 'None',
+      // Alojamiento
+      'Hotel': 'Hotel', 'Hostal': 'Hostel', 'Airbnb': 'Airbnb',
+      'Casa familiar': 'Family home', 'No tengo': 'None',
+    };
+    return _mapa[valorES] ?? valorES;
+  }
+
   Future<void> _generarItinerario() async {
     Future.microtask(() async {
       try {
@@ -5467,7 +5525,7 @@ Rutas disponibles:
 $rutasDisponibles
 
 Respondé SOLO con JSON válido (sin markdown):
-{"saludo":"...","dias":[{"numero":1,"fecha":"...","esFeria":false,"bloques":[{"periodo":"Mañana","periodoEN":"Morning","emoji":"🌅","rutaNombre":"NOMBRE EXACTO","descripcion":"...","duracion":"2-3 horas","precio":"Gratis","transporte":"Metro L.A → Est. Acevedo"}]}],"resumen":{"rutas":3,"horasTotales":"6-8 horas","costoEstimado":"~40.000 COP","puntosPosibles":350,"insignias":["Explorador Urbano"]},"tip":"..."}
+{"saludo":"...","saludoEN":"...","dias":[{"numero":1,"fecha":"...","esFeria":false,"bloques":[{"periodo":"Mañana","periodoEN":"Morning","emoji":"🌅","rutaNombre":"NOMBRE EXACTO","descripcion":"...","descripcionEN":"...","duracion":"2-3 horas","precio":"Gratis","transporte":"Metro L.A → Est. Acevedo"}]}],"resumen":{"rutas":3,"horasTotales":"6-8 horas","costoEstimado":"~40.000 COP","puntosPosibles":350,"insignias":["Explorador Urbano"]},"tip":"...","tipEN":"..."}
 ''';
 
     final promptEN = '''
@@ -5486,7 +5544,7 @@ Available routes:
 $rutasDisponibles
 
 Respond ONLY with valid JSON (no markdown):
-{"saludo":"...","dias":[{"numero":1,"fecha":"...","esFeria":false,"bloques":[{"periodo":"Morning","periodoEN":"Morning","emoji":"🌅","rutaNombre":"EXACT NAME","descripcion":"...","duracion":"2-3 hours","precio":"Free","transporte":"Metro L.A → Est. Acevedo"}]}],"resumen":{"rutas":3,"horasTotales":"6-8 hours","costoEstimado":"~40,000 COP","puntosPosibles":350,"insignias":["Urban Explorer"]},"tip":"..."}
+{"saludoEN":"...","saludo":"...","dias":[{"numero":1,"fecha":"...","esFeria":false,"bloques":[{"periodo":"Morning","periodoEN":"Morning","emoji":"🌅","rutaNombre":"EXACT NAME","descripcion":"...","descripcionEN":"...","duracion":"2-3 hours","precio":"Free","transporte":"Metro L.A → Est. Acevedo"}]}],"resumen":{"rutas":3,"horasTotales":"6-8 hours","costoEstimado":"~40,000 COP","puntosPosibles":350,"insignias":["Urban Explorer"]},"tip":"...","tipEN":"..."}
 ''';
 
     final prompt = kLang == 'en' ? promptEN : promptES;
@@ -6163,18 +6221,18 @@ Respond ONLY with valid JSON (no markdown):
           ]),
           Divider(height: 24, color: RDSColor.borderSubtle),
           fila('📅', t('Fechas','Dates'), '${_formatFecha(_llegada)} → ${_formatFecha(_salida)}', RDSColor.textPrimary),
-          fila('🕐', t('Llegada','Arrival'), _horaLlegada, RDSColor.textPrimary),
-          fila('🕐', t('Salida','Departure'), _horaSalida, RDSColor.textPrimary),
+          fila('🕐', t('Llegada','Arrival'), t(_horaLlegada, _plannerValorEN(_horaLlegada)), RDSColor.textPrimary),
+          fila('🕐', t('Salida','Departure'), t(_horaSalida, _plannerValorEN(_horaSalida)), RDSColor.textPrimary),
           fila('📍', t('Zona','Zone'), '$_zonaHotel · $_alojamiento', RDSColor.green),
-          fila('🚇', t('Transporte','Transport'), _transporte, RDSColor.gold),
-          fila('⚡', t('Ritmo','Pace'), _ritmo, RDSColor.gold),
-          fila('🎯', t('Experiencia','Experience'), _tipoExperiencia, RDSColor.orchid),
-          fila('🕐', t('Horario','Schedule'), _horarioPreferido, RDSColor.orchid),
-          fila('👤', t('Viaja','Traveling'), _compania, RDSColor.textPrimary),
-          fila('💰', t('Presupuesto','Budget'), _presupuesto, RDSColor.gold),
+          fila('🚇', t('Transporte','Transport'), t(_transporte, _plannerValorEN(_transporte)), RDSColor.gold),
+          fila('⚡', t('Ritmo','Pace'), t(_ritmo, _plannerValorEN(_ritmo)), RDSColor.gold),
+          fila('🎯', t('Experiencia','Experience'), t(_tipoExperiencia, _plannerValorEN(_tipoExperiencia)), RDSColor.orchid),
+          fila('🕐', t('Horario','Schedule'), t(_horarioPreferido, _plannerValorEN(_horarioPreferido)), RDSColor.orchid),
+          fila('👤', t('Viaja','Traveling'), t(_compania, _plannerValorEN(_compania)), RDSColor.textPrimary),
+          fila('💰', t('Presupuesto','Budget'), t(_presupuesto, _plannerValorEN(_presupuesto)), RDSColor.gold),
           fila('🌟', t('Primera vez','First time'), _primeraVez ? t('Sí','Yes') : t('No','No'), RDSColor.green),
           if (_descuento != 'Ninguno')
-            fila('🎓', t('Descuento','Discount'), _descuento, RDSColor.orchid),
+            fila('🎓', t('Descuento','Discount'), t(_descuento, _plannerValorEN(_descuento)), RDSColor.orchid),
           if (_intereses.isNotEmpty) ...[
             Divider(height: 24, color: RDSColor.borderSubtle),
             Align(alignment: Alignment.centerLeft,
@@ -6478,10 +6536,14 @@ class _PlannerResultScreenState extends State<_PlannerResultScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final saludo = widget.data['saludo']?.toString() ?? '';
+    final saludo = kLang == 'en'
+        ? (widget.data['saludoEN']?.toString() ?? widget.data['saludo']?.toString() ?? '')
+        : (widget.data['saludo']?.toString() ?? '');
     final diasList = (widget.data['dias'] as List? ?? []).cast<Map<String, dynamic>>();
     final resumen = widget.data['resumen'] as Map<String, dynamic>? ?? {};
-    final tip = widget.data['tip']?.toString() ?? '';
+    final tip = kLang == 'en'
+        ? (widget.data['tipEN']?.toString() ?? widget.data['tip']?.toString() ?? '')
+        : (widget.data['tip']?.toString() ?? '');
 
     // Progreso total
     int totalLugares = 0;
@@ -6694,7 +6756,9 @@ class _PlannerResultScreenState extends State<_PlannerResultScreen> {
                                     color: RDSColor.textPrimary,
                                     decoration: visitado ? TextDecoration.lineThrough : null)),
                                 const SizedBox(height: 4),
-                                Text(b['descripcion']?.toString() ?? '',
+                                Text(kLang == 'en'
+                                  ? (b['descripcionEN']?.toString() ?? b['descripcion']?.toString() ?? '')
+                                  : (b['descripcion']?.toString() ?? ''),
                                   style: const TextStyle(fontSize: 12, color: RDSColor.textMuted, height: 1.4)),
                                 const SizedBox(height: 8),
                                 Wrap(spacing: 6, runSpacing: 6, children: [
@@ -9562,6 +9626,11 @@ const Map<String, String> kZonaPorRuta = {
   'SABORES DE EL POBLADO':               'Comida Urbana',
   // Alrededores
   'RUTA GUATAPÉ & LA PIEDRA':            'Alrededores',
+  'RUTA SANTA FE DE ANTIOQUIA':          'Alrededores',
+  'FINCA Y FONDA':                       'Alrededores',
+  'GUARDIANES DE LA SILLETA':            'Alrededores',
+  'SENDEROS EN FLOR':                    'Alrededores',
+  'VEREDAS DE SANTA ELENA':              'Alrededores',
   // Temporada
   'FERIA DE LAS FLORES':                 'Temporada',
   // [eliminado] 'RUTA SILLETERA':                      'Temporada',
@@ -9602,20 +9671,14 @@ const Map<String, String> kImagenPorRuta = {
   // ── Rutas Secretaría de Turismo (Firestore) — imágenes reutilizadas ──
   // [eliminado] VIVE EL CENTRO
   'FINCAS SILLETERAS':               'assets/images/rutas/ruta_silletera.jpg',
-  'FINCAS AGROTURÍSTICAS':           'assets/images/rutas/ruta_03_verde_norte.jpg',
   'TURISMO CREATIVO':                'assets/images/rutas/ruta_poblado_creativo.jpg',
-  'TRANSFORMACIÓN MEMORIA E HISTORIA': 'assets/images/rutas/ruta_transformacion_memoria_historia.jpg',
   // ── Rutas Centro nuevas (29 jul) ──
   'BARRIO PRADO — CULTURA Y BOHEMIA':       'assets/images/rutas/ruta_barrio_prado.jpg',
   'MEMORIA Y DERECHOS HUMANOS':             'assets/images/rutas/ruta_memoria_derechos_humanos.jpg',
   'LA BOHEMIA DEL CENTRO': 'assets/images/rutas/ruta_cafes_cantinas_centro.jpg',
   'TEATROS Y ESCENA DEL CENTRO':             'assets/images/rutas/ruta_teatro_escena_centro.jpg',
   'DISEÑO MODA Y COMPRAS':           'assets/images/rutas/ruta_corredor_45.jpg',
-  // ── Rutas Fincas Silleteras temáticas (28 jul) — imágenes diferenciadas ──
-  'GUARDIANES DE LA SILLETA':        'assets/images/rutas/ruta_silletera.jpg',
-  'SENDEROS EN FLOR':                'assets/images/rutas/ruta_10_santa_elena.jpg',
-  'FINCA Y FONDA':                   'assets/images/rutas/ruta_13_santa_fe.jpg',
-  'VEREDAS DE SANTA ELENA':          'assets/images/rutas/ruta_07_miradores.jpg',
+  // ── Rutas Fincas Silleteras temáticas (28 jul) — claves migradas al bloque sep 2026 ──
   // ── Rutas Laureles nuevas (28 jul) — imágenes diferenciadas ──
   'ENTRE JUEGOS Y PALABRAS':              'assets/images/rutas/ruta_entre_juegos_palabras.jpg',
   'ENTRE SABORES RISAS Y MIL COLORES':   'assets/images/rutas/ruta_entre_sabores_risas.jpg',
@@ -9630,6 +9693,14 @@ const Map<String, String> kImagenPorRuta = {
   // ── Rutas gastronómicas ──
   'SABORES DE LA 70':                    'assets/images/rutas/ruta_gastronomia_laureles.jpg',
   'SABORES DEL CENTRO':                  'assets/images/rutas/ruta_gastronomia_centro.jpg',
+  // ── Rutas Santa Elena y alrededores (sep 2026) ──
+  'RUTA SANTA FE DE ANTIOQUIA':          'assets/images/rutas/ruta_santa_fe_antioquia.jpg',
+  'FINCA Y FONDA':                       'assets/images/rutas/ruta_finca_fonda.jpg',
+  'GUARDIANES DE LA SILLETA':            'assets/images/rutas/ruta_guardianes_silleta.jpg',
+  'SENDEROS EN FLOR':                    'assets/images/rutas/ruta_senderos_flor.jpg',
+  'VEREDAS DE SANTA ELENA':              'assets/images/rutas/ruta_veredas_santa_elena.jpg',
+  'FINCAS AGROTURÍSTICAS':               'assets/images/rutas/ruta_fincas_silleteras.jpg',
+  'TRANSFORMACIÓN MEMORIA E HISTORIA':   'assets/images/rutas/ruta_memoria_historia.jpg',
 };
 
 const Map<String, String> kInsigniaPorRuta = {
@@ -9665,9 +9736,7 @@ const Map<String, String> kInsigniaPorRuta = {
   // ── Rutas Secretaría de Turismo (Firestore) ──
   // [eliminado] VIVE EL CENTRO
   'FINCAS SILLETERAS':                           'assets/images/insignias/insignia_guardian_silletero.png',
-  'FINCAS AGROTURÍSTICAS':                       'assets/images/insignias/insignia_03_guardabosque.png',
   'TURISMO CREATIVO':                            'assets/images/insignias/insignia_espiritu_creativo.png',
-  'TRANSFORMACIÓN MEMORIA E HISTORIA':           'assets/images/insignias/insignia_memoria_viva.png',
   'DISEÑO MODA Y COMPRAS':                       'assets/images/insignias/insignia_explorador_45.png',
   // ── Rutas Centro nuevas (12 sep 2026) ──
   'RUTA CENTRO REPUBLICANO':                     'assets/images/insignias/insignia_guardian_patrimonio.png',
@@ -9686,6 +9755,14 @@ const Map<String, String> kInsigniaPorRuta = {
   'RINCONES ESCONDIDOS DE EL POBLADO':           'assets/images/insignias/insignia_explorador_oculto.png',
   'SABORES DE LA 70':                            'assets/images/insignias/insignia_paladar_70.png',
   'SABORES DEL CENTRO':                          'assets/images/insignias/insignia_paladar_paisa.png',
+  // ── Rutas Santa Elena y alrededores (sep 2026) ──
+  'RUTA SANTA FE DE ANTIOQUIA':                  'assets/images/insignias/insignia_viajero_colonial.png',
+  'FINCA Y FONDA':                               'assets/images/insignias/insignia_silletero_mayor.png',
+  'GUARDIANES DE LA SILLETA':                    'assets/images/insignias/insignia_guardian_silletero.png',
+  'SENDEROS EN FLOR':                            'assets/images/insignias/insignia_silletero_mayor.png',
+  'VEREDAS DE SANTA ELENA':                      'assets/images/insignias/insignia_guardian_silletero.png',
+  'FINCAS AGROTURÍSTICAS':                       'assets/images/insignias/insignia_silletero_mayor.png',
+  'TRANSFORMACIÓN MEMORIA E HISTORIA':           'assets/images/insignias/insignia_guardian_memoria.png',
 };
 
 
@@ -9773,6 +9850,10 @@ class RutasService {
       // ── Alrededores ──────────────────────────────────────────────────
       'RUTA SANTA FE DE ANTIOQUIA',
       'JOYA COLONIAL OCULTA — CONCEPCIÓN',
+      'FINCA Y FONDA',
+      'GUARDIANES DE LA SILLETA',
+      'SENDEROS EN FLOR',
+      'VEREDAS DE SANTA ELENA',
     };
     final soloLocales = kRutasData.where((r) {
       final nombre = r['nombre']?.toString() ?? '';
@@ -12540,6 +12621,21 @@ class _CameraScreenState extends State<CameraScreen> with SingleTickerProviderSt
             const Duration(seconds: 15),
             onTimeout: () { debugPrint('⚠️ Timeout galería'); return null; },
           ).catchError((e) { debugPrint('⚠️ Error galería: $e'); return null; });
+
+          // Subir foto a Firebase Storage para que persista tras reinstalación
+          if (AuthService.currentUser != null) {
+            try {
+              final uid = AuthService.currentUser!.uid;
+              final ts = DateTime.now().millisecondsSinceEpoch;
+              final ref = FirebaseStorage.instance
+                  .ref('fotos_usuarios/$uid/${ts}.jpg');
+              await ref.putFile(File(foto.path));
+              _fotoStorageUrl = await ref.getDownloadURL();
+            } catch (e) {
+              debugPrint('⚠️ Error subiendo foto a Storage: $e');
+            }
+          }
+
           await _validarFoto();
         }
       }
@@ -12780,6 +12876,7 @@ class _CameraScreenState extends State<CameraScreen> with SingleTickerProviderSt
   // Validar y subir foto a Firebase Storage
   // FIX B: Guarda foto en Firestore PRIMERO (con localPath) ANTES de intentar subir.
   String? _localFotoPath; // path local de la foto para MisFotosScreen
+  String? _fotoStorageUrl; // URL de Firebase Storage — persiste tras reinstalación
   //        Si la subida a Storage falla, al menos hay registro y la foto queda
   //        disponible localmente en la galería.
   // FIX C: Si la subida falla, muestra snackbar amarillo informativo al usuario.
@@ -12821,6 +12918,7 @@ class _CameraScreenState extends State<CameraScreen> with SingleTickerProviderSt
           'acento': (kRutaColor(widget.ruta['acento'], RDSColor.green)).value,
           'fecha': FieldValue.serverTimestamp(),
           'localPath': _localFotoPath ?? '',
+          'storageUrl': _fotoStorageUrl ?? '',
         }).catchError((e) => debugPrint('⚠️ fotos Firestore: $e'));
     }
     setState(() { _subiendo = false; _validando = false; });
@@ -15994,6 +16092,11 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
   Map<String, dynamic>? _estacionEnCiclaSeleccionada;
   double _zoomActual = 13.0; // zoom inicial — EnCicla visible desde 13.5
 
+  // ── Capa Whoosh ──────────────────────────────────────────────────────────
+  bool _mostrarWhoosh = false;
+  List<Map<String, dynamic>> _estacionesWhoosh = [];
+  Map<String, dynamic>? _estacionWhooshSeleccionada;
+
   // Centro dinámico según ciudad detectada
   LatLng get _centerCiudad {
     if (_ciudadMapa != null) return LatLng(_ciudadMapa!.lat, _ciudadMapa!.lng);
@@ -16019,6 +16122,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
     _cargarRutasDesbloqueadas();
     _detectarCiudadMapa();
     _cargarEstacionesEnCicla();
+    _cargarEstacionesWhoosh();
     // ── Escuchar cuando RutasService termina de cargar de Firestore ──
     RutasService().addListener(_onRutasCargadasMapa);
     // ── Forzar carga si aún no está lista ──────────────────────────
@@ -16198,9 +16302,54 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
     catch (e) { debugPrint('🔴 encicla error: $e'); }
     try { _iconCache['encicla_sel'] = await _crearPinEnCicla(seleccionado: true); }
     catch (e) { debugPrint('🔴 encicla_sel error: $e'); }
+    try { _iconCache['whoosh']      = await _crearPinWhoosh(seleccionado: false); }
+    catch (e) { debugPrint('🔴 whoosh error: $e'); }
+    try { _iconCache['whoosh_sel']  = await _crearPinWhoosh(seleccionado: true); }
+    catch (e) { debugPrint('🔴 whoosh_sel error: $e'); }
     if (mounted) setState(() => _iconsLoaded = true);
   }
 
+
+  Future<void> _cargarEstacionesWhoosh() async {
+    try {
+      final doc = await FirebaseFirestore.instance
+          .collection('capas_mapa')
+          .doc('whoosh_estaciones')
+          .get();
+      if (doc.exists) {
+        final data = doc.data()!;
+        final lista = (data['estaciones'] as List<dynamic>? ?? [])
+            .map((e) => Map<String, dynamic>.from(e as Map))
+            .toList();
+        if (mounted) setState(() => _estacionesWhoosh = lista);
+      }
+    } catch (e) {
+      debugPrint('Whoosh: error cargando estaciones — $e');
+    }
+  }
+
+  Future<BitmapDescriptor> _crearPinWhoosh({required bool seleccionado}) async {
+    const size = 28.0;
+    final recorder = ui.PictureRecorder();
+    final canvas = Canvas(recorder);
+    final paint = Paint()
+      ..color = seleccionado ? const Color(0xFFE6B800) : const Color(0xFFFFD700)
+      ..style = PaintingStyle.fill;
+    final border = Paint()
+      ..color = Colors.white.withOpacity(seleccionado ? 1.0 : 0.7)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = seleccionado ? 2.5 : 1.5;
+    canvas.drawCircle(const Offset(size / 2, size / 2), size / 2 - 1, paint);
+    canvas.drawCircle(const Offset(size / 2, size / 2), size / 2 - 1, border);
+    final tp = TextPainter(
+      text: const TextSpan(text: '🛴', style: TextStyle(fontSize: 14)),
+      textDirection: TextDirection.ltr);
+    tp.layout();
+    tp.paint(canvas, Offset((size - tp.width) / 2, (size - tp.height) / 2));
+    final img = await recorder.endRecording().toImage(size.toInt(), size.toInt());
+    final bytes = await img.toByteData(format: ui.ImageByteFormat.png);
+    return BitmapDescriptor.fromBytes(bytes!.buffer.asUint8List());
+  }
 
   Future<BitmapDescriptor> _crearPinEnCicla({required bool seleccionado}) async {
     const size = 28.0;
@@ -16394,6 +16543,36 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
     final bool selHay = _sitioSeleccionado != null;
     final Set<Marker> markers = {};
 
+    // ── Marcadores Whoosh ─────────────────────────────────────────────────
+    if (_mostrarWhoosh && _zoomActual >= 13.5) {
+      for (final est in _estacionesWhoosh) {
+        final lat = (est['lat'] as num?)?.toDouble() ?? 0;
+        final lng = (est['lng'] as num?)?.toDouble() ?? 0;
+        if (lat == 0 && lng == 0) continue;
+        final id = est['id']?.toString() ?? '';
+        final esSeleccionada = _estacionWhooshSeleccionada?['id'] == id;
+        final icon = _iconCache['whoosh${esSeleccionada ? '_sel' : ''}']
+            ?? BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueYellow);
+        markers.add(Marker(
+          markerId: MarkerId('whoosh_$id'),
+          position: LatLng(lat, lng),
+          icon: icon,
+          zIndex: esSeleccionada ? 2.5 : 0.8,
+          anchor: const Offset(0.5, 0.5),
+          onTap: () {
+            setState(() {
+              _estacionWhooshSeleccionada = est;
+              _sitioSeleccionado = null;
+              _estacionEnCiclaSeleccionada = null;
+            });
+            _mapController?.animateCamera(
+                CameraUpdate.newLatLngZoom(LatLng(lat, lng), 16));
+            _mostrarInfoWhoosh(est);
+          },
+        ));
+      }
+    }
+
     // ── Marcadores EnCicla ────────────────────────────────────────────────
     if (_mostrarEnCicla && _zoomActual >= 13.5) {
       for (final est in _estacionesEnCicla) {
@@ -16507,6 +16686,41 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
       const SizedBox(width: 8),
       Expanded(child: Text(texto, style: const TextStyle(color: RDSColor.textMuted, fontSize: 12))),
     ]));
+
+  void _mostrarInfoWhoosh(Map<String, dynamic> estacion) {
+    final id = estacion['id']?.toString() ?? '';
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: RDSColor.surface,
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (_) => Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Row(children: [
+            const Text('🛴', style: TextStyle(fontSize: 24)),
+            const SizedBox(width: 10),
+            Text(t('Estación Whoosh', 'Whoosh Station'),
+                style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: RDSColor.textPrimary)),
+            const Spacer(),
+            IconButton(icon: const Icon(Icons.close, color: RDSColor.textMuted),
+                onPressed: () { Navigator.pop(context); setState(() => _estacionWhooshSeleccionada = null); }),
+          ]),
+          const SizedBox(height: 8),
+          _enciclaInfoFila('📍', t('Punto Whoosh #$id', 'Whoosh Point #$id')),
+          const SizedBox(height: 12),
+          Text(t('¿Cómo usar Whoosh?', 'How to use Whoosh?'),
+              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: RDSColor.textPrimary)),
+          const SizedBox(height: 4),
+          Text(
+            t('1. Descargá la app Whoosh\n2. Escaneá el código QR de la patineta\n3. Disfrutá tu recorrido\n4. Dejá la patineta en cualquier zona permitida',
+              '1. Download the Whoosh app\n2. Scan the QR code on the scooter\n3. Enjoy your ride\n4. Leave the scooter in any permitted zone'),
+            style: const TextStyle(fontSize: 12, color: RDSColor.textMuted, height: 1.6)),
+          const SizedBox(height: 16),
+        ]),
+      ),
+    ).whenComplete(() => setState(() => _estacionWhooshSeleccionada = null));
+  }
 
   void _mostrarInfoEnCicla(Map<String, dynamic> estacion) {
     final nombre = estacion['nombre']?.toString() ?? '';
@@ -16871,6 +17085,8 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
         onTap: () { setState(() => _fabExpandido = false); _mostrarRutasCercanas(); }),
       _FabOpcion(icon: RDSIcons.transport,   label: _mostrarEnCicla ? t('Ocultar EnCicla','Hide EnCicla') : t('Ver EnCicla','Show EnCicla'), color: const Color(0xFF0066CC),
         onTap: () => setState(() { _fabExpandido = false; _mostrarEnCicla = !_mostrarEnCicla; })),
+      _FabOpcion(icon: RDSIcons.transport,   label: _mostrarWhoosh ? t('Ocultar Whoosh','Hide Whoosh') : t('Ver Whoosh 🛴','Show Whoosh 🛴'), color: const Color(0xFFFFD700),
+        onTap: () => setState(() { _fabExpandido = false; _mostrarWhoosh = !_mostrarWhoosh; })),
       _FabOpcion(icon: RDSIcons.planner,     label: t('Ver Planner','View Planner'),    color: RDSColor.orchid,
         onTap: () { setState(() => _fabExpandido = false); _mostrarCapaPlanner(); }),
     ];
@@ -17698,7 +17914,9 @@ class _MisFotosScreenState extends State<MisFotosScreen> {
                         itemCount: fotosFiltradas.length,
                         itemBuilder: (ctx, i) {
                           final data = fotosFiltradas[i].data() as Map<String, dynamic>;
-                          final url = data['url']?.toString();
+                          final url = data['storageUrl']?.toString().isNotEmpty == true
+                              ? data['storageUrl']?.toString()
+                              : data['url']?.toString();
                           final sitio = data['sitio']?.toString() ?? '';
                           final ruta = data['ruta']?.toString() ?? '';
                           final emoji = data['emoji']?.toString() ?? '📍';
