@@ -48,3 +48,4 @@ android/key.properties
 serviceAccountKey.json 
 "# Archivos sensibles" 
 "android/app/google-services.json" 
+ios/Runner/AppDelegate.swift 
