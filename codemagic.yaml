@@ -1,0 +1,85 @@
+workflows:
+  default-workflow:
+    name: Default Workflow
+    max_build_duration: 90
+    environment:
+      flutter: stable
+      xcode: latest
+      cocoapods: default
+      vars:
+        BUNDLE_ID: "com.ruteromde.app"
+        APP_STORE_APP_ID: "6739584898"
+    scripts:
+      - name: Set up GoogleService-Info.plist
+        script: |
+          echo $GOOGLE_SERVICE_INFO_PLIST | base64 --decode > $CM_BUILD_DIR/ios/Runner/GoogleService-Info.plist
+      - name: Flutter pub get
+        script: flutter pub get
+      - name: Pre-download Firebase XCFrameworks with retry
+        script: |
+          # Firebase XCFrameworks a veces dan timeout en CDN — descargamos con retry antes del pod install
+          retry_download() {
+            local url=$1
+            local dest=$2
+            local max_attempts=4
+            local attempt=1
+            while [ $attempt -le $max_attempts ]; do
+              echo "Descargando $dest (intento $attempt/$max_attempts)..."
+              if curl -L --retry 3 --retry-delay 5 --connect-timeout 60 --max-time 300 -o "$dest" "$url"; then
+                echo "✓ Descargado $dest"
+                return 0
+              fi
+              echo "✗ Falló intento $attempt"
+              attempt=$((attempt + 1))
+              sleep 10
+            done
+            echo "ERROR: No se pudo descargar $dest después de $max_attempts intentos"
+            return 1
+          }
+
+          # Leer versión de Firebase desde Podfile.lock si existe
+          FIREBASE_VERSION=$(grep "Firebase/Core" ios/Podfile.lock 2>/dev/null | head -1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)
+          if [ -z "$FIREBASE_VERSION" ]; then
+            FIREBASE_VERSION="11.6.0"
+          fi
+          echo "Usando Firebase versión: $FIREBASE_VERSION"
+
+          CACHE_DIR="$HOME/Library/Caches/CocoaPods/Pods/Release"
+          mkdir -p "$CACHE_DIR"
+
+          # Los ZIPs que suelen dar timeout
+          BASE_URL="https://github.com/firebase/firebase-ios-sdk/releases/download/${FIREBASE_VERSION}"
+
+          for pkg in FirebaseFirestoreInternal FirebaseAnalytics; do
+            ZIP="$CACHE_DIR/${pkg}-${FIREBASE_VERSION}.zip"
+            if [ ! -f "$ZIP" ]; then
+              retry_download "${BASE_URL}/${pkg}.zip" "$ZIP" || true
+            else
+              echo "✓ Ya en caché: $pkg"
+            fi
+          done
+
+          # gRPC (viene de su propio repo)
+          GRPC_VERSION=$(grep "gRPC-Core" ios/Podfile.lock 2>/dev/null | head -1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)
+          if [ -n "$GRPC_VERSION" ]; then
+            GRPC_ZIP="$CACHE_DIR/grpc-${GRPC_VERSION}.zip"
+            if [ ! -f "$GRPC_ZIP" ]; then
+              retry_download "https://github.com/grpc/grpc/archive/refs/tags/v${GRPC_VERSION}.zip" "$GRPC_ZIP" || true
+            fi
+          fi
+      - name: Pod install
+        script: |
+          find . -name "Podfile" -execdir pod install \;
+      - name: Build iOS
+        script: |
+          flutter build ipa --release \
+            --export-options-plist=/Users/builder/export_options.plist
+    artifacts:
+      - build/ios/ipa/*.ipa
+      - /tmp/xcodebuild_logs/*.log
+    publishing:
+      app_store_connect:
+        api_key: $APP_STORE_CONNECT_PRIVATE_KEY
+        key_id: $APP_STORE_CONNECT_KEY_IDENTIFIER
+        issuer_id: $APP_STORE_CONNECT_ISSUER_ID
+        submit_to_testflight: true
