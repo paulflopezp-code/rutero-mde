@@ -1642,6 +1642,7 @@ class AuthService {
       return result;
     } catch (e) {
       debugPrint('Error Sign in with Apple: $e');
+      _ultimoError = 'Apple: ${e.toString()}';
       return null;
     }
   }
@@ -3597,7 +3598,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   Navigator.of(context, rootNavigator: true).pushAndRemoveUntil(
                     MaterialPageRoute(builder: (_) => const MainShell()), (r) => false);
                 } else {
-                  setState(() { _cargando = false; _error = t('Error con Apple ID','Apple ID error'); });
+                  setState(() { _cargando = false; _error = AuthService._ultimoError ?? t('Error con Apple ID','Apple ID error'); });
                 }
               },
               child: Container(
