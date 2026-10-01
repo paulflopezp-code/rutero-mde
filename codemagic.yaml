@@ -6,6 +6,8 @@ workflows:
       flutter: stable
       xcode: latest
       cocoapods: default
+      groups:
+        - rutero-secrets
       vars:
         BUNDLE_ID: "com.ruteromde.app"
         APP_STORE_APP_ID: "6739584898"
@@ -17,7 +19,6 @@ workflows:
         script: flutter pub get
       - name: Pre-download Firebase XCFrameworks with retry
         script: |
-          # Firebase XCFrameworks a veces dan timeout en CDN — descargamos con retry antes del pod install
           retry_download() {
             local url=$1
             local dest=$2
@@ -37,7 +38,6 @@ workflows:
             return 1
           }
 
-          # Leer versión de Firebase desde Podfile.lock si existe
           FIREBASE_VERSION=$(grep "Firebase/Core" ios/Podfile.lock 2>/dev/null | head -1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)
           if [ -z "$FIREBASE_VERSION" ]; then
             FIREBASE_VERSION="11.6.0"
@@ -47,7 +47,6 @@ workflows:
           CACHE_DIR="$HOME/Library/Caches/CocoaPods/Pods/Release"
           mkdir -p "$CACHE_DIR"
 
-          # Los ZIPs que suelen dar timeout
           BASE_URL="https://github.com/firebase/firebase-ios-sdk/releases/download/${FIREBASE_VERSION}"
 
           for pkg in FirebaseFirestoreInternal FirebaseAnalytics; do
@@ -59,7 +58,6 @@ workflows:
             fi
           done
 
-          # gRPC (viene de su propio repo)
           GRPC_VERSION=$(grep "gRPC-Core" ios/Podfile.lock 2>/dev/null | head -1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)
           if [ -n "$GRPC_VERSION" ]; then
             GRPC_ZIP="$CACHE_DIR/grpc-${GRPC_VERSION}.zip"
