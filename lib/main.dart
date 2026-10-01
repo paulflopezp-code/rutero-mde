@@ -349,6 +349,9 @@ class DeepLinkManager {
       } else if (tipo == 'perfil' && segments.isNotEmpty) {
         final usuario = Uri.decodeComponent(segments.last);
         _abrirPerfilPublico(ctx, usuario);
+      } else if (tipo == 'hotel' && segments.isNotEmpty) {
+        final codigo = Uri.decodeComponent(segments.last).toUpperCase();
+        _activarHotel(ctx, codigo);
       }
     } catch (e) {
       debugPrint('🔴 Error procesando deep link: $e');
@@ -377,6 +380,30 @@ class DeepLinkManager {
   void _abrirPerfilPublico(BuildContext ctx, String usuario) {
     Navigator.of(ctx, rootNavigator: true).push(MaterialPageRoute(
       builder: (_) => PerfilPublicoScreen(usuario: usuario)));
+  }
+
+  void _activarHotel(BuildContext ctx, String codigo) async {
+    final exito = await HotelPartnerService.activarCodigo(codigo);
+    if (!exito) {
+      debugPrint('🏨 Código hotel inválido: $codigo');
+      return;
+    }
+    final hotel = await HotelPartnerService.getHotelActivo();
+    if (hotel == null || !ctx.mounted) return;
+    // Reset bienvenida para que aparezca aunque ya la haya visto antes
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('rutero_hotel_bienvenida_mostrada');
+    Navigator.of(ctx, rootNavigator: true).push(MaterialPageRoute(
+      builder: (_) => HotelBienvenidaScreen(
+        hotel: hotel,
+        onContinuar: () => Navigator.of(ctx, rootNavigator: true).pop(),
+      ),
+    ));
+  }
+
+  /// Genera un link/QR de activación para un hotel partner
+  static String linkHotel(String codigo) {
+    return 'https://rutero-mde.web.app/hotel/${codigo.toUpperCase()}';
   }
 
   /// Genera un link compartible para una ruta
@@ -1646,52 +1673,64 @@ class AuthService {
     if (currentUser == null) return;
     final docRef = _db.collection('usuarios').doc(currentUser!.uid);
 
+    // FIX OFFLINE (sep 2026): Los writes de Firestore se lanzan sin await.
+    // Con persistenceEnabled:true, Firestore encola los writes localmente
+    // y los sincroniza automáticamente cuando vuelve la conexión.
+    // Antes: los await bloqueaban indefinidamente sin internet → sitio no validado en UI.
+    // Ahora: fire-and-forget → la UI avanza inmediatamente, Firestore sincroniza solo.
+
     // 1. Guardar progreso específico de esta ruta
-    await docRef.collection('progreso').doc(rutaNombre).set({
+    docRef.collection('progreso').doc(rutaNombre).set({
       'sitiosCompletados': sitiosCompletados,
       'totalSitios': totalSitios,
       'ultimaActividad': FieldValue.serverTimestamp(),
       'completada': sitiosCompletados >= totalSitios,
-    }, SetOptions(merge: true));
+    }, SetOptions(merge: true)).catchError((e) =>
+      debugPrint('⚠️ guardarProgreso [progreso]: $e'));
 
     // 1b. Guardar nombre del sitio validado para persistencia individual
     if (sitioNombre != null && sitioNombre.isNotEmpty) {
       debugPrint('💾 Guardando sitio: $sitioNombre en ruta: $rutaNombre');
-      await docRef.collection('progreso').doc(rutaNombre)
+      docRef.collection('progreso').doc(rutaNombre)
         .collection('sitios').doc(sitioNombre).set({
           'validado': true,
           'fecha': FieldValue.serverTimestamp(),
-        });
+        }).catchError((e) =>
+          debugPrint('⚠️ guardarProgreso [sitio]: $e'));
     }
 
     // 2. Incrementar contadores globales del usuario por CADA sitio validado
-    await docRef.set({
+    docRef.set({
       'sitiosVisitados': FieldValue.increment(1),
       'puntosTotal': FieldValue.increment(30),
-    }, SetOptions(merge: true));
+    }, SetOptions(merge: true)).catchError((e) =>
+      debugPrint('⚠️ guardarProgreso [contadores]: $e'));
 
     // 3. Bono extra al completar la ruta entera (+1 ruta completa, +50 puntos bono)
     if (sitiosCompletados >= totalSitios) {
-      await docRef.set({
+      docRef.set({
         'rutasCompletadas': FieldValue.increment(1),
         'puntosTotal': FieldValue.increment(50),
-      }, SetOptions(merge: true));
+      }, SetOptions(merge: true)).catchError((e) =>
+        debugPrint('⚠️ guardarProgreso [bono]: $e'));
       // Guardar en colección 'rutasCompletadas' para que el mapa pueda desbloquear la ruta
-      await docRef.collection('rutasCompletadas').doc(rutaNombre).set({
+      docRef.collection('rutasCompletadas').doc(rutaNombre).set({
         'fechaCompletada': FieldValue.serverTimestamp(),
         'totalSitios': totalSitios,
-      }, SetOptions(merge: true));
+      }, SetOptions(merge: true)).catchError((e) =>
+        debugPrint('⚠️ guardarProgreso [rutasCompletadas]: $e'));
       // 4. Desbloquear insignia en collection('insignias')
       final rutaData = RutasService().rutas.firstWhere(
         (r) => r['nombre'] == rutaNombre, orElse: () => {});
-      await docRef.collection('insignias').doc(rutaNombre).set({
+      docRef.collection('insignias').doc(rutaNombre).set({
         'rutaNombre': rutaNombre,
         'nombre': rutaData['insignia']?.toString() ?? rutaNombre,
         'emoji': rutaData['emoji']?.toString() ?? '🏅',
         'insigniaImg': kInsigniaPorRuta[rutaNombre] ?? '',
         'puntos': (totalSitios * 30) + 50,
         'fechaDesbloqueada': FieldValue.serverTimestamp(),
-      }, SetOptions(merge: true));
+      }, SetOptions(merge: true)).catchError((e) =>
+        debugPrint('⚠️ guardarProgreso [insignia]: $e'));
     }
   }
 
@@ -2154,20 +2193,10 @@ class _SOSFloatingButton extends StatelessWidget {
           Text(t('¿Qué necesitas?', 'What do you need?'),
             style: const TextStyle(color: RDSColor.textPrimary, fontSize: 16, fontWeight: FontWeight.w800)),
           const SizedBox(height: 16),
-          _MenuOpcion(emoji: '📸', titulo: t('Captura de campo', 'Field capture'),
-            subtitulo: t('Fotografía sitios reales con tu GPS y marca de agua', 'Photograph real sites with GPS and watermark'),
-            color: RDSColor.green,
-            onTap: () { Navigator.pop(ctx); Navigator.of(context, rootNavigator: true).push(MaterialPageRoute(builder: (_) => const CapturasDeCampoScreen())); }),
-          const SizedBox(height: 10),
           _MenuOpcion(emoji: '🚨', titulo: t('Emergencias', 'Emergencies'),
             subtitulo: t('Líneas de emergencia, hospitales, consulados', 'Emergency lines, hospitals, consulates'),
             color: Colors.red,
             onTap: () { Navigator.pop(ctx); Navigator.of(context, rootNavigator: true).push(MaterialPageRoute(builder: (_) => const EmergenciaScreen())); }),
-          const SizedBox(height: 10),
-          _MenuOpcion(emoji: '🛎️', titulo: t('Servicios para viajeros', 'Traveler services'),
-            subtitulo: t('Traductor, guías turísticos y más', 'Translator, tour guides and more'),
-            color: RDSColor.gold,
-            onTap: () { Navigator.pop(ctx); Navigator.of(context, rootNavigator: true).push(MaterialPageRoute(builder: (_) => const ServiciosScreen())); }),
           const SizedBox(height: 10),
           _MenuOpcion(emoji: '📱', titulo: t('Mi botón SOS', 'My SOS button'),
             subtitulo: t('Envía tu ubicación por WhatsApp', 'Send your location via WhatsApp'),
@@ -4952,195 +4981,302 @@ final List<_CategoriaEmergencia> kDirectorioEmergencias = [
 // ─────────────────────────────────────────────────────────────────────────
 // ═══════════════════════════════════════════════════════════════════════════
 //  🛎️ SERVICIOS PARA VIAJEROS
-//  Directorio de servicios útiles: traductores, guías turísticos, etc.
-//  Acceso directo por WhatsApp a cada proveedor.
+//  Directorio por categoría: Transporte, Guías, Belleza, Tecnología, etc.
+//  Cards con WhatsApp directo, dirección y cómo llegar.
+//  Datos desde Firestore (colección serviciosViajero) con fallback hardcodeado.
 // ═══════════════════════════════════════════════════════════════════════════
 
+// ── Categorías disponibles ───────────────────────────────────────────────
+class _CatServicio {
+  final String id;
+  final String label;
+  final String labelEN;
+  final String emoji;
+  final Color color;
+  const _CatServicio({required this.id, required this.label, required this.labelEN, required this.emoji, required this.color});
+}
+
+const List<_CatServicio> kCategoriaServicio = [
+  _CatServicio(id: 'Todos',       label: 'Todos',       labelEN: 'All',         emoji: '🛎️', color: RDSColor.gold),
+  _CatServicio(id: 'Transporte',  label: 'Transporte',  labelEN: 'Transport',   emoji: '🚗', color: Color(0xFF1565C0)),
+  _CatServicio(id: 'Guías',       label: 'Guías',       labelEN: 'Guides',      emoji: '🧭', color: Color(0xFF1B6B3A)),
+  _CatServicio(id: 'Belleza',     label: 'Belleza',     labelEN: 'Beauty',      emoji: '💅', color: Color(0xFFAD1457)),
+  _CatServicio(id: 'Tecnología',  label: 'Tecnología',  labelEN: 'Tech',        emoji: '🔧', color: Color(0xFF0D47A1)),
+  _CatServicio(id: 'Hospedaje',   label: 'Hospedaje',   labelEN: 'Lodging',     emoji: '🏨', color: Color(0xFF6A1B9A)),
+  _CatServicio(id: 'Gastronomía', label: 'Gastronomía', labelEN: 'Food',        emoji: '🍽️', color: Color(0xFFE65100)),
+  _CatServicio(id: 'Otro',        label: 'Otro',        labelEN: 'Other',       emoji: '✨', color: Color(0xFF37474F)),
+];
+
+// ── Modelo hardcodeado (fallback) ────────────────────────────────────────
 class _ServicioViajero {
   final String nombre;
-  final String nombreEN;
   final String empresa;
+  final String categoria;  // id de _CatServicio
   final String descripcion;
   final String descripcionEN;
   final String whatsapp;
+  final String urlExterna;
   final String emoji;
   final String? logoAsset;
   final String idiomas;
   final String idiomasEN;
+  final String direccion;
+  final String comoLlegar;
+  final String comoLlegarEN;
+  final String mapsQuery;  // texto para abrir en Google Maps
   final Color color;
   const _ServicioViajero({
-    required this.nombre, required this.nombreEN,
-    required this.empresa,
+    required this.nombre, required this.empresa,
+    required this.categoria,
     required this.descripcion, required this.descripcionEN,
-    required this.whatsapp,
-    required this.emoji,
-    this.logoAsset,
-    required this.idiomas, required this.idiomasEN,
+    this.whatsapp = '', this.urlExterna = '',
+    required this.emoji, this.logoAsset,
+    this.idiomas = '', this.idiomasEN = '',
+    this.direccion = '', this.comoLlegar = '', this.comoLlegarEN = '',
+    this.mapsQuery = '',
     required this.color,
   });
 }
 
 final List<_ServicioViajero> kServiciosViajero = [
   _ServicioViajero(
-    nombre: 'Sebastián Lopera', nombreEN: 'Sebastián Lopera',
-    empresa: 'Iguideu',
+    nombre: 'Sebastián Lopera', empresa: 'Iguideu',
+    categoria: 'Guías',
     descripcion: 'Intérprete inglés ↔ español. Disponible para tours, reuniones de negocios, trámites y acompañamiento personalizado en Medellín.',
     descripcionEN: 'English ↔ Spanish interpreter. Available for tours, business meetings, procedures and personalized assistance in Medellín.',
     whatsapp: '+573003760845',
-    emoji: '🗣️',
-    logoAsset: 'assets/images/servicios/logo_iguideu.png',
-    idiomas: '🇬🇧 Inglés · 🇨🇴 Español',
-    idiomasEN: '🇬🇧 English · 🇨🇴 Spanish',
+    emoji: '🗣️', logoAsset: 'assets/images/servicios/logo_iguideu.png',
+    idiomas: '🇬🇧 Inglés · 🇨🇴 Español', idiomasEN: '🇬🇧 English · 🇨🇴 Spanish',
     color: Color(0xFF1B6B3A)),
   _ServicioViajero(
-    nombre: 'MedeGuide', nombreEN: 'MedeGuide',
-    empresa: 'MedeGuide',
+    nombre: 'MedeGuide', empresa: 'MedeGuide',
+    categoria: 'Guías',
     descripcion: 'Intérprete y guía turístico para turistas francófonos. Recorridos por Medellín, comunas, alrededores y experiencias auténticas.',
     descripcionEN: 'Interpreter and tour guide for French-speaking tourists. Tours through Medellín, comunas, surroundings and authentic experiences.',
     whatsapp: '+573115908072',
-    emoji: '🧭',
-    logoAsset: 'assets/images/servicios/logo_medeguide.png',
-    idiomas: '🇫🇷 Francés · 🇨🇴 Español',
-    idiomasEN: '🇫🇷 French · 🇨🇴 Spanish',
+    emoji: '🧭', logoAsset: 'assets/images/servicios/logo_medeguide.png',
+    idiomas: '🇫🇷 Francés · 🇨🇴 Español', idiomasEN: '🇫🇷 French · 🇨🇴 Spanish',
     color: Color(0xFF1565C0)),
   _ServicioViajero(
-    nombre: 'Mobiplab', nombreEN: 'Mobiplab',
-    empresa: 'Mobiplab',
-    descripcion: 'Reparación de celulares iPhone en el centro de Medellín. Calle 50 N° 55-50 piso 2.',
-    descripcionEN: 'iPhone repair shop in downtown Medellín. Calle 50 N° 55-50, 2nd floor.',
+    nombre: 'Mobiplab', empresa: 'Mobiplab',
+    categoria: 'Tecnología',
+    descripcion: 'Reparación de celulares iPhone en el centro de Medellín. Especialistas en pantallas, batería y diagnóstico rápido.',
+    descripcionEN: 'iPhone repair in downtown Medellín. Screen, battery and fast diagnosis.',
     whatsapp: '+573001852758',
-    emoji: '🔧',
-    logoAsset: 'assets/images/servicios/Mobiplab.jpg',
-    idiomas: '🇨🇴 Español',
-    idiomasEN: '🇨🇴 Spanish',
+    emoji: '🔧', logoAsset: 'assets/images/servicios/Mobiplab.jpg',
+    idiomas: '🇨🇴 Español', idiomasEN: '🇨🇴 Spanish',
+    direccion: 'Calle 50 N° 55-50, piso 2, Centro, Medellín',
+    comoLlegar: 'Metro línea A, estación Parque Berrío. Camina 3 min hacia el norte por la Calle 50.',
+    comoLlegarEN: 'Metro line A, Parque Berrío station. Walk 3 min north along Calle 50.',
+    mapsQuery: 'Calle 50 55-50 Medellín',
     color: Color(0xFF0D47A1)),
   _ServicioViajero(
-    nombre: 'Whoosh Colombia', nombreEN: 'Whoosh Colombia',
-    empresa: 'Whoosh',
-    descripcion: 'Patinetas eléctricas compartidas en Medellín. Más de 1.000 patinetas en zonas planas y bajas de la ciudad. Perfectas para recorrer rutas de Rutero MDE. Descarga la app en whoosh.bike/es_la y buscá el punto P más cercano.',
-    descripcionEN: 'Shared electric scooters in Medellín. Over 1,000 scooters in flat and low-lying areas of the city. Perfect for Rutero MDE routes. Get the app at whoosh.bike/es_la and find the nearest P point.',
-    whatsapp: '',
-    emoji: '🛴',
-    logoAsset: 'assets/images/servicios/whoosh_logo_amarillo.png',
-    idiomas: '🇨🇴 Español · 🇬🇧 English',
-    idiomasEN: '🇨🇴 Spanish · 🇬🇧 English',
+    nombre: 'Whoosh Colombia', empresa: 'Whoosh',
+    categoria: 'Transporte',
+    descripcion: 'Patinetas eléctricas compartidas en Medellín. Más de 1.000 patinetas en zonas planas. Perfectas para recorrer rutas de Rutero MDE. Buscá el punto P más cercano en la app.',
+    descripcionEN: 'Shared electric scooters in Medellín. Over 1,000 scooters in flat areas. Perfect for Rutero MDE routes. Find the nearest P point in the app.',
+    urlExterna: 'https://whoosh.bike/es_la',
+    emoji: '🛴', logoAsset: 'assets/images/servicios/whoosh_logo_amarillo.png',
+    idiomas: '🇨🇴 Español · 🇬🇧 English', idiomasEN: '🇨🇴 Spanish · 🇬🇧 English',
     color: Color(0xFFFFD000)),
 ];
 
-class ServiciosScreen extends StatelessWidget {
+// ── Screen principal ─────────────────────────────────────────────────────
+class ServiciosScreen extends StatefulWidget {
   const ServiciosScreen({super.key});
+  @override
+  State<ServiciosScreen> createState() => _ServiciosScreenState();
+}
 
-  Future<void> _abrirWhatsApp(String numero, BuildContext context) async {
-    final numeroLimpio = numero.replaceAll(RegExp(r'[^\d+]'), '');
-    final mensaje = Uri.encodeComponent(
-      t('Hola, vengo de Rutero MDE y me gustaría información sobre sus servicios.',
-        'Hi, I found you through Rutero MDE and would like information about your services.'));
-    final uri = Uri.parse('https://wa.me/$numeroLimpio?text=$mensaje');
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
-    } else if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text(t('No se pudo abrir WhatsApp', 'Could not open WhatsApp')),
-        backgroundColor: Colors.red));
-    }
+class _ServiciosScreenState extends State<ServiciosScreen> {
+  String _catActiva = 'Todos';
+
+  Future<void> _abrirWhatsApp(String numero) async {
+    final limpio = numero.replaceAll(RegExp(r'[^\d+]'), '');
+    final msg = Uri.encodeComponent(t(
+      'Hola, vengo de Rutero MDE y me gustaría información sobre sus servicios.',
+      'Hi, I found you through Rutero MDE and would like info about your services.'));
+    final uri = Uri.parse('https://wa.me/$limpio?text=$msg');
+    if (await canLaunchUrl(uri)) await launchUrl(uri, mode: LaunchMode.externalApplication);
   }
 
-  // Construye la card de servicio desde Firestore o desde datos hardcodeados
-  Widget _buildCard(Map<String, dynamic> data, BuildContext context) {
-    final nombre = data['nombre']?.toString() ?? '';
-    final empresa = data['empresa']?.toString() ?? '';
+  Future<void> _abrirMaps(String query) async {
+    final uri = Uri.parse('https://www.google.com/maps/search/${Uri.encodeComponent(query)}');
+    if (await canLaunchUrl(uri)) await launchUrl(uri, mode: LaunchMode.externalApplication);
+  }
+
+  Future<void> _abrirUrl(String url) async {
+    final uri = Uri.parse(url);
+    if (await canLaunchUrl(uri)) await launchUrl(uri, mode: LaunchMode.externalApplication);
+  }
+
+  Color _colorDeCat(String catId) =>
+    kCategoriaServicio.firstWhere((c) => c.id == catId, orElse: () => kCategoriaServicio.last).color;
+
+  Widget _buildCard(Map<String, dynamic> d) {
+    final nombre      = d['nombre']?.toString() ?? '';
+    final empresa     = d['empresa']?.toString() ?? '';
+    final categoria   = d['categoria']?.toString() ?? 'Otro';
     final descripcion = kLang == 'en'
-      ? (data['descripcionEN']?.toString() ?? data['descripcion']?.toString() ?? '')
-      : (data['descripcion']?.toString() ?? '');
-    final whatsapp = data['whatsapp']?.toString() ?? '';
-    final idiomas = kLang == 'en'
-      ? (data['idiomasEN']?.toString() ?? data['idiomas']?.toString() ?? '')
-      : (data['idiomas']?.toString() ?? '');
-    final emoji = data['emoji']?.toString() ?? '🛎️';
-    final logoAsset = data['logoAsset']?.toString();
-    final colorHex = data['color']?.toString() ?? '#1B6B3A';
+      ? (d['descripcionEN']?.toString() ?? d['descripcion']?.toString() ?? '')
+      : (d['descripcion']?.toString() ?? '');
+    final whatsapp    = d['whatsapp']?.toString() ?? '';
+    final urlExterna  = d['urlExterna']?.toString() ?? '';
+    final idiomas     = kLang == 'en'
+      ? (d['idiomasEN']?.toString() ?? d['idiomas']?.toString() ?? '')
+      : (d['idiomas']?.toString() ?? '');
+    final direccion   = d['direccion']?.toString() ?? '';
+    final comoLlegar  = kLang == 'en'
+      ? (d['comoLlegarEN']?.toString() ?? d['comoLlegar']?.toString() ?? '')
+      : (d['comoLlegar']?.toString() ?? '');
+    final mapsQuery   = d['mapsQuery']?.toString() ?? direccion;
+    final emoji       = d['emoji']?.toString() ?? '🛎️';
+    final logoAsset   = d['logoAsset']?.toString();
     Color color;
-    try {
-      color = Color(int.parse(colorHex.replaceAll('#', '0xFF')));
-    } catch (_) {
-      color = RDSColor.green;
-    }
+    try { color = Color(int.parse((d['color']?.toString() ?? '#1B6B3A').replaceAll('#', '0xFF'))); }
+    catch (_) { color = _colorDeCat(categoria); }
+
+    // Badge de categoría
+    final cat = kCategoriaServicio.firstWhere((c) => c.id == categoria, orElse: () => kCategoriaServicio.last);
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 14),
-      padding: const EdgeInsets.all(16),
+      margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
         color: RDSColor.card, borderRadius: BorderRadius.circular(16),
         border: Border.all(color: color.withOpacity(0.25))),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Row(children: [
-          Container(
-            width: 56, height: 56,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: color == const Color(0xFFFFD000) ? Colors.black : Colors.white,
-              border: Border.all(color: color.withOpacity(0.4), width: 1.5),
-              boxShadow: [BoxShadow(color: color.withOpacity(0.20), blurRadius: 8)]),
-            child: ClipOval(child: logoAsset != null
-              ? Padding(
-                  padding: const EdgeInsets.all(6),
-                  child: Image.asset(logoAsset, fit: BoxFit.contain, width: 44, height: 44,
-                    errorBuilder: (_, __, ___) => Center(child: Text(emoji, style: const TextStyle(fontSize: 22)))))
-              : Center(child: Text(emoji, style: const TextStyle(fontSize: 22))))),
-          const SizedBox(width: 12),
-          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(nombre, style: const TextStyle(color: RDSColor.textPrimary, fontSize: 14, fontWeight: FontWeight.w800)),
-            Text(empresa, style: TextStyle(color: color, fontSize: 11, fontWeight: FontWeight.w700)),
+
+        // ── Banner superior con badge de categoría ──
+        Container(
+          padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
+          decoration: BoxDecoration(
+            color: color.withOpacity(0.07),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(15))),
+          child: Row(children: [
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              decoration: BoxDecoration(
+                color: cat.color.withOpacity(0.15),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: cat.color.withOpacity(0.4))),
+              child: Text('${cat.emoji}  ${kLang == "en" ? cat.labelEN : cat.label}',
+                style: TextStyle(color: cat.color, fontSize: 10, fontWeight: FontWeight.w800, letterSpacing: 0.5))),
+            const Spacer(),
+            if (idiomas.isNotEmpty)
+              Text(idiomas, style: TextStyle(color: RDSColor.textMuted.withOpacity(0.55), fontSize: 10)),
           ])),
-        ]),
-        const SizedBox(height: 10),
-        if (idiomas.isNotEmpty)
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-            decoration: BoxDecoration(
-              color: color.withOpacity(0.08), borderRadius: BorderRadius.circular(8)),
-            child: Text(idiomas, style: TextStyle(color: color, fontSize: 11, fontWeight: FontWeight.w700))),
-        const SizedBox(height: 10),
-        if (descripcion.isNotEmpty)
-          Text(descripcion, style: TextStyle(color: RDSColor.textMuted.withOpacity(0.85), fontSize: 12, height: 1.5)),
-        const SizedBox(height: 14),
-        if (whatsapp.isNotEmpty)
-          GestureDetector(
-            onTap: () => _abrirWhatsApp(whatsapp, context),
-            child: Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(vertical: 12),
-              decoration: BoxDecoration(
-                color: const Color(0xFF25D366).withOpacity(0.12),
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: const Color(0xFF25D366).withOpacity(0.4))),
-              child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-                const Text('💬', style: TextStyle(fontSize: 16)),
-                const SizedBox(width: 8),
-                Text(t('Contactar por WhatsApp', 'Contact via WhatsApp'),
-                  style: const TextStyle(color: Color(0xFF25D366), fontSize: 13, fontWeight: FontWeight.w800)),
-              ])))
-        else if (empresa == 'Whoosh')
-          GestureDetector(
-            onTap: () async {
-              final uri = Uri.parse('https://whoosh.bike/es_la');
-              if (await canLaunchUrl(uri)) {
-                await launchUrl(uri, mode: LaunchMode.externalApplication);
-              }
-            },
-            child: Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(vertical: 12),
-              decoration: BoxDecoration(
-                color: const Color(0xFFFFD000).withOpacity(0.12),
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: const Color(0xFFFFD000).withOpacity(0.5))),
-              child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-                const Text('🛴', style: TextStyle(fontSize: 16)),
-                const SizedBox(width: 8),
-                Text(t('Ver app en whoosh.bike', 'Get app at whoosh.bike'),
-                  style: const TextStyle(color: Color(0xFFFFD000), fontSize: 13, fontWeight: FontWeight.w800)),
-              ]))),
+
+        // ── Cuerpo ──
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+
+            // Logo + nombre
+            Row(children: [
+              Container(
+                width: 52, height: 52,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: color == const Color(0xFFFFD000) ? Colors.black : Colors.white,
+                  border: Border.all(color: color.withOpacity(0.4), width: 1.5),
+                  boxShadow: [BoxShadow(color: color.withOpacity(0.18), blurRadius: 8)]),
+                child: ClipOval(child: logoAsset != null
+                  ? Padding(padding: const EdgeInsets.all(5),
+                      child: Image.asset(logoAsset, fit: BoxFit.contain,
+                        errorBuilder: (_, __, ___) => Center(child: Text(emoji, style: const TextStyle(fontSize: 22)))))
+                  : Center(child: Text(emoji, style: const TextStyle(fontSize: 22))))),
+              const SizedBox(width: 12),
+              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text(nombre, style: const TextStyle(color: RDSColor.textPrimary, fontSize: 14, fontWeight: FontWeight.w800)),
+                Text(empresa, style: TextStyle(color: color, fontSize: 11, fontWeight: FontWeight.w700)),
+              ])),
+            ]),
+
+            if (descripcion.isNotEmpty) ...[
+              const SizedBox(height: 10),
+              Text(descripcion, style: TextStyle(color: RDSColor.textMuted.withOpacity(0.85), fontSize: 12, height: 1.5)),
+            ],
+
+            // ── Dirección ──
+            if (direccion.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                const Text('📍', style: TextStyle(fontSize: 13)),
+                const SizedBox(width: 6),
+                Expanded(child: Text(direccion,
+                  style: TextStyle(color: RDSColor.textMuted.withOpacity(0.8), fontSize: 11, height: 1.4))),
+              ]),
+            ],
+
+            // ── Cómo llegar ──
+            if (comoLlegar.isNotEmpty) ...[
+              const SizedBox(height: 6),
+              Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                const Text('🗺️', style: TextStyle(fontSize: 13)),
+                const SizedBox(width: 6),
+                Expanded(child: Text(comoLlegar,
+                  style: TextStyle(color: RDSColor.textMuted.withOpacity(0.7), fontSize: 11, height: 1.4))),
+              ]),
+            ],
+
+            const SizedBox(height: 14),
+
+            // ── Botones de acción ──
+            Row(children: [
+              // WhatsApp
+              if (whatsapp.isNotEmpty)
+                Expanded(child: GestureDetector(
+                  onTap: () => _abrirWhatsApp(whatsapp),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(vertical: 11),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF25D366).withOpacity(0.10),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: const Color(0xFF25D366).withOpacity(0.4))),
+                    child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                      const Text('💬', style: TextStyle(fontSize: 15)),
+                      const SizedBox(width: 6),
+                      Text(t('WhatsApp', 'WhatsApp'),
+                        style: const TextStyle(color: Color(0xFF25D366), fontSize: 12, fontWeight: FontWeight.w800)),
+                    ])))),
+
+              // URL externa (ej. Whoosh)
+              if (urlExterna.isNotEmpty)
+                Expanded(child: GestureDetector(
+                  onTap: () => _abrirUrl(urlExterna),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(vertical: 11),
+                    decoration: BoxDecoration(
+                      color: color.withOpacity(0.10),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: color.withOpacity(0.4))),
+                    child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                      const Text('🌐', style: TextStyle(fontSize: 15)),
+                      const SizedBox(width: 6),
+                      Text(t('Ver sitio', 'Visit site'),
+                        style: TextStyle(color: color, fontSize: 12, fontWeight: FontWeight.w800)),
+                    ])))),
+
+              // Cómo llegar → Google Maps
+              if (mapsQuery.isNotEmpty) ...[
+                if (whatsapp.isNotEmpty || urlExterna.isNotEmpty) const SizedBox(width: 8),
+                Expanded(child: GestureDetector(
+                  onTap: () => _abrirMaps(mapsQuery),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(vertical: 11),
+                    decoration: BoxDecoration(
+                      color: RDSColor.gold.withOpacity(0.08),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: RDSColor.gold.withOpacity(0.35))),
+                    child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                      const Text('📍', style: TextStyle(fontSize: 15)),
+                      const SizedBox(width: 6),
+                      Text(t('Cómo llegar', 'Get there'),
+                        style: const TextStyle(color: RDSColor.gold, fontSize: 12, fontWeight: FontWeight.w800)),
+                    ])))),
+              ],
+            ]),
+          ])),
       ]));
   }
 
@@ -5149,111 +5285,162 @@ class ServiciosScreen extends StatelessWidget {
     return Scaffold(
       backgroundColor: RDSColor.base,
       body: Column(children: [
+
+        // ── AppBar ──────────────────────────────────────────────────────
         Container(
           decoration: BoxDecoration(
             color: RDSColor.base,
             border: Border(bottom: BorderSide(color: RDSColor.gold.withOpacity(0.1)))),
           child: SafeArea(bottom: false, child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 12, 20, 18),
-            child: Row(children: [
-              GestureDetector(onTap: () => Navigator.pop(context),
-                child: Container(width: 36, height: 36,
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.06), shape: BoxShape.circle,
-                    border: Border.all(color: RDSColor.gold.withOpacity(0.2))),
-                  child: const Center(child: Icon(Icons.arrow_back_ios_new_rounded, color: RDSColor.textPrimary, size: 18)))),
-              const SizedBox(width: 12),
-              Expanded(child: Text(t('Servicios para viajeros', 'Traveler services'),
-                style: const TextStyle(fontFamily: 'PlayfairDisplay',
-                  fontSize: 18, fontWeight: FontWeight.w900, color: RDSColor.textPrimary))),
-              const Text('🛎️', style: TextStyle(fontSize: 20)),
-            ])))),
-        Expanded(child: ListView(
-          padding: const EdgeInsets.fromLTRB(20, 16, 20, 40),
-          children: [
-            Text(t('Servicios verificados por Rutero MDE', 'Services verified by Rutero MDE'),
-              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w900,
-                color: RDSColor.textMuted, letterSpacing: 1.5)),
-            const SizedBox(height: 4),
-            Text(t('Contacta directamente por WhatsApp — di que vienes de Rutero MDE',
-                'Contact directly via WhatsApp — mention you come from Rutero MDE'),
-              style: TextStyle(color: RDSColor.textMuted.withOpacity(0.6), fontSize: 11)),
-            const SizedBox(height: 16),
-            // Leer de Firestore, con fallback a datos hardcodeados
-            StreamBuilder<QuerySnapshot>(
-              stream: FirebaseFirestore.instance
-                .collection('serviciosViajero')
-                .where('activo', isEqualTo: true)
-                .snapshots(),
-              builder: (ctx, snap) {
-                // Mientras carga o si Firestore está vacío → usar hardcodeados
-                final List<Map<String, dynamic>> items = [];
-                if (snap.hasData && snap.data!.docs.isNotEmpty) {
-                  for (final doc in snap.data!.docs) {
-                    items.add(doc.data() as Map<String, dynamic>);
-                  }
-                } else {
-                  // Fallback a hardcodeados
-                  for (final s in kServiciosViajero) {
-                    items.add({
-                      'nombre': s.nombre, 'empresa': s.empresa,
-                      'descripcion': s.descripcion, 'descripcionEN': s.descripcionEN,
-                      'whatsapp': s.whatsapp, 'emoji': s.emoji,
-                      'logoAsset': s.logoAsset, 'idiomas': s.idiomas, 'idiomasEN': s.idiomasEN,
-                      'color': '#${s.color.value.toRadixString(16).substring(2).toUpperCase()}',
-                    });
-                  }
-                }
-                return Column(children: items.map((d) => _buildCard(d, context)).toList());
-              }),
-            const SizedBox(height: 24),
-            // ── Banner reclutamiento de servicios ──────────────────────────
-            GestureDetector(
-              onTap: () async {
-                final uri = Uri.parse('mailto:paulflopezp@gmail.com?subject=Quiero%20ofrecer%20un%20servicio%20en%20Rutero%20MDE');
-                if (await canLaunchUrl(uri)) {
-                  await launchUrl(uri, mode: LaunchMode.externalApplication);
-                }
-              },
-              child: Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(18),
-                decoration: BoxDecoration(
-                  color: RDSColor.card,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: RDSColor.gold.withOpacity(0.35)),
-                  gradient: LinearGradient(
-                    colors: [RDSColor.gold.withOpacity(0.06), RDSColor.card],
-                    begin: Alignment.topLeft, end: Alignment.bottomRight)),
-                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Row(children: [
-                    const Text('🤝', style: TextStyle(fontSize: 22)),
-                    const SizedBox(width: 10),
-                    Expanded(child: Text(
-                      t('¿Tenés un servicio para viajeros?', 'Do you offer a traveler service?'),
-                      style: const TextStyle(color: RDSColor.gold, fontSize: 14, fontWeight: FontWeight.w900))),
-                  ]),
-                  const SizedBox(height: 8),
-                  Text(
-                    t('Si ofrecés transporte, guías, hospedaje u otros servicios para turistas en Medellín, contáctanos. Queremos conectarte con viajeros de todo el mundo.',
-                      'If you offer transport, guides, accommodation or other traveler services in Medellín, reach out. We want to connect you with travelers from around the world.'),
-                    style: TextStyle(color: RDSColor.textMuted.withOpacity(0.8), fontSize: 12, height: 1.5)),
-                  const SizedBox(height: 12),
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.symmetric(vertical: 11),
+            padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Row(children: [
+                GestureDetector(onTap: () => Navigator.pop(context),
+                  child: Container(width: 36, height: 36,
                     decoration: BoxDecoration(
-                      color: RDSColor.gold.withOpacity(0.12),
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: RDSColor.gold.withOpacity(0.4))),
-                    child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-                      const Text('✉️', style: TextStyle(fontSize: 15)),
-                      const SizedBox(width: 8),
-                      Text(t('Contáctanos — paulflopezp@gmail.com', 'Contact us — paulflopezp@gmail.com'),
-                        style: const TextStyle(color: RDSColor.gold, fontSize: 12, fontWeight: FontWeight.w800)),
-                    ])),
-                ]))),
-          ])),
+                      color: Colors.white.withOpacity(0.06), shape: BoxShape.circle,
+                      border: Border.all(color: RDSColor.gold.withOpacity(0.2))),
+                    child: const Center(child: Icon(Icons.arrow_back_ios_new_rounded, color: RDSColor.textPrimary, size: 18)))),
+                const SizedBox(width: 12),
+                Expanded(child: Text(t('Servicios para viajeros', 'Traveler services'),
+                  style: const TextStyle(fontFamily: 'PlayfairDisplay',
+                    fontSize: 18, fontWeight: FontWeight.w900, color: RDSColor.textPrimary))),
+                const Text('🛎️', style: TextStyle(fontSize: 20)),
+              ]),
+              const SizedBox(height: 12),
+
+              // ── Chips de categoría ──
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(children: kCategoriaServicio.map((cat) {
+                  final activo = _catActiva == cat.id;
+                  return Padding(
+                    padding: const EdgeInsets.only(right: 8, bottom: 12),
+                    child: GestureDetector(
+                      onTap: () => setState(() => _catActiva = cat.id),
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 180),
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                        decoration: BoxDecoration(
+                          color: activo ? cat.color : cat.color.withOpacity(0.08),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(color: activo ? cat.color : cat.color.withOpacity(0.3))),
+                        child: Text('${cat.emoji}  ${kLang == "en" ? cat.labelEN : cat.label}',
+                          style: TextStyle(
+                            color: activo ? Colors.white : cat.color,
+                            fontSize: 11, fontWeight: FontWeight.w700)))));
+                }).toList())),
+            ])))),
+
+        // ── Lista de servicios ───────────────────────────────────────────
+        Expanded(child: StreamBuilder<QuerySnapshot>(
+          stream: FirebaseFirestore.instance
+            .collection('serviciosViajero')
+            .where('activo', isEqualTo: true)
+            .snapshots(),
+          builder: (ctx, snap) {
+            // Construir lista desde Firestore o fallback hardcodeado
+            List<Map<String, dynamic>> todos = [];
+            if (snap.hasData && snap.data!.docs.isNotEmpty) {
+              for (final doc in snap.data!.docs) {
+                todos.add(doc.data() as Map<String, dynamic>);
+              }
+            } else {
+              for (final s in kServiciosViajero) {
+                todos.add({
+                  'nombre': s.nombre, 'empresa': s.empresa,
+                  'categoria': s.categoria,
+                  'descripcion': s.descripcion, 'descripcionEN': s.descripcionEN,
+                  'whatsapp': s.whatsapp, 'urlExterna': s.urlExterna,
+                  'emoji': s.emoji, 'logoAsset': s.logoAsset,
+                  'idiomas': s.idiomas, 'idiomasEN': s.idiomasEN,
+                  'direccion': s.direccion,
+                  'comoLlegar': s.comoLlegar, 'comoLlegarEN': s.comoLlegarEN,
+                  'mapsQuery': s.mapsQuery,
+                  'color': '#${s.color.value.toRadixString(16).substring(2).toUpperCase()}',
+                });
+              }
+            }
+
+            // Filtrar por categoría activa
+            final filtrados = _catActiva == 'Todos'
+              ? todos
+              : todos.where((d) => (d['categoria']?.toString() ?? 'Otro') == _catActiva).toList();
+
+            return ListView(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 40),
+              children: [
+                Text(t('Servicios verificados por Rutero MDE', 'Services verified by Rutero MDE'),
+                  style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w900,
+                    color: RDSColor.textMuted, letterSpacing: 1.5)),
+                const SizedBox(height: 4),
+                Text(t('Di que vienes de Rutero MDE al contactar', 'Mention Rutero MDE when you reach out'),
+                  style: TextStyle(color: RDSColor.textMuted.withOpacity(0.55), fontSize: 11)),
+                const SizedBox(height: 16),
+
+                if (filtrados.isEmpty)
+                  Container(
+                    padding: const EdgeInsets.symmetric(vertical: 40),
+                    child: Column(children: [
+                      const Text('🔍', style: TextStyle(fontSize: 36)),
+                      const SizedBox(height: 12),
+                      Text(t('Sin servicios en esta categoría', 'No services in this category'),
+                        style: const TextStyle(color: RDSColor.textMuted, fontSize: 14, fontWeight: FontWeight.w700)),
+                      const SizedBox(height: 4),
+                      Text(t('Pronto agregaremos más aliados', 'We\'ll add more partners soon'),
+                        style: TextStyle(color: RDSColor.textMuted.withOpacity(0.5), fontSize: 12)),
+                    ]))
+                else
+                  ...filtrados.map((d) => _buildCard(d)),
+
+                const SizedBox(height: 8),
+
+                // ── Banner "quiero ser aliado" ──────────────────────────
+                GestureDetector(
+                  onTap: () async {
+                    final uri = Uri.parse('mailto:paulflopezp@gmail.com?subject=${Uri.encodeComponent("Quiero ofrecer un servicio en Rutero MDE")}');
+                    if (await canLaunchUrl(uri)) await launchUrl(uri, mode: LaunchMode.externalApplication);
+                  },
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(18),
+                    decoration: BoxDecoration(
+                      color: RDSColor.card,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: RDSColor.gold.withOpacity(0.35)),
+                      gradient: LinearGradient(
+                        colors: [RDSColor.gold.withOpacity(0.06), RDSColor.card],
+                        begin: Alignment.topLeft, end: Alignment.bottomRight)),
+                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      Row(children: [
+                        const Text('🤝', style: TextStyle(fontSize: 22)),
+                        const SizedBox(width: 10),
+                        Expanded(child: Text(
+                          t('¿Tenés un servicio para viajeros?', 'Do you offer a traveler service?'),
+                          style: const TextStyle(color: RDSColor.gold, fontSize: 14, fontWeight: FontWeight.w900))),
+                      ]),
+                      const SizedBox(height: 8),
+                      Text(
+                        t('Transporte, guías, hospedaje, belleza u otros servicios para turistas — contáctanos y conectate con viajeros de todo el mundo.',
+                          'Transport, guides, lodging, beauty or other traveler services — reach out and connect with travelers from around the world.'),
+                        style: TextStyle(color: RDSColor.textMuted.withOpacity(0.8), fontSize: 12, height: 1.5)),
+                      const SizedBox(height: 12),
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(vertical: 11),
+                        decoration: BoxDecoration(
+                          color: RDSColor.gold.withOpacity(0.12),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: RDSColor.gold.withOpacity(0.4))),
+                        child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                          const Text('✉️', style: TextStyle(fontSize: 15)),
+                          const SizedBox(width: 8),
+                          Text(t('Contáctanos — paulflopezp@gmail.com', 'Contact us — paulflopezp@gmail.com'),
+                            style: const TextStyle(color: RDSColor.gold, fontSize: 12, fontWeight: FontWeight.w800)),
+                        ])),
+                    ]))),
+              ]);
+          })),
       ]));
   }
 }
@@ -5497,7 +5684,7 @@ class _PlannerScreenState extends State<PlannerScreen> {
     // Hotel partner — priorizar rutas del hotel en Felo
     final hotelPartner = await HotelPartnerService.getHotelActivo();
     final hotelStr = hotelPartner != null
-      ? '\n- El turista se hospeda en \${hotelPartner.nombre} (zona \${hotelPartner.zona}). Priorizar rutas cercanas: \${hotelPartner.rutasDestacadas.join(", ")}.'
+      ? '\n- El turista se hospeda en ${hotelPartner.nombre} (zona ${hotelPartner.zona}). Priorizar rutas cercanas a su zona: ${hotelPartner.rutasDestacadas.join(", ")}.'
       : '';
 
     final familiarStr    = _compania == 'Familia'
@@ -6363,14 +6550,19 @@ class _PlannerLoadingScreenState extends State<_PlannerLoadingScreen>
         Uri.parse('https://planneriav2-u2yk2c4v7a-uc.a.run.app'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({'prompt': widget.prompt}),
-      );
+      ).timeout(const Duration(seconds: 90));
 
       if (!mounted) return;
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         final text = data['result'] as String;
-        final clean = text.replaceAll(RegExp(r'```json|```'), '').trim();
+        debugPrint('plannerIA raw (primeros 500): ${text.substring(0, text.length > 500 ? 500 : text.length)}');
+        // Extraer JSON robusto: buscar primer { y último }
+        final start = text.indexOf('{');
+        final end = text.lastIndexOf('}');
+        if (start == -1 || end == -1 || end <= start) throw FormatException('No JSON found — texto: ${text.substring(0, text.length > 200 ? 200 : text.length)}');
+        final clean = text.substring(start, end + 1);
         final parsed = jsonDecode(clean) as Map<String, dynamic>;
         if (mounted) Navigator.of(context).pop(parsed);
       } else {
@@ -6383,6 +6575,7 @@ class _PlannerLoadingScreenState extends State<_PlannerLoadingScreen>
         }
       }
     } catch (e) {
+      debugPrint('plannerIA error: $e');
       if (mounted) {
         Navigator.of(context).pop(null);
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
@@ -8395,7 +8588,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> with SingleTickerProvider
 
   Future<void> _detectarCiudadWelcome() async {
     final ciudad = await detectarCiudadActual();
-    if (mounted) setState(() => _ciudadWelcome = ciudad);
+    if (mounted) setState(() => _ciudadWelcome = ciudad ?? kCiudadesRegistradas[0]);
   }
 
   @override
@@ -8943,8 +9136,26 @@ const Map<String, HotelPartner> kHotelesPartner = {
     bienvenidaEN: 'Hello! Thanks for visiting Pergamino. Explore Laureles with Rutero MDE.',
   ),
 
-  // ── SLOT LIBRE — para siguiente aliado ──
-  // Agregar aquí cuando se confirme el próximo hotel
+  // ── CASA PATIO MEDELLÍN (El Poblado — demo) ──
+  'CASAPATIO2026': HotelPartner(
+    id: 'casa_patio',
+    nombre: 'Hotel Casa Patio Medellín',
+    nombreCorto: 'Casa Patio',
+    codigo: 'CASAPATIO2026',
+    zona: 'El Poblado',
+    colorPrimario: Color(0xFF2D5A3D),
+    rutasDestacadas: [
+      'HUELLAS VIVAS DE EL POBLADO',
+      'ENTRE SABORES RISAS Y MIL COLORES',
+      'METROCABLE COMUNAS',
+      'NOCHE EN EL POBLADO',
+      'VIVE LAURELES',
+    ],
+    bienvenida: '¡Bienvenido a Casa Patio! Medellín tiene mucho por descubrir — te armamos las mejores rutas. Pregúntanos en recepción.',
+    bienvenidaEN: 'Welcome to Casa Patio! Medellín is yours to explore — we\'ve picked the best routes for you. Ask us at the front desk.',
+  ),
+
+  // ── SLOT LIBRE — para siguiente aliado confirmado ──
 };
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -9271,6 +9482,514 @@ class HotelBienvenidaScreen extends StatelessWidget {
   }
 }
 
+// ══════════════════════════════════════════════════════════════════════════════
+//  PANTALLA: HOTELES PARTNER
+//  Directorio de hoteles aliados — el turista busca su hotel y solicita el código
+// ══════════════════════════════════════════════════════════════════════════════
+class HotelesPartnerScreen extends StatefulWidget {
+  const HotelesPartnerScreen({super.key});
+
+  @override
+  State<HotelesPartnerScreen> createState() => _HotelesPartnerScreenState();
+}
+
+class _HotelesPartnerScreenState extends State<HotelesPartnerScreen> {
+  String _busqueda = '';
+  HotelPartner? _hotelActivo;
+
+  @override
+  void initState() {
+    super.initState();
+    HotelPartnerService.getHotelActivo().then((h) {
+      if (mounted) setState(() => _hotelActivo = h);
+    }).catchError((_) {});
+  }
+
+  List<HotelPartner> get _hotelesFiltrados {
+    final todos = kHotelesPartner.values.where((h) => h.activo).toList();
+    if (_busqueda.isEmpty) return todos;
+    final q = _busqueda.toLowerCase();
+    return todos.where((h) =>
+      h.nombre.toLowerCase().contains(q) ||
+      h.zona.toLowerCase().contains(q)
+    ).toList();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: RDSColor.base,
+      appBar: AppBar(
+        backgroundColor: RDSColor.base,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_rounded, color: RDSColor.textPrimary, size: 20),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: Text(
+          t('Hoteles Partner', 'Partner Hotels'),
+          style: RDSType.headlineMd,
+        ),
+        centerTitle: false,
+      ),
+      body: Column(
+        children: [
+          // ── Barra de búsqueda ──────────────────────────────────────
+          Padding(
+            padding: const EdgeInsets.fromLTRB(RDSSpace.lg, 0, RDSSpace.lg, RDSSpace.md),
+            child: Container(
+              decoration: BoxDecoration(
+                color: RDSColor.card,
+                borderRadius: RDSRadius.bMd,
+                border: Border.all(color: Colors.white.withOpacity(0.07)),
+              ),
+              child: TextField(
+                onChanged: (v) => setState(() => _busqueda = v),
+                style: RDSType.bodyMd,
+                decoration: InputDecoration(
+                  hintText: t('Buscar hotel o zona…', 'Search hotel or area…'),
+                  hintStyle: TextStyle(color: RDSColor.textMuted, fontSize: 14),
+                  prefixIcon: const Icon(Icons.search_rounded, color: RDSColor.textMuted, size: 20),
+                  border: InputBorder.none,
+                  contentPadding: const EdgeInsets.symmetric(vertical: 14),
+                ),
+              ),
+            ),
+          ),
+
+          // ── Hotel activo (si tiene uno) ────────────────────────────
+          if (_hotelActivo != null)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(RDSSpace.lg, 0, RDSSpace.lg, RDSSpace.md),
+              child: Container(
+                padding: const EdgeInsets.all(RDSSpace.md),
+                decoration: BoxDecoration(
+                  color: _hotelActivo!.colorPrimario.withOpacity(0.12),
+                  borderRadius: RDSRadius.bMd,
+                  border: Border.all(color: _hotelActivo!.colorPrimario.withOpacity(0.35)),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.hotel_rounded, color: _hotelActivo!.colorPrimario, size: 22),
+                    const SizedBox(width: RDSSpace.sm),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            t('Tu hotel activo', 'Your active hotel'),
+                            style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600,
+                              letterSpacing: 1.2, color: _hotelActivo!.colorPrimario),
+                          ),
+                          Text(_hotelActivo!.nombre, style: RDSType.headlineMd),
+                        ],
+                      ),
+                    ),
+                    GestureDetector(
+                      onTap: () async {
+                        await HotelPartnerService.limpiar();
+                        if (mounted) setState(() => _hotelActivo = null);
+                      },
+                      child: Icon(Icons.close_rounded, color: RDSColor.textMuted, size: 18),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
+          // ── Lista de hoteles ───────────────────────────────────────
+          Expanded(
+            child: _hotelesFiltrados.isEmpty
+              ? Center(
+                  child: Text(
+                    t('Sin resultados', 'No results'),
+                    style: TextStyle(color: RDSColor.textMuted),
+                  ),
+                )
+              : ListView.builder(
+                  padding: const EdgeInsets.fromLTRB(
+                    RDSSpace.lg, 0, RDSSpace.lg, RDSSpace.xl),
+                  itemCount: _hotelesFiltrados.length + 1,
+                  itemBuilder: (ctx, i) {
+                    if (i == _hotelesFiltrados.length) {
+                      // Pie de lista — CTA para nuevos hoteles
+                      return Padding(
+                        padding: const EdgeInsets.only(top: RDSSpace.xl),
+                        child: Column(
+                          children: [
+                            Container(
+                              width: 40, height: 1,
+                              color: Colors.white.withOpacity(0.08),
+                              margin: const EdgeInsets.only(bottom: RDSSpace.lg),
+                            ),
+                            Icon(Icons.business_rounded,
+                              color: RDSColor.textMuted, size: 28),
+                            const SizedBox(height: RDSSpace.sm),
+                            Text(
+                              t('¿Tu hotel no está aquí?', 'Is your hotel not listed?'),
+                              style: RDSType.headlineMd,
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              t(
+                                'Pedile a recepción que se sume a Rutero.',
+                                'Ask the front desk to join Rutero.',
+                              ),
+                              style: TextStyle(
+                                color: RDSColor.textMuted, fontSize: 13),
+                              textAlign: TextAlign.center,
+                            ),
+                            const SizedBox(height: RDSSpace.md),
+                            GestureDetector(
+                              onTap: () async {
+                                final uri = Uri.parse(
+                                  'https://wa.me/573194840611?text=${Uri.encodeComponent(
+                                    t(
+                                      'Hola, quiero sumarme como hotel partner de Rutero MDE',
+                                      'Hi, I want to join as a hotel partner of Rutero MDE',
+                                    )
+                                  )}'
+                                );
+                                // ignore: deprecated_member_use
+                                await launchUrl(uri, mode: LaunchMode.externalApplication);
+                              },
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: RDSSpace.lg, vertical: RDSSpace.sm + 2),
+                                decoration: BoxDecoration(
+                                  border: Border.all(color: RDSColor.gold.withOpacity(0.5)),
+                                  borderRadius: RDSRadius.bMd,
+                                ),
+                                child: Text(
+                                  t('CONTACTAR A RUTERO', 'CONTACT RUTERO'),
+                                  style: const TextStyle(
+                                    fontFamily: 'SpaceGrotesk',
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w700,
+                                    letterSpacing: 1.4,
+                                    color: RDSColor.gold,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    }
+
+                    final hotel = _hotelesFiltrados[i];
+                    final esActivo = _hotelActivo?.id == hotel.id;
+
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: RDSSpace.sm),
+                      child: GestureDetector(
+                        onTap: () => _mostrarDetalleHotel(hotel),
+                        child: Container(
+                          padding: const EdgeInsets.all(RDSSpace.md),
+                          decoration: BoxDecoration(
+                            color: esActivo
+                              ? hotel.colorPrimario.withOpacity(0.1)
+                              : RDSColor.card,
+                            borderRadius: RDSRadius.bMd,
+                            border: Border.all(
+                              color: esActivo
+                                ? hotel.colorPrimario.withOpacity(0.4)
+                                : Colors.white.withOpacity(0.06),
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              // Ícono / avatar del hotel
+                              Container(
+                                width: 48,
+                                height: 48,
+                                decoration: BoxDecoration(
+                                  color: hotel.colorPrimario.withOpacity(0.15),
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Icon(
+                                  Icons.hotel_rounded,
+                                  color: hotel.colorPrimario,
+                                  size: 24,
+                                ),
+                              ),
+                              const SizedBox(width: RDSSpace.md),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(hotel.nombre,
+                                      style: RDSType.headlineMd,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis),
+                                    const SizedBox(height: 2),
+                                    Row(
+                                      children: [
+                                        Icon(Icons.location_on_rounded,
+                                          size: 11, color: RDSColor.textMuted),
+                                        const SizedBox(width: 3),
+                                        Text(hotel.zona,
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            color: RDSColor.textMuted)),
+                                        if (esActivo) ...[
+                                          const SizedBox(width: 8),
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 6, vertical: 1),
+                                            decoration: BoxDecoration(
+                                              color: hotel.colorPrimario.withOpacity(0.2),
+                                              borderRadius: BorderRadius.circular(4),
+                                            ),
+                                            child: Text(
+                                              t('ACTIVO', 'ACTIVE'),
+                                              style: TextStyle(
+                                                fontSize: 9, fontWeight: FontWeight.w700,
+                                                letterSpacing: 0.8,
+                                                color: hotel.colorPrimario),
+                                            ),
+                                          ),
+                                        ],
+                                      ],
+                                    ),
+                                    const SizedBox(height: 6),
+                                    // Rutas destacadas (chips pequeños)
+                                    Wrap(
+                                      spacing: 4, runSpacing: 4,
+                                      children: hotel.rutasDestacadas.take(2).map((r) =>
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 6, vertical: 2),
+                                          decoration: BoxDecoration(
+                                            color: Colors.white.withOpacity(0.05),
+                                            borderRadius: BorderRadius.circular(4),
+                                          ),
+                                          child: Text(
+                                            r,
+                                            style: const TextStyle(
+                                              fontSize: 9, color: RDSColor.textMuted,
+                                              fontWeight: FontWeight.w500),
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ),
+                                      ).toList(),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(width: RDSSpace.sm),
+                              Icon(Icons.chevron_right_rounded,
+                                color: RDSColor.textMuted, size: 20),
+                            ],
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _mostrarDetalleHotel(HotelPartner hotel) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (_) => _HotelDetalleSheet(
+        hotel: hotel,
+        esActivo: _hotelActivo?.id == hotel.id,
+        onActivar: () async {
+          final exito = await HotelPartnerService.activarCodigo(hotel.codigo);
+          if (!exito || !mounted) return;
+          final h = await HotelPartnerService.getHotelActivo();
+          if (!mounted) return;
+          setState(() => _hotelActivo = h);
+          Navigator.pop(context); // Cierra el sheet
+          // Mostrar bienvenida
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.remove('rutero_hotel_bienvenida_mostrada');
+          if (!mounted) return;
+          Navigator.push(context, MaterialPageRoute(
+            builder: (_) => HotelBienvenidaScreen(
+              hotel: hotel,
+              onContinuar: () => Navigator.pop(context),
+            ),
+          ));
+        },
+      ),
+    );
+  }
+}
+
+// ── Bottom sheet de detalle de hotel ─────────────────────────────────────────
+class _HotelDetalleSheet extends StatelessWidget {
+  final HotelPartner hotel;
+  final bool esActivo;
+  final VoidCallback onActivar;
+
+  const _HotelDetalleSheet({
+    required this.hotel,
+    required this.esActivo,
+    required this.onActivar,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: RDSColor.base,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: Colors.white.withOpacity(0.08)),
+      ),
+      child: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.all(RDSSpace.xl),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Handle
+              Center(
+                child: Container(
+                  width: 36, height: 4,
+                  margin: const EdgeInsets.only(bottom: RDSSpace.lg),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.15),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              // Header
+              Row(
+                children: [
+                  Container(
+                    width: 56, height: 56,
+                    decoration: BoxDecoration(
+                      color: hotel.colorPrimario.withOpacity(0.15),
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: Icon(Icons.hotel_rounded,
+                      color: hotel.colorPrimario, size: 28),
+                  ),
+                  const SizedBox(width: RDSSpace.md),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(hotel.nombre, style: RDSType.displayMd),
+                        Row(
+                          children: [
+                            Icon(Icons.location_on_rounded,
+                              size: 12, color: RDSColor.textMuted),
+                            const SizedBox(width: 3),
+                            Text(hotel.zona,
+                              style: TextStyle(
+                                fontSize: 13, color: RDSColor.textMuted)),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: RDSSpace.lg),
+              // Mensaje de bienvenida
+              Container(
+                padding: const EdgeInsets.all(RDSSpace.md),
+                decoration: BoxDecoration(
+                  color: hotel.colorPrimario.withOpacity(0.08),
+                  borderRadius: RDSRadius.bMd,
+                  border: Border.all(color: hotel.colorPrimario.withOpacity(0.2)),
+                ),
+                child: Text(
+                  kLang == 'en' ? hotel.bienvenidaEN : hotel.bienvenida,
+                  style: RDSType.bodyMd.copyWith(height: 1.55),
+                ),
+              ),
+              const SizedBox(height: RDSSpace.lg),
+              // Rutas destacadas
+              Text(
+                t('RUTAS RECOMENDADAS', 'RECOMMENDED ROUTES'),
+                style: const TextStyle(
+                  fontFamily: 'SpaceGrotesk',
+                  fontSize: 10, fontWeight: FontWeight.w700,
+                  letterSpacing: 1.8, color: RDSColor.textMuted),
+              ),
+              const SizedBox(height: RDSSpace.sm),
+              ...hotel.rutasDestacadas.map((r) => Padding(
+                padding: const EdgeInsets.only(bottom: 6),
+                child: Row(
+                  children: [
+                    Icon(Icons.route_rounded,
+                      color: hotel.colorPrimario, size: 15),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(r,
+                        style: RDSType.bodyMd.copyWith(fontSize: 13))),
+                  ],
+                ),
+              )),
+              const SizedBox(height: RDSSpace.xl),
+              // Botón activar
+              if (esActivo)
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.06),
+                    borderRadius: RDSRadius.bMd,
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.check_circle_rounded,
+                        color: hotel.colorPrimario, size: 18),
+                      const SizedBox(width: 8),
+                      Text(
+                        t('Hotel activo', 'Hotel active'),
+                        style: TextStyle(
+                          fontFamily: 'SpaceGrotesk',
+                          fontSize: 13, fontWeight: FontWeight.w700,
+                          color: hotel.colorPrimario, letterSpacing: 1),
+                      ),
+                    ],
+                  ),
+                )
+              else
+                GestureDetector(
+                  onTap: onActivar,
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    decoration: BoxDecoration(
+                      color: hotel.colorPrimario,
+                      borderRadius: RDSRadius.bMd,
+                    ),
+                    child: Text(
+                      t('ACTIVAR ESTE HOTEL', 'ACTIVATE THIS HOTEL'),
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        fontFamily: 'SpaceGrotesk',
+                        fontSize: 13, fontWeight: FontWeight.w900,
+                        color: Colors.white, letterSpacing: 1.5),
+                    ),
+                  ),
+                ),
+              const SizedBox(height: RDSSpace.sm),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 // Rutas del Centro que activan el descuento Mobiplab al completarse
 const Set<String> kRutasMobiplab = {
   'DEL ORIGEN PAISA A LA MEDELLÍN MODERNA',
@@ -9581,6 +10300,29 @@ const Map<String, String> kComoLlegarPorRuta = {
 };
 
 
+// ── Override definitivo: ciudad y zona garantizados para rutas críticas ───────
+// Estos valores SE APLICAN SIEMPRE (override), no solo cuando el campo es null.
+// Necesario porque el caché SQLite de Firestore persiste valores incorrectos
+// incluso después de limpiar el caché de la app desde Configuración Android.
+const Map<String, Map<String, String>> kCiudadZonaOverride = {
+  // Rutas de Medellín → Alrededores
+  'RUTA GUATAPÉ & LA PIEDRA':        {'ciudad': 'Medellín', 'zona': 'Alrededores'},
+  'RUTA SANTA FE DE ANTIOQUIA':      {'ciudad': 'Medellín', 'zona': 'Alrededores'},
+  'FINCAS AGROTURÍSTICAS':           {'ciudad': 'Medellín', 'zona': 'Alrededores'},
+  'FINCA Y FONDA':                   {'ciudad': 'Medellín', 'zona': 'Alrededores'},
+  'GUARDIANES DE LA SILLETA':        {'ciudad': 'Medellín', 'zona': 'Alrededores'},
+  'SENDEROS EN FLOR':                {'ciudad': 'Medellín', 'zona': 'Alrededores'},
+  'VEREDAS DE SANTA ELENA':          {'ciudad': 'Medellín', 'zona': 'Alrededores'},
+  'FINCA Y FONDA SILLETERA':         {'ciudad': 'Medellín', 'zona': 'Alrededores'},
+  // Rutas de Bogotá → Ciudad
+  'LA CANDELARIA HISTÓRICA':         {'ciudad': 'Bogotá',   'zona': 'Ciudad'},
+  // Rutas de Bogotá → Alrededores
+  'PARQUE JAIME DUQUE — AVENTURA FAMILIAR': {'ciudad': 'Bogotá', 'zona': 'Alrededores'},
+  'PARQUE JAIME DUQUE — CLÁSICA':    {'ciudad': 'Bogotá',   'zona': 'Alrededores'},
+  'PARQUE JAIME DUQUE — FAMILIA':    {'ciudad': 'Bogotá',   'zona': 'Alrededores'},
+  'PARQUE JAIME DUQUE — NATURALEZA': {'ciudad': 'Bogotá',   'zona': 'Alrededores'},
+};
+
 // ── Zona por ruta — fallback para rutas de Firestore sin campo 'zona' ────────
 const Map<String, String> kZonaPorRuta = {
   // Ciudad
@@ -9620,11 +10362,11 @@ const Map<String, String> kZonaPorRuta = {
   'RUTA CENTRO REPUBLICANO':             'Ciudad',
   'RUTA PATRIMONIAL DEL CENTRO':         'Ciudad',
   'FINCAS SILLETERAS':                    'Ciudad',
-  'FINCAS AGROTURÍSTICAS':               'Ciudad',
   'DISEÑO MODA Y COMPRAS':               'Ciudad',
   // Comida Urbana
   'SABORES DE EL POBLADO':               'Comida Urbana',
   // Alrededores
+  'FINCAS AGROTURÍSTICAS':               'Alrededores',
   'RUTA GUATAPÉ & LA PIEDRA':            'Alrededores',
   'RUTA SANTA FE DE ANTIOQUIA':          'Alrededores',
   'FINCA Y FONDA':                       'Alrededores',
@@ -9654,9 +10396,10 @@ const Map<String, String> kImagenPorRuta = {
   'DEL ORIGEN PAISA A LA MEDELLÍN MODERNA': 'assets/images/rutas/ruta_11_origen_paisa_moderno.jpg',
   'TRANVÍA CULTURAL': 'assets/images/rutas/ruta_12_tranvia_cultural.jpg',
   'RUTA GUATAPÉ & LA PIEDRA': 'assets/images/rutas/ruta_09_guatape.jpg',
-  'FERIA DE LAS FLORES': 'assets/images/rutas/ruta_04_metrocable.jpg',
+  'FERIA DE LAS FLORES': 'assets/images/rutas/ruta_17_feria_flores.jpg',
   // [eliminado] 'TABLADOS Y RUMBA': 'assets/images/rutas/ruta_04_metrocable.jpg',
   // ── Rutas nuevas Vive (Firestore) — imágenes propias ──
+  'LA CANDELARIA HISTÓRICA': 'assets/images/rutas/ruta_bta_01_candelaria.jpg',
   'HUELLAS VIVAS DE EL POBLADO': 'assets/images/rutas/ruta_huellas_vivas_poblado.jpg',
   'EL POBLADO VERDE': 'assets/images/rutas/ruta_poblado_verde.jpg',
   'EL POBLADO CREATIVO': 'assets/images/rutas/ruta_poblado_creativo.jpg',
@@ -9666,23 +10409,23 @@ const Map<String, String> kImagenPorRuta = {
   // ── Feria — imágenes propias ──
   'FERIA CLÁSICA': 'assets/images/rutas/ruta_feria_clasica.jpg',
   // [eliminado] 'RUTA SILLETERA': 'assets/images/rutas/ruta_silletera.jpg',
-  'VIVE MANRIQUE': 'assets/images/rutas/ruta_corredor_45.jpg',
-  'MANRIQUE CULTURA Y VIDA': 'assets/images/rutas/ruta_corredor_45.jpg',
+  'VIVE MANRIQUE': 'assets/images/rutas/ruta_vive_manrique.jpg',
+  'MANRIQUE CULTURA Y VIDA': 'assets/images/rutas/ruta_manrique_cultura.jpg',
   // ── Rutas Secretaría de Turismo (Firestore) — imágenes reutilizadas ──
   // [eliminado] VIVE EL CENTRO
   'FINCAS SILLETERAS':               'assets/images/rutas/ruta_silletera.jpg',
-  'TURISMO CREATIVO':                'assets/images/rutas/ruta_poblado_creativo.jpg',
+  'TURISMO CREATIVO':                'assets/images/rutas/ruta_turismo_creativo.jpg',
   // ── Rutas Centro nuevas (29 jul) ──
   'BARRIO PRADO — CULTURA Y BOHEMIA':       'assets/images/rutas/ruta_barrio_prado.jpg',
   'MEMORIA Y DERECHOS HUMANOS':             'assets/images/rutas/ruta_memoria_derechos_humanos.jpg',
   'LA BOHEMIA DEL CENTRO': 'assets/images/rutas/ruta_cafes_cantinas_centro.jpg',
   'TEATROS Y ESCENA DEL CENTRO':             'assets/images/rutas/ruta_teatro_escena_centro.jpg',
-  'DISEÑO MODA Y COMPRAS':           'assets/images/rutas/ruta_corredor_45.jpg',
+  'DISEÑO MODA Y COMPRAS':           'assets/images/rutas/ruta_diseno_moda_compras.jpg',
   // ── Rutas Fincas Silleteras temáticas (28 jul) — claves migradas al bloque sep 2026 ──
   // ── Rutas Laureles nuevas (28 jul) — imágenes diferenciadas ──
   'ENTRE JUEGOS Y PALABRAS':              'assets/images/rutas/ruta_entre_juegos_palabras.jpg',
   'ENTRE SABORES RISAS Y MIL COLORES':   'assets/images/rutas/ruta_entre_sabores_risas.jpg',
-  'OTROS CAMINOS LAURELES':              'assets/images/rutas/ruta_noche_laureles.jpg',
+  'OTROS CAMINOS LAURELES':              'assets/images/rutas/ruta_otros_caminos_laureles.jpg',
   'NOCHE EN LAURELES':                   'assets/images/rutas/ruta_noche_laureles.jpg',
   // ── Rutas Centro nuevas (12 sep 2026) ──
   'RUTA CENTRO REPUBLICANO':             'assets/images/rutas/ruta_02b_republicano.jpg',
@@ -9694,12 +10437,12 @@ const Map<String, String> kImagenPorRuta = {
   'SABORES DE LA 70':                    'assets/images/rutas/ruta_gastronomia_laureles.jpg',
   'SABORES DEL CENTRO':                  'assets/images/rutas/ruta_gastronomia_centro.jpg',
   // ── Rutas Santa Elena y alrededores (sep 2026) ──
-  'RUTA SANTA FE DE ANTIOQUIA':          'assets/images/rutas/ruta_santa_fe_antioquia.jpg',
+  'RUTA SANTA FE DE ANTIOQUIA':          'assets/images/rutas/ruta_13_santa_fe.jpg',
   'FINCA Y FONDA':                       'assets/images/rutas/ruta_finca_fonda.jpg',
-  'GUARDIANES DE LA SILLETA':            'assets/images/rutas/ruta_guardianes_silleta.jpg',
+  'GUARDIANES DE LA SILLETA':            'assets/images/rutas/ruta_guardanes_silleta.jpg',
   'SENDEROS EN FLOR':                    'assets/images/rutas/ruta_senderos_flor.jpg',
   'VEREDAS DE SANTA ELENA':              'assets/images/rutas/ruta_veredas_santa_elena.jpg',
-  'FINCAS AGROTURÍSTICAS':               'assets/images/rutas/ruta_fincas_silleteras.jpg',
+  'FINCAS AGROTURÍSTICAS':               'assets/images/rutas/ruta_fincas_agroturisticas.jpg',
   'TRANSFORMACIÓN MEMORIA E HISTORIA':   'assets/images/rutas/ruta_memoria_historia.jpg',
 };
 
@@ -9946,17 +10689,17 @@ class RutasService {
       QuerySnapshot<Map<String, dynamic>> snap;
       try {
         // Forzar lectura directa del servidor — evita mostrar datos
-        // borrados que aún estén en la caché local persistente del SDK.
+        // desactualizados que estén en la caché local persistente del SDK.
         snap = await FirebaseFirestore.instance
             .collection('rutas')
-            .get(const GetOptions(source: cf.Source.serverAndCache))
+            .get(const GetOptions(source: cf.Source.server))
             .timeout(const Duration(seconds: 15));
       } catch (e) {
         debugPrint('⚠️ RutasService: server falló, intentando caché. ' + e.toString());
         try {
           snap = await FirebaseFirestore.instance
               .collection('rutas')
-              .get()
+              .get(const GetOptions(source: cf.Source.cache))
               .timeout(const Duration(seconds: 60));
         } catch (e2) {
           debugPrint('⚠️ RutasService: fallback hardcode. ' + e2.toString());
@@ -9969,13 +10712,20 @@ class RutasService {
             final data = d.data() as Map<String, dynamic>;
             final ruta = <String, dynamic>{'id': d.id, ...data};
             final nombre = ruta['nombre']?.toString() ?? '';
-            // Enriquecer con imagen/insignia local si Firestore no las trae
-            // Enriquecer con imagen local (override Firestore paths que no existen)
+            // Override definitivo: ciudad + zona para rutas con historial de caché incorrecto.
+            // Se aplica SIEMPRE (no ??=) para garantizar valores correctos sin importar
+            // lo que el caché SQLite de Firestore tenga almacenado.
+            final override = kCiudadZonaOverride[nombre];
+            if (override != null) {
+              ruta['ciudad'] = override['ciudad'];
+              ruta['zona']   = override['zona'];
+            }
+            // Enriquecer con imagen local (override Firestore paths que no existen localmente)
             final imagenLocal = kImagenPorRuta[nombre];
             if (imagenLocal != null) ruta['imagen'] = imagenLocal;
 
             ruta['insigniaImg'] ??= kInsigniaPorRuta[nombre];
-            // Enriquecer zona si Firestore no la trae
+            // Enriquecer zona si Firestore no la trae (solo cuando no aplicó override)
             if (!ruta.containsKey('zona') || ruta['zona'] == null) {
               final zonaLocal = kZonaPorRuta[nombre];
               if (zonaLocal != null) ruta['zona'] = zonaLocal;
@@ -10152,7 +10902,7 @@ class _HomeBodyState extends State<HomeBody> {
 
   Future<void> _detectarCiudad() async {
     final ciudad = await detectarCiudadActual();
-    if (mounted) setState(() { _ciudadDetectada = ciudad; _cargandoCiudad = false; });
+    if (mounted) setState(() { _ciudadDetectada = ciudad ?? kCiudadesRegistradas[0]; _cargandoCiudad = false; });
   }
 
   // Rutas filtradas por ciudad detectada + filtro de zona activo
@@ -10564,17 +11314,20 @@ class _HomeBodyState extends State<HomeBody> {
                   activo: _filtroActivo == 'Temporada',
                   onTap: () => setState(() => _filtroActivo = 'Temporada')),
                 const SizedBox(width: RDSSpace.sm),
-                CategoryChip(
-                  label: t('Creadores','Creators'),
-                  icon: Icons.video_camera_back_rounded,
-                  activo: _filtroActivo == 'Creadores',
-                  onTap: () => setState(() => _filtroActivo = 'Creadores')),
-                const SizedBox(width: RDSSpace.sm),
+                // FASE 3: Creadores — oculto hasta alianza confirmada
+                // CategoryChip(label: t('Creadores','Creators'), icon: Icons.video_camera_back_rounded, activo: _filtroActivo == 'Creadores', onTap: () => setState(() => _filtroActivo = 'Creadores')),
+                // const SizedBox(width: RDSSpace.sm),
                 CategoryChip(
                   label: t('Gastronomía','Food'),
                   icon: RDSIcons.catGastrono,
                   activo: _filtroActivo == 'Comida Urbana',
                   onTap: () => setState(() => _filtroActivo = 'Comida Urbana')),
+                const SizedBox(width: RDSSpace.sm),
+                CategoryChip(
+                  label: t('Servicios','Services'),
+                  icon: Icons.room_service_rounded,
+                  activo: _filtroActivo == 'Servicios',
+                  onTap: () => setState(() => _filtroActivo = 'Servicios')),
 
               ])),
             const SizedBox(height: 16),
@@ -10604,7 +11357,7 @@ class _HomeBodyState extends State<HomeBody> {
                 titulo: t('🏙️ EN ${(_ciudadDetectada?.ciudad ?? "MEDELLÍN").toUpperCase()}','🏙️ IN ${(_ciudadDetectada?.ciudad ?? "MEDELLÍN").toUpperCase()}'),
                 subtitulo: '${_rutas.where((r) => r["zona"] == "Ciudad").length} ${t("rutas disponibles","routes available")}'),
               const SizedBox(height: 10),
-              // ── Agrupar por sectores de Medellín ──
+              // ── Agrupar por sectores ──
               ...(() {
                 final rutasCiudad = _rutas.where((r) {
                   if (r['zona'] != 'Ciudad') return false;
@@ -10616,11 +11369,12 @@ class _HomeBodyState extends State<HomeBody> {
                 // Detectar sector por nombre de ruta
                 String _sector(Map<String, dynamic> r) {
                   final n = r['nombre']?.toString() ?? '';
+                  final ciudad = r['ciudad']?.toString() ?? 'Medellín';
                   if (n.contains('POBLADO') || n.contains('HUELLAS VIVAS')) return '📍 El Poblado';
                   if (n.contains('LAURELES') || n.contains('LA 70')) return '🌿 Laureles';
                   if (n.contains('CENTRO') || n.contains('PATRIMONIAL') || n.contains('REPUBLICANO') || n.contains('TRANVÍA') || n.contains('ORIGEN PAISA')) return '🏛️ Centro';
                   if (n.contains('MANRIQUE') || n.contains('TRANSFORMACIÓN')) return '🎨 Manrique & Norte';
-                  return '🗺️ Medellín';
+                  return '🗺️ $ciudad';
                 }
 
                 // Orden fijo de sectores: primero las rutas urbanas históricas, Poblado y Laureles al final
@@ -10747,6 +11501,34 @@ class _HomeBodyState extends State<HomeBody> {
                 ruta: r, activa: !pausada,
                 proximaActivacion: pausada ? (r['tagPausada'] ?? '🚧 Próximamente') : '',
                 onTap: pausada ? null : () => RuteroNav.push(context, RouteDetailScreen(ruta: r))); }),
+            ] else if (_filtroActivo == 'Servicios') ...[
+              _SectionHeader(
+                titulo: t('🛎️ SERVICIOS PARA VIAJEROS','🛎️ TRAVELER SERVICES'),
+                subtitulo: t('Transporte, guías, hospedaje y más','Transport, guides, accommodation and more')),
+              const SizedBox(height: 10),
+              GestureDetector(
+                onTap: () => RuteroNav.push(context, const ServiciosScreen()),
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(18),
+                  decoration: BoxDecoration(
+                    color: RDSColor.card, borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: RDSColor.gold.withOpacity(0.35)),
+                    gradient: LinearGradient(
+                      colors: [RDSColor.gold.withOpacity(0.06), RDSColor.card],
+                      begin: Alignment.topLeft, end: Alignment.bottomRight)),
+                  child: Row(children: [
+                    const Text('🛎️', style: TextStyle(fontSize: 32)),
+                    const SizedBox(width: 14),
+                    Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      Text(t('Servicios verificados por Rutero MDE', 'Services verified by Rutero MDE'),
+                        style: const TextStyle(color: RDSColor.gold, fontSize: 14, fontWeight: FontWeight.w900)),
+                      const SizedBox(height: 4),
+                      Text(t('Contacta directamente por WhatsApp', 'Contact directly via WhatsApp'),
+                        style: TextStyle(color: RDSColor.textMuted.withOpacity(0.7), fontSize: 12)),
+                    ])),
+                    Icon(Icons.arrow_forward_ios, color: RDSColor.gold.withOpacity(0.5), size: 14),
+                  ]))),
             ] else if (_filtroActivo == 'Eventos') ...[
               _SectionHeader(
                 titulo: t('🎪 EVENTOS','🎪 EVENTS'),
@@ -10757,7 +11539,9 @@ class _HomeBodyState extends State<HomeBody> {
                 proximaActivacion: _proximaActivacion(r),
                 diasParaActivacion: _diasParaActivacion(r),
                 onTap: _rutaActivaEvento(r) ? () => RuteroNav.push(context, RouteDetailScreen(ruta: r)) : null)),
-            ] else if (_filtroActivo == 'Creadores') ...[
+            // FASE 3: Creadores — oculto hasta alianza confirmada
+            // } else if (_filtroActivo == 'Creadores') ...[
+            ] else if (_filtroActivo == '_creadores_oculto_fase3') ...[
               _SectionHeader(
                 titulo: t('🎬 CREADORES','🎬 CREATORS'),
                 subtitulo: t('Exploradores que muestran Medellín en terreno real','Explorers who show Medellín in the field')),
@@ -13718,8 +14502,36 @@ class ProfileScreen extends StatelessWidget {
 
             const SizedBox(height: RDSSpace.md),
 
-            // ── Código de hotel ─────────────────────────────────────────
+            // ── Hoteles partner ──────────────────────────────────────────
             _HotelCodigoField(onActivado: () => setModal(() {})),
+            const SizedBox(height: RDSSpace.sm),
+            GestureDetector(
+              onTap: () => Navigator.push(ctx,
+                MaterialPageRoute(builder: (_) => const HotelesPartnerScreen())),
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                decoration: BoxDecoration(
+                  border: Border.all(color: Colors.white.withOpacity(0.1)),
+                  borderRadius: RDSRadius.bMd,
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(Icons.hotel_rounded,
+                      color: RDSColor.textMuted, size: 16),
+                    const SizedBox(width: 8),
+                    Text(
+                      t('Ver hoteles partner', 'View partner hotels'),
+                      style: const TextStyle(
+                        fontFamily: 'SpaceGrotesk',
+                        fontSize: 12, fontWeight: FontWeight.w600,
+                        letterSpacing: 0.8, color: RDSColor.textMuted),
+                    ),
+                  ],
+                ),
+              ),
+            ),
 
           const SizedBox(height: 20),
 
@@ -16168,7 +16980,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
   Future<void> _detectarCiudadMapa() async {
     final ciudad = await detectarCiudadActual();
     if (mounted) {
-      setState(() => _ciudadMapa = ciudad);
+      setState(() => _ciudadMapa = ciudad ?? kCiudadesRegistradas[0]);
       _mapController?.animateCamera(
         CameraUpdate.newLatLngZoom(_centerCiudad, 13));
     }
