@@ -43,9 +43,10 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Archivos sensibles — NUNCA subir al repositorio
 android/key.properties
-*.jksserviceAccountKey.json 
-serviceAccountKey.json 
-"# Archivos sensibles" 
-"android/app/google-services.json" 
-ios/Runner/AppDelegate.swift 
+*.jks
+serviceAccountKey.json
+android/app/google-services.json
+ios/Runner/GoogleService-Info.plist
