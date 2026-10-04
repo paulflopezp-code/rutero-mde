@@ -777,7 +777,10 @@ List<Map<String, dynamic>> filtrarRutasPorCiudad(_CiudadRegistrada? ciudad) {
   }).toList();
   // Admin siempre ve todas las rutas activas de todas las ciudades
   if (esAdmin) return rutasActivas;
-  if (ciudad == null) return rutasActivas;
+  if (ciudad == null) return rutasActivas.where((r) {
+    final rutaCiudad = (r['ciudad']?.toString() ?? 'Medellín').trim();
+    return rutaCiudad.toLowerCase() == kCiudadesRegistradas[0].ciudad.toLowerCase();
+  }).toList();
   return rutasActivas.where((r) {
     final rutaCiudad = (r['ciudad']?.toString() ?? 'Medellín').trim();
     final rutaPais = r['pais']?.toString().trim();
@@ -10907,8 +10910,11 @@ class _HomeBodyState extends State<HomeBody> {
   }
 
   // Rutas filtradas por ciudad detectada + filtro de zona activo
+  // Mientras GPS carga (_ciudadDetectada == null), se usa Medellín como default
+  // para que el usuario nunca vea rutas mezcladas de todas las ciudades.
   List<Map<String, dynamic>> get _rutas {
-    final porCiudad = filtrarRutasPorCiudad(_ciudadDetectada);
+    final ciudadParaFiltro = _ciudadDetectada ?? kCiudadesRegistradas[0];
+    final porCiudad = filtrarRutasPorCiudad(ciudadParaFiltro);
     return porCiudad;
   }
 
@@ -11362,9 +11368,9 @@ class _HomeBodyState extends State<HomeBody> {
               ...(() {
                 final rutasCiudad = _rutas.where((r) {
                   if (r['zona'] != 'Ciudad') return false;
-                  if (_ciudadDetectada == null) return true;
+                  final _ciudadFiltro = _ciudadDetectada ?? kCiudadesRegistradas[0];
                   final rutaCiudad = r['ciudad']?.toString() ?? 'Medellín';
-                  return rutaCiudad == _ciudadDetectada!.ciudad;
+                  return rutaCiudad == _ciudadFiltro.ciudad;
                 }).toList();
 
                 // Detectar sector por nombre de ruta
@@ -11423,7 +11429,7 @@ class _HomeBodyState extends State<HomeBody> {
                 titulo: t('🗻 ALREDEDORES','🗻 SURROUNDINGS'),
                 subtitulo: '${_rutas.where((r) => r["zona"] == "Alrededores").length} ${t("rutas disponibles","routes available")}'),
               const SizedBox(height: 10),
-              ..._rutas.where((r) => r['zona'] == 'Alrededores' && (_ciudadDetectada == null || (r['ciudad']?.toString() ?? 'Medellín') == _ciudadDetectada!.ciudad)).map((r) { final pausada = r['pausada'] == true; return _RouteCard(
+              ..._rutas.where((r) => r['zona'] == 'Alrededores' && (r['ciudad']?.toString() ?? 'Medellín') == (_ciudadDetectada ?? kCiudadesRegistradas[0]).ciudad).map((r) { final pausada = r['pausada'] == true; return _RouteCard(
                 ruta: r, activa: !pausada,
                 proximaActivacion: pausada ? (r['tagPausada'] ?? '🚧 Próximamente') : '',
                 onTap: pausada ? null : () => RuteroNav.push(context, RouteDetailScreen(ruta: r))); }),
@@ -11435,7 +11441,7 @@ class _HomeBodyState extends State<HomeBody> {
               ...(() {
                 // Feria de las Flores siempre primero — ocultar si módulo Feria activo (tab dedicada)
                 final rutasTemp = _rutas.where((r) => r['zona'] == 'Temporada'
-                  && (_ciudadDetectada == null || (r['ciudad']?.toString() ?? 'Medellín') == _ciudadDetectada!.ciudad)
+                  && (r['ciudad']?.toString() ?? 'Medellín') == (_ciudadDetectada ?? kCiudadesRegistradas[0]).ciudad
                   && !(feriaModuloActivo && r['nombre'] == 'FERIA DE LAS FLORES')
                   // Quitar duplicados — solo mostrar FERIA DE LAS FLORES 2026, no las versiones genéricas
                   && r['nombre'] != 'FERIA DE LAS FLORES'
@@ -11498,7 +11504,7 @@ class _HomeBodyState extends State<HomeBody> {
                 titulo: t('🍟 COMIDA URBANA','🍟 STREET FOOD'),
                 subtitulo: '${_rutas.where((r) => r["zona"] == "Comida Urbana").length} ${t("rutas · Street Food MDE","routes · Street Food MDE")}'),
               const SizedBox(height: 10),
-              ..._rutas.where((r) => r['zona'] == 'Comida Urbana' && (_ciudadDetectada == null || (r['ciudad']?.toString() ?? 'Medellín') == _ciudadDetectada!.ciudad)).map((r) { final pausada = r['pausada'] == true; return _RouteCard(
+              ..._rutas.where((r) => r['zona'] == 'Comida Urbana' && (r['ciudad']?.toString() ?? 'Medellín') == (_ciudadDetectada ?? kCiudadesRegistradas[0]).ciudad).map((r) { final pausada = r['pausada'] == true; return _RouteCard(
                 ruta: r, activa: !pausada,
                 proximaActivacion: pausada ? (r['tagPausada'] ?? '🚧 Próximamente') : '',
                 onTap: pausada ? null : () => RuteroNav.push(context, RouteDetailScreen(ruta: r))); }),
@@ -13056,6 +13062,29 @@ class _SitioInfoScreenState extends State<SitioInfoScreen> {
         Expanded(child: SingleChildScrollView(
           padding: const EdgeInsets.all(24),
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            // ── Imagen del sitio desde sitiosDetalle ─────────────────
+            Builder(builder: (_) {
+              final detalles = parseSitiosDetalle(widget.ruta['sitiosDetalle']);
+              String? imagenPath;
+              for (final d in detalles) {
+                if (d is Map && d['nombre']?.toString() == widget.sitioNombre) {
+                  imagenPath = d['imagenAsset']?.toString();
+                  break;
+                }
+              }
+              if (imagenPath == null || imagenPath.isEmpty) return const SizedBox.shrink();
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 20),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(16),
+                  child: Image.asset(
+                    imagenPath,
+                    width: double.infinity,
+                    height: 200,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                  )));
+            }),
             // ── Nombre del sitio — protagonista editorial ─────────────
             Text(widget.sitioNombre,
               style: RDSType3.displayXl.copyWith(height: 1.05)),

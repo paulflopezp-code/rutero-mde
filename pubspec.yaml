@@ -58,6 +58,7 @@ flutter:
     - assets/images/onboarding_valida.png
     - assets/images/onboarding_gana.png
     - assets/images/rutas/
+	- assets/images/lugares/
     - assets/images/insignias/
     - assets/images/avatar/
     - assets/images/logo_rutero_badge.png
