@@ -11,7 +11,7 @@ import UserNotifications
     _ application: UIApplication,
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
   ) -> Bool {
-    GMSServices.provideAPIKey("AIzaSy0ZsYhRWGcIm4CPb9YVoj3TIVHBemE-Lr0")
+    GMSServices.provideAPIKey("AIzaSyC4D3nwkeJqNr8jof0l7gB__1GNs1OKe80")
 
     // FCM: registrar para notificaciones remotas
     UNUserNotificationCenter.current().delegate = self
