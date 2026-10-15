@@ -1,7 +1,7 @@
 name: rutero_mde
 description: "A new Flutter project."
 publish_to: 'none'
-version: 1.0.20+23
+version: 1.0.21+24
 
 environment:
   sdk: '>=3.3.0 <4.0.0'
@@ -10,7 +10,11 @@ dependencies:
   flutter:
     sdk: flutter
   cupertino_icons: ^1.0.8
-  google_maps_flutter: ^2.9.0
+  # ─── Google Maps — versión 2.15.x corrige SecurityException en Android 15 ───
+  google_maps_flutter: ^2.10.0
+  google_maps_flutter_android: 2.14.0
+  google_maps_flutter_platform_interface: ^2.10.0
+  # ────────────────────────────────────────────────────────────────────────────
   geolocator: ^13.0.2
   permission_handler: ^11.3.1
   qr_flutter: ^4.1.0
@@ -46,7 +50,7 @@ flutter_launcher_icons:
   image_path: "assets/icon/icon.png"
   min_sdk_android: 23
   adaptive_icon_background: "#0D1F0D"
-  
+
 
 flutter:
   uses-material-design: true
@@ -58,7 +62,7 @@ flutter:
     - assets/images/onboarding_valida.png
     - assets/images/onboarding_gana.png
     - assets/images/rutas/
-	- assets/images/lugares/
+    - assets/images/lugares/
     - assets/images/insignias/
     - assets/images/avatar/
     - assets/images/logo_rutero_badge.png

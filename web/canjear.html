@@ -40,10 +40,11 @@
 
     function mostrarEstado(estado) {
       estadoActual = estado;
-      $('pantalla-cargando').style.display = estado === 'cargando' ? 'flex'  : 'none';
-      $('pantalla-valido').style.display   = estado === 'valido'   ? 'block' : 'none';
-      $('pantalla-canjeado').style.display = estado === 'ya_canjeado' ? 'block' : 'none';
-      $('pantalla-invalido').style.display = estado === 'invalido' ? 'block' : 'none';
+      $('pantalla-cargando').style.display       = estado === 'cargando'       ? 'flex'  : 'none';
+      $('pantalla-valido').style.display         = estado === 'valido'         ? 'block' : 'none';
+      $('pantalla-canjeado').style.display       = estado === 'ya_canjeado'    ? 'block' : 'none';
+      $('pantalla-invalido').style.display       = estado === 'invalido'       ? 'block' : 'none';
+      $('pantalla-aliado-inv').style.display     = estado === 'aliado_invalido'? 'block' : 'none';
     }
 
     async function verificarCodigo() {
@@ -54,33 +55,42 @@
         let encontrado = false;
         let datos = {};
 
-        if (tipo === 'aliado') {
-          // Buscar en consumos_aliados por código
+        // Buscar primero en premios_index (índice raíz — rápido, sin índice Firestore)
+        const snapIndex = await getDoc(doc(db, 'premios_index', codigo));
+        if (snapIndex.exists()) {
+          encontrado = true;
+          datos = snapIndex.data();
+          datos._docId = codigo;
+          datos._coleccion = 'premios_index';
+        }
+
+        // Si no está en premios_index, buscar en consumos_aliados (tipo aliado QR)
+        if (!encontrado) {
           const q = query(collection(db, 'consumos_aliados'), where('codigo', '==', codigo));
           const snap = await getDocs(q);
-
           if (!snap.empty) {
             encontrado = true;
             datos = snap.docs[0].data();
             datos._docId = snap.docs[0].id;
             datos._coleccion = 'consumos_aliados';
           }
-        } else {
-          // Buscar en premios globales por código
-          // Necesitamos buscar en todos los usuarios — usamos colección global
-          const q = query(collection(db, 'premios_global'), where('codigo', '==', codigo));
-          const snap = await getDocs(q);
-
-          if (!snap.empty) {
-            encontrado = true;
-            datos = snap.docs[0].data();
-            datos._docId = snap.docs[0].id;
-            datos._coleccion = 'premios_global';
-          }
         }
 
         if (!encontrado) {
           mostrarEstado('invalido');
+          return;
+        }
+
+        // Verificar aliado — si el QR trae aliado y el premio tiene aliadoId, deben coincidir
+        const aliadoUrl = (new URLSearchParams(window.location.search)).get('aliado') || '';
+        const aliadoGuardado = datos.aliadoId || '';
+        if (aliadoUrl && aliadoGuardado && aliadoUrl !== aliadoGuardado) {
+          // Llenar campos informativos antes de mostrar error
+          const elCod = $('aliado-inv-codigo');
+          const elNom = $('aliado-inv-nombre');
+          if (elCod) elCod.textContent = codigo;
+          if (elNom) elNom.textContent = datos.aliadoNombre || aliadoGuardado || '(no especificado)';
+          mostrarEstado('aliado_invalido');
           return;
         }
 
@@ -123,13 +133,24 @@
       try {
         const coleccion = datosCanje._coleccion;
         const docId     = datosCanje._docId;
-
-        // Marcar como canjeado
-        await updateDoc(doc(db, coleccion, docId), {
+        const canjeData = {
           canjeado: true,
           fechaCanje: serverTimestamp(),
           confirmadoPor: aliadoId || 'aliado_web',
-        });
+        };
+
+        // Marcar como canjeado
+        await updateDoc(doc(db, coleccion, docId), canjeData);
+
+        // Si viene de premios_index, también actualizar subcollección del usuario
+        if (coleccion === 'premios_index' && datosCanje.userId) {
+          try {
+            await updateDoc(
+              doc(db, 'usuarios', datosCanje.userId, 'premios', codigo),
+              canjeData
+            );
+          } catch(_) { /* subcollección puede no existir en legacy */ }
+        }
 
         // Registrar en log de estadísticas
         await addDoc(collection(db, 'estadisticas_canjes'), {
@@ -338,6 +359,7 @@
     #pantalla-valido { display: none; animation: fadeUp 0.4s ease; }
     #pantalla-canjeado { display: none; animation: fadeUp 0.4s ease; }
     #pantalla-invalido { display: none; animation: fadeUp 0.4s ease; }
+    #pantalla-aliado-inv { display: none; animation: fadeUp 0.4s ease; }
     #pantalla-confirmado { display: none; animation: fadeUp 0.4s ease; }
 
     @keyframes fadeUp {
@@ -781,7 +803,7 @@
 
       <div class="aviso" style="border-color: rgba(232,93,38,0.3); background: rgba(232,93,38,0.06);">
         <span>⚠️</span>
-        <span>Si crees que esto es un error, contacta a Rutero MDE: paullopez474@gmail.com</span>
+        <span>Si crees que esto es un error, contacta a Rutero MDE: paulflopezp@gmail.com</span>
       </div>
     </div>
 
@@ -807,7 +829,35 @@
 
       <div class="aviso" style="border-color: rgba(232,93,38,0.3); background: rgba(232,93,38,0.06);">
         <span>💡</span>
-        <span>Posibles causas: el QR fue modificado, el código expiró, o el turista no completó la ruta correctamente. Contacta: paullopez474@gmail.com</span>
+        <span>Posibles causas: el QR fue modificado, el código expiró, o el turista no completó la ruta correctamente. Contacta: paulflopezp@gmail.com</span>
+      </div>
+    </div>
+
+    <!-- ═══ PANTALLA: ALIADO INVÁLIDO ═══ -->
+    <div id="pantalla-aliado-inv">
+      <div class="error-circle">🚫</div>
+
+      <p class="titulo-pantalla" style="color: var(--accent);">ALIADO INCORRECTO</p>
+      <p class="subtitulo-pantalla">Este código es válido, pero <strong>no corresponde a este aliado</strong>.<br>El turista debe canjearlo en el punto autorizado.</p>
+
+      <div class="badge-invalido">
+        <span>●</span> ALIADO NO AUTORIZADO
+      </div>
+
+      <div class="card card-red">
+        <div class="info-row">
+          <span class="info-label">CÓDIGO</span>
+          <span class="info-value mono" style="color: var(--accent);" id="aliado-inv-codigo">—</span>
+        </div>
+        <div class="info-row">
+          <span class="info-label">ALIADO VÁLIDO</span>
+          <span class="info-value" id="aliado-inv-nombre" style="color:var(--text);">—</span>
+        </div>
+      </div>
+
+      <div class="aviso" style="border-color: rgba(232,93,38,0.3); background: rgba(232,93,38,0.06);">
+        <span>💡</span>
+        <span>El turista debe presentar este QR únicamente al aliado indicado en su premio. Si crees que hay un error, contacta: paulflopezp@gmail.com</span>
       </div>
     </div>
 

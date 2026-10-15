@@ -4,19 +4,30 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Rutero MDE — Explora Medellín jugando · Rutas, GPS e Insignias</title>
-<meta name="description" content="La primera app que convierte el turismo en una aventura con GPS, insignias y recompensas reales. 60+ rutas en Medellín, Bogotá y Popayán. Gratis en Google Play.">
+<meta name="description" content="La primera app que convierte el turismo en una aventura con GPS, insignias y recompensas reales. 60+ rutas en Medellín, Bogotá y Popayán. Gratis en App Store y Google Play.">
 <meta property="og:title" content="Rutero MDE — Explora Medellín jugando">
-<meta property="og:description" content="60+ rutas gamificadas con GPS. Insignias coleccionables. Recompensas en negocios locales. Gratis en Google Play.">
+<meta property="og:description" content="60+ rutas gamificadas con GPS. Insignias coleccionables. Recompensas en negocios locales. Gratis en App Store y Google Play.">
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://rutero-mde.web.app">
 <meta property="og:image" content="https://rutero-mde.web.app/assets/splash.jpg">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="theme-color" content="#111410">
 <link rel="canonical" href="https://rutero-mde.web.app">
+
+<!-- PERFORMANCE: preconnect a fuentes y CDN -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+
+<!-- PERFORMANCE: preload imagen hero crítica -->
+<link rel="preload" as="image" href="assets/imagenes/rutas/ruta_corredor_45.jpg" fetchpriority="high">
+
+<!-- PERFORMANCE: font-display swap ya incluido en URL con &display=swap -->
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;0,800;0,900;1,700;1,800&family=Inter:wght@300;400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+<!-- Swiper CSS -->
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.css">
+
 <style>
 :root {
   --bg:     #111410;
@@ -50,6 +61,10 @@ a{text-decoration:none;color:inherit}
 .btn-gp{display:inline-flex;align-items:center;gap:12px;background:var(--gold);color:#0D0D0A;font-family:var(--fn);font-weight:700;font-size:15px;padding:16px 32px;border-radius:12px;transition:transform .2s,box-shadow .2s;box-shadow:0 0 40px rgba(201,168,76,.35)}
 .btn-gp:hover{transform:translateY(-3px);box-shadow:0 8px 48px rgba(201,168,76,.55)}
 .btn-gp small{display:block;font-size:10px;font-weight:500;opacity:.7}
+.btn-apple{display:inline-flex;align-items:center;gap:12px;background:#000;color:#fff;font-family:var(--fn);font-weight:700;font-size:15px;padding:16px 32px;border-radius:12px;border:1px solid rgba(255,255,255,.15);transition:transform .2s,box-shadow .2s}
+.btn-apple:hover{transform:translateY(-3px);box-shadow:0 8px 48px rgba(255,255,255,.15)}
+.btn-apple small{display:block;font-size:10px;font-weight:400;opacity:.7}
+.btn-apple svg{flex-shrink:0}
 .btn-ghost{display:inline-flex;align-items:center;gap:10px;background:transparent;color:var(--text);font-family:var(--fn);font-weight:600;font-size:15px;padding:16px 28px;border-radius:12px;border:1px solid rgba(255,255,255,.15);transition:border-color .2s}
 .btn-ghost:hover{border-color:var(--gold)}
 
@@ -81,7 +96,6 @@ a{text-decoration:none;color:inherit}
 .hero-stats{display:flex;gap:36px;padding-top:36px;border-top:1px solid var(--border)}
 .snum{display:block;font-family:var(--fn);font-size:34px;font-weight:700;color:var(--gold);line-height:1}
 .slabel{font-size:12px;color:var(--muted);font-weight:500;margin-top:4px}
-
 
 /* PHONE */
 .hero-vis{display:flex;justify-content:center;align-items:center;position:relative}
@@ -150,7 +164,6 @@ a{text-decoration:none;color:inherit}
 .ncard-info{display:flex;gap:8px;align-items:center}
 .ncard-info span{font-family:var(--fn);font-size:10px;color:var(--muted);font-weight:500}
 .ndot{width:3px;height:3px;border-radius:50%;background:var(--muted)}
-/* Gradientes fallback */
 .ng1{background:linear-gradient(135deg,#1A2E1C,#0F1A10)}
 .ng2{background:linear-gradient(135deg,#2A1500,#6B2E00)}
 .ng3{background:linear-gradient(135deg,#0D1A2E,#1A3050)}
@@ -181,6 +194,16 @@ a{text-decoration:none;color:inherit}
 .paso h3{font-family:var(--ft);font-size:20px;font-weight:700;margin-bottom:10px}
 .paso p{font-size:14px;color:var(--muted);line-height:1.65}
 
+/* VALIDACIONES EN CAMPO */
+.campo{background:var(--bg2);padding:90px 0}
+.campo-scroll{overflow-x:auto;overflow-y:visible;padding:36px 24px 48px;scrollbar-width:none;display:flex;gap:16px;max-width:1248px;margin:0 auto}
+.campo-scroll::-webkit-scrollbar{display:none}
+.vcard{flex:0 0 280px;border-radius:16px;overflow:hidden;position:relative;border:1px solid var(--border);transition:transform .3s,border-color .3s}
+.vcard:hover{transform:translateY(-6px);border-color:rgba(201,168,76,.3)}
+.vcard img{width:280px;height:340px;object-fit:cover;filter:brightness(.85);transition:filter .3s}
+.vcard:hover img{filter:brightness(1)}
+.vcard-label{position:absolute;bottom:0;left:0;right:0;background:linear-gradient(to top,rgba(10,12,9,.95),transparent);padding:18px 16px 14px;font-family:var(--fn);font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--gold)}
+
 /* VIDEO */
 .video-sec{background:var(--bg2);padding:90px 0}
 .vid-wrap{position:relative;padding-bottom:56.25%;height:0;border-radius:20px;overflow:hidden;border:1px solid var(--border);box-shadow:0 50px 100px rgba(0,0,0,.5);margin-top:48px}
@@ -188,12 +211,29 @@ a{text-decoration:none;color:inherit}
 
 /* ALIADOS */
 .aliados{background:var(--bg);padding:64px 0}
+.aliados-title{font-family:var(--fn);font-size:11px;font-weight:600;letter-spacing:3px;text-transform:uppercase;color:var(--muted);text-align:center;margin-bottom:40px}
 .aliados-grid{display:flex;border:1px solid var(--border);border-radius:16px;overflow:hidden}
-.aliado{flex:1;padding:28px 20px;border-right:1px solid var(--border);text-align:center;display:flex;align-items:center;justify-content:center;transition:background .2s}
+.aliado{flex:1;padding:28px 20px;border-right:1px solid var(--border);text-align:center;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;transition:background .2s}
 .aliado:last-child{border-right:none}
 .aliado:hover{background:var(--bg2)}
+.aliado img{height:32px;width:auto;object-fit:contain;opacity:.7;transition:opacity .2s}
+.aliado:hover img{opacity:1}
 .aliado-name{font-family:var(--ft);font-size:15px;font-weight:700;color:rgba(245,240,232,.4);transition:color .2s}
 .aliado:hover .aliado-name{color:var(--gold)}
+.aliado-sub{font-family:var(--fn);font-size:10px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;margin-top:2px}
+
+/* WHOOSH DESTACADO */
+.whoosh-sec{background:var(--bg2);padding:72px 0;border-top:1px solid var(--border);border-bottom:1px solid var(--border)}
+.whoosh-inner{display:grid;grid-template-columns:1fr 1fr;gap:80px;align-items:center;max-width:1200px;margin:0 auto;padding:0 24px}
+.whoosh-logo{height:48px;width:auto;object-fit:contain;opacity:.9;margin-bottom:20px}
+.whoosh-title{font-family:var(--ft);font-size:clamp(28px,4vw,44px);font-weight:800;margin-bottom:14px;line-height:1.1}
+.whoosh-desc{font-size:15px;color:var(--muted);line-height:1.7;margin-bottom:24px}
+.whoosh-pill{display:inline-flex;align-items:center;gap:8px;background:rgba(201,168,76,.08);border:1px solid rgba(201,168,76,.2);border-radius:20px;padding:6px 14px;font-family:var(--fn);font-size:12px;font-weight:600;color:var(--gold)}
+.whoosh-visual{background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:20px;padding:36px;display:flex;align-items:center;justify-content:center;min-height:220px;position:relative;overflow:hidden}
+.whoosh-visual::before{content:'🛴';font-size:80px;opacity:.08;position:absolute;right:20px;bottom:10px;transform:rotate(-10deg)}
+.whoosh-stat{text-align:center}
+.whoosh-stat-num{font-family:var(--fn);font-size:52px;font-weight:700;color:var(--gold);line-height:1;display:block}
+.whoosh-stat-label{font-size:13px;color:var(--muted);margin-top:6px}
 
 /* CTA */
 .cta{position:relative;min-height:580px;display:flex;align-items:center;justify-content:center;text-align:center;overflow:hidden}
@@ -211,7 +251,7 @@ a{text-decoration:none;color:inherit}
 .footer{background:#0A0C09;border-top:1px solid var(--border);padding:52px 0 36px}
 .footer-in{display:grid;grid-template-columns:1fr 1fr 1fr;gap:48px;margin-bottom:40px}
 .f-brand{display:flex;align-items:center;gap:10px;margin-bottom:12px}
-.f-brand img{width:32px;border-radius:8px}
+.f-brand img{width:32px;height:32px;border-radius:8px}
 .f-brand-t{font-family:var(--ft);font-size:18px;font-weight:800}
 .f-brand-t span{color:var(--gold)}
 .f-tag{font-size:13px;color:var(--muted);line-height:1.6;max-width:220px}
@@ -220,6 +260,7 @@ a{text-decoration:none;color:inherit}
 .f-col a:hover{color:var(--text)}
 .f-bottom{border-top:1px solid var(--border);padding-top:22px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px}
 .f-credit{font-size:12px;color:rgba(138,138,122,.5)}
+.f-stores{display:flex;gap:12px;align-items:center}
 
 /* RESPONSIVE */
 @media(max-width:1024px){
@@ -230,6 +271,7 @@ a{text-decoration:none;color:inherit}
   .como-grid{grid-template-columns:repeat(2,1fr);gap:40px}
   .como-grid::after{display:none}
   .footer-in{grid-template-columns:1fr 1fr}
+  .whoosh-inner{grid-template-columns:1fr;gap:40px}
 }
 @media(max-width:768px){
   .sec{padding:72px 0}
@@ -241,6 +283,7 @@ a{text-decoration:none;color:inherit}
   .aliado{flex:1 1 40%}
   .footer-in{grid-template-columns:1fr;gap:28px}
   .f-bottom{flex-direction:column;text-align:center}
+  .hero-actions{flex-direction:column;align-items:flex-start}
 }
 @media(prefers-reduced-motion:reduce){*{animation-duration:.01ms !important;transition-duration:.01ms !important}}
 </style>
@@ -251,23 +294,32 @@ a{text-decoration:none;color:inherit}
 <header class="nav" id="nav">
   <div class="nav-in">
     <a href="#top" class="nav-logo">
-      <img src="assets/logo.png" alt="Rutero MDE">
+      <img src="assets/logo.png" alt="Rutero MDE" width="36" height="36">
       <div class="nav-logo-t">Rutero <span>MDE</span></div>
     </a>
     <nav class="nav-links">
       <a href="#rutas">Rutas</a>
-      <a href="#rutas">Rutas</a>
       <a href="#insignias">Insignias</a>
       <a href="#como">Cómo funciona</a>
+      <a href="#campo">En campo</a>
     </nav>
-    <a href="https://play.google.com/store/apps/details?id=com.ruteromde.app" target="_blank" class="nav-dl">Descargar gratis</a>
+    <div style="display:flex;align-items:center;gap:10px">
+      <button onclick="toggleLang()" id="lang-btn" style="background:transparent;border:1px solid rgba(255,255,255,.2);color:var(--muted);font-family:var(--fn);font-size:12px;font-weight:600;padding:7px 14px;border-radius:8px;cursor:pointer;transition:all .2s;letter-spacing:1px">EN</button>
+      <a href="#" class="nav-dl" id="nav-dl" onclick="var u=/android/i.test(navigator.userAgent)?'https://play.google.com/store/apps/details?id=com.ruteromde.app':'https://apps.apple.com/app/rutero-mde/id6797524669';window.open(u,'_blank');return false;">Descargar gratis</a>
+    </div>
   </div>
 </header>
 
 <!-- HERO -->
 <section class="hero" id="top">
   <div class="hero-bg">
-    <img src="assets/imagenes/rutas/ruta_corredor_45.jpg" alt="Medellín" loading="eager" decoding="async"
+    <!-- PERFORMANCE: eager + fetchpriority alto para LCP -->
+    <img src="assets/imagenes/rutas/ruta_corredor_45.jpg"
+         alt="Medellín"
+         loading="eager"
+         decoding="sync"
+         fetchpriority="high"
+         width="1920" height="1080"
          onerror="this.src='assets/splash.jpg'">
   </div>
   <div class="hero-in">
@@ -280,16 +332,19 @@ a{text-decoration:none;color:inherit}
       </h1>
       <p class="hero-sub" data-es="La primera app que convierte el turismo en una aventura con GPS, insignias y recompensas reales." data-en="The first app that turns tourism into an adventure with GPS, badges and real rewards.">La primera app que convierte el turismo en una aventura con GPS, insignias y recompensas reales.</p>
       <div class="hero-actions">
+        <a href="https://apps.apple.com/app/rutero-mde/id6797524669" target="_blank" class="btn-apple">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="white"><path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/></svg>
+          <div><small>Disponible en</small><strong>App Store</strong></div>
+        </a>
         <a href="https://play.google.com/store/apps/details?id=com.ruteromde.app" target="_blank" class="btn-gp">
           <span style="font-size:22px">▶</span>
           <div><small>Disponible en</small><strong>Google Play</strong></div>
         </a>
-        <a href="#rutas" class="btn-ghost">Explorar rutas →</a>
       </div>
       <div class="hero-stats">
-        <div><span class="snum">49</span><div class="slabel" data-es="eventos<br>con GPS" data-en="events<br>with GPS">eventos<br>con GPS</div></div>
-        <div><span class="snum">3</span><div class="slabel" data-es="rutas<br>gamificadas" data-en="gamified<br>routes">rutas<br>gamificadas</div></div>
-        <div><span class="snum">100%</span><div class="slabel" data-es="gratis<br>sin anuncios" data-en="free<br>no ads">gratis<br>sin anuncios</div></div>
+        <div><span class="snum">60+</span><div class="slabel">rutas<br>gamificadas</div></div>
+        <div><span class="snum">2</span><div class="slabel">stores<br>iOS · Android</div></div>
+        <div><span class="snum">100%</span><div class="slabel">gratis<br>sin anuncios</div></div>
       </div>
     </div>
     <div class="hero-vis">
@@ -298,7 +353,7 @@ a{text-decoration:none;color:inherit}
         <div class="pdeco pdeco2"></div>
         <div class="phone">
           <div class="phone-notch"></div>
-          <img src="assets/splash.jpg" alt="Rutero MDE app" loading="lazy" decoding="async">
+          <img src="assets/splash.jpg" alt="Rutero MDE app" loading="lazy" decoding="async" width="255" height="530">
           <div class="phone-ov">
             <div class="pchip">
               <div class="pchip-l">🗺️ Rutero MDE · Activo ahora</div>
@@ -333,16 +388,20 @@ a{text-decoration:none;color:inherit}
 <!-- FERIA HERO -->
 <section class="feria-hero" id="rutas-destacadas">
   <div class="feria-bg">
-    <img src="assets/imagenes/rutas/ruta_01_transformacion.jpg" alt="Transformación Urbana Medellín" loading="lazy" decoding="async"
+    <img src="assets/imagenes/rutas/ruta_01_transformacion.jpg"
+         alt="Transformación Urbana Medellín"
+         loading="lazy"
+         decoding="async"
+         width="1920" height="580"
          onerror="this.src='assets/splash.jpg'">
   </div>
   <div class="feria-cnt">
     <div class="feria-pre" id="feria-pre-el">🗺️ Rutero MDE · Rutas activas</div>
     <h2 class="feria-t">Explorá<br><em>Medellín</em></h2>
     <p class="feria-d" id="feria-date-el"><strong>60+ rutas gamificadas</strong> · Medellín, Bogotá y Popayán</p>
-    <a href="https://play.google.com/store/apps/details?id=com.ruteromde.app" target="_blank" class="btn-gp">
-      <span style="font-size:22px">▶</span>
-      <div><small>Descargá y explorá</small><strong>Google Play</strong></div>
+    <a href="https://apps.apple.com/app/rutero-mde/id6797524669" target="_blank" class="btn-apple">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="white"><path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/></svg>
+      <div><small>Descargá en</small><strong>App Store</strong></div>
     </a>
   </div>
 </section>
@@ -360,7 +419,10 @@ a{text-decoration:none;color:inherit}
         <div class="swiper-slide" style="width:340px">
           <div class="route-card">
             <div class="route-img">
-              <img src="assets/imagenes/rutas/ruta_corredor_45.jpg" alt="Corredor Cultural de la 45" loading="lazy" decoding="async"
+              <img src="assets/imagenes/rutas/ruta_corredor_45.jpg"
+                   alt="Corredor Cultural de la 45"
+                   loading="lazy" decoding="async"
+                   width="340" height="190"
                    onerror="this.parentElement.style.background='linear-gradient(135deg,#3D1500,#8B3500)';this.style.display='none'">
             </div>
             <div class="route-body">
@@ -375,7 +437,10 @@ a{text-decoration:none;color:inherit}
         <div class="swiper-slide" style="width:340px">
           <div class="route-card">
             <div class="route-img">
-              <img src="assets/imagenes/rutas/ruta_silletera.jpg" alt="Ruta Silletera"
+              <img src="assets/imagenes/rutas/ruta_silletera.jpg"
+                   alt="Ruta Silletera"
+                   loading="lazy"
+                   width="340" height="190"
                    onerror="this.parentElement.style.background='linear-gradient(135deg,#0D2B0F,#1D5C22)';this.style.display='none'">
             </div>
             <div class="route-body">
@@ -390,7 +455,10 @@ a{text-decoration:none;color:inherit}
         <div class="swiper-slide" style="width:340px">
           <div class="route-card">
             <div class="route-img">
-              <img src="assets/imagenes/rutas/tablados_y_rumba.jpg" alt="Metrocable & Arví"
+              <img src="assets/imagenes/rutas/tablados_y_rumba.jpg"
+                   alt="Metrocable & Arví"
+                   loading="lazy"
+                   width="340" height="190"
                    onerror="this.parentElement.style.background='linear-gradient(135deg,#1A0B2E,#4A1A6E)';this.style.display='none'">
             </div>
             <div class="route-body">
@@ -416,52 +484,46 @@ a{text-decoration:none;color:inherit}
     <p class="sub" data-es="60+ rutas en Medellín y Antioquia. Cada una con historia real, GPS y su insignia." data-en="60+ routes in Medellín and Antioquia. Each one with real history, GPS and its badge.">60+ rutas en Medellín y Antioquia. Cada una con historia real, GPS y su insignia.</p>
   </div>
   <div class="nscroll">
-
     <div class="ncard ng1">
-      <div class="ncard-bg"><img src="assets/imagenes/rutas/ruta_corredor_45.jpg" alt="Corredor 45" loading="lazy" onerror="this.style.display='none'"></div>
+      <div class="ncard-bg"><img src="assets/imagenes/rutas/ruta_corredor_45.jpg" alt="Corredor 45" loading="lazy" width="250" height="350" onerror="this.style.display='none'"></div>
       <div class="ncard-ov">
         <div class="ncard-city" id="nc1">Medellín · Norte</div>
         <div class="ncard-name" id="nn1">Corredor Cultural de la 45</div>
         <div class="ncard-info"><span>8 sitios</span><div class="ndot"></div><span>🏅</span></div>
       </div>
     </div>
-
     <div class="ncard ng2">
-      <div class="ncard-bg"><img src="assets/imagenes/rutas/ruta_poblado_verde.jpg" alt="Poblado Verde" loading="lazy" onerror="this.style.display='none'"></div>
+      <div class="ncard-bg"><img src="assets/imagenes/rutas/ruta_poblado_verde.jpg" alt="Poblado Verde" loading="lazy" width="250" height="350" onerror="this.style.display='none'"></div>
       <div class="ncard-ov">
         <div class="ncard-city" id="nc2">Medellín · El Poblado</div>
         <div class="ncard-name" id="nn2">El Poblado Verde</div>
         <div class="ncard-info"><span>6 sitios</span><div class="ndot"></div><span>🏅</span></div>
       </div>
     </div>
-
     <div class="ncard ng3">
-      <div class="ncard-bg"><img src="assets/imagenes/rutas/ruta_04_metrocable.jpg" alt="Metrocable" loading="lazy" onerror="this.style.display='none'"></div>
+      <div class="ncard-bg"><img src="assets/imagenes/rutas/ruta_04_metrocable.jpg" alt="Metrocable" loading="lazy" width="250" height="350" onerror="this.style.display='none'"></div>
       <div class="ncard-ov">
         <div class="ncard-city" id="nc3">Medellín · Metrocable</div>
         <div class="ncard-name" id="nn3">Metrocable & Arví</div>
         <div class="ncard-info"><span>5 sitios</span><div class="ndot"></div><span>🏅</span></div>
       </div>
     </div>
-
     <div class="ncard ng4">
-      <div class="ncard-bg"><img src="assets/imagenes/rutas/ruta_09_guatape.jpg" alt="Guatapé" loading="lazy" onerror="this.style.display='none'"></div>
+      <div class="ncard-bg"><img src="assets/imagenes/rutas/ruta_09_guatape.jpg" alt="Guatapé" loading="lazy" width="250" height="350" onerror="this.style.display='none'"></div>
       <div class="ncard-ov">
         <div class="ncard-city" id="nc4">Oriente Antioqueño</div>
         <div class="ncard-name" id="nn4">Guatapé & La Piedra</div>
         <div class="ncard-info"><span>7 sitios</span><div class="ndot"></div><span>🏅</span></div>
       </div>
     </div>
-
     <div class="ncard ng5">
-      <div class="ncard-bg"><img src="assets/imagenes/rutas/ruta_01_transformacion.jpg" alt="Transformación" loading="lazy" onerror="this.style.display='none'"></div>
+      <div class="ncard-bg"><img src="assets/imagenes/rutas/ruta_01_transformacion.jpg" alt="Transformación" loading="lazy" width="250" height="350" onerror="this.style.display='none'"></div>
       <div class="ncard-ov">
         <div class="ncard-city" id="nc5">Medellín · Norte</div>
         <div class="ncard-name" id="nn5">Transformación Urbana</div>
         <div class="ncard-info"><span>6 sitios</span><div class="ndot"></div><span>🏅</span></div>
       </div>
     </div>
-
     <div class="ncard ng6">
       <div class="ncard-ov">
         <div class="ncard-city" id="nc6">Medellín · Laureles</div>
@@ -469,7 +531,6 @@ a{text-decoration:none;color:inherit}
         <div class="ncard-info"><span>7 sitios</span><div class="ndot"></div><span>🏅</span></div>
       </div>
     </div>
-
   </div>
 </section>
 
@@ -484,31 +545,29 @@ a{text-decoration:none;color:inherit}
       </div>
       <div class="ins-grid">
         <div class="ins-item">
-          <img src="assets/imagenes/insignias/insignia_hijo_barrio.png" loading="lazy" decoding="async" alt="Hijo del Barrio">
+          <img src="Insignias/insignia_hijo_barrio.png" loading="lazy" decoding="async" alt="Hijo del Barrio" width="130" height="130">
           <span class="ins-name" id="ins-name1">Hijo del Barrio</span>
           <span class="ins-ruta" id="ins-ruta1">Corredor de la 45</span>
         </div>
         <div class="ins-item">
-          <img src="assets/imagenes/insignias/insignia_guardabosque.png" loading="lazy" decoding="async" alt="Guardabosque">
+          <img src="Insignias/insignia_03_guardabosque.png" loading="lazy" decoding="async" alt="Guardabosque" width="130" height="130">
           <span class="ins-name" id="ins-name2">Guardabosque</span>
           <span class="ins-ruta" id="ins-ruta2">Ruta Verde del Poblado</span>
         </div>
         <div class="ins-item">
-          <img src="assets/imagenes/insignias/insignia_07_condor_andes.png" loading="lazy" decoding="async" alt="Cóndor de los Andes">
+          <img src="Insignias/insignia_feria_guardian_silletero.png" loading="lazy" decoding="async" alt="Guardián Silletero" width="130" height="130">
           <span class="ins-name" id="ins-name3">Guardián Silletero</span>
           <span class="ins-ruta" id="ins-ruta3">Ruta Silletera</span>
         </div>
         <div class="ins-item">
-          <img src="assets/imagenes/insignias/insignia_guardian_patrimonio.png" loading="lazy" decoding="async" alt="Guardián Patrimonio"
-               onerror="this.style.display='none'">
+          <img src="Insignias/insignia_02_guardian_patrimonio.png" loading="lazy" decoding="async" alt="Guardián Patrimonio" width="130" height="130">
           <span class="ins-name" id="ins-name4">Guardián Patrimonio</span>
           <span class="ins-ruta" id="ins-ruta4">Ruta Patrimonial</span>
         </div>
         <div class="ins-item">
-          <img src="assets/imagenes/insignias/insignia_hijo_barrio.png" loading="lazy" decoding="async" alt="Hijo del Barrio"
-               onerror="this.style.display='none'">
-          <span class="ins-name" id="ins-name5">Hijo del Barrio</span>
-          <span class="ins-ruta" id="ins-ruta5">Corredor Cultural</span>
+          <img src="Insignias/insignia_07_condor_andes.png" loading="lazy" decoding="async" alt="Cóndor de los Andes" width="130" height="130">
+          <span class="ins-name" id="ins-name5">Cóndor de los Andes</span>
+          <span class="ins-ruta" id="ins-ruta5">Ruta de los Andes</span>
         </div>
         <div class="ins-secret">
           <div class="ins-secret-q">?</div>
@@ -525,11 +584,67 @@ a{text-decoration:none;color:inherit}
     <div class="tag">Sin complicaciones</div>
     <h2 class="h1" id="como-title-el">4 pasos.<br>Una aventura.</h2>
     <div class="como-grid">
-      <div class="paso"><div class="paso-num">1</div><h3><span id="paso1-t">Descargá</span></h3><p>Gratis en Google Play. Sin registro obligatorio. Abrís y ya tenés todos los eventos y rutas disponibles.</p></div>
+      <div class="paso"><div class="paso-num">1</div><h3><span id="paso1-t">Descargá</span></h3><p>Gratis en App Store y Google Play. Sin registro obligatorio. Abrís y ya tenés todas las rutas disponibles.</p></div>
       <div class="paso"><div class="paso-num">2</div><h3><span id="paso2-t">Elegí tu ruta</span></h3><p>Filtrá por ciudad, tema o duración. Cada ruta tiene historia real y un mapa con los sitios a visitar.</p></div>
       <div class="paso"><div class="paso-num">3</div><h3><span id="paso3-t">Validá con GPS</span></h3><p>Llegá a cada sitio. El GPS confirma tu visita en tiempo real. Sin trampas, sin atajos, sin fotos falsas.</p></div>
       <div class="paso"><div class="paso-num">4</div><h3><span id="paso4-t">Ganás</span></h3><p>Desbloqueás tu insignia coleccionable y accedés a beneficios reales en negocios locales aliados.</p></div>
     </div>
+  </div>
+</section>
+
+<!-- EN CAMPO — FOTOS VALIDADAS -->
+<section class="campo" id="campo">
+  <div class="wrap">
+    <div class="tag">Validaciones reales</div>
+    <h2 class="h1" style="font-size:clamp(28px,4vw,48px)">Ruteros en<br><span class="gold">campo.</span></h2>
+    <p class="sub">Cada foto fue tomada por un usuario con la app activa. El GPS confirmó la visita. Esto es Medellín desde adentro.</p>
+  </div>
+  <div class="campo-scroll">
+    <div class="vcard">
+      <img src="assets/Validaciones/estacion-san-javier.webp" alt="Estación San Javier" loading="lazy" width="280" height="340"
+           onerror="this.style.background='#1A2E1C';this.style.display='none'">
+      <div class="vcard-label">Estación San Javier · Metro</div>
+    </div>
+    <div class="vcard">
+      <img src="assets/Validaciones/biblioteca-san-javier-1.webp" alt="Biblioteca San Javier" loading="lazy" width="280" height="340"
+           onerror="this.style.display='none'">
+      <div class="vcard-label">Biblioteca San Javier</div>
+    </div>
+    <div class="vcard">
+      <img src="assets/Validaciones/biblioteca-san-javier-2.webp" alt="Biblioteca San Javier 2" loading="lazy" width="280" height="340"
+           onerror="this.style.display='none'">
+      <div class="vcard-label">Biblioteca San Javier · Interior</div>
+    </div>
+    <div class="vcard">
+      <img src="assets/Validaciones/ciudadela-4rev-1.webp" alt="Ciudadela 4° Revolución" loading="lazy" width="280" height="340"
+           onerror="this.style.display='none'">
+      <div class="vcard-label">Cuarta Revolución</div>
+    </div>
+    <div class="vcard">
+      <img src="assets/Validaciones/ciudadela-4rev-2.webp" alt="Ciudadela 4° Revolución fachada" loading="lazy" width="280" height="340"
+           onerror="this.style.display='none'">
+      <div class="vcard-label">Fachada · Cuarta Revolución</div>
+    </div>
+    <div class="vcard">
+      <img src="assets/Validaciones/parque-paz.webp" alt="Parque de la Paz" loading="lazy" width="280" height="340"
+           onerror="this.style.display='none'">
+      <div class="vcard-label">Parque de la Paz</div>
+    </div>
+    <div class="vcard">
+      <img src="assets/Validaciones/salon-prado.webp" alt="Salón Prado" loading="lazy" width="280" height="340"
+           onerror="this.style.display='none'">
+      <div class="vcard-label">Salón Prado · Barrio Prado</div>
+    </div>
+  </div>
+</section>
+
+<!-- WHOOSH -->
+<section class="whoosh-sec">
+  <div class="whoosh-inner" style="max-width:680px;margin:0 auto;text-align:center;display:block">
+    <img src="assets/servicios/whoosh_movilidad_oficial.png" alt="Whoosh Colombia" class="whoosh-logo" width="200" height="48" style="margin:0 auto 20px">
+    <h2 class="whoosh-title">Explorá en patineta<br><span class="gold">con Whoosh.</span></h2>
+    <p class="whoosh-desc" style="margin:0 auto 24px">Rutero MDE se une a Whoosh Colombia para conectar las rutas con movilidad eléctrica. Llegá a cada punto de la ruta en patineta — sostenible, rápido y sin complicaciones.</p>
+    <div class="whoosh-pill">🛴 Movilidad eléctrica · Aliado oficial</div>
   </div>
 </section>
 
@@ -550,11 +665,30 @@ a{text-decoration:none;color:inherit}
 <!-- ALIADOS -->
 <section class="aliados">
   <div class="wrap">
+    <div class="aliados-title">Con el respaldo de</div>
     <div class="aliados-grid">
-      <div class="aliado"><div class="aliado-name">Créame</div></div>
-      <div class="aliado"><div class="aliado-name">Google Play</div></div>
-      <div class="aliado"><div class="aliado-name">Whoosh Colombia</div></div>
-      <div class="aliado"><div class="aliado-name">Secretaría de Turismo</div></div>
+      <div class="aliado">
+        <img src="assets/servicios/whoosh_movilidad_oficial.png" alt="Whoosh Colombia" width="100" height="32">
+        <div class="aliado-name">Whoosh</div>
+        <div class="aliado-sub">Movilidad</div>
+      </div>
+      <div class="aliado">
+        <img src="assets/servicios/logo_iguideu.png" alt="iGuide" width="80" height="32" onerror="this.style.display='none'">
+        <div class="aliado-name">iGuide</div>
+        <div class="aliado-sub">Guías</div>
+      </div>
+      <div class="aliado">
+        <div class="aliado-name">Créame</div>
+        <div class="aliado-sub">Alcaldía MDE</div>
+      </div>
+      <div class="aliado">
+        <div class="aliado-name">Sec. Turismo</div>
+        <div class="aliado-sub">Medellín</div>
+      </div>
+      <div class="aliado">
+        <div class="aliado-name">Salón Prado</div>
+        <div class="aliado-sub">Barrio Prado</div>
+      </div>
     </div>
   </div>
 </section>
@@ -563,12 +697,17 @@ a{text-decoration:none;color:inherit}
 <section class="cta" id="descarga">
   <div class="cta-bg">
     <img src="assets/imagenes/rutas/ruta_04_metrocable.jpg" alt="Medellín"
+         loading="lazy" width="1920" height="580"
          onerror="this.src='assets/splash.jpg'">
   </div>
   <div class="cta-in">
     <h2 class="cta-t" id="cta-title-el">Tu próxima<br>aventura<br><em style="color:var(--gold)">empieza hoy.</em></h2>
     <p class="cta-s" data-es="60+ rutas con GPS en Medellín, Bogotá y Popayán. Insignias únicas. Recompensas reales. Todo gratis." data-en="60+ GPS routes in Medellín, Bogotá and Popayán. Unique badges. Real rewards. All free.">60+ rutas con GPS en Medellín, Bogotá y Popayán. Insignias únicas. Recompensas reales. Todo gratis.</p>
     <div class="cta-btns">
+      <a href="https://apps.apple.com/app/rutero-mde/id6797524669" target="_blank" class="btn-apple">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="white"><path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/></svg>
+        <div><small>Descargar gratis en</small><strong>App Store</strong></div>
+      </a>
       <a href="https://play.google.com/store/apps/details?id=com.ruteromde.app" target="_blank" class="btn-gp">
         <span style="font-size:24px">▶</span>
         <div><small>Descargar gratis en</small><strong>Google Play</strong></div>
@@ -577,6 +716,7 @@ a{text-decoration:none;color:inherit}
     <div class="cta-trust">
       <span>✓ Gratis</span>
       <span>✓ Sin anuncios</span>
+      <span>✓ iOS y Android</span>
       <span>✓ Hecho en Medellín</span>
       <span>✓ Créame · Alcaldía</span>
     </div>
@@ -589,7 +729,7 @@ a{text-decoration:none;color:inherit}
     <div class="footer-in">
       <div>
         <div class="f-brand">
-          <img src="assets/logo.png" alt="Rutero MDE">
+          <img src="assets/logo.png" alt="Rutero MDE" width="32" height="32">
           <div class="f-brand-t">Rutero <span>MDE</span></div>
         </div>
         <p class="f-tag" data-es="Turismo gamificado, hecho en Medellín. Programa Créame, Alcaldía de Medellín." data-en="Gamified tourism, made in Medellín. Créame Program, Medellín Mayor's Office.">Turismo gamificado, hecho en Medellín. Programa Créame, Alcaldía de Medellín.</p>
@@ -597,9 +737,9 @@ a{text-decoration:none;color:inherit}
       <div class="f-col">
         <h4>Explorar</h4>
         <a href="#rutas">Rutas</a>
-        <a href="#rutas">Rutas</a>
         <a href="#insignias">Insignias</a>
         <a href="#como">Cómo funciona</a>
+        <a href="#campo">En campo</a>
       </div>
       <div class="f-col">
         <h4>Contacto</h4>
@@ -611,48 +751,63 @@ a{text-decoration:none;color:inherit}
     </div>
     <div class="f-bottom">
       <p class="f-credit">© 2026 Rutero MDE · Programa Créame, Alcaldía de Medellín · DNDA 1-2025-110420</p>
-      <a href="https://play.google.com/store/apps/details?id=com.ruteromde.app" target="_blank"
-         style="font-family:var(--fn);font-size:12px;color:var(--gold);font-weight:600">
-        Descargar en Google Play →
-      </a>
+      <div class="f-stores">
+        <a href="https://apps.apple.com/app/rutero-mde/id6797524669" target="_blank"
+           style="font-family:var(--fn);font-size:12px;color:var(--text);font-weight:600">
+          App Store →
+        </a>
+        <a href="https://play.google.com/store/apps/details?id=com.ruteromde.app" target="_blank"
+           style="font-family:var(--fn);font-size:12px;color:var(--gold);font-weight:600">
+          Google Play →
+        </a>
+      </div>
     </div>
   </div>
 </footer>
 
-<script src="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/ScrollTrigger.min.js"></script>
-<script>
+<!-- PERFORMANCE: scripts diferidos al final, con defer -->
+<script src="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.js" defer></script>
+<script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js" defer></script>
+<script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/ScrollTrigger.min.js" defer></script>
+<script defer>
+// Esperar a que los scripts diferidos carguen
+window.addEventListener('load', function() {
+
 // Nav
 window.addEventListener('scroll',()=>{
   document.getElementById('nav').classList.toggle('on',window.scrollY>40);
 },{passive:true});
 
-// Swiper
-new Swiper('.feria-swiper',{
-  slidesPerView:'auto',spaceBetween:20,grabCursor:true,
-  pagination:{el:'.swiper-pagination',clickable:true},
-  breakpoints:{768:{slidesPerView:2},1024:{slidesPerView:3}}
-});
+// Swiper rutas
+if (typeof Swiper !== 'undefined') {
+  new Swiper('.feria-swiper',{
+    slidesPerView:'auto',spaceBetween:20,grabCursor:true,
+    pagination:{el:'.swiper-pagination',clickable:true},
+    breakpoints:{768:{slidesPerView:2},1024:{slidesPerView:3}}
+  });
+}
 
 // GSAP
-gsap.registerPlugin(ScrollTrigger);
-gsap.from('.eyebrow',{opacity:0,y:20,duration:.8,delay:.2});
-gsap.from('.hero-title',{opacity:0,y:40,duration:1,delay:.4});
-gsap.from('.hero-sub',{opacity:0,y:20,duration:.8,delay:.6});
-gsap.from('.cd',{opacity:0,y:20,duration:.8,delay:.7});
-gsap.from('.hero-actions',{opacity:0,y:20,duration:.8,delay:.8});
-gsap.from('.hero-stats',{opacity:0,y:20,duration:.8,delay:1});
-gsap.from('.phone',{opacity:0,x:40,duration:1,delay:.6});
+if (typeof gsap !== 'undefined' && typeof ScrollTrigger !== 'undefined') {
+  gsap.registerPlugin(ScrollTrigger);
+  gsap.from('.eyebrow',{opacity:0,y:20,duration:.8,delay:.2});
+  gsap.from('.hero-title',{opacity:0,y:40,duration:1,delay:.4});
+  gsap.from('.hero-sub',{opacity:0,y:20,duration:.8,delay:.6});
+  gsap.from('.hero-actions',{opacity:0,y:20,duration:.8,delay:.8});
+  gsap.from('.hero-stats',{opacity:0,y:20,duration:.8,delay:1});
+  gsap.from('.phone',{opacity:0,x:40,duration:1,delay:.6});
 
-gsap.utils.toArray('.why-card,.paso,.ins-item,.route-card').forEach((el,i)=>{
-  gsap.from(el,{opacity:0,y:28,duration:.7,delay:i*.08,
-    scrollTrigger:{trigger:el,start:'top 88%'}});
-});
-gsap.utils.toArray('.h1,.sub').forEach(el=>{
-  gsap.from(el,{opacity:0,y:22,duration:.8,
-    scrollTrigger:{trigger:el,start:'top 90%'}});
-});
+  gsap.utils.toArray('.why-card,.paso,.ins-item,.route-card,.vcard').forEach((el,i)=>{
+    gsap.from(el,{opacity:0,y:28,duration:.7,delay:i*.06,
+      scrollTrigger:{trigger:el,start:'top 88%'}});
+  });
+  gsap.utils.toArray('.h1,.sub').forEach(el=>{
+    gsap.from(el,{opacity:0,y:22,duration:.8,
+      scrollTrigger:{trigger:el,start:'top 90%'}});
+  });
+}
+
+}); // end window.load
 </script>
 
 <script>
@@ -666,25 +821,18 @@ const i18n = {
     'why-p2': 'Colecciones digitales únicas por ciudad. Medellín, Bogotá y Popayán tienen sus propias insignias exclusivas.',
     'why-p3': 'Beneficios reales en negocios locales aliados. Completar una ruta tiene valor tangible, no solo virtual.',
     'why-p4': 'Conectamos turistas con el comercio auténtico de Medellín. No cadenas, no franquicias. Lo que hace único al destino.',
-    'feria-pre': '🌺 Módulo especial · Activo ahora',
+    'feria-pre': '🗺️ Rutero MDE · Rutas activas',
     'feria-date': '<strong>60+ rutas gamificadas</strong> · Medellín, Bogotá y Popayán',
     'rutas-title': '3 rutas. 3 insignias. Solo en 2026.',
-    'rc-desc1': 'Los 13 momentos más icónicos. Obelisco, Desfile Silleteros, Súper Concierto, Plaza Gardel.',
-    'rc-desc2': 'Metrocable, Parque Arví, fincas silleteras El Pinar y La Playa, Parque de Santa Elena.',
-    'rc-desc3': 'Un tablado cada noche en toda la ciudad. Trova, salsa, vallenato. La Feria vive en los barrios.',
+    'rc-desc1': 'Arte urbano, galerías, cafés y cultura viva entre la 45 y sus calles. La ruta más auténtica del norte de Medellín.',
+    'rc-desc2': 'La historia del milagro urbano de Medellín. Biblioteca España, Parque Explora, Metrocable y la memoria de la transformación.',
+    'rc-desc3': 'Desde el Metro hasta el Parque Arví. Naturaleza, comunidad y los mejores miradores de Medellín en una sola ruta.',
     'netflix-title': 'Más rutas.<br>Más aventuras.',
     'ins-title': 'Insignias que<br>se <span class="gold">ganan.</span>',
     'como-title': '4 pasos.<br>Una aventura.',
-    'paso1-t': 'Descargá', 'paso1-p': 'Gratis en Google Play. Sin registro obligatorio. Abrís y ya tenés todos los eventos y rutas disponibles.',
-    'paso2-t': 'Elegí tu ruta', 'paso2-p': 'Filtrá por ciudad, tema o duración. Cada ruta tiene historia real y un mapa con los sitios a visitar.',
-    'paso3-t': 'Validá con GPS', 'paso3-p': 'Llegá a cada sitio. El GPS confirma tu visita en tiempo real. Sin trampas, sin atajos, sin fotos falsas.',
-    'paso4-t': 'Ganás', 'paso4-p': 'Desbloqueás tu insignia coleccionable y accedés a beneficios reales en negocios locales aliados.',
+    'paso1-t': 'Descargá', 'paso2-t': 'Elegí tu ruta', 'paso3-t': 'Validá con GPS', 'paso4-t': 'Ganás',
     'video-title': 'Ve cómo se explora<br>Medellín con Rutero.',
     'cta-title': 'Tu próxima<br>aventura<br><em style="color:var(--gold)">empieza hoy.</em>',
-    'btn-explore': 'Explorar Feria →',
-    'btn-dl-s': 'Disponible en', 'btn-dl-b': 'Google Play',
-    'btn-explore2': 'Descargá y explorá',
-    'btn-dl-cta-s': 'Descargar gratis en',
     'ins-name1': 'Hijo del Barrio', 'ins-ruta1': 'Corredor de la 45',
     'ins-name2': 'Guardabosque', 'ins-ruta2': 'Ruta Verde del Poblado',
     'ins-name3': 'Guardián Silletero', 'ins-ruta3': 'Ruta Silletera',
@@ -703,30 +851,23 @@ const i18n = {
     'why-tag': 'Why Rutero?',
     'why-title': "It's not Google Maps.<br>It's a video game.",
     'why-p1': 'Real-time GPS validation. The app confirms you arrived. No cheats, no shortcuts. The badge is earned by walking.',
-    'why-p2': 'Unique digital collections per city and event. The 2026 Flower Festival ones only exist this year.',
+    'why-p2': 'Unique digital collections per city. Each city has its own exclusive badges.',
     'why-p3': 'Real benefits at local partner businesses. Completing a route has tangible value, not just virtual.',
     'why-p4': "We connect tourists with Medellín's authentic commerce. No chains, no franchises. What makes the destination unique.",
-    'feria-pre': '🌺 Special module · Active now',
-    'feria-date': '<strong>July 31 — August 9</strong> · Medellín, Colombia',
+    'feria-pre': '🗺️ Rutero MDE · Active routes',
+    'feria-date': '<strong>60+ gamified routes</strong> · Medellín, Bogotá and Popayán',
     'rutas-title': '3 routes. 3 badges. Only in 2026.',
-    'rc-desc1': 'The 13 most iconic moments. Obelisco, Silleteros Parade, Super Concert, Plaza Gardel.',
-    'rc-desc2': 'Metrocable, Arví Park, El Pinar and La Playa silletera farms, Santa Elena Park.',
-    'rc-desc3': 'A stage every night across the city. Trova, salsa, vallenato. The Festival lives in the neighborhoods.',
+    'rc-desc1': 'Urban art, galleries, cafés and living culture along the 45. The most authentic route in northern Medellín.',
+    'rc-desc2': 'The story of Medellín\'s urban miracle. España Library, Parque Explora, Metrocable and the memory of transformation.',
+    'rc-desc3': 'From the Metro to Arví Park. Nature, community and the best viewpoints of Medellín in one route.',
     'netflix-title': 'More routes.<br>More adventures.',
     'ins-title': 'Badges that are<br><span class="gold">earned.</span>',
     'como-title': '4 steps.<br>One adventure.',
-    'paso1-t': 'Download', 'paso1-p': 'Free on Google Play. No mandatory registration. Open it and you have all events and routes ready.',
-    'paso2-t': 'Choose your route', 'paso2-p': 'Filter by city, theme or duration. Each route has real history and a map with sites to visit.',
-    'paso3-t': 'Validate with GPS', 'paso3-p': 'Arrive at each site. GPS confirms your visit in real time. No cheats, no shortcuts, no fake photos.',
-    'paso4-t': 'You win', 'paso4-p': 'Unlock your collectible badge and access real benefits at local partner businesses.',
+    'paso1-t': 'Download', 'paso2-t': 'Choose your route', 'paso3-t': 'Validate with GPS', 'paso4-t': 'You win',
     'video-title': 'See how<br>Medellín is explored with Rutero.',
     'cta-title': 'Your next<br>adventure<br><em style="color:var(--gold)">starts today.</em>',
-    'btn-explore': 'Explore Festival →',
-    'btn-dl-s': 'Available on', 'btn-dl-b': 'Google Play',
-    'btn-explore2': 'Download & explore',
-    'btn-dl-cta-s': 'Download free on',
     'ins-name1': 'Son of the Barrio', 'ins-ruta1': 'Corredor de la 45',
-    'ins-name2': 'Guardabosque', 'ins-ruta2': 'Green Route Poblado',
+    'ins-name2': 'Forest Guardian', 'ins-ruta2': 'Green Route Poblado',
     'ins-name3': 'Silletero Guardian', 'ins-ruta3': 'Silletera Route',
     'ins-name4': 'Heritage Guardian', 'ins-ruta4': 'Heritage Route',
     'ins-name5': 'Son of the Hood', 'ins-ruta5': 'Cultural Corridor',
@@ -741,67 +882,41 @@ const i18n = {
 };
 
 let currentLang = 'es';
+function t(key){ return i18n[currentLang][key] || i18n.es[key] || ''; }
 
-function t(key) { return i18n[currentLang][key] || i18n.es[key] || ''; }
-
-function applyLang() {
-  // data-es/data-en directos
-  document.querySelectorAll('[data-es]').forEach(el => {
-    el.innerHTML = currentLang === 'es' ? el.dataset.es : el.dataset.en;
+function applyLang(){
+  document.querySelectorAll('[data-es]').forEach(el=>{
+    el.innerHTML = currentLang==='es' ? el.dataset.es : el.dataset.en;
   });
-
-  // Elementos con data-i18n
-  document.querySelectorAll('[data-i18n]').forEach(el => {
-    const key = el.dataset.i18n;
-    if (t(key)) el.innerHTML = t(key);
-  });
-
-  // Aplicar todas las claves del diccionario a elementos con id o data-i18n
-  const set = (id, key) => { const e = document.getElementById(id); if(e && t(key)) e.innerHTML = t(key); };
-
-  // Why
+  const set=(id,key)=>{const e=document.getElementById(id);if(e&&t(key))e.innerHTML=t(key);};
   set('why-tag-el','why-tag'); set('why-title-el','why-title');
   set('why-p1','why-p1'); set('why-p2','why-p2'); set('why-p3','why-p3'); set('why-p4','why-p4');
-  // Feria
   set('feria-pre-el','feria-pre'); set('feria-date-el','feria-date');
-  // Rutas
   set('rutas-title-el','rutas-title');
   set('rc-desc1','rc-desc1'); set('rc-desc2','rc-desc2'); set('rc-desc3','rc-desc3');
-  // Netflix
   set('netflix-title-el','netflix-title');
   for(let i=1;i<=6;i++){set('nc'+i,'nc'+i);set('nn'+i,'nn'+i);}
-  // Insignias
   set('ins-title-el','ins-title');
   for(let i=1;i<=5;i++){set('ins-name'+i,'ins-name'+i);set('ins-ruta'+i,'ins-ruta'+i);}
   set('ins-secret-el','ins-secret');
-  // Como
   set('como-title-el','como-title');
-  for(let i=1;i<=4;i++){set('paso'+i+'-t','paso'+i+'-t');set('paso'+i+'-p','paso'+i+'-p');}
-  // Video
+  for(let i=1;i<=4;i++){set('paso'+i+'-t','paso'+i+'-t');}
   set('video-title-el','video-title');
-  // CTA
   set('cta-title-el','cta-title');
-
-  // Botones Google Play
-  document.querySelectorAll('.btn-gp-s').forEach(e => { if(t('btn-dl-s')) e.innerHTML = t('btn-dl-s'); });
-  document.querySelectorAll('.btn-explore-el').forEach(e => { if(t('btn-explore')) e.innerHTML = t('btn-explore'); });
-
-  // Toggle button
-  const btn = document.getElementById('lang-btn');
-  if(btn) btn.textContent = currentLang === 'es' ? 'EN' : 'ES';
+  const btn=document.getElementById('lang-btn');
+  if(btn) btn.textContent=currentLang==='es'?'EN':'ES';
 }
 
-function toggleLang() {
-  currentLang = currentLang === 'es' ? 'en' : 'es';
+function toggleLang(){
+  currentLang=currentLang==='es'?'en':'es';
   applyLang();
-  localStorage.setItem('rutero-lang', currentLang);
+  localStorage.setItem('rutero-lang',currentLang);
 }
 
-// Init
-window.addEventListener('DOMContentLoaded', () => {
-  const saved = localStorage.getItem('rutero-lang');
-  if(saved) currentLang = saved;
-  if(currentLang === 'en') applyLang();
+window.addEventListener('DOMContentLoaded',()=>{
+  const saved=localStorage.getItem('rutero-lang');
+  if(saved) currentLang=saved;
+  if(currentLang==='en') applyLang();
 });
 </script>
 

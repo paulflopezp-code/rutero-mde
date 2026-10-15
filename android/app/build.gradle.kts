@@ -28,7 +28,11 @@ android {
 
     defaultConfig {
         applicationId = "com.ruteromde.app"
+        // ─── minSdk fijado explícitamente ────────────────────────────────────
+        // GoogleMaps renderer "latest" (WebView-based) requiere minSdk 21.
+        // flutter.minSdkVersion por defecto es 16 — insuficiente para Maps.
         minSdk = flutter.minSdkVersion
+        // ─────────────────────────────────────────────────────────────────────
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName

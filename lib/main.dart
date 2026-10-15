@@ -659,7 +659,7 @@ const List<_CiudadRegistrada> kCiudadesRegistradas = [
     lat: 6.2442, lng: -75.5812, radioKm: 35,
     codigo: 'MDE', emoji: '🌸',
     nombreApp: 'RUTERO MDE',
-    taglineES: 'The most beautiful city in the world 🌸',
+    taglineES: 'La ciudad más hermosa del mundo 🌸',
     taglineEN: 'The most beautiful city in the world 🌸',
   ),
 
@@ -5001,42 +5001,55 @@ class _CatServicio {
 }
 
 const List<_CatServicio> kCategoriaServicio = [
-  _CatServicio(id: 'Todos',       label: 'Todos',       labelEN: 'All',         emoji: '🛎️', color: RDSColor.gold),
-  _CatServicio(id: 'Transporte',  label: 'Transporte',  labelEN: 'Transport',   emoji: '🚗', color: Color(0xFF1565C0)),
-  _CatServicio(id: 'Guías',       label: 'Guías',       labelEN: 'Guides',      emoji: '🧭', color: Color(0xFF1B6B3A)),
-  _CatServicio(id: 'Belleza',     label: 'Belleza',     labelEN: 'Beauty',      emoji: '💅', color: Color(0xFFAD1457)),
-  _CatServicio(id: 'Tecnología',  label: 'Tecnología',  labelEN: 'Tech',        emoji: '🔧', color: Color(0xFF0D47A1)),
-  _CatServicio(id: 'Hospedaje',   label: 'Hospedaje',   labelEN: 'Lodging',     emoji: '🏨', color: Color(0xFF6A1B9A)),
-  _CatServicio(id: 'Gastronomía', label: 'Gastronomía', labelEN: 'Food',        emoji: '🍽️', color: Color(0xFFE65100)),
-  _CatServicio(id: 'Otro',        label: 'Otro',        labelEN: 'Other',       emoji: '✨', color: Color(0xFF37474F)),
+  _CatServicio(id: 'Todos',            label: 'Todos',            labelEN: 'All',             emoji: '🛎️', color: RDSColor.gold),
+  _CatServicio(id: 'Transporte',       label: 'Transporte',       labelEN: 'Transport',       emoji: '🚗', color: Color(0xFF1565C0)),
+  _CatServicio(id: 'Guías',            label: 'Guías',            labelEN: 'Guides',          emoji: '🧭', color: Color(0xFF1B6B3A)),
+  _CatServicio(id: 'Hospedaje',        label: 'Hospedaje',        labelEN: 'Lodging',         emoji: '🏨', color: Color(0xFF6A1B9A)),
+  _CatServicio(id: 'Gastronomía',      label: 'Gastronomía',      labelEN: 'Food',            emoji: '🍽️', color: Color(0xFFE65100)),
+  _CatServicio(id: 'Experiencias',     label: 'Experiencias',     labelEN: 'Experiences',     emoji: '🎯', color: Color(0xFF00695C)),
+  _CatServicio(id: 'Salud y Bienestar',label: 'Salud',            labelEN: 'Wellness',        emoji: '🧘', color: Color(0xFF2E7D32)),
+  _CatServicio(id: 'Belleza',          label: 'Belleza',          labelEN: 'Beauty',          emoji: '💅', color: Color(0xFFAD1457)),
+  _CatServicio(id: 'Tecnología',       label: 'Tecnología',       labelEN: 'Tech',            emoji: '🔧', color: Color(0xFF0D47A1)),
+  _CatServicio(id: 'Comercio',         label: 'Comercio',         labelEN: 'Commerce',        emoji: '🛍️', color: Color(0xFF4527A0)),
+  _CatServicio(id: 'Otro',             label: 'Otro',             labelEN: 'Other',           emoji: '✨', color: Color(0xFF37474F)),
 ];
 
 // ── Modelo hardcodeado (fallback) ────────────────────────────────────────
 class _ServicioViajero {
   final String nombre;
   final String empresa;
-  final String categoria;  // id de _CatServicio
+  final String categoria;       // id de _CatServicio
+  final String especialidad;    // describí tu categoría (formulario paso 1)
   final String descripcion;
   final String descripcionEN;
   final String whatsapp;
+  final String email;
   final String urlExterna;
   final String emoji;
   final String? logoAsset;
   final String idiomas;
   final String idiomasEN;
   final String direccion;
+  final String zona;            // barrio / zona
+  final String modalidad;       // presencial / domicilio / ambas
+  final String horario;
+  final String precio;          // precio base o rango (ej: "COP 80.000/hora")
+  final String ofertaRutero;    // oferta exclusiva para viajeros Rutero MDE
   final String comoLlegar;
   final String comoLlegarEN;
-  final String mapsQuery;  // texto para abrir en Google Maps
+  final String mapsQuery;
   final Color color;
   const _ServicioViajero({
     required this.nombre, required this.empresa,
     required this.categoria,
+    this.especialidad = '',
     required this.descripcion, required this.descripcionEN,
-    this.whatsapp = '', this.urlExterna = '',
+    this.whatsapp = '', this.email = '', this.urlExterna = '',
     required this.emoji, this.logoAsset,
     this.idiomas = '', this.idiomasEN = '',
-    this.direccion = '', this.comoLlegar = '', this.comoLlegarEN = '',
+    this.direccion = '', this.zona = '', this.modalidad = '',
+    this.horario = '', this.precio = '', this.ofertaRutero = '',
+    this.comoLlegar = '', this.comoLlegarEN = '',
     this.mapsQuery = '',
     required this.color,
   });
@@ -5046,30 +5059,46 @@ final List<_ServicioViajero> kServiciosViajero = [
   _ServicioViajero(
     nombre: 'Sebastián Lopera', empresa: 'Iguideu',
     categoria: 'Guías',
+    especialidad: 'Intérprete y guía turístico bilingüe',
     descripcion: 'Intérprete inglés ↔ español. Disponible para tours, reuniones de negocios, trámites y acompañamiento personalizado en Medellín.',
     descripcionEN: 'English ↔ Spanish interpreter. Available for tours, business meetings, procedures and personalized assistance in Medellín.',
     whatsapp: '+573003760845',
     emoji: '🗣️', logoAsset: 'assets/images/servicios/logo_iguideu.png',
     idiomas: '🇬🇧 Inglés · 🇨🇴 Español', idiomasEN: '🇬🇧 English · 🇨🇴 Spanish',
+    modalidad: 'Ambas modalidades',
+    horario: 'Lun–Sáb 8:00 am – 8:00 pm',
+    precio: 'Desde COP 120.000/hora',
+    ofertaRutero: '10% descuento en tu primer tour al mostrar Rutero MDE',
     color: Color(0xFF1B6B3A)),
   _ServicioViajero(
     nombre: 'MedeGuide', empresa: 'MedeGuide',
     categoria: 'Guías',
+    especialidad: 'Guía turístico francófono',
     descripcion: 'Intérprete y guía turístico para turistas francófonos. Recorridos por Medellín, comunas, alrededores y experiencias auténticas.',
     descripcionEN: 'Interpreter and tour guide for French-speaking tourists. Tours through Medellín, comunas, surroundings and authentic experiences.',
     whatsapp: '+573115908072',
     emoji: '🧭', logoAsset: 'assets/images/servicios/logo_medeguide.png',
     idiomas: '🇫🇷 Francés · 🇨🇴 Español', idiomasEN: '🇫🇷 French · 🇨🇴 Spanish',
+    modalidad: 'Ambas modalidades',
+    horario: 'Lun–Dom 8:00 am – 7:00 pm',
+    precio: 'Desde COP 150.000/tour',
+    ofertaRutero: 'Tour de bienvenida a Medellín con descuento especial para viajeros Rutero',
     color: Color(0xFF1565C0)),
   _ServicioViajero(
     nombre: 'Mobiplab', empresa: 'Mobiplab',
     categoria: 'Tecnología',
+    especialidad: 'Reparación de iPhone y Android',
     descripcion: 'Reparación de celulares iPhone en el centro de Medellín. Especialistas en pantallas, batería y diagnóstico rápido.',
     descripcionEN: 'iPhone repair in downtown Medellín. Screen, battery and fast diagnosis.',
     whatsapp: '+573001852758',
     emoji: '🔧', logoAsset: 'assets/images/servicios/Mobiplab.jpg',
     idiomas: '🇨🇴 Español', idiomasEN: '🇨🇴 Spanish',
     direccion: 'Calle 50 N° 55-50, piso 2, Centro, Medellín',
+    zona: 'Centro, Medellín',
+    modalidad: 'Solo presencial',
+    horario: 'Lun–Sáb 9:00 am – 6:00 pm',
+    precio: 'Diagnóstico gratis · Pantalla desde COP 180.000',
+    ofertaRutero: 'Diagnóstico gratuito + 10% descuento en reparación al mostrar Rutero MDE',
     comoLlegar: 'Metro línea A, estación Parque Berrío. Camina 3 min hacia el norte por la Calle 50.',
     comoLlegarEN: 'Metro line A, Parque Berrío station. Walk 3 min north along Calle 50.',
     mapsQuery: 'Calle 50 55-50 Medellín',
@@ -5077,11 +5106,16 @@ final List<_ServicioViajero> kServiciosViajero = [
   _ServicioViajero(
     nombre: 'Whoosh Colombia', empresa: 'Whoosh',
     categoria: 'Transporte',
+    especialidad: 'Patinetas eléctricas compartidas',
     descripcion: 'Patinetas eléctricas compartidas en Medellín. Más de 1.000 patinetas en zonas planas. Perfectas para recorrer rutas de Rutero MDE. Buscá el punto P más cercano en la app.',
     descripcionEN: 'Shared electric scooters in Medellín. Over 1,000 scooters in flat areas. Perfect for Rutero MDE routes. Find the nearest P point in the app.',
     urlExterna: 'https://whoosh.bike/es_la',
     emoji: '🛴', logoAsset: 'assets/images/servicios/whoosh_logo_amarillo.png',
     idiomas: '🇨🇴 Español · 🇬🇧 English', idiomasEN: '🇨🇴 Spanish · 🇬🇧 English',
+    modalidad: 'Solo presencial',
+    horario: 'Disponible 24/7 — depende disponibilidad de patinetas en la zona',
+    precio: 'Desde COP 2.000 por minuto',
+    ofertaRutero: 'Primeros 10 minutos gratis al registrarse con código RUTERO',
     color: Color(0xFFFFD000)),
 ];
 
@@ -5117,10 +5151,277 @@ class _ServiciosScreenState extends State<ServiciosScreen> {
   Color _colorDeCat(String catId) =>
     kCategoriaServicio.firstWhere((c) => c.id == catId, orElse: () => kCategoriaServicio.last).color;
 
+  // Normaliza la categoría desde Firestore (acepta todos los valores del formulario ficha-aliados.html
+  // y variantes con/sin tilde, mayúsculas/minúsculas)
+  String _normalizarCategoria(String raw) {
+    final r = raw.trim().toLowerCase();
+    // Match exacto (case-insensitive) contra los ids de kCategoriaServicio
+    for (final c in kCategoriaServicio) {
+      if (c.id.toLowerCase() == r) return c.id;
+    }
+    // Aliases de Transporte
+    if (r == 'transport') return 'Transporte';
+    // Aliases de Guías
+    if (r == 'guia' || r == 'guias' || r == 'guía' || r == 'guide' || r == 'guides') return 'Guías';
+    // Aliases de Hospedaje — el formulario web usa "Alojamiento"
+    if (r == 'alojamiento' || r == 'lodging' || r == 'hotel' || r == 'accommodation') return 'Hospedaje';
+    // Aliases de Gastronomía
+    if (r == 'gastronomia' || r == 'food' || r == 'restaurante' || r == 'restaurant') return 'Gastronomía';
+    // Aliases de Tecnología
+    if (r == 'tecnologia' || r == 'tech') return 'Tecnología';
+    // Aliases de Belleza
+    if (r == 'beauty') return 'Belleza';
+    // Aliases de Experiencias
+    if (r == 'experiencia' || r == 'experience' || r == 'experiences') return 'Experiencias';
+    // Aliases de Salud y Bienestar
+    if (r == 'salud' || r == 'bienestar' || r == 'salud y bienestar' || r == 'wellness' || r == 'health') return 'Salud y Bienestar';
+    // Aliases de Comercio
+    if (r == 'comercio' || r == 'commerce' || r == 'tienda' || r == 'store' || r == 'shop') return 'Comercio';
+    // Servicios Legales y Educación → Otro (no tienen categoría propia en la app aún)
+    if (r == 'servicios legales' || r == 'legal' || r == 'educacion' || r == 'educación' || r == 'education') return 'Otro';
+    return 'Otro';
+  }
+
+  void _mostrarDetalle(BuildContext context, Map<String, dynamic> d) {
+    final nombre        = d['nombre']?.toString() ?? '';
+    final empresa       = d['empresa']?.toString() ?? '';
+    final categoria     = _normalizarCategoria(d['categoria']?.toString() ?? 'Otro');
+    final especialidad  = d['especialidad']?.toString() ?? '';
+    final descripcion   = kLang == 'en'
+      ? (d['descripcionEN']?.toString() ?? d['descripcion']?.toString() ?? '')
+      : (d['descripcion']?.toString() ?? '');
+    final whatsapp      = d['whatsapp']?.toString() ?? '';
+    final email         = d['email']?.toString() ?? '';
+    final urlExterna    = d['urlExterna']?.toString() ?? '';
+    final idiomas       = kLang == 'en'
+      ? (d['idiomasEN']?.toString() ?? d['idiomas']?.toString() ?? '')
+      : (d['idiomas']?.toString() ?? '');
+    final direccion     = d['direccion']?.toString() ?? '';
+    final zona          = d['zona']?.toString() ?? '';
+    final modalidad     = d['modalidad']?.toString() ?? '';
+    final horario       = d['horario']?.toString() ?? '';
+    final precio        = d['precio']?.toString() ?? '';
+    final ofertaRutero  = d['ofertaRutero']?.toString() ?? '';
+    final comoLlegar    = kLang == 'en'
+      ? (d['comoLlegarEN']?.toString() ?? d['comoLlegar']?.toString() ?? '')
+      : (d['comoLlegar']?.toString() ?? '');
+    final mapsQuery     = d['mapsQuery']?.toString() ?? direccion;
+    final emoji         = d['emoji']?.toString() ?? '🛎️';
+    final logoAsset     = d['logoAsset']?.toString();
+    Color color;
+    try { color = Color(int.parse((d['color']?.toString() ?? '#1B6B3A').replaceAll('#', '0xFF'))); }
+    catch (_) { color = _colorDeCat(categoria); }
+    final cat = kCategoriaServicio.firstWhere((c) => c.id == categoria, orElse: () => kCategoriaServicio.last);
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (_) => DraggableScrollableSheet(
+        initialChildSize: 0.65,
+        minChildSize: 0.4,
+        maxChildSize: 0.95,
+        builder: (_, ctrl) => Container(
+          decoration: BoxDecoration(
+            color: RDSColor.base,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+            border: Border.all(color: color.withOpacity(0.25))),
+          child: ListView(controller: ctrl, padding: const EdgeInsets.fromLTRB(24, 0, 24, 48), children: [
+            // Handle
+            Center(child: Container(margin: const EdgeInsets.only(top: 12, bottom: 20),
+              width: 36, height: 4,
+              decoration: BoxDecoration(color: RDSColor.textMuted.withOpacity(0.3), borderRadius: BorderRadius.circular(2)))),
+
+            // Badge categoría + idiomas
+            Row(children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: cat.color.withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: cat.color.withOpacity(0.4))),
+                child: Text('${cat.emoji}  ${kLang == "en" ? cat.labelEN : cat.label}',
+                  style: TextStyle(color: cat.color, fontSize: 11, fontWeight: FontWeight.w800))),
+              if (idiomas.isNotEmpty) ...[
+                const Spacer(),
+                Text(idiomas, style: TextStyle(color: RDSColor.textMuted.withOpacity(0.6), fontSize: 11)),
+              ],
+            ]),
+            const SizedBox(height: 16),
+
+            // Logo + nombre + especialidad
+            Row(children: [
+              Container(
+                width: 68, height: 68,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: color == const Color(0xFFFFD000) ? Colors.black : Colors.white,
+                  border: Border.all(color: color.withOpacity(0.4), width: 2),
+                  boxShadow: [BoxShadow(color: color.withOpacity(0.2), blurRadius: 12)]),
+                child: ClipOval(child: logoAsset != null
+                  ? Padding(padding: const EdgeInsets.all(6),
+                      child: Image.asset(logoAsset, fit: BoxFit.contain,
+                        errorBuilder: (_, __, ___) => Center(child: Text(emoji, style: const TextStyle(fontSize: 28)))))
+                  : Center(child: Text(emoji, style: const TextStyle(fontSize: 28))))),
+              const SizedBox(width: 14),
+              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text(nombre, style: const TextStyle(color: RDSColor.textPrimary, fontSize: 17, fontWeight: FontWeight.w900)),
+                Text(empresa, style: TextStyle(color: color, fontSize: 13, fontWeight: FontWeight.w700)),
+                if (especialidad.isNotEmpty) ...[
+                  const SizedBox(height: 2),
+                  Text(especialidad, style: TextStyle(color: RDSColor.textMuted.withOpacity(0.65), fontSize: 11)),
+                ],
+              ])),
+            ]),
+
+            // Descripción completa
+            if (descripcion.isNotEmpty) ...[
+              const SizedBox(height: 16),
+              Text(descripcion, style: TextStyle(color: RDSColor.textMuted.withOpacity(0.9), fontSize: 13, height: 1.6)),
+            ],
+
+            // Oferta exclusiva Rutero MDE
+            if (ofertaRutero.isNotEmpty) ...[
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: RDSColor.gold.withOpacity(0.08),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: RDSColor.gold.withOpacity(0.4))),
+                child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  const Text('🎁', style: TextStyle(fontSize: 18)),
+                  const SizedBox(width: 10),
+                  Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text(t('Oferta exclusiva Rutero', 'Exclusive Rutero Offer'),
+                      style: const TextStyle(color: RDSColor.gold, fontSize: 11, fontWeight: FontWeight.w800)),
+                    const SizedBox(height: 4),
+                    Text(ofertaRutero, style: TextStyle(color: RDSColor.textMuted.withOpacity(0.9), fontSize: 12, height: 1.4)),
+                  ])),
+                ])),
+            ],
+
+            // Precio
+            if (precio.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              Row(children: [
+                const Text('💰', style: TextStyle(fontSize: 14)),
+                const SizedBox(width: 8),
+                Text(precio, style: TextStyle(color: RDSColor.textMuted.withOpacity(0.85), fontSize: 13, fontWeight: FontWeight.w600)),
+              ]),
+            ],
+
+            // Horario
+            if (horario.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Row(children: [
+                const Text('🕐', style: TextStyle(fontSize: 14)),
+                const SizedBox(width: 8),
+                Expanded(child: Text(horario, style: TextStyle(color: RDSColor.textMuted.withOpacity(0.8), fontSize: 12))),
+              ]),
+            ],
+
+            // Modalidad
+            if (modalidad.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Row(children: [
+                const Text('📌', style: TextStyle(fontSize: 14)),
+                const SizedBox(width: 8),
+                Text(modalidad, style: TextStyle(color: RDSColor.textMuted.withOpacity(0.75), fontSize: 12)),
+              ]),
+            ],
+
+            // Dirección + zona
+            if (direccion.isNotEmpty || zona.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                const Text('📍', style: TextStyle(fontSize: 14)),
+                const SizedBox(width: 8),
+                Expanded(child: Text(
+                  [if (direccion.isNotEmpty) direccion, if (zona.isNotEmpty) zona].join(' — '),
+                  style: TextStyle(color: RDSColor.textMuted.withOpacity(0.8), fontSize: 12, height: 1.4))),
+              ]),
+            ],
+
+            // Cómo llegar
+            if (comoLlegar.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                const Text('🗺️', style: TextStyle(fontSize: 14)),
+                const SizedBox(width: 8),
+                Expanded(child: Text(comoLlegar, style: TextStyle(color: RDSColor.textMuted.withOpacity(0.7), fontSize: 12, height: 1.4))),
+              ]),
+            ],
+
+            // Email
+            if (email.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Row(children: [
+                const Text('✉️', style: TextStyle(fontSize: 14)),
+                const SizedBox(width: 8),
+                Text(email, style: TextStyle(color: RDSColor.textMuted.withOpacity(0.7), fontSize: 12)),
+              ]),
+            ],
+
+            const SizedBox(height: 24),
+            // Botones de acción
+            Wrap(spacing: 10, runSpacing: 10, children: [
+              if (whatsapp.isNotEmpty)
+                GestureDetector(
+                  onTap: () { Navigator.pop(context); _abrirWhatsApp(whatsapp); },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF25D366).withOpacity(0.10),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: const Color(0xFF25D366).withOpacity(0.4))),
+                    child: Row(mainAxisSize: MainAxisSize.min, children: [
+                      const Text('💬', style: TextStyle(fontSize: 16)),
+                      const SizedBox(width: 6),
+                      Text(t('WhatsApp', 'WhatsApp'),
+                        style: const TextStyle(color: Color(0xFF25D366), fontSize: 13, fontWeight: FontWeight.w800)),
+                    ]))),
+              if (urlExterna.isNotEmpty)
+                GestureDetector(
+                  onTap: () { Navigator.pop(context); _abrirUrl(urlExterna); },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    decoration: BoxDecoration(
+                      color: color.withOpacity(0.10),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: color.withOpacity(0.4))),
+                    child: Row(mainAxisSize: MainAxisSize.min, children: [
+                      const Text('🌐', style: TextStyle(fontSize: 16)),
+                      const SizedBox(width: 6),
+                      Text(t('Ver sitio', 'Visit site'),
+                        style: TextStyle(color: color, fontSize: 13, fontWeight: FontWeight.w800)),
+                    ]))),
+              if (mapsQuery.isNotEmpty)
+                GestureDetector(
+                  onTap: () { Navigator.pop(context); _abrirMaps(mapsQuery); },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    decoration: BoxDecoration(
+                      color: RDSColor.gold.withOpacity(0.08),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: RDSColor.gold.withOpacity(0.35))),
+                    child: Row(mainAxisSize: MainAxisSize.min, children: [
+                      const Text('📍', style: TextStyle(fontSize: 16)),
+                      const SizedBox(width: 6),
+                      Text(t('Cómo llegar', 'Get there'),
+                        style: const TextStyle(color: RDSColor.gold, fontSize: 13, fontWeight: FontWeight.w800)),
+                    ]))),
+            ]),
+          ]),
+        ),
+      ),
+    );
+  }
+
   Widget _buildCard(Map<String, dynamic> d) {
     final nombre      = d['nombre']?.toString() ?? '';
     final empresa     = d['empresa']?.toString() ?? '';
-    final categoria   = d['categoria']?.toString() ?? 'Otro';
+    final categoria   = _normalizarCategoria(d['categoria']?.toString() ?? 'Otro');
     final descripcion = kLang == 'en'
       ? (d['descripcionEN']?.toString() ?? d['descripcion']?.toString() ?? '')
       : (d['descripcion']?.toString() ?? '');
@@ -5143,7 +5444,9 @@ class _ServiciosScreenState extends State<ServiciosScreen> {
     // Badge de categoría
     final cat = kCategoriaServicio.firstWhere((c) => c.id == categoria, orElse: () => kCategoriaServicio.last);
 
-    return Container(
+    return GestureDetector(
+      onTap: () => _mostrarDetalle(context, d),
+      child: Container(
       margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
         color: RDSColor.card, borderRadius: BorderRadius.circular(16),
@@ -5280,8 +5583,24 @@ class _ServiciosScreenState extends State<ServiciosScreen> {
                     ])))),
               ],
             ]),
+            // ── Ver más ──
+            const SizedBox(height: 10),
+            Row(mainAxisAlignment: MainAxisAlignment.end, children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+                decoration: BoxDecoration(
+                  color: color.withOpacity(0.08),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: color.withOpacity(0.3))),
+                child: Row(mainAxisSize: MainAxisSize.min, children: [
+                  Text(t('Ver más', 'See more'),
+                    style: TextStyle(color: color, fontSize: 11, fontWeight: FontWeight.w800)),
+                  const SizedBox(width: 4),
+                  Icon(Icons.arrow_forward_ios_rounded, color: color, size: 10),
+                ])),
+            ]),
           ])),
-      ]));
+      ])));
   }
 
   @override
@@ -5366,10 +5685,10 @@ class _ServiciosScreenState extends State<ServiciosScreen> {
               }
             }
 
-            // Filtrar por categoría activa
+            // Filtrar por categoría activa (normalizado para soportar Firestore con minúsculas/variantes)
             final filtrados = _catActiva == 'Todos'
               ? todos
-              : todos.where((d) => (d['categoria']?.toString() ?? 'Otro') == _catActiva).toList();
+              : todos.where((d) => _normalizarCategoria(d['categoria']?.toString() ?? 'Otro') == _catActiva).toList();
 
             return ListView(
               padding: const EdgeInsets.fromLTRB(20, 16, 20, 40),
@@ -10673,7 +10992,7 @@ class RutasService {
     for (final ruta in _rutas) {
       if (ruta['nombre']?.toString() == rutaNombre && ruta['misionEpica'] != null) {
         return {
-          'nombre_es': ruta['nombre'] ?? '',
+          'nombre_es': ruta['personaje'] ?? ruta['nombre'] ?? '',
           'nombre_en': ruta['nombreEN'] ?? '',
           'descripcion_es': ruta['misionEpica'] ?? '',
           'descripcion_en': ruta['misionEpicaEN'] ?? '',
@@ -11036,9 +11355,10 @@ class _HomeBodyState extends State<HomeBody> {
       }
       if (_filtroActivo == 'Ciudad' && r['zona'] != 'Ciudad') return false;
       if (_filtroActivo == 'Alrededores' && r['zona'] != 'Alrededores') return false;
-      if (_filtroActivo == 'Temporada' && r['zona'] != 'Temporada') return false;
+      if (_filtroActivo == 'Creadores') return false; // Creadores tiene su propia sección, no filtra rutas
       if (_filtroActivo == 'Comida Urbana' && r['zona'] != 'Comida Urbana') return false;
       if (_filtroActivo == 'Eventos' && r['zona'] != 'Eventos') return false;
+      if (_filtroActivo == 'Servicios') return false; // Servicios navega directo, nunca filtra rutas
       return true;
     }).toList();
 
@@ -11316,14 +11636,11 @@ class _HomeBodyState extends State<HomeBody> {
                   onTap: () => setState(() => _filtroActivo = 'Alrededores')),
                 const SizedBox(width: RDSSpace.sm),
                 CategoryChip(
-                  label: t('Temporada','Season'),
-                  icon: Icons.event_rounded,
-                  activo: _filtroActivo == 'Temporada',
-                  onTap: () => setState(() => _filtroActivo = 'Temporada')),
+                  label: t('Creadores','Creators'),
+                  icon: Icons.video_camera_back_rounded,
+                  activo: _filtroActivo == 'Creadores',
+                  onTap: () => setState(() => _filtroActivo = 'Creadores')),
                 const SizedBox(width: RDSSpace.sm),
-                // FASE 3: Creadores — oculto hasta alianza confirmada
-                // CategoryChip(label: t('Creadores','Creators'), icon: Icons.video_camera_back_rounded, activo: _filtroActivo == 'Creadores', onTap: () => setState(() => _filtroActivo = 'Creadores')),
-                // const SizedBox(width: RDSSpace.sm),
                 CategoryChip(
                   label: t('Gastronomía','Food'),
                   icon: RDSIcons.catGastrono,
@@ -11334,7 +11651,7 @@ class _HomeBodyState extends State<HomeBody> {
                   label: t('Servicios','Services'),
                   icon: Icons.room_service_rounded,
                   activo: _filtroActivo == 'Servicios',
-                  onTap: () => setState(() => _filtroActivo = 'Servicios')),
+                  onTap: () => RuteroNav.push(context, const ServiciosScreen())),
 
               ])),
             const SizedBox(height: 16),
@@ -11433,71 +11750,24 @@ class _HomeBodyState extends State<HomeBody> {
                 ruta: r, activa: !pausada,
                 proximaActivacion: pausada ? (r['tagPausada'] ?? '🚧 Próximamente') : '',
                 onTap: pausada ? null : () => RuteroNav.push(context, RouteDetailScreen(ruta: r))); }),
-            ] else if (_filtroActivo == 'Temporada') ...[
-              _SectionHeader(
-                titulo: t('🎆 TEMPORADA','🎆 SEASON'),
-                subtitulo: '${_rutas.where((r) => r["zona"] == "Temporada").length} ${t("rutas · orden calendario","routes · calendar order")}'),
-              const SizedBox(height: 10),
-              ...(() {
-                // Feria de las Flores siempre primero — ocultar si módulo Feria activo (tab dedicada)
-                final rutasTemp = _rutas.where((r) => r['zona'] == 'Temporada'
-                  && (r['ciudad']?.toString() ?? 'Medellín') == (_ciudadDetectada ?? kCiudadesRegistradas[0]).ciudad
-                  && !(feriaModuloActivo && r['nombre'] == 'FERIA DE LAS FLORES')
-                  // Quitar duplicados — solo mostrar FERIA DE LAS FLORES 2026, no las versiones genéricas
-                  && r['nombre'] != 'FERIA DE LAS FLORES'
-                  ).toList();
-                // Ordenar: 1) vigentes hoy, 2) próximas futuras (más cercanas primero), 3) ya pasadas al final
-                // FIX: eventos con >180 días se calculan para el año siguiente
-                final ahora = DateTime.now();
-                rutasTemp.sort((a, b) {
-                  DateTime _proximaFecha(Map<String, dynamic> r) {
-                    final List? ini = r['temporadaInicio'] as List?;
-                    if (ini == null || ini.length < 2) return DateTime(ahora.year + 1);
-                    var dt = DateTime(ahora.year, ini[0] as int, ini[1] as int);
-                    // Si la fecha ya pasó este año, usar el año siguiente
-                    final List? fin = r['temporadaFin'] as List?;
-                    final dtFin = fin != null && fin.length == 2
-                      ? DateTime(ahora.year, fin[0] as int, fin[1] as int, 23, 59)
-                      : dt;
-                    if (dtFin.isBefore(ahora)) dt = DateTime(ahora.year + 1, ini[0] as int, ini[1] as int);
-                    return dt;
-                  }
-                  int _prioridad(Map<String, dynamic> r) {
-                    if (_rutaActiva(r)) return 0; // vigente hoy
-                    final List? fin = r['temporadaFin'] as List?;
-                    if (fin != null && fin.length == 2) {
-                      final dtFin = DateTime(ahora.year, fin[0] as int, fin[1] as int, 23, 59);
-                      if (dtFin.isBefore(ahora)) return 2; // ya pasó este año
-                    }
-                    return 1; // próxima
-                  }
-                  final pa = _prioridad(a);
-                  final pb = _prioridad(b);
-                  if (pa != pb) return pa.compareTo(pb);
-                  // ordenTemporada 99 = siempre al final
-                  final oA = a['ordenTemporada'] as int? ?? 50;
-                  final oB = b['ordenTemporada'] as int? ?? 50;
-                  if (oA == 99 || oB == 99) return oA.compareTo(oB);
-                  // Mismo grupo: ordenar por fecha más cercana
-                  if (pa == 2) return _proximaFecha(a).compareTo(_proximaFecha(b));
-                  return _proximaFecha(a).compareTo(_proximaFecha(b));
-                });
-                return rutasTemp.map((r) {
-                  final pausada = r['pausada'] == true;
-                  final activa = !pausada && _rutaActiva(r);
-                  return Column(children: [
-                    // Contador regresivo solo para Feria de las Flores
-                    if (r['mostrarContador'] == true)
-                      _FeriaCountdownWidget(),
-                    _RouteCard(
-                      ruta: r, activa: activa,
-                      proximaActivacion: pausada ? (r['tagPausada'] ?? '🚧 Próximamente') : _proximaActivacion(r),
-                      diasParaActivacion: _diasParaActivacion(r),
-                      onTap: activa ? () => RuteroNav.push(context, RouteDetailScreen(ruta: r)) : null),
-                  ]);
-                });
-              })(),
-              const SizedBox(height: 20),
+            // TEMPORADA — desactivado oct 2026, reemplazado por Creadores.
+            // Conservar para reactivar en 2027 (Feria de las Flores, festivales de temporada).
+            // Para reactivar: cambiar chip Creadores→Temporada, restaurar filtro _rutasFiltradas
+            // y descomentar este bloque.
+            //
+            // ] else if (_filtroActivo == 'Temporada') ...[
+            //   _SectionHeader(
+            //     titulo: t('🎆 TEMPORADA','🎆 SEASON'),
+            //     subtitulo: '${_rutas.where((r) => r["zona"] == "Temporada").length} ${t("rutas · orden calendario","routes · calendar order")}'),
+            //   const SizedBox(height: 10),
+            //   ...(() {
+            //     final rutasTemp = _rutas.where((r) => r['zona'] == 'Temporada'
+            //       && (r['ciudad']?.toString() ?? 'Medellín') == (_ciudadDetectada ?? kCiudadesRegistradas[0]).ciudad
+            //       && !(feriaModuloActivo && r['nombre'] == 'FERIA DE LAS FLORES')
+            //       && r['nombre'] != 'FERIA DE LAS FLORES').toList();
+            //     ... (lógica de ordenación calendario + _FeriaCountdownWidget) ...
+            //   })(),
+            //   const SizedBox(height: 20),
 
             ] else if (_filtroActivo == 'Comida Urbana') ...[
               _SectionHeader(
@@ -11546,9 +11816,7 @@ class _HomeBodyState extends State<HomeBody> {
                 proximaActivacion: _proximaActivacion(r),
                 diasParaActivacion: _diasParaActivacion(r),
                 onTap: _rutaActivaEvento(r) ? () => RuteroNav.push(context, RouteDetailScreen(ruta: r)) : null)),
-            // FASE 3: Creadores — oculto hasta alianza confirmada
-            // } else if (_filtroActivo == 'Creadores') ...[
-            ] else if (_filtroActivo == '_creadores_oculto_fase3') ...[
+            ] else if (_filtroActivo == 'Creadores') ...[
               _SectionHeader(
                 titulo: t('🎬 CREADORES','🎬 CREATORS'),
                 subtitulo: t('Exploradores que muestran Medellín en terreno real','Explorers who show Medellín in the field')),
@@ -12864,8 +13132,9 @@ class MisionEpicaCard extends StatelessWidget {
             Text(t('MISIÓN ÉPICA', 'EPIC MISSION'),
               style: const TextStyle(color: RDSColor.gold, fontSize: 11,
                 fontWeight: FontWeight.w800, letterSpacing: 1.5)),
-            Text(nombre, style: const TextStyle(color: RDSColor.textPrimary, fontSize: 16,
-              fontWeight: FontWeight.w900)),
+            Text(nombre, maxLines: 2, overflow: TextOverflow.ellipsis,
+              style: const TextStyle(color: RDSColor.textPrimary, fontSize: 16,
+                fontWeight: FontWeight.w900)),
           ])),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
@@ -16834,6 +17103,39 @@ const Map<String, Map<String, dynamic>> kMisionesPorRuta = {
     'puntos': 15,
     'recompensa_es': 'Insignia "Conquistador del Peñol"',
     'recompensa_en': 'Badge "Peñol Conqueror"',
+  },
+  'PARQUE JAIME DUQUE — CLÁSICA': {
+    'nombre_es': 'El Guardián de la Memoria',
+    'nombre_en': 'The Guardian of Memory',
+    'emoji': '🏛️',
+    'descripcion_es': 'Fotografía una réplica de monumento mundial, un animal nativo colombiano y una embarcación del Puerto Caribe — tres Colombia en una visita.',
+    'descripcion_en': 'Photograph a world monument replica, a native Colombian animal, and a boat at Caribbean Port — three Colombias in one visit.',
+    'objetivo': 3,
+    'puntos': 360,
+    'recompensa_es': 'Insignia Explorador del Parque Jaime Duque',
+    'recompensa_en': 'Jaime Duque Park Explorer Badge',
+  },
+  'PARQUE JAIME DUQUE — FAMILIA': {
+    'nombre_es': 'Wakatá el Jaguar',
+    'nombre_en': 'Wakatá the Jaguar',
+    'emoji': '🦁',
+    'descripcion_es': 'Toca la tierra del Ecoparque, moja la mano en Puerto Caribe y ruge frente al jaguar del Bioparque — tres Colombia con el cuerpo.',
+    'descripcion_en': 'Touch the Ecopark soil, dip your hand in Caribbean Port, and roar at the jaguar — three Colombias with your body.',
+    'objetivo': 3,
+    'puntos': 300,
+    'recompensa_es': 'Insignia Explorador Pequeño Wakatá',
+    'recompensa_en': 'Little Wakatá Explorer Badge',
+  },
+  'PARQUE JAIME DUQUE — AVENTURA FAMILIAR': {
+    'nombre_es': 'El Aviador Jaime',
+    'nombre_en': 'The Aviator Jaime',
+    'emoji': '🎯',
+    'descripcion_es': 'Completa las 12 estaciones antes del cierre — cada miembro de la familia debe liderar al menos una parada y contar un dato nuevo al resto del grupo.',
+    'descripcion_en': 'Complete all 12 stations before closing — each family member must lead at least one stop and share a new fact with the group.',
+    'objetivo': 12,
+    'puntos': 500,
+    'recompensa_es': 'Insignia Campeón Jaime Duque',
+    'recompensa_en': 'Jaime Duque Champion Badge',
   },
 };
 

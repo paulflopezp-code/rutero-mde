@@ -1,0 +1,167 @@
+🔍 Auditando rutas en Firestore...
+
+✅ Rutas completas: 28
+   ✓ BARRIO PRADO — CULTURA Y BOHEMIA
+   ✓ CENTRO ALTERNATIVO
+   ✓ DEL ORIGEN PAISA A LA MEDELLÍN MODERNA
+   ✓ EL POBLADO CREATIVO
+   ✓ EL POBLADO VERDE
+   ✓ ENTRE JUEGOS Y PALABRAS
+   ✓ ENTRE SABORES RISAS Y MIL COLORES
+   ✓ FINCAS AGROTURÍSTICAS
+   ✓ FINCAS SILLETERAS
+   ✓ HUELLAS VIVAS DE EL POBLADO
+   ✓ MANRIQUE CULTURA Y VIDA
+   ✓ MEMORIA Y DERECHOS HUMANOS
+   ✓ NOCHE EN EL POBLADO
+   ✓ NOCHE EN LAURELES
+   ✓ RINCONES ESCONDIDOS DE EL POBLADO
+   ✓ RUTA DE LOS MIRADORES
+   ✓ RUTA GUATAPÉ & LA PIEDRA
+   ✓ RUTA SANTA FE DE ANTIOQUIA
+   ✓ RUTA VERDE DEL NORTE
+   ✓ SABORES DE EL POBLADO
+   ✓ SABORES DE LA 70
+   ✓ SENDEROS EN FLOR
+   ✓ TEATROS Y ESCENA DEL CENTRO
+   ✓ TRANSFORMACIÓN MEMORIA E HISTORIA
+   ✓ TRANVÍA CULTURAL
+   ✓ TURISMO CREATIVO
+   ✓ VEREDAS DE SANTA ELENA
+   ✓ VIVE MANRIQUE
+
+❌ Rutas con campos vacíos: 19
+
+🟢 ALUMBRADO NAVIDEÑO — RÍO MEDELLÍN [Temporada]
+   ID: ALUMBRADO NAVIDEÑO — RÍO MEDELLÍN
+   Faltan: descripcionEN, hook, hookEN, subtitulo, subtituloEN
+   Emoji: 🎇
+   Insignia: Guardián de la Luz
+   InsigniaImg: assets/images/insignias/insignia_15_guardian_luz_nav.png
+   Descripcion: Vive la magia del alumbrado navideño más espectacular de Col...
+
+🟢 CAFÉS Y CANTINAS HISTÓRICAS DEL CENTRO [Ciudad]
+   ID: CAFÉS Y CANTINAS HISTÓRICAS DEL CENTRO
+   Faltan: insigniaImg
+   Emoji: ☕
+   Insignia: Parroquiano del Centro
+   Descripcion: En pleno centro de Medellín sobreviven establecimientos que ...
+   Hook: Medellín tiene salones de té, cantinas y reposterías que lle...
+
+⏸️ Estaciones EnCicla [Ciudad]
+   ID: Estaciones EnCicla
+   Faltan: hook, hookEN, insigniaImg, subtitulo, subtituloEN
+   Descripcion: Red de bicicletas públicas de Medellín y el Área Metropolita...
+
+🟢 FERIA DE LA ANTIOQUEÑIDAD [Temporada]
+   ID: FERIA DE LA ANTIOQUEÑIDAD
+   Faltan: descripcionEN, hook, hookEN, subtitulo, subtituloEN
+   Emoji: 🎭
+   Insignia: Embajador Paisa
+   InsigniaImg: assets/images/insignias/insignia_21_embajador_paisa.png
+   Descripcion: Celebra lo mejor de la cultura paisa en la Feria de la Antio...
+
+🟢 FERIA DE LAS FLORES [Temporada]
+   ID: FERIA DE LAS FLORES
+   Faltan: descripcionEN, hookEN, subtitulo, subtituloEN
+   Emoji: 🌹
+   Insignia: Silletero de Oro
+   InsigniaImg: assets/images/insignias/insignia_17_silletero_oro.png
+   Descripcion: Feria de las Flores 2026 · Edición 69 del Desfile de Sillete...
+   Hook: La feria más colorida de Colombia · 10 días donde Medellín s...
+
+🟢 FESTIVAL DE POESÍA INTERNACIONAL [Temporada]
+   ID: FESTIVAL DE POESÍA INTERNACIONAL
+   Faltan: descripcionEN, hook, hookEN, subtitulo, subtituloEN
+   Emoji: 🌷
+   Insignia: Poeta del Valle
+   InsigniaImg: assets/images/insignias/insignia_23_poeta_valle.png
+   Descripcion: Medellín se convierte cada julio en la capital mundial de la...
+
+🟢 FESTIVAL INTERNACIONAL DE TANGO [Temporada]
+   ID: FESTIVAL INTERNACIONAL DE TANGO
+   Faltan: descripcion, descripcionEN, hook, hookEN, subtitulo, subtituloEN
+   Emoji: 🎷
+   Insignia: Gardel de Medellín
+   InsigniaImg: assets/images/insignias/insignia_18_gardel_medellin.png
+
+🟢 FIESTA DEL LIBRO Y LA CULTURA [Temporada]
+   ID: FIESTA DEL LIBRO Y LA CULTURA
+   Faltan: descripcion, descripcionEN, hook, hookEN, subtitulo, subtituloEN
+   Emoji: 📚
+   Insignia: Lector de la Eterna Primavera
+   InsigniaImg: assets/images/insignias/insignia_20_lector_primavera.png
+
+🟢 FINCA Y FONDA [Santa Elena]
+   ID: FINCA Y FONDA
+   Faltan: descripcion, descripcionEN, hook, hookEN, insigniaImg, subtitulo, subtituloEN
+   Emoji: 🍲
+
+🟢 GUARDIANES DE LA SILLETA [Santa Elena]
+   ID: GUARDIANES DE LA SILLETA
+   Faltan: descripcion, descripcionEN, hook, hookEN, insigniaImg, subtitulo, subtituloEN
+   Emoji: 🌸
+
+🟢 MEDEJAZZ — FESTIVAL DE JAZZ [Temporada]
+   ID: MEDEJAZZ — FESTIVAL DE JAZZ
+   Faltan: descripcion, descripcionEN, hook, hookEN, subtitulo, subtituloEN
+   Emoji: 🎵
+   Insignia: Jazz Paisa
+   InsigniaImg: assets/images/insignias/insignia_19_jazz_paisa.png
+
+🟢 OTROS CAMINOS LAURELES [Ciudad]
+   ID: OTROS CAMINOS LAURELES
+   Faltan: hook, hookEN, insigniaImg, subtitulo, subtituloEN
+   Descripcion: Laureles tiene más secretos de los que caben en una sola rut...
+
+⏸️ PARQUE JAIME DUQUE — AVENTURA FAMILIAR [Alrededores]
+   ID: PARQUE JAIME DUQUE — AVENTURA FAMILIAR
+   Faltan: descripcionEN, hookEN, subtitulo, subtituloEN
+   Emoji: 👨‍👩‍👧‍👦
+   Insignia: Familia Aventurera Jaime Duque
+   InsigniaImg: assets/images/insignias/insignia_01_explorador_13.png
+   Descripcion: Una ruta diseñada para fortalecer los lazos familiares mient...
+   Hook: 12 estaciones · 12 retos · 1 familia más unida. La aventura ...
+
+⏸️ PARQUE JAIME DUQUE — CLÁSICA [Alrededores]
+   ID: PARQUE JAIME DUQUE — CLÁSICA
+   Faltan: descripcionEN, hookEN, insigniaImg, subtitulo, subtituloEN
+   Emoji: 🏛️
+   Insignia: Explorador Jaime Duque
+   Descripcion: El Parque Jaime Duque es un centro cultural y recreativo con...
+   Hook: Más de 100 hectáreas de historia, naturaleza y cultura — el ...
+
+⏸️ PARQUE JAIME DUQUE — FAMILIA [Alrededores]
+   ID: PARQUE JAIME DUQUE — FAMILIA
+   Faltan: descripcionEN, hookEN, insigniaImg, subtitulo, subtituloEN
+   Emoji: 🦕
+   Insignia: Explorador Familia Jaime Duque
+   Descripcion: Una ruta diseñada para familias con niños — desde el parque ...
+   Hook: El parque más completo de Colombia para vivir en familia — d...
+
+⏸️ PARQUE JAIME DUQUE — NATURALEZA [Alrededores]
+   ID: PARQUE JAIME DUQUE — NATURALEZA
+   Faltan: descripcionEN, hookEN, insigniaImg, subtitulo, subtituloEN
+   Emoji: 🌿
+   Insignia: Guardián de la Sabana
+   Descripcion: La Reserva Natural Ecoparque Sabana es un ecosistema vivo de...
+   Hook: 70 hectáreas de bosque andino restaurado — donde el Cóndor d...
+
+🟢 RUTA DEL METROCABLE & ARVÍ [Ciudad]
+   ID: RUTA DEL METROCABLE & ARVÍ
+   Faltan: descripcion, descripcionEN, hook, hookEN, insigniaImg, subtitulo, subtituloEN
+   Emoji: 🚡
+
+🟢 RUTA TRANSFORMACIÓN URBANA [Ciudad]
+   ID: RUTA TRANSFORMACIÓN URBANA
+   Faltan: descripcion, descripcionEN, hook, hookEN, insigniaImg, subtitulo, subtituloEN
+   Emoji: 🏙️
+
+🟢 SEMANA SANTA PATRIMONIAL [Temporada]
+   ID: SEMANA SANTA PATRIMONIAL
+   Faltan: descripcion, descripcionEN, hook, hookEN, subtitulo, subtituloEN
+   Emoji: ✝️
+   Insignia: Peregrino Paisa
+   InsigniaImg: assets/images/insignias/insignia_16_peregrino_paisa.png
+
+📊 RESUMEN: 19 rutas necesitan completarse de 47 total

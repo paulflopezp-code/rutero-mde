@@ -4,93 +4,119 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Rutero MDE — Panel Admin</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=Inter:wght@400;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
 <style>
-  * { margin: 0; padding: 0; box-sizing: border-box; }
+  /* ── RDS Design System ─────────────────────────────────────── */
   :root {
-    --verde: #5BAD6F; --oro: #C9A84C; --oscuro: #0D0D0D;
-    --card: #1C2018; --texto: #F5F0E8; --muted: #8A9278;
-    --acento: #E85D26; --peligro: #E24B4A;
+    /* Colores */
+    --rds-base:    #060A04;   /* fondo oscuro profundo */
+    --rds-surface: #0D1209;   /* capa intermedia */
+    --rds-card:    #1C2018;   /* tarjetas/paneles */
+    --rds-gold:    #C9A84C;   /* acento dorado */
+    --rds-green:   #5BAD6F;   /* verde montaña */
+    --rds-text:    #F5F0E8;   /* texto primario */
+    --rds-muted:   #8A9278;   /* texto secundario */
+    --rds-border:  rgba(255,255,255,0.07);
+    --rds-danger:  #E24B4A;
+    --rds-orange:  #E85D26;
+    /* Alias legacy (compatibilidad) */
+    --verde: var(--rds-green); --oro: var(--rds-gold);
+    --card: var(--rds-card); --texto: var(--rds-text); --muted: var(--rds-muted);
+    --acento: var(--rds-orange); --peligro: var(--rds-danger);
+    /* Tipografía */
+    --font-display: 'Playfair Display', Georgia, serif;
+    --font-body:    'Inter', system-ui, sans-serif;
+    --font-label:   'Space Grotesk', 'Inter', sans-serif;
+    /* Radios */
+    --r-xl:   24px;   /* modales */
+    --r-card: 14px;   /* tarjetas */
+    --r-sm:   10px;   /* inputs */
+    --r-pill: 99px;   /* badges/pills */
   }
-  body { font-family: 'Segoe UI', sans-serif; background: #0a0f08; color: var(--texto); min-height: 100vh; }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: var(--font-body); background: var(--rds-base); color: var(--rds-text); min-height: 100vh; }
   #login-screen { display: flex; align-items: center; justify-content: center; min-height: 100vh; }
-  .login-box { background: var(--card); border: 1px solid rgba(255,255,255,0.08); border-radius: 20px; padding: 40px; width: 360px; text-align: center; }
-  .login-box h1 { font-size: 22px; color: var(--oro); letter-spacing: 3px; margin-bottom: 4px; }
-  .login-box p { color: var(--muted); font-size: 13px; margin-bottom: 28px; }
-  .input-field { width: 100%; background: #111; border: 1px solid rgba(255,255,255,0.1); border-radius: 10px; padding: 12px 14px; color: var(--texto); font-size: 14px; margin-bottom: 12px; outline: none; }
-  .input-field:focus { border-color: var(--verde); }
-  .btn-primary { width: 100%; background: var(--verde); color: white; border: none; border-radius: 10px; padding: 13px; font-size: 14px; font-weight: 700; cursor: pointer; letter-spacing: 1px; }
-  .btn-primary:hover { opacity: 0.9; }
-  .error-msg { color: var(--peligro); font-size: 12px; margin-top: 8px; min-height: 18px; }
+  .login-box { background: var(--rds-card); border: 1px solid rgba(201,168,76,0.15); border-radius: var(--r-xl); padding: 40px; width: 360px; text-align: center; }
+  .login-box h1 { font-family: var(--font-display); font-size: 26px; font-weight: 900; color: var(--rds-gold); letter-spacing: 2px; margin-bottom: 4px; }
+  .login-box p { font-family: var(--font-body); color: var(--rds-muted); font-size: 13px; margin-bottom: 28px; }
+  .input-field { width: 100%; background: var(--rds-surface); border: 1px solid rgba(255,255,255,0.1); border-radius: var(--r-sm); padding: 12px 14px; color: var(--rds-text); font-family: var(--font-body); font-size: 14px; margin-bottom: 12px; outline: none; transition: border-color 0.2s; }
+  .input-field:focus { border-color: var(--rds-green); }
+  .btn-primary { width: 100%; background: var(--rds-green); color: white; border: none; border-radius: var(--r-sm); padding: 13px; font-family: var(--font-label); font-size: 14px; font-weight: 700; cursor: pointer; letter-spacing: 1.5px; text-transform: uppercase; transition: opacity 0.2s; }
+  .btn-primary:hover { opacity: 0.88; }
+  .error-msg { color: var(--rds-danger); font-size: 12px; margin-top: 8px; min-height: 18px; }
   #app { display: none; }
-  .sidebar { position: fixed; left: 0; top: 0; width: 220px; height: 100vh; background: var(--card); border-right: 1px solid rgba(255,255,255,0.06); padding: 24px 0; overflow-y: auto; }
-  .sidebar-logo { padding: 0 20px 20px; border-bottom: 1px solid rgba(255,255,255,0.06); margin-bottom: 12px; }
-  .sidebar-logo h2 { font-size: 14px; color: var(--oro); letter-spacing: 2px; }
-  .sidebar-logo p { font-size: 11px; color: var(--muted); margin-top: 2px; }
-  .nav-item { display: flex; align-items: center; gap: 10px; padding: 11px 20px; cursor: pointer; font-size: 13px; color: var(--muted); border-left: 3px solid transparent; transition: all 0.2s; }
+  .sidebar { position: fixed; left: 0; top: 0; width: 220px; height: 100vh; background: var(--rds-card); border-right: 1px solid var(--rds-border); padding: 24px 0; overflow-y: auto; }
+  .sidebar-logo { padding: 0 20px 20px; border-bottom: 1px solid var(--rds-border); margin-bottom: 12px; }
+  .sidebar-logo h2 { font-family: var(--font-label); font-size: 13px; font-weight: 700; color: var(--rds-gold); letter-spacing: 2.5px; text-transform: uppercase; }
+  .sidebar-logo p { font-size: 11px; color: var(--rds-muted); margin-top: 3px; }
+  .nav-item { display: flex; align-items: center; gap: 10px; padding: 11px 20px; cursor: pointer; font-family: var(--font-body); font-size: 13px; color: var(--rds-muted); border-left: 3px solid transparent; transition: all 0.2s; }
   .nav-item:hover { color: var(--texto); background: rgba(255,255,255,0.03); }
-  .nav-item.active { color: var(--verde); border-left-color: var(--verde); background: rgba(91,173,111,0.08); }
+  .nav-item:hover { color: var(--rds-text); background: rgba(255,255,255,0.03); }
+  .nav-item.active { color: var(--rds-green); border-left-color: var(--rds-green); background: rgba(91,173,111,0.08); }
   .nav-item .icon { font-size: 16px; width: 20px; }
   .main-content { margin-left: 220px; padding: 28px; min-height: 100vh; }
   .topbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
-  .topbar h1 { font-size: 20px; font-weight: 700; }
-  .btn-sm { padding: 8px 16px; border-radius: 8px; font-size: 12px; font-weight: 600; cursor: pointer; border: none; letter-spacing: 0.5px; }
-  .btn-verde { background: var(--verde); color: white; }
-  .btn-oro { background: var(--oro); color: #1a1000; }
-  .btn-danger { background: var(--peligro); color: white; }
-  .btn-ghost { background: transparent; color: var(--muted); border: 1px solid rgba(255,255,255,0.1); }
+  .topbar h1 { font-family: var(--font-display); font-size: 22px; font-weight: 700; }
+  .btn-sm { padding: 8px 16px; border-radius: 8px; font-family: var(--font-label); font-size: 12px; font-weight: 600; cursor: pointer; border: none; letter-spacing: 0.5px; transition: opacity 0.2s; }
+  .btn-verde { background: var(--rds-green); color: white; }
+  .btn-oro { background: var(--rds-gold); color: #1a1000; }
+  .btn-danger { background: var(--rds-danger); color: white; }
+  .btn-ghost { background: transparent; color: var(--rds-muted); border: 1px solid rgba(255,255,255,0.12); }
   .btn-sm:hover { opacity: 0.85; }
   .tab-content { display: none; }
   .tab-content.active { display: block; }
   .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 24px; }
-  .stat-card { background: var(--card); border-radius: 14px; padding: 18px; border: 1px solid rgba(255,255,255,0.06); }
-  .stat-card .label { font-size: 11px; color: var(--muted); letter-spacing: 1px; text-transform: uppercase; margin-bottom: 8px; }
-  .stat-card .value { font-size: 28px; font-weight: 800; }
-  .stat-card .sub { font-size: 11px; color: var(--muted); margin-top: 4px; }
-  .card { background: var(--card); border-radius: 14px; border: 1px solid rgba(255,255,255,0.06); overflow: hidden; margin-bottom: 20px; }
-  .card-header { padding: 16px 20px; border-bottom: 1px solid rgba(255,255,255,0.06); display: flex; justify-content: space-between; align-items: center; }
-  .card-header h3 { font-size: 14px; font-weight: 600; }
+  .stat-card { background: var(--rds-card); border-radius: var(--r-card); padding: 18px; border: 1px solid rgba(201,168,76,0.12); }
+  .stat-card .label { font-family: var(--font-label); font-size: 10px; color: var(--rds-muted); letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 8px; }
+  .stat-card .value { font-family: var(--font-display); font-size: 30px; font-weight: 900; }
+  .stat-card .sub { font-size: 11px; color: var(--rds-muted); margin-top: 4px; }
+  .card { background: var(--rds-card); border-radius: var(--r-card); border: 1px solid var(--rds-border); overflow: hidden; margin-bottom: 20px; }
+  .card-header { padding: 16px 20px; border-bottom: 1px solid var(--rds-border); display: flex; justify-content: space-between; align-items: center; }
+  .card-header h3 { font-family: var(--font-body); font-size: 14px; font-weight: 700; }
   table { width: 100%; border-collapse: collapse; }
-  th { text-align: left; padding: 11px 16px; font-size: 11px; color: var(--muted); letter-spacing: 1px; text-transform: uppercase; border-bottom: 1px solid rgba(255,255,255,0.06); background: rgba(0,0,0,0.2); }
+  th { text-align: left; padding: 11px 16px; font-family: var(--font-label); font-size: 10px; color: var(--rds-muted); letter-spacing: 1.5px; text-transform: uppercase; border-bottom: 1px solid var(--rds-border); background: rgba(0,0,0,0.25); }
   td { padding: 12px 16px; font-size: 13px; border-bottom: 1px solid rgba(255,255,255,0.04); vertical-align: middle; }
   tr:last-child td { border-bottom: none; }
   tr:hover td { background: rgba(255,255,255,0.02); }
-  .badge { display: inline-block; padding: 3px 10px; border-radius: 20px; font-size: 10px; font-weight: 700; letter-spacing: 0.5px; }
-  .badge-verde { background: rgba(91,173,111,0.15); color: var(--verde); }
-  .badge-oro { background: rgba(201,168,76,0.15); color: var(--oro); }
-  .badge-rojo { background: rgba(226,75,74,0.15); color: var(--peligro); }
-  .badge-gris { background: rgba(138,146,120,0.15); color: var(--muted); }
-  .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 100; align-items: center; justify-content: center; }
+  .badge { display: inline-block; padding: 3px 10px; border-radius: var(--r-pill); font-family: var(--font-label); font-size: 10px; font-weight: 700; letter-spacing: 0.5px; }
+  .badge-verde { background: rgba(91,173,111,0.15); color: var(--rds-green); }
+  .badge-oro { background: rgba(201,168,76,0.15); color: var(--rds-gold); }
+  .badge-rojo { background: rgba(226,75,74,0.15); color: var(--rds-danger); }
+  .badge-gris { background: rgba(138,146,120,0.15); color: var(--rds-muted); }
+  .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.75); backdrop-filter: blur(4px); z-index: 100; align-items: center; justify-content: center; }
   .modal-overlay.open { display: flex; }
-  .modal { background: var(--card); border-radius: 20px; padding: 28px; width: 560px; max-height: 85vh; overflow-y: auto; border: 1px solid rgba(255,255,255,0.1); }
-  .modal h2 { font-size: 18px; margin-bottom: 20px; }
+  .modal { background: var(--rds-card); border-radius: var(--r-xl); padding: 28px; width: 560px; max-height: 85vh; overflow-y: auto; border: 1px solid rgba(201,168,76,0.2); }
+  .modal h2 { font-family: var(--font-display); font-size: 20px; font-weight: 700; margin-bottom: 20px; }
   .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; }
   .form-group { margin-bottom: 12px; }
-  .form-group label { font-size: 11px; color: var(--muted); letter-spacing: 1px; display: block; margin-bottom: 6px; }
-  .form-group input, .form-group select, .form-group textarea { width: 100%; background: #111; border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; padding: 10px 12px; color: var(--texto); font-size: 13px; outline: none; }
-  .form-group input:focus, .form-group select:focus, .form-group textarea:focus { border-color: var(--verde); }
-  .form-group textarea { height: 80px; resize: vertical; }
-  .modal-footer { display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px; padding-top: 16px; border-top: 1px solid rgba(255,255,255,0.06); }
+  .form-group label { font-family: var(--font-label); font-size: 10px; font-weight: 600; color: var(--rds-muted); letter-spacing: 1.2px; text-transform: uppercase; display: block; margin-bottom: 6px; }
+  .form-group input, .form-group select, .form-group textarea { width: 100%; background: var(--rds-surface); border: 1px solid rgba(255,255,255,0.1); border-radius: var(--r-sm); padding: 10px 12px; color: var(--rds-text); font-family: var(--font-body); font-size: 13px; outline: none; transition: border-color 0.2s; }
+  .form-group input:focus, .form-group select:focus, .form-group textarea:focus { border-color: var(--rds-green); }
+  .form-group textarea { height: 80px; resize: vertical; font-family: var(--font-body); }
+  .modal-footer { display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--rds-border); }
   .search-bar { display: flex; gap: 10px; margin-bottom: 16px; }
-  .search-input { flex: 1; background: var(--card); border: 1px solid rgba(255,255,255,0.1); border-radius: 10px; padding: 10px 14px; color: var(--texto); font-size: 13px; outline: none; }
-  .search-input:focus { border-color: var(--verde); }
-  .loading { text-align: center; padding: 40px; color: var(--muted); }
-  .spinner { display: inline-block; width: 24px; height: 24px; border: 2px solid rgba(91,173,111,0.2); border-top-color: var(--verde); border-radius: 50%; animation: spin 0.8s linear infinite; }
+  .search-input { flex: 1; background: var(--rds-card); border: 1px solid rgba(255,255,255,0.1); border-radius: var(--r-sm); padding: 10px 14px; color: var(--rds-text); font-family: var(--font-body); font-size: 13px; outline: none; transition: border-color 0.2s; }
+  .search-input:focus { border-color: var(--rds-green); }
+  .loading { text-align: center; padding: 40px; color: var(--rds-muted); }
+  .spinner { display: inline-block; width: 24px; height: 24px; border: 2px solid rgba(91,173,111,0.2); border-top-color: var(--rds-green); border-radius: 50%; animation: spin 0.8s linear infinite; }
   @keyframes spin { to { transform: rotate(360deg); } }
   .validar-box { max-width: 480px; margin: 0 auto; }
-  .codigo-input { font-size: 24px; font-weight: 800; letter-spacing: 4px; text-transform: uppercase; text-align: center; }
-  .resultado-validacion { margin-top: 20px; padding: 20px; border-radius: 14px; text-align: center; display: none; }
+  .codigo-input { font-family: var(--font-label); font-size: 24px; font-weight: 700; letter-spacing: 4px; text-transform: uppercase; text-align: center; }
+  .resultado-validacion { margin-top: 20px; padding: 20px; border-radius: var(--r-card); text-align: center; display: none; }
   .resultado-ok { background: rgba(91,173,111,0.1); border: 1px solid rgba(91,173,111,0.3); }
   .resultado-err { background: rgba(226,75,74,0.1); border: 1px solid rgba(226,75,74,0.3); }
-  .empty-state { text-align: center; padding: 40px; color: var(--muted); font-size: 13px; }
-  .cat-badge { display:inline-block;padding:3px 10px;border-radius:20px;font-size:10px;font-weight:700; }
+  .empty-state { text-align: center; padding: 40px; color: var(--rds-muted); font-size: 13px; }
+  .cat-badge { display:inline-block; padding:3px 10px; border-radius:var(--r-pill); font-family:var(--font-label); font-size:10px; font-weight:700; letter-spacing:0.3px; }
   .cat-concierto { background:rgba(184,92,174,0.15);color:#B85CAE; }
-  .cat-festival { background:rgba(232,93,38,0.15);color:var(--acento); }
-  .cat-deporte { background:rgba(91,173,111,0.15);color:var(--verde); }
-  .cat-cultura { background:rgba(201,168,76,0.15);color:var(--oro); }
-  .cat-gastronomia { background:rgba(226,75,74,0.15);color:var(--peligro); }
+  .cat-festival { background:rgba(232,93,38,0.15);color:var(--rds-orange); }
+  .cat-deporte { background:rgba(91,173,111,0.15);color:var(--rds-green); }
+  .cat-cultura { background:rgba(201,168,76,0.15);color:var(--rds-gold); }
+  .cat-gastronomia { background:rgba(226,75,74,0.15);color:var(--rds-danger); }
   .cat-moda { background:rgba(55,138,221,0.15);color:#4A90D9; }
   .cat-arte { background:rgba(90,173,200,0.15);color:#5AADC8; }
-  .cat-otro { background:rgba(138,146,120,0.15);color:var(--muted); }
+  .cat-otro { background:rgba(138,146,120,0.15);color:var(--rds-muted); }
   .evento-finalizado { opacity:0.5; }
   .sitios-body { max-height: 2000px; overflow: hidden; transition: max-height 0.3s ease; }
   .sitios-body.collapsed { max-height: 0; }
@@ -134,7 +160,9 @@
     <div class="nav-item" onclick="showTab('servicios',this)"><span class="icon">🧭</span> Servicios Viajeros</div>
     <div class="nav-item" onclick="showTab('codigos',this)"><span class="icon">🎫</span> Códigos Aliado</div>
     <div class="nav-item" onclick="showTab('hoteles',this)"><span class="icon">🏨</span> Hoteles Partner</div>
-    <div style="position:absolute;bottom:20px;left:0;right:0;padding:0 20px;">
+    <div class="nav-item" onclick="showTab('aliados-pendientes',this)"><span class="icon">📬</span> Aliados Pendientes</div>
+    <div class="nav-item" onclick="showTab('clicks-whatsapp',this)"><span class="icon">📲</span> Clicks WhatsApp</div>
+    <div style="padding:12px 20px 24px;">
       <button class="btn-sm btn-ghost" style="width:100%" onclick="doLogout()">🚪 Cerrar sesión</button>
     </div>
   </div>
@@ -223,16 +251,31 @@
 
     <!-- PREMIOS -->
     <div id="tab-premios" class="tab-content">
+      <!-- Stats -->
+      <div class="stats-grid" style="grid-template-columns:repeat(4,1fr);margin-bottom:20px">
+        <div class="stat-card"><div class="label">Total códigos</div><div class="value" style="color:var(--oro)" id="stat-premios-total">—</div></div>
+        <div class="stat-card"><div class="label">Disponibles</div><div class="value" style="color:var(--verde)" id="stat-premios-disponibles">—</div></div>
+        <div class="stat-card"><div class="label">Canjeados</div><div class="value" style="color:#B85CAE" id="stat-premios-canjeados">—</div></div>
+        <div class="stat-card"><div class="label">% Canje</div><div class="value" style="color:var(--acento)" id="stat-premios-pct">—</div></div>
+      </div>
+      <!-- Filtros -->
       <div class="search-bar">
-        <input class="search-input" placeholder="🔍 Buscar por código o ruta..." id="search-premios" oninput="filtrarPremios()">
+        <input class="search-input" placeholder="🔍 Buscar por código, ruta o usuario..." id="search-premios" oninput="filtrarPremios()">
         <select class="search-input" style="max-width:160px" id="filtro-estado-premio" onchange="filtrarPremios()">
-          <option value="">Todos</option>
-          <option value="false">Disponibles</option>
-          <option value="true">Canjeados</option>
+          <option value="">Todos los estados</option>
+          <option value="false">✅ Disponibles</option>
+          <option value="true">🔒 Canjeados</option>
         </select>
+        <select class="search-input" style="max-width:180px" id="filtro-ruta-premio" onchange="filtrarPremios()">
+          <option value="">Todas las rutas</option>
+        </select>
+        <button class="btn-sm btn-ghost" onclick="loadPremios()">🔄 Actualizar</button>
       </div>
       <div class="card">
-        <div class="card-header"><h3>🏆 Códigos de premio generados</h3></div>
+        <div class="card-header">
+          <h3>🏆 Códigos de premio</h3>
+          <span style="font-size:12px;color:var(--muted)" id="count-premios"></span>
+        </div>
         <div id="tabla-premios"><div class="loading"><div class="spinner"></div></div></div>
       </div>
     </div>
@@ -294,6 +337,13 @@
         <div class="card" style="margin-top:16px">
           <div class="card-header"><h3>📊 Canjes recientes</h3><button class="btn-sm btn-ghost" onclick="loadEstadisticasCanjes()">🔄 Actualizar</button></div>
           <div id="tabla-canjes-recientes"><div class="loading"><div class="spinner"></div></div></div>
+        </div>
+        <!-- Migración masiva de premios viejos a premios_index -->
+        <div class="card" style="margin-top:16px;border-color:rgba(201,168,76,0.3)">
+          <h3 style="margin-bottom:6px">🔧 Migración de premios históricos</h3>
+          <p style="font-size:12px;color:var(--muted);margin-bottom:14px">Copia todos los premios existentes al índice de búsqueda rápida. Ejecutar una sola vez para activar códigos generados antes de la actualización.</p>
+          <button class="btn-sm btn-oro" style="width:100%;padding:12px" onclick="migrarPremiosIndex()">⚡ MIGRAR TODOS LOS PREMIOS A ÍNDICE</button>
+          <div id="resultado-migracion" style="margin-top:12px;font-size:12px;color:var(--muted)"></div>
         </div>
       </div>
     </div>
@@ -522,44 +572,154 @@
 </div>
 
 <!-- ═══════════════════════════════════════════════════════════
-     TAB: SERVICIOS VIAJEROS (01/07/2026)
-     Iguideu, MedeGuide y futuros servicios para turistas
+     TAB: SERVICIOS VIAJEROS — v2 con campos enriquecidos
+     Colección Firestore: serviciosViajero (sin 's' al final)
 ═══════════════════════════════════════════════════════════ -->
 <div id="tab-servicios" class="tab-content">
   <div class="search-bar">
-    <input class="search-input" id="input-serv-nombre" placeholder="🧭 Nombre del servicio">
-    <button class="btn-sm btn-verde" onclick="guardarServicio()">+ Agregar servicio</button>
+    <input class="search-input" id="search-servicios" placeholder="🔍 Buscar servicio..." oninput="filtrarServicios()">
+    <select class="search-input" style="max-width:160px" id="filtro-cat-servicio" onchange="filtrarServicios()">
+      <option value="">Todas las categorías</option>
+      <option value="Transporte">🚗 Transporte</option>
+      <option value="Guías">🧭 Guías</option>
+      <option value="Belleza">💅 Belleza</option>
+      <option value="Tecnología">🔧 Tecnología</option>
+      <option value="Hospedaje">🏨 Hospedaje</option>
+      <option value="Gastronomía">🍽️ Gastronomía</option>
+      <option value="Otro">✨ Otro</option>
+    </select>
+    <button class="btn-sm btn-verde" onclick="abrirModalServicio()">+ Nuevo servicio</button>
+    <button class="btn-sm btn-ghost" onclick="loadServicios()">🔄 Actualizar</button>
   </div>
-  <div class="card" style="margin-bottom:16px">
-    <div class="card-header"><h3>🧭 Datos del servicio</h3></div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:16px">
-      <div><label style="color:var(--texto-muted);font-size:11px">Nombre del servicio</label><input class="search-input" id="input-serv-nombre2" placeholder="Iguideu" style="margin-top:4px"></div>
-      <div><label style="color:var(--texto-muted);font-size:11px">Tipo</label>
-        <select class="search-input" id="input-serv-tipo" style="margin-top:4px">
-          <option value="guia">🗺️ Guía turístico</option>
-          <option value="transporte">🚌 Transporte</option>
-          <option value="seguro">🛡️ Seguro de viaje</option>
-          <option value="cambio">💱 Cambio de moneda</option>
-          <option value="sim">📱 SIM / Conectividad</option>
-          <option value="otro">📦 Otro</option>
-        </select>
-      </div>
-      <div><label style="color:var(--texto-muted);font-size:11px">WhatsApp / Contacto</label><input class="search-input" id="input-serv-wa" placeholder="57300..." style="margin-top:4px"></div>
-      <div><label style="color:var(--texto-muted);font-size:11px">Idiomas</label><input class="search-input" id="input-serv-idiomas" placeholder="ES / EN / FR" style="margin-top:4px"></div>
-      <div><label style="color:var(--texto-muted);font-size:11px">URL o perfil</label><input class="search-input" id="input-serv-url" placeholder="https://iguideu.com" style="margin-top:4px"></div>
-      <div><label style="color:var(--texto-muted);font-size:11px">Estado</label>
-        <select class="search-input" id="input-serv-estado" style="margin-top:4px">
-          <option value="activo">✅ Activo en app</option>
-          <option value="pendiente">⏳ Pendiente</option>
-          <option value="inactivo">❌ Inactivo</option>
-        </select>
-      </div>
-      <div style="grid-column:1/-1"><label style="color:var(--texto-muted);font-size:11px">Descripción / Notas</label><textarea class="search-input" id="input-serv-notas" rows="2" placeholder="Ej: Guía bilingüe EN↔ES, aparece en ServiciosScreen..." style="margin-top:4px;resize:vertical"></textarea></div>
-    </div>
+
+  <!-- Stats rápidas -->
+  <div class="stats-grid" style="grid-template-columns:repeat(3,1fr);margin-bottom:20px">
+    <div class="stat-card"><div class="label">Total servicios</div><div class="value" style="color:var(--verde)" id="stat-serv-total">—</div><div class="sub">En Firestore</div></div>
+    <div class="stat-card"><div class="label">Activos en app</div><div class="value" style="color:var(--oro)" id="stat-serv-activos">—</div><div class="sub">Estado = activo</div></div>
+    <div class="stat-card"><div class="label">Categorías</div><div class="value" style="color:#5BAAA0" id="stat-serv-cats">—</div><div class="sub">Tipos distintos</div></div>
   </div>
+
   <div class="card">
-    <div class="card-header"><h3>📋 Servicios registrados</h3></div>
-    <div id="tabla-servicios" style="padding:16px"><div class="loading"><div class="spinner"></div></div></div>
+    <div class="card-header">
+      <h3>🛎️ Servicios para Viajeros</h3>
+      <span style="font-size:11px;color:var(--muted)">Colección: <code>serviciosViajero</code></span>
+    </div>
+    <div id="tabla-servicios"><div class="loading"><div class="spinner"></div></div></div>
+  </div>
+</div>
+
+<!-- MODAL SERVICIO VIAJERO -->
+<div class="modal-overlay" id="modal-servicio">
+  <div class="modal" style="width:640px;max-width:95vw">
+    <h2 id="modal-serv-title">➕ Nuevo servicio para viajeros</h2>
+    <input type="hidden" id="serv-doc-id">
+
+    <!-- Fila 1: Nombre empresa + Nombre servicio -->
+    <div class="form-row">
+      <div class="form-group">
+        <label>EMPRESA / MARCA</label>
+        <input id="serv-empresa" placeholder="Mobiplab SAS" class="input-field">
+      </div>
+      <div class="form-group">
+        <label>NOMBRE DEL SERVICIO</label>
+        <input id="serv-nombre" placeholder="Servicio de alquiler de scooters" class="input-field">
+      </div>
+    </div>
+
+    <!-- Fila 2: Categoría + Emoji -->
+    <div class="form-row">
+      <div class="form-group">
+        <label>CATEGORÍA</label>
+        <select id="serv-categoria" class="input-field">
+          <option value="Transporte">🚗 Transporte</option>
+          <option value="Guías">🧭 Guías</option>
+          <option value="Belleza">💅 Belleza</option>
+          <option value="Tecnología">🔧 Tecnología</option>
+          <option value="Hospedaje">🏨 Hospedaje</option>
+          <option value="Gastronomía">🍽️ Gastronomía</option>
+          <option value="Otro">✨ Otro</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>EMOJI DEL SERVICIO</label>
+        <input id="serv-emoji" placeholder="🛵" class="input-field" style="font-size:20px;text-align:center">
+      </div>
+    </div>
+
+    <!-- Descripción ES -->
+    <div class="form-group">
+      <label>DESCRIPCIÓN (ES)</label>
+      <textarea id="serv-descripcion" class="input-field" rows="2" placeholder="Alquiler de scooters eléctricos para explorar Medellín de forma libre y sostenible."></textarea>
+    </div>
+
+    <!-- Descripción EN -->
+    <div class="form-group">
+      <label>DESCRIPCIÓN (EN)</label>
+      <textarea id="serv-descripcionEN" class="input-field" rows="2" placeholder="Electric scooter rental to explore Medellín freely and sustainably."></textarea>
+    </div>
+
+    <!-- Fila: WhatsApp + Idiomas -->
+    <div class="form-row">
+      <div class="form-group">
+        <label>WHATSAPP (con código país, sin +)</label>
+        <input id="serv-whatsapp" placeholder="573001234567" class="input-field">
+      </div>
+      <div class="form-group">
+        <label>IDIOMAS ATENCIÓN</label>
+        <input id="serv-idiomas" placeholder="ES / EN" class="input-field">
+      </div>
+    </div>
+
+    <!-- Fila: Idiomas EN + URL externa -->
+    <div class="form-row">
+      <div class="form-group">
+        <label>IDIOMAS (EN)</label>
+        <input id="serv-idiomasEN" placeholder="ES / EN" class="input-field">
+      </div>
+      <div class="form-group">
+        <label>URL EXTERNA (app, web, reservas)</label>
+        <input id="serv-urlExterna" placeholder="https://whoosh.bike/co" class="input-field" type="url">
+      </div>
+    </div>
+
+    <!-- Dirección física -->
+    <div class="form-group">
+      <label>DIRECCIÓN FÍSICA (dejar vacío si no aplica)</label>
+      <input id="serv-direccion" placeholder="Calle 50 N° 55-50, piso 2, Centro, Medellín" class="input-field">
+    </div>
+
+    <!-- Cómo llegar ES -->
+    <div class="form-group">
+      <label>CÓMO LLEGAR (ES)</label>
+      <textarea id="serv-comoLlegar" class="input-field" rows="2" placeholder="Metro línea A, estación Parque Berrío. Camina 3 min hacia el norte por la Calle 50."></textarea>
+    </div>
+
+    <!-- Cómo llegar EN -->
+    <div class="form-group">
+      <label>CÓMO LLEGAR (EN)</label>
+      <textarea id="serv-comoLlegarEN" class="input-field" rows="2" placeholder="Metro line A, Parque Berrío station. Walk 3 min north along Calle 50."></textarea>
+    </div>
+
+    <!-- Maps Query -->
+    <div class="form-group">
+      <label>BÚSQUEDA EN GOOGLE MAPS (ej: nombre + ciudad)</label>
+      <input id="serv-mapsQuery" placeholder="Whoosh scooters Medellín" class="input-field">
+    </div>
+
+    <!-- Estado -->
+    <div class="form-group">
+      <label>ESTADO EN APP</label>
+      <select id="serv-estado" class="input-field">
+        <option value="activo">✅ Activo — visible en ServiciosScreen</option>
+        <option value="pendiente">⏳ Pendiente de revisión</option>
+        <option value="inactivo">❌ Inactivo — oculto en app</option>
+      </select>
+    </div>
+
+    <div class="modal-footer">
+      <button class="btn-sm btn-ghost" onclick="cerrarModalServicio()">Cancelar</button>
+      <button class="btn-sm btn-verde" onclick="guardarServicio()">💾 Guardar en Firestore</button>
+    </div>
   </div>
 </div>
 
@@ -641,6 +801,38 @@
     </div>
     <div id="tabla-hotel-activaciones"><div class="loading"><div class="spinner"></div></div></div>
   </div>
+</div>
+
+<!-- CLICKS WHATSAPP -->
+<div id="tab-clicks-whatsapp" class="tab-content">
+  <div class="stats-grid" style="grid-template-columns:repeat(3,1fr);margin-bottom:20px">
+    <div class="stat-card"><div class="label">Total clicks</div><div class="value" style="color:var(--verde)" id="cw-total">—</div><div class="sub">Todos los tiempos</div></div>
+    <div class="stat-card"><div class="label">Aliados contactados</div><div class="value" style="color:var(--oro)" id="cw-aliados">—</div><div class="sub">Negocios distintos</div></div>
+    <div class="stat-card"><div class="label">Usuarios únicos</div><div class="value" style="color:var(--acento)" id="cw-usuarios">—</div><div class="sub">Han contactado al menos 1</div></div>
+  </div>
+  <div class="card" style="margin-bottom:16px">
+    <div class="card-header">
+      <h3>📲 Clicks por aliado</h3>
+      <button class="btn-sm btn-ghost" onclick="loadClicksWhatsApp()">🔄 Actualizar</button>
+    </div>
+    <div id="cw-tabla-aliados"><div class="loading"><div class="spinner"></div></div></div>
+  </div>
+  <div class="card">
+    <div class="card-header"><h3>🕐 Últimos 50 clicks</h3></div>
+    <div id="cw-tabla-recientes"><div class="loading"><div class="spinner"></div></div></div>
+  </div>
+</div>
+
+<!-- ALIADOS PENDIENTES -->
+<div id="tab-aliados-pendientes" class="tab-content">
+  <div class="card" style="margin-bottom:16px">
+    <div class="card-header">
+      <h3>📬 Fichas de aliados recibidas</h3>
+      <button class="btn-sm btn-ghost" onclick="loadAliadosPendientes()">🔄 Actualizar</button>
+    </div>
+    <p style="color:var(--muted);font-size:13px;margin:0 0 4px">Aliados que completaron la ficha de vinculación. Aprueba para publicar en la app o rechaza para descartarlos.</p>
+  </div>
+  <div id="aliados-pendientes-list"><div class="loading"><div class="spinner"></div></div></div>
 </div>
 
 <div id="tab-pipeline" class="tab-content">
@@ -1071,14 +1263,16 @@ function showTab(tab, el) {
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
   document.getElementById('tab-' + tab).classList.add('active');
   if (el) el.classList.add('active');
-  const titles = {dashboard:'Dashboard',rutas:'Rutas',usuarios:'Usuarios',aliados:'Aliados',premios:'Premios',eventos:'Eventos',validar:'Validar Codigo',pipeline:'Pipeline CRM',colaboradores:'Colaboradores',servicios:'Servicios Viajeros',codigos:'Códigos Aliado',importar:'Importar Rutas y Capas'};
+  const titles = {dashboard:'Dashboard',rutas:'Rutas',usuarios:'Usuarios',aliados:'Aliados',premios:'Premios',eventos:'Eventos',validar:'Validar Codigo',pipeline:'Pipeline CRM',colaboradores:'Colaboradores',servicios:'Servicios Viajeros',codigos:'Códigos Aliado',importar:'Importar Rutas y Capas','aliados-pendientes':'Aliados Pendientes',hoteles:'Hoteles Partner','clicks-whatsapp':'Clicks WhatsApp'};
 
   if (tab === 'pipeline') loadPipeline();
   if (tab === 'validar') { loadEstadisticasCanjes(); detectarCodigoDesdeURL(); }
+  if (tab === 'clicks-whatsapp') loadClicksWhatsApp();
   if (tab === 'colaboradores') loadColaboradores();
   if (tab === 'servicios') loadServicios();
   if (tab === 'codigos') loadCodigos();
   if (tab === 'hoteles') loadHotelActivaciones();
+  if (tab === 'aliados-pendientes') loadAliadosPendientes();
   document.getElementById('page-title').textContent = titles[tab] || tab;
 }
 
@@ -1145,33 +1339,78 @@ async function loadColaboradores() {
 }
 
 // ════════════════════════════════════════════════════════
-//  SERVICIOS VIAJEROS (01/07/2026)
+//  SERVICIOS VIAJEROS — v2 (campos enriquecidos)
+//  Colección Firestore: serviciosViajero (sin 's' al final)
 // ════════════════════════════════════════════════════════
-function limpiarFormServicio() {
-  ['input-serv-nombre','input-serv-nombre2','input-serv-wa','input-serv-idiomas','input-serv-url','input-serv-notas'].forEach(id => {
-    const el = document.getElementById(id);
-    if (el) el.value = '';
+let _serviciosData = [];
+
+const SERV_CAT_COLOR = {
+  'Transporte': '#1565C0', 'Guías': '#1B6B3A', 'Belleza': '#AD1457',
+  'Tecnología': '#0D47A1', 'Hospedaje': '#6A1B9A', 'Gastronomía': '#E65100', 'Otro': '#37474F'
+};
+
+function abrirModalServicio(docId, data) {
+  document.getElementById('serv-doc-id').value = docId || '';
+  document.getElementById('modal-serv-title').textContent = docId ? '✏️ Editar servicio' : '➕ Nuevo servicio para viajeros';
+  const campos = ['empresa','nombre','categoria','emoji','descripcion','descripcionEN',
+                  'whatsapp','idiomas','idiomasEN','urlExterna','direccion','comoLlegar','comoLlegarEN','mapsQuery','estado'];
+  campos.forEach(c => {
+    const el = document.getElementById('serv-' + c);
+    if (el) el.value = (data && data[c]) ? data[c] : '';
   });
+  if (!docId) {
+    document.getElementById('serv-estado').value = 'activo';
+    document.getElementById('serv-categoria').value = 'Guías';
+  }
+  document.getElementById('modal-servicio').classList.add('open');
+}
+
+function cerrarModalServicio() {
+  document.getElementById('modal-servicio').classList.remove('open');
 }
 
 async function guardarServicio() {
-  const nombre = document.getElementById('input-serv-nombre2').value.trim()
-              || document.getElementById('input-serv-nombre').value.trim();
-  const tipo = document.getElementById('input-serv-tipo').value;
-  const wa = document.getElementById('input-serv-wa').value.trim();
-  const idiomas = document.getElementById('input-serv-idiomas').value.trim();
-  const url = document.getElementById('input-serv-url').value.trim();
-  const notas = document.getElementById('input-serv-notas').value.trim();
-  const estado = document.getElementById('input-serv-estado').value;
-  if (!nombre) { alert('El nombre del servicio es obligatorio'); return; }
+  const docId = document.getElementById('serv-doc-id').value.trim();
+  const nombre = document.getElementById('serv-nombre').value.trim();
+  const empresa = document.getElementById('serv-empresa').value.trim();
+  if (!nombre && !empresa) { alert('El nombre del servicio o empresa es obligatorio'); return; }
+
+  const catVal = document.getElementById('serv-categoria').value;
+  const data = {
+    empresa:        empresa,
+    nombre:         nombre || empresa,
+    categoria:      catVal,
+    categoriaBase:  catVal,
+    emoji:          document.getElementById('serv-emoji').value.trim() || '🛎️',
+    descripcion:    document.getElementById('serv-descripcion').value.trim(),
+    descripcionEN:  document.getElementById('serv-descripcionEN').value.trim(),
+    whatsapp:       document.getElementById('serv-whatsapp').value.trim(),
+    idiomas:        document.getElementById('serv-idiomas').value.trim(),
+    idiomasEN:      document.getElementById('serv-idiomasEN').value.trim(),
+    urlExterna:     document.getElementById('serv-urlExterna').value.trim(),
+    direccion:      document.getElementById('serv-direccion').value.trim(),
+    comoLlegar:     document.getElementById('serv-comoLlegar').value.trim(),
+    comoLlegarEN:   document.getElementById('serv-comoLlegarEN').value.trim(),
+    mapsQuery:      document.getElementById('serv-mapsQuery').value.trim(),
+    estado:         document.getElementById('serv-estado').value,
+    activo:         document.getElementById('serv-estado').value === 'activo',
+  };
+
   try {
-    await db.collection('serviciosViajeros').add({
-      nombre, tipo, wa, idiomas, url, notas, estado,
-      creadoEn: firebase.firestore.FieldValue.serverTimestamp()
-    });
-    limpiarFormServicio();
+    if (docId) {
+      await db.collection('serviciosViajero').doc(docId).update({
+        ...data,
+        actualizadoEn: firebase.firestore.FieldValue.serverTimestamp()
+      });
+    } else {
+      await db.collection('serviciosViajero').add({
+        ...data,
+        creadoEn: firebase.firestore.FieldValue.serverTimestamp()
+      });
+    }
+    cerrarModalServicio();
     loadServicios();
-    alert('✅ Servicio guardado');
+    alert(docId ? '✅ Servicio actualizado' : '✅ Servicio guardado en app');
   } catch(e) { alert('Error: ' + e.message); }
 }
 
@@ -1180,27 +1419,90 @@ async function loadServicios() {
   if (!cont) return;
   cont.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
   try {
-    const snap = await db.collection('serviciosViajeros').orderBy('creadoEn','desc').get();
-    if (snap.empty) { cont.innerHTML = '<p style="color:var(--texto-muted);padding:12px">No hay servicios registrados aún. Agrega Iguideu y MedeGuide para empezar.</p>'; return; }
-    const tipoLabel = {guia:'🗺️ Guía',transporte:'🚌 Transporte',seguro:'🛡️ Seguro',cambio:'💱 Cambio',sim:'📱 SIM',otro:'📦 Otro'};
-    let html = '<table style="width:100%;border-collapse:collapse">';
-    html += '<tr style="color:var(--texto-muted);font-size:11px;border-bottom:1px solid var(--borde)"><th style="padding:8px;text-align:left">Servicio</th><th style="padding:8px;text-align:left">Tipo</th><th style="padding:8px;text-align:left">Contacto</th><th style="padding:8px;text-align:left">Idiomas</th><th style="padding:8px;text-align:left">Estado</th><th style="padding:8px"></th></tr>';
-    snap.forEach(doc => {
-      const d = doc.data();
-      const estadoColor = d.estado === 'activo' ? 'var(--verde)' : 'var(--texto-muted)';
-      html += `<tr style="border-bottom:1px solid var(--borde)">
-        <td style="padding:8px;font-weight:700">${d.nombre}<br>${d.url ? `<a href="${d.url}" target="_blank" style="font-size:10px;color:var(--acento)">${d.url}</a>` : ''}</td>
-        <td style="padding:8px">${tipoLabel[d.tipo] || d.tipo}</td>
-        <td style="padding:8px">${d.wa ? `<a href="https://wa.me/${d.wa}" target="_blank" style="color:var(--verde)">📱 ${d.wa}</a>` : '—'}</td>
-        <td style="padding:8px">${d.idiomas || '—'}</td>
-        <td style="padding:8px;color:${estadoColor};font-size:12px">${d.estado === 'activo' ? '✅ En app' : '⏳ Pendiente'}</td>
-        <td style="padding:8px"><button class="btn-sm" style="background:var(--rojo);color:#fff;font-size:10px" onclick="eliminarDoc('serviciosViajeros','${doc.id}',loadServicios)">🗑️</button></td>
-      </tr>`;
-      if (d.notas) html += `<tr><td colspan="6" style="padding:4px 8px 12px;color:var(--texto-muted);font-size:11px;font-style:italic">📝 ${d.notas}</td></tr>`;
-    });
-    html += '</table>';
-    cont.innerHTML = html;
-  } catch(e) { cont.innerHTML = '<p style="color:var(--rojo)">Error: ' + e.message + '</p>'; }
+    const snap = await db.collection('serviciosViajero').orderBy('creadoEn','desc').get();
+    _serviciosData = [];
+    snap.forEach(doc => _serviciosData.push({ id: doc.id, ...doc.data() }));
+
+    // Stats
+    const activos = _serviciosData.filter(s => s.estado === 'activo').length;
+    const cats = new Set(_serviciosData.map(s => s.categoria).filter(Boolean)).size;
+    const el = id => document.getElementById(id);
+    if (el('stat-serv-total')) el('stat-serv-total').textContent = _serviciosData.length;
+    if (el('stat-serv-activos')) el('stat-serv-activos').textContent = activos;
+    if (el('stat-serv-cats')) el('stat-serv-cats').textContent = cats;
+
+    renderTablaServicios(_serviciosData);
+  } catch(e) { cont.innerHTML = `<p style="color:var(--peligro);padding:16px">Error: ${e.message}</p>`; }
+}
+
+function filtrarServicios() {
+  const q = (document.getElementById('search-servicios')?.value || '').toLowerCase();
+  const cat = document.getElementById('filtro-cat-servicio')?.value || '';
+  const filtered = _serviciosData.filter(s => {
+    const matchQ = !q || [s.nombre,s.empresa,s.descripcion,s.categoria].some(v => v && v.toLowerCase().includes(q));
+    const matchCat = !cat || s.categoria === cat;
+    return matchQ && matchCat;
+  });
+  renderTablaServicios(filtered);
+}
+
+function renderTablaServicios(lista) {
+  const cont = document.getElementById('tabla-servicios');
+  if (!cont) return;
+  if (!lista.length) {
+    cont.innerHTML = '<div class="empty-state">No hay servicios. Agrega el primero con "+ Nuevo servicio".</div>';
+    return;
+  }
+  let html = `<table style="width:100%">
+    <thead><tr>
+      <th>Servicio</th><th>Categoría</th><th>Contacto</th><th>Dirección</th><th>Estado</th><th></th>
+    </tr></thead><tbody>`;
+  lista.forEach(s => {
+    const catColor = SERV_CAT_COLOR[s.categoria] || '#37474F';
+    const estadoBadge = s.estado === 'activo'
+      ? '<span class="badge badge-verde">✅ Activo</span>'
+      : s.estado === 'inactivo'
+      ? '<span class="badge badge-rojo">❌ Inactivo</span>'
+      : '<span class="badge badge-gris">⏳ Pendiente</span>';
+    const links = [];
+    if (s.whatsapp) links.push(`<a href="https://wa.me/${s.whatsapp}" target="_blank" style="color:#25D366;font-size:12px">📱 WA</a>`);
+    if (s.urlExterna) links.push(`<a href="${s.urlExterna}" target="_blank" style="color:var(--acento);font-size:12px">🌐 Web</a>`);
+    if (s.mapsQuery) links.push(`<a href="https://maps.google.com/?q=${encodeURIComponent(s.mapsQuery)}" target="_blank" style="color:#4A90D9;font-size:12px">📍 Maps</a>`);
+
+    html += `<tr>
+      <td>
+        <div style="font-weight:700;font-size:13px">${s.emoji || '🛎️'} ${s.empresa || s.nombre}</div>
+        ${s.empresa && s.nombre !== s.empresa ? `<div style="font-size:11px;color:var(--muted)">${s.nombre}</div>` : ''}
+        ${s.descripcion ? `<div style="font-size:11px;color:var(--muted);margin-top:2px;max-width:220px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${s.descripcion}</div>` : ''}
+      </td>
+      <td><span class="badge" style="background:${catColor}22;color:${catColor}">${s.categoria || '—'}</span></td>
+      <td style="font-size:12px">${links.join(' · ') || '—'}<br>${s.idiomas ? `<span style="color:var(--muted);font-size:10px">${s.idiomas}</span>` : ''}</td>
+      <td style="font-size:11px;color:var(--muted);max-width:180px">
+        ${s.direccion ? `<div>📍 ${s.direccion}</div>` : '—'}
+        ${s.comoLlegar ? `<div style="font-size:10px;color:var(--muted);margin-top:2px">🗺️ ${s.comoLlegar.substring(0,60)}${s.comoLlegar.length>60?'…':''}</div>` : ''}
+      </td>
+      <td>${estadoBadge}</td>
+      <td style="white-space:nowrap">
+        <button class="btn-sm btn-ghost" style="font-size:10px;margin-right:4px" onclick='editarServicio("${s.id}")'>✏️</button>
+        <button class="btn-sm btn-danger" style="font-size:10px" onclick="eliminarServicio('${s.id}','${(s.empresa||s.nombre).replace(/'/g,'')}')">🗑️</button>
+      </td>
+    </tr>`;
+  });
+  html += '</tbody></table>';
+  cont.innerHTML = html;
+}
+
+function editarServicio(docId) {
+  const s = _serviciosData.find(x => x.id === docId);
+  if (s) abrirModalServicio(docId, s);
+}
+
+async function eliminarServicio(docId, nombre) {
+  if (!confirm(`¿Eliminar "${nombre}" de serviciosViajero?\nEsto lo quitará de la app.`)) return;
+  try {
+    await db.collection('serviciosViajero').doc(docId).delete();
+    loadServicios();
+  } catch(e) { alert('Error: ' + e.message); }
 }
 
 // ════════════════════════════════════════════════════════
@@ -1384,7 +1686,9 @@ async function loadDashboard() {
 }
 
 // ─── RUTAS ───
-let todasLasRutas = []; let filtroZonaActivo = 'Todas';
+let todasLasRutas = []; let filtroZonaActivo = 'Todas'; let filtroCiudadActivo = 'Todas';
+// Helper global: convierte cualquier valor a string seguro
+function str(v) { return (v==null||v===undefined) ? '' : (typeof v==='object' ? JSON.stringify(v) : String(v)); }
 // RUTAS_FALLBACK eliminado — todo desde Firestore
 const RUTAS_FALLBACK = [];
 async function loadRutas() {
@@ -1393,7 +1697,7 @@ async function loadRutas() {
     const rutasFirestore = [];
     const nombresVistos = new Set();
     snap.forEach(d => {
-      const r = {id:d.id,...d.data()};
+      const r = {...d.data(), id:d.id}; // id de Firestore siempre gana sobre campo interno
       if (!r.ciudad) r.ciudad = 'Medellín';
       // Deduplicar por nombre — si hay duplicados queda el último (más reciente)
       if (nombresVistos.has(r.nombre)) {
@@ -1421,7 +1725,7 @@ function filtrarRutas() {
   const q = document.getElementById('search-rutas').value.toLowerCase();
   let rutas = todasLasRutas;
   if (filtroZonaActivo !== 'Todas') rutas = rutas.filter(r => r.zona === filtroZonaActivo);
-  if (filtroCiudadActivo !== 'Todas') rutas = rutas.filter(r => (r.ciudad||'Medellín') === filtroCiudadActivo);
+  if (filtroCiudadActivo !== 'Todas') rutas = rutas.filter(r => (str(r.ciudad)||'Medellín') === filtroCiudadActivo);
   if (q) rutas = rutas.filter(r => r.nombre.toLowerCase().includes(q) || r.zona.toLowerCase().includes(q));
   renderRutas(rutas);
 }
@@ -1455,15 +1759,15 @@ function renderRutas(rutas) {
   rutas.forEach(r => {
     const activa = r.activa !== false;
     h += `<tr style="opacity:${activa?1:0.55}">
-    <td style="font-size:20px">${r.emoji||''}</td>
+    <td style="font-size:20px">${str(r.emoji)}</td>
     <td style="font-weight:600">${r.nombre}<br><span style="font-size:11px;color:var(--muted);font-weight:400">${r.sitiosList ? r.sitiosList.length+' sitios' : (r.sitios||'—')+' sitios'}${r.sitiosDetalle?.length ? ' <span class="badge badge-oro" style="font-size:9px">✨ detalle</span>' : ''}</span></td>
-    <td><span style="font-size:11px;padding:3px 8px;border-radius:20px;background:rgba(255,255,255,0.06);color:var(--muted)">${r.ciudad||'Medellín'}</span></td>
+    <td><span style="font-size:11px;padding:3px 8px;border-radius:20px;background:rgba(255,255,255,0.06);color:var(--muted)">${str(r.ciudad)||'Medellín'}</span></td>
     <td><span class="badge ${zb[r.zona]||'badge-gris'}">${r.zona}</span></td>
-    <td style="color:var(--muted);font-size:12px">${r.ciudad||'Medellín'}</td>
+    <td style="color:var(--muted);font-size:12px">${str(r.ciudad)||'Medellín'}</td>
     <td style="color:var(--oro);font-weight:700">${r.precio||'—'}</td>
     <td><span class="badge ${r.dificultad==='DIFÍCIL'?'badge-rojo':r.dificultad==='MEDIO'?'badge-oro':'badge-verde'}">${r.dificultad||'—'}</span></td>
-    <td><span class="badge ${activa?'badge-verde':'badge-gris'}" style="cursor:pointer" title="Click para cambiar estado" onclick="toggleRutaActiva('${r.id}',${activa})">${activa?'🟢 Activa':'⏸️ Pausada'}</span></td>
-    <td><button class="btn-sm btn-ghost" onclick="editarRuta('${r.id}')">✏️ Editar</button></td></tr>`;
+    <td><span class="badge ${activa?'badge-verde':'badge-gris'}" style="cursor:pointer" title="Click para cambiar estado" onclick="toggleRutaActiva(this.dataset.id,${activa})" data-id="${r.id}">${activa?'🟢 Activa':'⏸️ Pausada'}</span></td>
+    <td><button class="btn-sm btn-ghost" onclick="editarRuta(this.dataset.id)" data-id="${r.id}">✏️ Editar</button></td></tr>`;
   });
   document.getElementById('tabla-rutas').innerHTML = h + '</table>';
 }
@@ -1499,47 +1803,49 @@ function abrirModalRuta() {
   document.getElementById('modal-ruta').classList.add('open');
 }
 function editarRuta(id) {
-  const r = todasLasRutas.find(r => r.id===id); if(!r) return;
+  try {
+  const r = todasLasRutas.find(r => r.id===id); if(!r) { console.error('Ruta no encontrada:', id); return; }
+
   document.getElementById('modal-ruta-title').textContent = '✏️ Editar ruta';
   document.getElementById('btn-eliminar-ruta').style.display = 'inline-flex';
   document.getElementById('ruta-id').value = id;
-  document.getElementById('ruta-nombre').value = r.nombre||'';
-  document.getElementById('ruta-emoji').value = r.emoji||'';
-  document.getElementById('ruta-subtitulo').value = r.subtitulo||'';
-  document.getElementById('ruta-zona').value = r.zona||'Ciudad';
-  document.getElementById('ruta-ciudad').value = r.ciudad||'Medellín';
-  document.getElementById('ruta-precio').value = r.precio||'';
-  document.getElementById('ruta-tiempo').value = r.tiempo||'';
-  document.getElementById('ruta-dificultad').value = r.dificultad||'FÁCIL';
-  document.getElementById('ruta-transporte').value = r.transporte||'';
-  document.getElementById('ruta-mejorHora').value = r.mejorHora||'';
-  document.getElementById('ruta-hook').value = r.hook||'';
-  document.getElementById('ruta-descripcion').value = r.descripcion||'';
-  document.getElementById('ruta-sitios').value = (r.sitiosList||[]).join('\n');
-  document.getElementById('ruta-premio').value = r.premio||'';
-  document.getElementById('ruta-insignia').value = r.insignia||'';
-  document.getElementById('ruta-personaje').value = r.personaje||'';
+  document.getElementById('ruta-nombre').value = str(r.nombre);
+  document.getElementById('ruta-emoji').value = str(r.emoji);
+  document.getElementById('ruta-subtitulo').value = str(r.subtitulo);
+  document.getElementById('ruta-zona').value = str(r.zona)||'Ciudad';
+  document.getElementById('ruta-ciudad').value = str(r.ciudad)||'Medellín';
+  document.getElementById('ruta-precio').value = str(r.precio);
+  document.getElementById('ruta-tiempo').value = str(r.tiempo);
+  document.getElementById('ruta-dificultad').value = str(r.dificultad)||'FÁCIL';
+  document.getElementById('ruta-transporte').value = str(r.transporte);
+  document.getElementById('ruta-mejorHora').value = str(r.mejorHora);
+  document.getElementById('ruta-hook').value = str(r.hook);
+  document.getElementById('ruta-descripcion').value = str(r.descripcion);
+  document.getElementById('ruta-sitios').value = Array.isArray(r.sitiosList) ? r.sitiosList.join('\n') : (r.sitiosList||'');
+  document.getElementById('ruta-premio').value = str(r.premio);
+  document.getElementById('ruta-insignia').value = str(r.insignia);
+  document.getElementById('ruta-personaje').value = str(r.personaje);
   document.getElementById('ruta-activa').value = String(r.activa !== false);
   // Campos nuevos
-  document.getElementById('ruta-misionEpica').value = r.misionEpica||'';
-  document.getElementById('ruta-momentoClave').value = r.momentoClave||'';
-  document.getElementById('ruta-tipoExperiencia').value = r.tipoExperiencia||'';
-  document.getElementById('ruta-tipoExperienciaEN').value = r.tipoExperienciaEN||'';
+  document.getElementById('ruta-misionEpica').value = str(r.misionEpica);
+  document.getElementById('ruta-momentoClave').value = str(r.momentoClave);
+  document.getElementById('ruta-tipoExperiencia').value = str(r.tipoExperiencia);
+  document.getElementById('ruta-tipoExperienciaEN').value = str(r.tipoExperienciaEN);
   document.getElementById('ruta-familiar').value = String(r.familiar === true);
-  document.getElementById('ruta-notaFamiliar').value = r.notaFamiliar||'';
-  document.getElementById('ruta-pais').value = r.pais||'Colombia';
-  document.getElementById('ruta-color1').value = r.color1||'';
-  document.getElementById('ruta-color2').value = r.color2||'';
-  document.getElementById('ruta-acento').value = r.acento||'';
-  document.getElementById('ruta-tag').value = r.tag||'';
-  document.getElementById('ruta-tagPausada').value = r.tagPausada||'';
-  document.getElementById('ruta-imagen').value = r.imagen||'';
-  document.getElementById('ruta-insigniaImg').value = r.insigniaImg||'';
-  document.getElementById('ruta-consejos').value = (r.consejos||[]).join('\n');
-  document.getElementById('ruta-nombreEN').value = r.nombreEN||'';
-  document.getElementById('ruta-subtituloEN').value = r.subtituloEN||'';
-  document.getElementById('ruta-hookEN').value = r.hookEN||'';
-  document.getElementById('ruta-descripcionEN').value = r.descripcionEN||'';
+  document.getElementById('ruta-notaFamiliar').value = str(r.notaFamiliar);
+  document.getElementById('ruta-pais').value = str(r.pais)||'Colombia';
+  document.getElementById('ruta-color1').value = str(r.color1);
+  document.getElementById('ruta-color2').value = str(r.color2);
+  document.getElementById('ruta-acento').value = str(r.acento);
+  document.getElementById('ruta-tag').value = str(r.tag);
+  document.getElementById('ruta-tagPausada').value = str(r.tagPausada);
+  document.getElementById('ruta-imagen').value = str(r.imagen);
+  document.getElementById('ruta-insigniaImg').value = str(r.insigniaImg);
+  document.getElementById('ruta-consejos').value = Array.isArray(r.consejos) ? r.consejos.join('\n') : (r.consejos||'');
+  document.getElementById('ruta-nombreEN').value = str(r.nombreEN);
+  document.getElementById('ruta-subtituloEN').value = str(r.subtituloEN);
+  document.getElementById('ruta-hookEN').value = str(r.hookEN);
+  document.getElementById('ruta-descripcionEN').value = str(r.descripcionEN);
   // Temporada
   if (r.temporadaInicio) {
     document.getElementById('ruta-tempMesInicio').value = r.temporadaInicio[0]||'';
@@ -1561,6 +1867,7 @@ function editarRuta(id) {
   }
   document.getElementById('sitios-detalle-editor').style.display = 'none';
   document.getElementById('modal-ruta').classList.add('open');
+  } catch(e) { console.error('Error editarRuta:', e); alert('Error al abrir la ruta: ' + e.message); }
 }
 async function eliminarRutaActual() {
   const id = document.getElementById('ruta-id').value; if(!id) return;
@@ -2336,7 +2643,7 @@ function mostrarPreviewIA(ruta) {
         <div style="font-size:12px;font-style:italic;color:var(--texto);margin-bottom:6px">"${ruta.hook||''}"</div>
         <div style="font-size:12px;color:var(--muted)">${ruta.descripcion||''}</div>
         ${ruta.misionEpica ? `<div style="margin-top:8px;padding:8px 12px;background:rgba(201,168,76,0.1);border-radius:8px;font-size:12px"><strong style="color:var(--oro)">🎯 Misión:</strong> ${ruta.misionEpica}</div>` : ''}
-        ${ruta.consejos?.length ? `<div style="margin-top:8px;font-size:11px;color:var(--muted)">${ruta.consejos.join(' · ')}</div>` : ''}
+        ${ruta.consejos?.length ? `<div style="margin-top:8px;font-size:11px;color:var(--muted)">${Array.isArray(ruta.consejos) ? ruta.consejos.join(' · ') : ruta.consejos}</div>` : ''}
       </div>
     </div>`;
 
@@ -2577,44 +2884,74 @@ async function guardarAliado() {
 let todosPremios = [];
 async function loadPremios() {
   try {
-    const snap = await db.collectionGroup('premios').orderBy('fecha','desc').limit(100).get();
-    todosPremios = []; snap.forEach(d => todosPremios.push({id:d.id,ref:d.ref,...d.data()}));
+    // Leer desde premios_index — sin índice Firestore requerido
+    const snap = await db.collection('premios_index').orderBy('fecha','desc').get();
+    todosPremios = [];
+    snap.forEach(d => todosPremios.push({id:d.id, ...d.data()}));
+
+    // Calcular stats
+    const total = todosPremios.length;
+    const canjeados = todosPremios.filter(p => p.canjeado).length;
+    const disponibles = total - canjeados;
+    const pct = total ? Math.round(canjeados/total*100) : 0;
+    document.getElementById('stat-premios-total').textContent = total;
+    document.getElementById('stat-premios-disponibles').textContent = disponibles;
+    document.getElementById('stat-premios-canjeados').textContent = canjeados;
+    document.getElementById('stat-premios-pct').textContent = pct + '%';
+
+    // Poblar filtro de rutas
+    const rutas = [...new Set(todosPremios.map(p => p.rutaNombre).filter(Boolean))].sort();
+    const sel = document.getElementById('filtro-ruta-premio');
+    sel.innerHTML = '<option value="">Todas las rutas</option>' +
+      rutas.map(r => `<option value="${r}">${r}</option>`).join('');
+
     renderPremios(todosPremios);
-  } catch(e) { document.getElementById('tabla-premios').innerHTML = '<div class="empty-state">Sin premios aún</div>'; }
+  } catch(e) {
+    document.getElementById('tabla-premios').innerHTML = `<div class="empty-state">Error: ${e.message}</div>`;
+  }
 }
 function filtrarPremios() {
-  const q = document.getElementById('search-premios').value.toLowerCase();
+  const q = (document.getElementById('search-premios').value||'').toLowerCase();
   const estado = document.getElementById('filtro-estado-premio').value;
-  renderPremios(todosPremios.filter(p => {
-    const mq = (p.codigo||'').toLowerCase().includes(q)||(p.rutaNombre||'').toLowerCase().includes(q);
-    const me = estado===''||String(p.canjeado)===estado;
-    return mq && me;
-  }));
+  const ruta = document.getElementById('filtro-ruta-premio').value;
+  const filtrados = todosPremios.filter(p => {
+    const mq = (p.codigo||'').toLowerCase().includes(q)
+      || (p.rutaNombre||'').toLowerCase().includes(q)
+      || (p.userId||'').toLowerCase().includes(q);
+    const me = estado==='' || String(p.canjeado)===estado;
+    const mr = ruta==='' || p.rutaNombre===ruta;
+    return mq && me && mr;
+  });
+  document.getElementById('count-premios').textContent = `${filtrados.length} de ${todosPremios.length}`;
+  renderPremios(filtrados);
 }
 function renderPremios(premios) {
-  if (!premios.length) { document.getElementById('tabla-premios').innerHTML = '<div class="empty-state">Sin premios generados aún</div>'; return; }
-  let h = '<table><tr><th>Código</th><th>Usuario</th><th>Ruta</th><th>Insignia</th><th>Estado</th><th>Fecha</th><th>Acción</th></tr>';
+  document.getElementById('count-premios').textContent = `${premios.length} códigos`;
+  if (!premios.length) { document.getElementById('tabla-premios').innerHTML = '<div class="empty-state">Sin resultados</div>'; return; }
+  let h = '<table><tr><th>Código</th><th>Ruta</th><th>Premio</th><th>Estado</th><th>Fecha</th><th>Canje</th><th>Acción</th></tr>';
   premios.forEach(p => {
     const f = p.fecha ? new Date(p.fecha.seconds*1000).toLocaleDateString('es-CO') : '—';
-    // El userId viene del path: users/{userId}/premios/{premioId}
-    const uid = p.ref?.parent?.parent?.id || p.userId || '—';
-    const uidShort = uid !== '—' ? uid.substring(0,8)+'…' : '—';
+    const fc = p.fechaCanje ? new Date(p.fechaCanje.seconds*1000).toLocaleDateString('es-CO') : '—';
     h += `<tr>
-      <td style="font-weight:900;color:var(--oro);letter-spacing:2px;font-size:12px">${p.codigo||'—'}</td>
-      <td style="color:var(--muted);font-size:11px" title="${uid}">${uidShort}</td>
+      <td style="font-weight:900;color:var(--oro);letter-spacing:2px;font-size:11px">${p.codigo||'—'}</td>
       <td>${p.emoji||''} ${p.rutaNombre||'—'}</td>
-      <td style="color:var(--muted);font-size:12px">${p.insignia||'—'}</td>
-      <td><span class="badge ${p.canjeado?'badge-gris':'badge-verde'}">${p.canjeado?'Canjeado':'Disponible'}</span></td>
+      <td style="color:var(--muted);font-size:12px">${p.premio||p.insignia||'—'}</td>
+      <td><span class="badge ${p.canjeado?'badge-gris':'badge-verde'}">${p.canjeado?'🔒 Canjeado':'✅ Disponible'}</span></td>
       <td style="color:var(--muted);font-size:12px">${f}</td>
-      <td>${!p.canjeado?`<button class="btn-sm btn-oro" onclick="canjearDesdeTabla('${p.id}')">✅ Canjear</button>`:'—'}</td>
+      <td style="color:var(--muted);font-size:12px">${p.canjeado?fc:'—'}</td>
+      <td>${!p.canjeado?`<button class="btn-sm btn-oro" onclick="canjearDesdeTabla('${p.id}')">Canjear</button>`:'—'}</td>
     </tr>`;
   });
   document.getElementById('tabla-premios').innerHTML = h + '</table>';
 }
-async function canjearDesdeTabla(id) {
-  const p = todosPremios.find(p => p.id===id); if(!p) return;
-  if (!confirm(`¿Marcar el código ${p.codigo} como canjeado?`)) return;
-  await p.ref.update({canjeado:true,fechaCanje:firebase.firestore.FieldValue.serverTimestamp()});
+async function canjearDesdeTabla(codigo) {
+  const p = todosPremios.find(p => p.id===codigo); if(!p) return;
+  if (!confirm(`¿Marcar el código ${codigo} como canjeado?`)) return;
+  const canjeData = {canjeado:true, fechaCanje:firebase.firestore.FieldValue.serverTimestamp(), confirmadoPor:'admin_web'};
+  await db.collection('premios_index').doc(codigo).update(canjeData);
+  if (p.userId) {
+    try { await db.collection('usuarios').doc(p.userId).collection('premios').doc(codigo).update(canjeData); } catch(_) {}
+  }
   loadPremios(); loadDashboard();
 }
 
@@ -2728,6 +3065,44 @@ async function eliminarEventoActual() {
   catch(e) { alert('Error: '+e.message); }
 }
 
+// ─── MIGRACIÓN MASIVA: premios históricos → premios_index ───
+async function migrarPremiosIndex() {
+  const res = document.getElementById('resultado-migracion');
+  res.innerHTML = '⏳ Leyendo usuarios...';
+  try {
+    const usuariosSnap = await db.collection('usuarios').get();
+    let total = 0, migrados = 0, errores = 0;
+    const batch_size = 20;
+    let promises = [];
+
+    for (const usuarioDoc of usuariosSnap.docs) {
+      const uid = usuarioDoc.id;
+      const premiosSnap = await usuarioDoc.ref.collection('premios').get();
+      for (const premioDoc of premiosSnap.docs) {
+        total++;
+        const data = premioDoc.data();
+        const codigo = data.codigo || premioDoc.id;
+        promises.push(
+          db.collection('premios_index').doc(codigo).set({
+            ...data,
+            userId: uid,
+            _migrado: true,
+          }).then(() => migrados++).catch(() => errores++)
+        );
+        if (promises.length >= batch_size) {
+          await Promise.all(promises);
+          promises = [];
+          res.innerHTML = `⏳ Procesando... ${migrados} migrados de ${total}`;
+        }
+      }
+    }
+    if (promises.length) await Promise.all(promises);
+    res.innerHTML = `✅ Migración completa — ${migrados} premios indexados${errores ? `, ${errores} errores` : ''}. Ya puedes validar todos los códigos.`;
+  } catch(e) {
+    res.innerHTML = `❌ Error: ${e.message}`;
+  }
+}
+
 // ─── VALIDAR CÓDIGO — mejorado con QR + estadísticas ───
 
 // Detectar código desde URL (cuando llega desde QR escaneado)
@@ -2754,16 +3129,30 @@ async function validarCodigo() {
   res.innerHTML = '<div class="spinner"></div> Verificando...';
 
   try {
-    // Buscar en premios (tipo ruta completa)
+    // Buscar en premios_index (índice raíz — búsqueda directa por ID, sin índice Firestore)
     let docEncontrado = null;
     let datosEncontrados = null;
     let coleccionOrigen = '';
 
-    const snapPremios = await db.collectionGroup('premios').where('codigo','==',codigo).get();
-    if (!snapPremios.empty) {
-      docEncontrado = snapPremios.docs[0];
-      datosEncontrados = docEncontrado.data();
-      coleccionOrigen = 'premios';
+    const snapIndex = await db.collection('premios_index').doc(codigo).get();
+    if (snapIndex.exists) {
+      docEncontrado = snapIndex;
+      datosEncontrados = snapIndex.data();
+      coleccionOrigen = 'premios_index';
+    }
+
+    // Fallback: buscar en subcollección users (premios legacy sin índice)
+    if (!docEncontrado) {
+      try {
+        const snapPremios = await db.collectionGroup('premios').where('codigo','==',codigo).get();
+        if (!snapPremios.empty) {
+          docEncontrado = snapPremios.docs[0];
+          datosEncontrados = docEncontrado.data();
+          coleccionOrigen = 'premios';
+          // Migrar al índice para futuras búsquedas
+          await db.collection('premios_index').doc(codigo).set({...datosEncontrados, _migrado: true});
+        }
+      } catch(eIdx) { /* índice no disponible aún */ }
     }
 
     // Si no está en premios, buscar en consumos_aliados (tipo aliado QR)
@@ -2846,21 +3235,33 @@ async function confirmarCanje(docId, coleccion, btn) {
     const codigo = document.getElementById('codigo-validar').value.trim().toUpperCase();
 
     // Marcar como canjeado en la colección correcta
-    if (coleccion === 'premios') {
-      const snap = await db.collectionGroup('premios').where('codigo','==',codigo).get();
-      if (!snap.empty) {
-        await snap.docs[0].ref.update({
-          canjeado: true,
-          fechaCanje: firebase.firestore.FieldValue.serverTimestamp(),
-          confirmadoPor: 'admin_web',
-        });
+    const canjeData = {
+      canjeado: true,
+      fechaCanje: firebase.firestore.FieldValue.serverTimestamp(),
+      confirmadoPor: 'admin_web',
+    };
+
+    if (coleccion === 'premios_index') {
+      // Actualizar índice raíz
+      await db.collection('premios_index').doc(codigo).update(canjeData);
+      // También actualizar en subcollección del usuario si existe
+      const idxDoc = await db.collection('premios_index').doc(codigo).get();
+      const userId = idxDoc.data()?.userId;
+      if (userId) {
+        try {
+          await db.collection('usuarios').doc(userId).collection('premios').doc(codigo).update(canjeData);
+        } catch(_) {}
       }
+    } else if (coleccion === 'premios') {
+      // Legacy: buscar en subcollección (puede fallar si no hay índice)
+      try {
+        const snap = await db.collectionGroup('premios').where('codigo','==',codigo).get();
+        if (!snap.empty) await snap.docs[0].ref.update(canjeData);
+      } catch(_) {}
+      // También actualizar premios_index si existe
+      try { await db.collection('premios_index').doc(codigo).update(canjeData); } catch(_) {}
     } else {
-      await db.collection('consumos_aliados').doc(docId).update({
-        canjeado: true,
-        fechaCanje: firebase.firestore.FieldValue.serverTimestamp(),
-        confirmadoPor: 'admin_web',
-      });
+      await db.collection('consumos_aliados').doc(docId).update(canjeData);
     }
 
     // Registrar en estadisticas_canjes
@@ -3056,7 +3457,7 @@ function filtrarPipeline() {
   const tier = document.getElementById('filtro-tier').value;
   const estado = document.getElementById('filtro-estado').value;
   const f = todosPipeline.filter(r => {
-    const mq = !q || (r.nombre||'').toLowerCase().includes(q) || (r.ubicacion||'').toLowerCase().includes(q) || (r.contacto||'').toLowerCase().includes(q);
+    const mq = !q || (str(r.nombre)).toLowerCase().includes(q) || (r.ubicacion||'').toLowerCase().includes(q) || (r.contacto||'').toLowerCase().includes(q);
     const mt = !tier || r.tier === tier;
     const me = !estado || r.estado === estado;
     return mq && mt && me;
@@ -3227,6 +3628,215 @@ async function eliminarPipe() {
 // ═══════════════════════════════════════════
 // 🎬 COLABORADORES
 // ═══════════════════════════════════════════
+
+// ═══════════════════════════════════════════
+// 📬 ALIADOS PENDIENTES
+// ═══════════════════════════════════════════
+
+async function loadAliadosPendientes() {
+  const cont = document.getElementById('aliados-pendientes-list');
+  cont.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+  try {
+    const snap = await db.collection('aliados_pendientes')
+      .orderBy('fechaEnvio', 'desc')
+      .get();
+    if (snap.empty) {
+      cont.innerHTML = '<p style="color:var(--muted);text-align:center;padding:40px">No hay fichas pendientes</p>';
+      return;
+    }
+    cont.innerHTML = '';
+    snap.forEach(doc => {
+      const d = doc.data();
+      const estado = d.estado || 'pendiente';
+      const estadoColor = estado === 'aprobado' ? 'var(--verde)' : estado === 'rechazado' ? '#e05' : 'var(--oro)';
+      const estadoBadge = estado === 'aprobado' ? '✅ Aprobado' : estado === 'rechazado' ? '❌ Rechazado' : '⏳ Pendiente';
+      const fecha = d.fechaEnvio ? new Date(d.fechaEnvio.seconds * 1000).toLocaleDateString('es-CO') : '—';
+      const card = document.createElement('div');
+      card.className = 'card';
+      card.style.marginBottom = '16px';
+      card.innerHTML = `
+        <div style="display:flex;gap:20px;align-items:flex-start">
+          <div style="flex-shrink:0">
+            ${d.fotoURL
+              ? `<img src="${d.fotoURL}" style="width:90px;height:90px;object-fit:cover;border-radius:10px;border:2px solid var(--border)">`
+              : `<div style="width:90px;height:90px;border-radius:10px;background:var(--card);border:2px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:32px">${d.emoji||'🤝'}</div>`}
+          </div>
+          <div style="flex:1;min-width:0">
+            <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+              <strong style="font-size:16px">${d.nombre||'—'}</strong>
+              <span style="font-size:11px;font-weight:600;padding:2px 8px;border-radius:20px;background:${estadoColor}22;color:${estadoColor}">${estadoBadge}</span>
+              <span style="font-size:11px;color:var(--muted)">${fecha}</span>
+            </div>
+            <div style="margin-top:4px;font-size:13px;color:var(--oro)">${d.categoria||'—'} · ${d.ciudad||'—'} · ${d.zona||'—'}</div>
+            <div style="margin-top:4px;font-size:13px;color:var(--muted)">${d.descripcion||'—'}</div>
+            <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap;font-size:12px;color:var(--muted)">
+              ${d.whatsapp ? `<span>📱 ${d.whatsapp}</span>` : ''}
+              ${d.email ? `<span>📧 ${d.email}</span>` : ''}
+              ${d.precio ? `<span>💰 ${d.precio}</span>` : ''}
+              ${d.horario ? `<span>🕐 ${d.horario}</span>` : ''}
+              ${d.direccion ? `<span>📍 ${d.direccion}</span>` : ''}
+            </div>
+            ${d.reto ? `<div style="margin-top:6px;font-size:12px;color:var(--muted)">🎯 Reto: ${d.reto}</div>` : ''}
+            ${d.urlExterna ? `<div style="margin-top:4px;font-size:12px"><a href="${d.urlExterna}" target="_blank" style="color:var(--oro)">${d.urlExterna}</a></div>` : ''}
+          </div>
+          ${estado === 'pendiente' ? `
+          <div style="display:flex;flex-direction:column;gap:8px;flex-shrink:0">
+            <button class="btn-sm" style="background:var(--verde);color:#fff;border:none" onclick="aprobarAliado('${doc.id}')">✅ Aprobar</button>
+            <button class="btn-sm btn-ghost" style="color:#e05;border-color:#e05" onclick="rechazarAliado('${doc.id}')">❌ Rechazar</button>
+          </div>` : ''}
+        </div>
+      `;
+      cont.appendChild(card);
+    });
+  } catch(e) {
+    cont.innerHTML = `<p style="color:#e05">Error: ${e.message}</p>`;
+  }
+}
+
+async function aprobarAliado(id) {
+  if (!confirm('¿Aprobar este aliado y publicarlo en la app?')) return;
+  try {
+    const docRef = db.collection('aliados_pendientes').doc(id);
+    const snap = await docRef.get();
+    const data = snap.data();
+    // Copiar a serviciosViajero con activo:true
+    const servicioData = {
+      nombre:        data.nombre || '',
+      empresa:       data.empresa || data.nombre || '',
+      categoria:     data.categoria || '',
+      categoriaBase: data.categoriaBase || data.categoria || '',
+      subcategoria:  data.subcategoria || '',
+      emoji:         data.emoji || '🤝',
+      descripcion:   data.descripcion || '',
+      descripcionEN: data.descripcionEN || '',
+      whatsapp:      data.whatsapp || '',
+      contacto:      data.contacto || '',
+      email:         data.email || '',
+      urlExterna:    data.urlExterna || '',
+      ciudad:        data.ciudad || '',
+      zona:          data.zona || '',
+      modalidad:     data.modalidad || '',
+      direccion:     data.direccion || '',
+      precio:        data.precio || '',
+      horario:       data.horario || '',
+      reto:          data.reto || '',
+      descuento:     data.descuento || '',
+      adicional:     data.adicional || '',
+      fotoURL:       data.fotoURL || '',
+      logoURL:       data.fotoURL || '',
+      codigoQR:      data.codigoQR || '',
+      stats:         data.stats || { qrVisto: 0, convertido: 0 },
+      activo:        true,
+      xp:            data.xp || 25,
+      fechaAprobacion: firebase.firestore.FieldValue.serverTimestamp(),
+    };
+    await db.collection('serviciosViajero').add(servicioData);
+    await docRef.update({ estado: 'aprobado', fechaAprobacion: firebase.firestore.FieldValue.serverTimestamp() });
+    alert('✅ Aliado aprobado y publicado en la app.');
+    loadAliadosPendientes();
+  } catch(e) {
+    alert('Error al aprobar: ' + e.message);
+  }
+}
+
+async function rechazarAliado(id) {
+  if (!confirm('¿Rechazar esta ficha?')) return;
+  try {
+    await db.collection('aliados_pendientes').doc(id).update({
+      estado: 'rechazado',
+      fechaRechazo: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    alert('Ficha rechazada.');
+    loadAliadosPendientes();
+  } catch(e) {
+    alert('Error al rechazar: ' + e.message);
+  }
+}
+
+// ─── CLICKS WHATSAPP ───────────────────────────────────────────────────────
+async function loadClicksWhatsApp() {
+  const tablaAliados   = document.getElementById('cw-tabla-aliados');
+  const tablaRecientes = document.getElementById('cw-tabla-recientes');
+  const elTotal    = document.getElementById('cw-total');
+  const elAliados  = document.getElementById('cw-aliados');
+  const elUsuarios = document.getElementById('cw-usuarios');
+
+  tablaAliados.innerHTML   = '<div class="loading"><div class="spinner"></div></div>';
+  tablaRecientes.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+
+  try {
+    const snap = await db.collection('clicks_whatsapp').orderBy('timestamp','desc').limit(500).get();
+    const docs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+    // Estadísticas globales
+    const totalClicks   = docs.length;
+    const setAliados    = new Set(docs.map(d => d.servicioId));
+    const setUsuarios   = new Set(docs.map(d => d.userId));
+    elTotal.textContent   = totalClicks;
+    elAliados.textContent = setAliados.size;
+    elUsuarios.textContent = setUsuarios.size;
+
+    // Agrupar por aliado
+    const porAliado = {};
+    docs.forEach(d => {
+      const key = d.servicioId || 'desconocido';
+      if (!porAliado[key]) porAliado[key] = { nombre: d.nombreServicio || key, clicks: 0, usuarios: new Set() };
+      porAliado[key].clicks++;
+      porAliado[key].usuarios.add(d.userId);
+    });
+    const aliados = Object.values(porAliado).sort((a,b) => b.clicks - a.clicks);
+
+    if (aliados.length === 0) {
+      tablaAliados.innerHTML = '<p style="color:var(--muted);padding:16px">Sin datos aún.</p>';
+    } else {
+      tablaAliados.innerHTML = `
+        <table style="width:100%;border-collapse:collapse;font-size:13px">
+          <thead><tr style="border-bottom:1px solid var(--border)">
+            <th style="text-align:left;padding:8px 4px;color:var(--muted)">Aliado</th>
+            <th style="text-align:center;padding:8px 4px;color:var(--muted)">Clicks</th>
+            <th style="text-align:center;padding:8px 4px;color:var(--muted)">Usuarios únicos</th>
+          </tr></thead>
+          <tbody>${aliados.map(a => `
+            <tr style="border-bottom:1px solid var(--border)">
+              <td style="padding:10px 4px">${a.nombre}</td>
+              <td style="text-align:center;padding:10px 4px;font-weight:700;color:var(--verde)">${a.clicks}</td>
+              <td style="text-align:center;padding:10px 4px;color:var(--muted)">${a.usuarios.size}</td>
+            </tr>`).join('')}
+          </tbody>
+        </table>`;
+    }
+
+    // Últimos 50 clicks con fecha
+    const recientes = docs.slice(0, 50);
+    if (recientes.length === 0) {
+      tablaRecientes.innerHTML = '<p style="color:var(--muted);padding:16px">Sin datos aún.</p>';
+    } else {
+      tablaRecientes.innerHTML = `
+        <table style="width:100%;border-collapse:collapse;font-size:12px">
+          <thead><tr style="border-bottom:1px solid var(--border)">
+            <th style="text-align:left;padding:8px 4px;color:var(--muted)">Aliado</th>
+            <th style="text-align:left;padding:8px 4px;color:var(--muted)">Usuario</th>
+            <th style="text-align:left;padding:8px 4px;color:var(--muted)">Fecha</th>
+          </tr></thead>
+          <tbody>${recientes.map(d => {
+            const fecha = d.timestamp?.toDate ? d.timestamp.toDate().toLocaleString('es-CO') : '—';
+            const uid = d.userId === 'anonimo' ? '<span style="color:var(--muted)">anónimo</span>' : `<span style="font-family:monospace;font-size:10px">${d.userId.slice(0,10)}…</span>`;
+            return `<tr style="border-bottom:1px solid var(--border)">
+              <td style="padding:8px 4px">${d.nombreServicio || d.servicioId || '—'}</td>
+              <td style="padding:8px 4px">${uid}</td>
+              <td style="padding:8px 4px;color:var(--muted)">${fecha}</td>
+            </tr>`;
+          }).join('')}
+          </tbody>
+        </table>`;
+    }
+
+  } catch(e) {
+    tablaAliados.innerHTML = `<p style="color:var(--err);padding:16px">Error: ${e.message}</p>`;
+    tablaRecientes.innerHTML = '';
+  }
+}
+// ──────────────────────────────────────────────────────────────────────────
 
 </script>
 </body>

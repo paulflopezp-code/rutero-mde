@@ -12,28 +12,7 @@
           "package_name": "com.example.rutero_mde"
         }
       },
-      "oauth_client": [
-        {
-          "client_id": "300771058852-876d0uftjrbbji94k1b0u1j79ebac3k3.apps.googleusercontent.com",
-          "client_type": 1,
-          "android_info": {
-            "package_name": "com.example.rutero_mde",
-            "certificate_hash": "b5ce859e3c77873f2cd1c3f08aa49a618322a9d2"
-          }
-        },
-        {
-          "client_id": "300771058852-q24eo87j9nulm4s602d8b68kjqbd0o74.apps.googleusercontent.com",
-          "client_type": 1,
-          "android_info": {
-            "package_name": "com.example.rutero_mde",
-            "certificate_hash": "cc309bb9fe8481d1c41cd240ae73190a956f9a56"
-          }
-        },
-        {
-          "client_id": "300771058852-5d53fguf8gsinvj24719m0tkmnh5k7h4.apps.googleusercontent.com",
-          "client_type": 3
-        }
-      ],
+      "oauth_client": [],
       "api_key": [
         {
           "current_key": "AIzaSyA37snNyEz7h-mOXcar1pnsNnzBntSbFTg"
@@ -43,14 +22,10 @@
         "appinvite_service": {
           "other_platform_oauth_client": [
             {
-              "client_id": "300771058852-5d53fguf8gsinvj24719m0tkmnh5k7h4.apps.googleusercontent.com",
-              "client_type": 3
-            },
-            {
-              "client_id": "300771058852-nlj5rrvtbvi70fk2lpi8r8qjqbigh87t.apps.googleusercontent.com",
+              "client_id": "300771058852-ea6r1gjc59rskb69jba2uhpoa94k8duv.apps.googleusercontent.com",
               "client_type": 2,
               "ios_info": {
-                "bundle_id": "com.example.ruteroMde"
+                "bundle_id": "com.ruteromde.app"
               }
             }
           ]
@@ -66,6 +41,14 @@
       },
       "oauth_client": [
         {
+          "client_id": "300771058852-7cfi9lunobkmje6ask429c3g0nu2lr1u.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.ruteromde.app",
+            "certificate_hash": "b5ce859e3c77873f2cd1c3f08aa49a618322a9d2"
+          }
+        },
+        {
           "client_id": "300771058852-tcmvvt71rckch07blj4msks9kboth2jc.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {
@@ -74,8 +57,12 @@
           }
         },
         {
-          "client_id": "300771058852-5d53fguf8gsinvj24719m0tkmnh5k7h4.apps.googleusercontent.com",
-          "client_type": 3
+          "client_id": "300771058852-v6fdt7mc744gp7qjpfi8jern0tvdbu1p.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.ruteromde.app",
+            "certificate_hash": "c343aa69a1f4aee103942cbd47db9ee7753ce53a"
+          }
         }
       ],
       "api_key": [
@@ -87,14 +74,10 @@
         "appinvite_service": {
           "other_platform_oauth_client": [
             {
-              "client_id": "300771058852-5d53fguf8gsinvj24719m0tkmnh5k7h4.apps.googleusercontent.com",
-              "client_type": 3
-            },
-            {
-              "client_id": "300771058852-nlj5rrvtbvi70fk2lpi8r8qjqbigh87t.apps.googleusercontent.com",
+              "client_id": "300771058852-ea6r1gjc59rskb69jba2uhpoa94k8duv.apps.googleusercontent.com",
               "client_type": 2,
               "ios_info": {
-                "bundle_id": "com.example.ruteroMde"
+                "bundle_id": "com.ruteromde.app"
               }
             }
           ]

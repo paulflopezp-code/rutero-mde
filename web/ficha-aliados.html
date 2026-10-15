@@ -1,0 +1,1519 @@
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Vinculá tu negocio — Rutero MDE</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;0,900;1,700&family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap">
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/9.23.0/firebase-app-compat.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/9.23.0/firebase-firestore-compat.min.js"></script>
+<script>
+const firebaseConfig = {
+  apiKey: "AIzaSyBaC-aTKIUg_gYEE7QDcb2_-d5uZrhePsI",
+  authDomain: "rutero-mde.firebaseapp.com",
+  projectId: "rutero-mde",
+  storageBucket: "rutero-mde.firebasestorage.app",
+  messagingSenderId: "300771058852",
+  appId: "1:300771058852:web:1b21fe476d0268defc3231"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+</script>
+
+<style>
+/* ══════════════════════════════════════════════
+   RDS — Rutero Design System  ·  ficha-aliados
+   ══════════════════════════════════════════════ */
+:root {
+  --bg:          #060A04;
+  --surface:     #0D1209;
+  --card:        #1C2018;
+  --card-high:   #232819;
+  --border:      rgba(255,255,255,0.07);
+  --border-mid:  rgba(255,255,255,0.12);
+  --gold:        #C9A84C;
+  --gold-dim:    #8A6E2F;
+  --gold-glow:   rgba(201,168,76,.14);
+  --gold-glow2:  rgba(201,168,76,.06);
+  --fg:          #F5F0E8;
+  --fg-muted:    #8A9278;
+  --fg-faint:    rgba(245,240,232,.4);
+  --green:       #5BAD6F;
+  --green-glow:  rgba(91,173,111,.12);
+  --orange:      #E85D26;
+  --orange-glow: rgba(232,93,38,.12);
+  --err:         #E24B4A;
+  --err-glow:    rgba(226,75,74,.1);
+
+  --font-display: 'Playfair Display', Georgia, serif;
+  --font-body:    'Inter', system-ui, sans-serif;
+  --font-label:   'Space Grotesk', 'Inter', sans-serif;
+
+  --r-xl:   24px;
+  --r-card: 16px;
+  --r-sm:   10px;
+  --r-pill: 99px;
+
+  --shadow-card: 0 4px 32px rgba(0,0,0,.36);
+  --shadow-input: 0 0 0 3px rgba(201,168,76,.18);
+
+  color-scheme: dark;
+}
+
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    --bg: #F2F4F0; --surface: #FFFFFF; --card: #FFFFFF; --card-high: #F8F9F6;
+    --border: rgba(0,0,0,.09); --border-mid: rgba(0,0,0,.14);
+    --gold: #9A6D1A; --gold-dim: #C9A84C; --gold-glow: rgba(154,109,26,.1); --gold-glow2: rgba(154,109,26,.05);
+    --fg: #0D1F0D; --fg-muted: #556655; --fg-faint: rgba(13,31,13,.35);
+    --green: #2E7D3A; --green-glow: rgba(46,125,58,.1);
+    --orange: #C0420A; --orange-glow: rgba(192,66,10,.1);
+    --err: #C0392B; --err-glow: rgba(192,57,43,.08);
+    --shadow-card: 0 2px 16px rgba(0,0,0,.1);
+    --shadow-input: 0 0 0 3px rgba(154,109,26,.14);
+    color-scheme: light;
+  }
+}
+:root[data-theme="light"] {
+  --bg: #F2F4F0; --surface: #FFFFFF; --card: #FFFFFF; --card-high: #F8F9F6;
+  --border: rgba(0,0,0,.09); --border-mid: rgba(0,0,0,.14);
+  --gold: #9A6D1A; --gold-dim: #C9A84C; --gold-glow: rgba(154,109,26,.1); --gold-glow2: rgba(154,109,26,.05);
+  --fg: #0D1F0D; --fg-muted: #556655; --fg-faint: rgba(13,31,13,.35);
+  --green: #2E7D3A; --green-glow: rgba(46,125,58,.1);
+  --orange: #C0420A; --orange-glow: rgba(192,66,10,.1);
+  --err: #C0392B; --err-glow: rgba(192,57,43,.08);
+  --shadow-card: 0 2px 16px rgba(0,0,0,.1);
+  --shadow-input: 0 0 0 3px rgba(154,109,26,.14);
+  color-scheme: light;
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html, body {
+  min-height: 100%;
+  background: var(--bg);
+}
+
+body {
+  color: var(--fg);
+  font-family: var(--font-body);
+  font-size: 15px;
+  line-height: 1.6;
+  margin: 0;
+  padding-inline: 16px;
+  padding-block: 0 56px;
+  -webkit-font-smoothing: antialiased;
+}
+
+.wrap {
+  max-width: 680px;
+  margin-inline: auto;
+}
+
+/* ── Elementos decorativos ── */
+.topo-deco {
+  position: fixed; top: 0; left: 0; right: 0;
+  height: 280px; pointer-events: none; z-index: 0; overflow: hidden; opacity: .045;
+}
+.topo-deco svg { width: 100%; height: 100%; }
+
+/* ── Hero header ── */
+.hero {
+  position: relative; z-index: 1;
+  padding: 52px 0 40px;
+  text-align: center;
+}
+.hero-eyebrow {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-family: var(--font-label);
+  font-size: 10px; font-weight: 700; letter-spacing: .18em;
+  text-transform: uppercase; color: var(--gold);
+  background: var(--gold-glow);
+  border: 1px solid rgba(201,168,76,.22);
+  border-radius: var(--r-pill);
+  padding: 5px 14px 5px 10px;
+  margin-bottom: 20px;
+}
+.hero-eyebrow .material-symbols-rounded { font-size: 14px; }
+.hero h1 {
+  font-family: var(--font-display);
+  font-size: clamp(28px, 6vw, 42px);
+  font-weight: 900; line-height: 1.15;
+  text-wrap: balance; margin: 0 0 6px; color: var(--fg);
+  letter-spacing: -.01em;
+}
+.hero h1 em { font-style: italic; color: var(--gold); }
+.hero-sub {
+  font-family: var(--font-label);
+  font-size: 11px; font-weight: 600; letter-spacing: .14em;
+  text-transform: uppercase; color: var(--fg-muted);
+  margin: 0 0 14px;
+}
+.hero-desc {
+  color: var(--fg-muted); font-size: 14px; line-height: 1.6;
+  max-width: 440px; margin: 0 auto;
+}
+
+/* ── Stepper ── */
+.stepper {
+  display: flex; align-items: flex-start; gap: 0;
+  margin-bottom: 36px; position: relative; z-index: 1;
+}
+.step-item {
+  flex: 1; display: flex; flex-direction: column; align-items: center; gap: 8px;
+  position: relative;
+}
+.step-item:not(:last-child)::after {
+  content: '';
+  position: absolute;
+  top: 18px; left: 50%; right: -50%;
+  height: 1px;
+  background: var(--border-mid);
+  z-index: 0;
+  transition: background .4s;
+}
+.step-item.done:not(:last-child)::after { background: var(--green); }
+.step-item.active:not(:last-child)::after { background: var(--gold-dim); }
+
+.step-circle {
+  width: 36px; height: 36px; border-radius: 50%;
+  border: 2px solid var(--border-mid);
+  background: var(--surface);
+  display: flex; align-items: center; justify-content: center;
+  position: relative; z-index: 1;
+  transition: all .3s;
+}
+.step-circle .snum {
+  font-family: var(--font-label); font-size: 13px; font-weight: 700;
+  color: var(--fg-muted); transition: color .3s;
+}
+.step-circle .material-symbols-rounded { font-size: 16px; display: none; }
+
+.step-item.active .step-circle {
+  border-color: var(--gold);
+  background: var(--gold-glow);
+  box-shadow: 0 0 0 4px var(--gold-glow2);
+}
+.step-item.active .step-circle .snum { color: var(--gold); }
+
+.step-item.done .step-circle {
+  border-color: var(--green);
+  background: var(--green-glow);
+}
+.step-item.done .step-circle .snum { display: none; }
+.step-item.done .step-circle .material-symbols-rounded { display: block; color: var(--green); }
+
+.step-meta {
+  text-align: center;
+}
+.step-num-label {
+  font-family: var(--font-label); font-size: 9px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: .12em;
+  color: var(--fg-faint);
+}
+.step-name-label {
+  font-family: var(--font-label); font-size: 10px; font-weight: 600;
+  color: var(--fg-muted); line-height: 1.3;
+  display: none;
+}
+@media (min-width: 480px) { .step-name-label { display: block; } }
+.step-item.active .step-num-label { color: var(--gold); }
+.step-item.active .step-name-label { color: var(--fg); }
+.step-item.done .step-num-label { color: var(--green); }
+
+/* ── Cards ── */
+.card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--r-card);
+  padding: 28px 24px;
+  margin-bottom: 14px;
+  box-shadow: var(--shadow-card);
+  position: relative; z-index: 1;
+}
+
+.section-eyebrow {
+  display: flex; align-items: center; gap: 8px;
+  font-family: var(--font-label); font-size: 10px; font-weight: 700;
+  letter-spacing: .14em; text-transform: uppercase; color: var(--gold);
+  margin-bottom: 6px;
+}
+.section-eyebrow .material-symbols-rounded { font-size: 14px; }
+
+.card-title {
+  font-family: var(--font-display);
+  font-size: 22px; font-weight: 700; line-height: 1.2;
+  margin: 0 0 6px; color: var(--fg);
+}
+.card-desc {
+  font-size: 13px; color: var(--fg-muted); margin: 0 0 24px; line-height: 1.5;
+}
+
+/* ── Fields ── */
+.field { margin-bottom: 20px; }
+.field:last-child { margin-bottom: 0; }
+
+.field-label {
+  display: flex; align-items: center; gap: 6px;
+  font-family: var(--font-label); font-size: 11px; font-weight: 700;
+  color: var(--fg-muted); letter-spacing: .1em; text-transform: uppercase;
+  margin-bottom: 8px;
+}
+.field-label .material-symbols-rounded { font-size: 14px; color: var(--fg-faint); }
+.req { color: var(--gold); margin-left: 2px; }
+
+input[type="text"],
+input[type="email"],
+input[type="tel"],
+input[type="url"],
+select,
+textarea {
+  display: block; width: 100%;
+  background: var(--surface); color: var(--fg);
+  border: 1.5px solid var(--border-mid);
+  border-radius: var(--r-sm);
+  font-family: var(--font-body); font-size: 15px;
+  padding: 13px 16px;
+  outline: none;
+  transition: border-color .2s, box-shadow .2s;
+  min-width: 0;
+  -webkit-appearance: none;
+}
+input:focus, select:focus, textarea:focus {
+  border-color: var(--gold);
+  box-shadow: var(--shadow-input);
+}
+input::placeholder, textarea::placeholder { color: var(--fg-faint); }
+select option { background: var(--card); }
+textarea { resize: vertical; min-height: 100px; }
+
+.field-hint {
+  display: flex; align-items: flex-start; gap: 5px;
+  font-size: 12px; color: var(--fg-muted); margin-top: 6px; line-height: 1.4;
+}
+.field-hint .material-symbols-rounded { font-size: 13px; flex-shrink: 0; margin-top: 1px; }
+
+.field-error {
+  display: flex; align-items: center; gap: 5px;
+  font-size: 12px; color: var(--err); margin-top: 6px;
+  font-family: var(--font-label); font-weight: 600;
+  opacity: 0; transform: translateY(-4px);
+  transition: opacity .2s, transform .2s;
+}
+.field-error.show { opacity: 1; transform: translateY(0); }
+.field-error .material-symbols-rounded { font-size: 13px; }
+
+.field.has-error input,
+.field.has-error select,
+.field.has-error textarea {
+  border-color: var(--err);
+  box-shadow: 0 0 0 3px var(--err-glow);
+}
+
+.two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+@media (max-width: 480px) { .two-col { grid-template-columns: 1fr; } }
+
+/* ── Categorías visuales ── */
+.cat-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+}
+@media (min-width: 520px) {
+  .cat-grid { grid-template-columns: repeat(3, 1fr); }
+}
+.cat-card {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 10px; padding: 18px 10px;
+  border-radius: var(--r-card);
+  border: 1.5px solid var(--border-mid);
+  background: var(--surface);
+  color: var(--fg-muted);
+  font-size: 12px; font-family: var(--font-label); font-weight: 600;
+  cursor: pointer; transition: all .22s; text-align: center; line-height: 1.3;
+  position: relative; overflow: hidden;
+}
+.cat-card .cat-icon {
+  width: 44px; height: 44px; border-radius: 12px;
+  background: rgba(255,255,255,.04);
+  display: flex; align-items: center; justify-content: center;
+  transition: all .22s;
+}
+.cat-card .cat-icon .material-symbols-rounded { font-size: 24px; }
+.cat-card:hover {
+  border-color: var(--gold-dim);
+  color: var(--fg);
+  background: var(--card-high);
+}
+.cat-card:hover .cat-icon { background: var(--gold-glow); }
+.cat-card.sel {
+  border-color: var(--gold);
+  background: var(--gold-glow);
+  color: var(--gold);
+}
+.cat-card.sel .cat-icon {
+  background: rgba(201,168,76,.2);
+}
+.cat-card.sel .cat-icon .material-symbols-rounded { color: var(--gold); }
+.cat-card.sel::after {
+  content: '';
+  position: absolute; top: 8px; right: 8px;
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--gold);
+  box-shadow: 0 0 6px var(--gold);
+}
+
+/* ── Subcategorías / pills ── */
+.sub-section {
+  margin-top: 18px; padding: 18px;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--r-card);
+  animation: fadeSlideIn .3s ease;
+}
+.sub-title {
+  font-family: var(--font-label); font-size: 10px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: .12em;
+  color: var(--fg-muted); margin: 0 0 12px;
+}
+.pills { display: flex; flex-wrap: wrap; gap: 8px; }
+.pill {
+  padding: 7px 16px; border-radius: var(--r-pill);
+  border: 1.5px solid var(--border-mid);
+  background: transparent; color: var(--fg-muted);
+  font-size: 13px; font-family: var(--font-label); font-weight: 600;
+  cursor: pointer; transition: all .2s;
+  white-space: nowrap;
+}
+.pill:hover { border-color: var(--gold-dim); color: var(--fg); }
+.pill.sel {
+  border-color: var(--gold);
+  background: var(--gold-glow); color: var(--gold);
+}
+
+/* ── Modalidad ── */
+.modal-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+@media (max-width: 400px) { .modal-grid { grid-template-columns: 1fr; } }
+.modal-card {
+  display: flex; flex-direction: column; align-items: center; gap: 8px;
+  padding: 16px 8px; border-radius: var(--r-card);
+  border: 1.5px solid var(--border-mid);
+  background: var(--surface); color: var(--fg-muted);
+  font-size: 12px; font-family: var(--font-label); font-weight: 600;
+  cursor: pointer; transition: all .22s; text-align: center;
+}
+.modal-card .m-icon { font-size: 22px; }
+.modal-card:hover { border-color: var(--gold-dim); color: var(--fg); background: var(--card-high); }
+.modal-card.sel { border-color: var(--gold); background: var(--gold-glow); color: var(--gold); }
+
+/* ── Contador caracteres ── */
+.char-wrap { position: relative; }
+.char-count {
+  font-size: 11px; color: var(--fg-muted);
+  font-family: var(--font-label); font-weight: 600;
+  text-align: right; margin-top: 6px;
+  font-variant-numeric: tabular-nums;
+}
+.char-count.warn { color: var(--gold); }
+.char-count.ok { color: var(--green); }
+.char-count.err-c { color: var(--err); }
+
+/* ── Gamificación reto ── */
+.reto-card {
+  border-radius: var(--r-card);
+  background: linear-gradient(135deg, rgba(232,93,38,.08) 0%, rgba(201,168,76,.06) 100%);
+  border: 1px solid rgba(232,93,38,.2);
+  padding: 18px;
+  margin-bottom: 0;
+}
+.reto-header {
+  display: flex; align-items: center; gap: 10px; margin-bottom: 12px;
+}
+.reto-icon-wrap {
+  width: 40px; height: 40px; border-radius: 12px; flex-shrink: 0;
+  background: var(--orange-glow);
+  border: 1px solid rgba(232,93,38,.25);
+  display: flex; align-items: center; justify-content: center;
+}
+.reto-icon-wrap .material-symbols-rounded { font-size: 20px; color: var(--orange); }
+.reto-title { font-family: var(--font-label); font-size: 13px; font-weight: 700; color: var(--fg); }
+.reto-subtitle { font-size: 12px; color: var(--fg-muted); }
+.reto-card textarea { background: rgba(255,255,255,.04); border-color: rgba(232,93,38,.2); }
+.reto-card textarea:focus { border-color: var(--orange); box-shadow: 0 0 0 3px rgba(232,93,38,.12); }
+.xp-badge {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-family: var(--font-label); font-size: 10px; font-weight: 700;
+  color: var(--orange); letter-spacing: .1em;
+  background: rgba(232,93,38,.1); border: 1px solid rgba(232,93,38,.25);
+  border-radius: var(--r-pill); padding: 3px 10px; margin-top: 8px;
+}
+.xp-badge .material-symbols-rounded { font-size: 12px; }
+
+/* ── Preview ficha (step 4) ── */
+.ficha-preview {
+  border-radius: var(--r-card); overflow: hidden;
+  border: 1px solid var(--border-mid);
+  margin-bottom: 20px;
+  background: var(--surface);
+}
+.ficha-preview-body { padding: 18px; }
+.fp-cat {
+  font-family: var(--font-label); font-size: 10px; font-weight: 700;
+  letter-spacing: .14em; text-transform: uppercase; color: var(--gold);
+  margin-bottom: 6px;
+}
+.fp-name {
+  font-family: var(--font-display); font-size: 20px; font-weight: 700;
+  margin: 0 0 4px; color: var(--fg); line-height: 1.2;
+}
+.fp-meta {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 12px; color: var(--fg-muted); margin-bottom: 10px;
+  flex-wrap: wrap;
+}
+.fp-meta .material-symbols-rounded { font-size: 14px; }
+.fp-desc { font-size: 13px; color: var(--fg-muted); line-height: 1.55; margin-bottom: 12px; }
+.fp-price {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-family: var(--font-label); font-size: 12px; font-weight: 700;
+  color: var(--green); background: var(--green-glow);
+  border: 1px solid rgba(91,173,111,.2); border-radius: var(--r-pill);
+  padding: 4px 12px;
+}
+.fp-price .material-symbols-rounded { font-size: 14px; }
+
+/* ── Checklist ── */
+.checklist-wrap {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--r-card); padding: 18px; margin-bottom: 20px;
+}
+.checklist-header {
+  display: flex; align-items: center; gap: 8px;
+  font-family: var(--font-label); font-size: 10px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: .12em; color: var(--fg-muted);
+  margin-bottom: 14px;
+}
+.checklist-header .material-symbols-rounded { font-size: 14px; }
+.check-item {
+  display: flex; align-items: flex-start; gap: 10px;
+  padding: 10px 0; border-top: 1px solid var(--border);
+}
+.check-item:first-of-type { border-top: none; padding-top: 0; }
+.check-circle {
+  flex-shrink: 0; width: 22px; height: 22px; border-radius: 50%;
+  border: 1.5px solid var(--border-mid);
+  display: flex; align-items: center; justify-content: center;
+  transition: all .3s;
+}
+.check-circle .material-symbols-rounded { font-size: 12px; display: none; }
+.check-circle.ok { background: var(--green); border-color: var(--green); }
+.check-circle.ok .material-symbols-rounded { display: block; color: #fff; }
+.check-circle.err { background: var(--err); border-color: var(--err); }
+.check-circle.err .material-symbols-rounded { display: block; color: #fff; }
+.check-label { flex: 1; min-width: 0; font-size: 13px; color: var(--fg-muted); line-height: 1.4; }
+.check-label.ok { color: var(--fg); }
+
+/* ── Legal notice ── */
+.legal-notice {
+  display: flex; gap: 10px; align-items: flex-start;
+  font-size: 12px; color: var(--fg-muted); line-height: 1.55;
+  padding: 14px; background: var(--surface);
+  border-radius: var(--r-sm); border: 1px solid var(--border);
+}
+.legal-notice .material-symbols-rounded { font-size: 15px; color: var(--fg-faint); flex-shrink: 0; margin-top: 1px; }
+
+/* ── Botones ── */
+.btn-row {
+  display: flex; gap: 10px; justify-content: flex-end;
+  margin-top: 20px; position: relative; z-index: 1;
+}
+.btn {
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 13px 24px;
+  border-radius: var(--r-pill); border: none;
+  font-family: var(--font-label); font-size: 14px; font-weight: 700;
+  letter-spacing: .02em; cursor: pointer;
+  transition: opacity .2s, transform .1s, box-shadow .2s;
+  white-space: nowrap;
+}
+.btn .material-symbols-rounded { font-size: 18px; }
+.btn:active { transform: scale(.97); }
+
+.btn-ghost {
+  background: transparent; border: 1.5px solid var(--border-mid);
+  color: var(--fg-muted);
+}
+.btn-ghost:hover { border-color: var(--fg-muted); color: var(--fg); }
+
+.btn-primary {
+  background: var(--gold); color: #060A04;
+  box-shadow: 0 4px 20px rgba(201,168,76,.25);
+}
+.btn-primary:hover { opacity: .88; box-shadow: 0 4px 28px rgba(201,168,76,.35); }
+.btn-primary:disabled { opacity: .32; cursor: not-allowed; box-shadow: none; }
+
+/* ── Pantalla éxito ── */
+.success-screen {
+  text-align: center; padding: 56px 24px 40px;
+  position: relative; z-index: 1;
+}
+.success-icon-wrap {
+  width: 80px; height: 80px; border-radius: 50%; margin: 0 auto 24px;
+  background: var(--green-glow);
+  border: 2px solid rgba(91,173,111,.3);
+  display: flex; align-items: center; justify-content: center;
+  animation: popIn .5s cubic-bezier(.34,1.56,.64,1);
+}
+.success-icon-wrap .material-symbols-rounded { font-size: 40px; color: var(--green); }
+.success-h {
+  font-family: var(--font-display);
+  font-size: clamp(24px, 5vw, 32px); font-weight: 900;
+  margin: 0 0 12px; color: var(--fg);
+}
+.success-tag {
+  display: inline-block; font-family: var(--font-label);
+  font-size: 10px; font-weight: 700; letter-spacing: .14em;
+  text-transform: uppercase; color: var(--gold);
+  background: var(--gold-glow); border: 1px solid rgba(201,168,76,.22);
+  border-radius: var(--r-pill); padding: 4px 14px; margin-bottom: 16px;
+}
+.success-desc {
+  color: var(--fg-muted); font-size: 14px; line-height: 1.65;
+  max-width: 400px; margin: 0 auto 28px;
+}
+.success-contact {
+  display: inline-flex; align-items: center; gap: 8px;
+  background: var(--card); border: 1px solid var(--border-mid);
+  border-radius: var(--r-card); padding: 14px 20px;
+  font-size: 13px; color: var(--fg-muted);
+}
+.success-contact strong { color: var(--gold); font-family: var(--font-label); }
+.success-contact .material-symbols-rounded { font-size: 18px; color: var(--gold); }
+
+/* ── Step transitions ── */
+.step-panel {
+  animation: fadeSlideIn .35s ease;
+}
+@keyframes fadeSlideIn {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes popIn {
+  from { opacity: 0; transform: scale(.5); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+/* ── Material Symbols config ── */
+.material-symbols-rounded {
+  font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+  vertical-align: middle; line-height: 1;
+  user-select: none;
+}
+.ms-fill { font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
+
+.hidden { display: none !important; }
+</style>
+
+<!-- Decoración topográfica -->
+<div class="topo-deco" aria-hidden="true">
+  <svg viewBox="0 0 800 280" preserveAspectRatio="xMidYMid slice" fill="none">
+    <path d="M-40 200 Q100 160 200 180 Q320 200 400 140 Q520 80 640 120 Q760 160 840 100" stroke="currentColor" stroke-width="1" opacity=".6"/>
+    <path d="M-40 230 Q80 200 180 210 Q300 220 420 170 Q540 120 660 150 Q780 180 840 130" stroke="currentColor" stroke-width="1" opacity=".5"/>
+    <path d="M-40 170 Q120 130 220 155 Q340 180 460 110 Q580 40 700 90 Q780 120 840 80" stroke="currentColor" stroke-width="1" opacity=".4"/>
+    <circle cx="200" cy="170" r="4" fill="currentColor" opacity=".5"/>
+    <circle cx="420" cy="140" r="3" fill="currentColor" opacity=".4"/>
+    <circle cx="640" cy="120" r="4" fill="currentColor" opacity=".5"/>
+  </svg>
+</div>
+
+<div class="wrap">
+
+  <!-- ── Hero ── -->
+  <div class="hero">
+    <div class="hero-eyebrow">
+      <span class="material-symbols-rounded ms-fill">handshake</span>
+      ALIADOS · RUTERO MDE
+    </div>
+    <h1>Vinculá tu <em>experiencia</em></h1>
+    <div class="hero-sub">con quienes exploran Medellín</div>
+    <p class="hero-desc">Completá los 4 pasos para que el equipo de Rutero MDE revise tu negocio y lo publique en la app. El proceso toma menos de 5 minutos.</p>
+  </div>
+
+  <!-- ── Stepper ── -->
+  <div class="stepper" id="stepper" aria-label="Progreso del formulario">
+    <div class="step-item active" id="si1">
+      <div class="step-circle">
+        <span class="snum">01</span>
+        <span class="material-symbols-rounded ms-fill">check</span>
+      </div>
+      <div class="step-meta">
+        <div class="step-num-label">Paso 01</div>
+        <div class="step-name-label">Información</div>
+      </div>
+    </div>
+    <div class="step-item" id="si2">
+      <div class="step-circle">
+        <span class="snum">02</span>
+        <span class="material-symbols-rounded ms-fill">check</span>
+      </div>
+      <div class="step-meta">
+        <div class="step-num-label">Paso 02</div>
+        <div class="step-name-label">Tu negocio</div>
+      </div>
+    </div>
+    <div class="step-item" id="si3">
+      <div class="step-circle">
+        <span class="snum">03</span>
+        <span class="material-symbols-rounded ms-fill">check</span>
+      </div>
+      <div class="step-meta">
+        <div class="step-num-label">Paso 03</div>
+        <div class="step-name-label">Horario y reto</div>
+      </div>
+    </div>
+    <div class="step-item" id="si4">
+      <div class="step-circle">
+        <span class="snum">04</span>
+        <span class="material-symbols-rounded ms-fill">check</span>
+      </div>
+      <div class="step-meta">
+        <div class="step-num-label">Paso 04</div>
+        <div class="step-name-label">Revisión</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════ PASO 1 ══════════ -->
+  <div id="step1" class="step-panel">
+
+    <div class="card">
+      <div class="section-eyebrow">
+        <span class="material-symbols-rounded">storefront</span>
+        Categoría y ubicación
+      </div>
+      <h2 class="card-title">¿Qué tipo de servicio ofrecés?</h2>
+      <p class="card-desc">Elegí la categoría principal que mejor describe lo que hacés.</p>
+
+      <div class="field" id="field-cat">
+        <div class="field-label">
+          <span class="material-symbols-rounded">category</span>
+          Categoría principal <span class="req">*</span>
+        </div>
+        <div class="cat-grid" id="catGrid">
+          <button class="cat-card" data-cat="Gastronomía" aria-label="Gastronomía">
+            <div class="cat-icon"><span class="material-symbols-rounded ms-fill">restaurant</span></div>
+            Gastronomía
+          </button>
+          <button class="cat-card" data-cat="Alojamiento" aria-label="Alojamiento">
+            <div class="cat-icon"><span class="material-symbols-rounded ms-fill">hotel</span></div>
+            Alojamiento
+          </button>
+          <button class="cat-card" data-cat="Salud y Bienestar" aria-label="Salud y Bienestar">
+            <div class="cat-icon"><span class="material-symbols-rounded ms-fill">self_improvement</span></div>
+            Salud y Bienestar
+          </button>
+          <button class="cat-card" data-cat="Belleza" aria-label="Belleza">
+            <div class="cat-icon"><span class="material-symbols-rounded ms-fill">spa</span></div>
+            Belleza
+          </button>
+          <button class="cat-card" data-cat="Transporte" aria-label="Transporte">
+            <div class="cat-icon"><span class="material-symbols-rounded ms-fill">directions_car</span></div>
+            Transporte
+          </button>
+          <button class="cat-card" data-cat="Experiencias" aria-label="Experiencias">
+            <div class="cat-icon"><span class="material-symbols-rounded ms-fill">explore</span></div>
+            Experiencias
+          </button>
+          <button class="cat-card" data-cat="Comercio" aria-label="Comercio">
+            <div class="cat-icon"><span class="material-symbols-rounded ms-fill">shopping_bag</span></div>
+            Comercio
+          </button>
+          <button class="cat-card" data-cat="Servicios Legales" aria-label="Servicios Legales">
+            <div class="cat-icon"><span class="material-symbols-rounded ms-fill">gavel</span></div>
+            Servicios Legales
+          </button>
+          <button class="cat-card" data-cat="Educación" aria-label="Educación">
+            <div class="cat-icon"><span class="material-symbols-rounded ms-fill">school</span></div>
+            Educación
+          </button>
+          <button class="cat-card" data-cat="Otro" aria-label="Otro">
+            <div class="cat-icon"><span class="material-symbols-rounded ms-fill">add_circle</span></div>
+            Otro
+          </button>
+        </div>
+        <div class="field-error" id="err-cat">
+          <span class="material-symbols-rounded">error</span>
+          Seleccioná una categoría para continuar.
+        </div>
+      </div>
+
+      <!-- Subcategorías -->
+      <div id="subSection" class="sub-section hidden">
+        <div class="sub-title" id="subLabel">Especialidad</div>
+        <div class="pills" id="subPills"></div>
+        <input type="text" id="subOther" placeholder="Describí tu especialidad" class="hidden" style="margin-top:12px" aria-label="Especialidad personalizada">
+      </div>
+
+      <!-- Categoría libre si elige Otro -->
+      <div id="catOtherField" class="field hidden" style="margin-top:16px">
+        <div class="field-label">
+          <span class="material-symbols-rounded">edit</span>
+          Describí tu categoría <span class="req">*</span>
+        </div>
+        <input type="text" id="catOther" placeholder="Ej: Fotografía, Diseño gráfico…" aria-label="Categoría personalizada">
+        <div class="field-error" id="err-catOther">
+          <span class="material-symbols-rounded">error</span>
+          Describí tu categoría para continuar.
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="section-eyebrow">
+        <span class="material-symbols-rounded">location_on</span>
+        Datos básicos
+      </div>
+
+      <div class="field" id="field-nombre">
+        <div class="field-label">
+          <span class="material-symbols-rounded">storefront</span>
+          Nombre del negocio <span class="req">*</span>
+        </div>
+        <input type="text" id="nombre" placeholder="Ej: Posada León" autocomplete="organization" aria-label="Nombre del negocio">
+        <div class="field-error" id="err-nombre">
+          <span class="material-symbols-rounded">error</span>
+          El nombre del negocio es obligatorio.
+        </div>
+      </div>
+
+      <div class="two-col">
+        <div class="field" id="field-ciudad">
+          <div class="field-label">
+            <span class="material-symbols-rounded">location_city</span>
+            Ciudad <span class="req">*</span>
+          </div>
+          <select id="ciudad" aria-label="Ciudad">
+            <option value="">Seleccioná…</option>
+            <option>Medellín</option>
+            <option>Bogotá</option>
+            <option>Cartagena</option>
+            <option>Popayán</option>
+            <option>Otra ciudad</option>
+          </select>
+          <div class="field-error" id="err-ciudad">
+            <span class="material-symbols-rounded">error</span>
+            Seleccioná la ciudad.
+          </div>
+        </div>
+        <div class="field">
+          <div class="field-label">
+            <span class="material-symbols-rounded">map</span>
+            Zona / Barrio
+          </div>
+          <input type="text" id="zona" placeholder="Ej: El Poblado, Laureles…" aria-label="Zona o barrio">
+        </div>
+      </div>
+
+      <div class="field" id="field-modal">
+        <div class="field-label">
+          <span class="material-symbols-rounded">pin_drop</span>
+          Modalidad de atención <span class="req">*</span>
+        </div>
+        <div class="modal-grid" id="modalGrid">
+          <button class="modal-card" data-modal="presencial" aria-label="Solo presencial">
+            <span class="material-symbols-rounded ms-fill m-icon">location_on</span>
+            Solo presencial
+          </button>
+          <button class="modal-card" data-modal="domicilio" aria-label="Solo a domicilio">
+            <span class="material-symbols-rounded ms-fill m-icon">home</span>
+            Solo a domicilio
+          </button>
+          <button class="modal-card" data-modal="ambas" aria-label="Presencial y domicilio">
+            <span class="material-symbols-rounded ms-fill m-icon">sync_alt</span>
+            Ambas modalidades
+          </button>
+        </div>
+        <div class="field-error" id="err-modal">
+          <span class="material-symbols-rounded">error</span>
+          Seleccioná la modalidad de atención.
+        </div>
+      </div>
+
+      <div class="field" id="campoDir">
+        <div class="field-label">
+          <span class="material-symbols-rounded">home_pin</span>
+          Dirección exacta <span class="req">*</span>
+        </div>
+        <input type="text" id="direccion" placeholder="Calle, carrera, número, referencia…" aria-label="Dirección">
+        <div class="field-error" id="err-dir">
+          <span class="material-symbols-rounded">error</span>
+          Ingresá la dirección del negocio.
+        </div>
+      </div>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn btn-primary" onclick="goStep(2)" aria-label="Ir al paso 2">
+        Siguiente
+        <span class="material-symbols-rounded">arrow_forward</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- ══════════ PASO 2 ══════════ -->
+  <div id="step2" class="hidden">
+
+    <div class="card">
+      <div class="section-eyebrow">
+        <span class="material-symbols-rounded">person</span>
+        Contacto y descripción
+      </div>
+      <h2 class="card-title">Contale al viajero qué te hace especial</h2>
+      <p class="card-desc">Esta información aparecerá en la ficha dentro de la app.</p>
+
+      <div class="field" id="field-contacto">
+        <div class="field-label">
+          <span class="material-symbols-rounded">badge</span>
+          Nombre del contacto / representante <span class="req">*</span>
+        </div>
+        <input type="text" id="contacto" placeholder="Tu nombre completo" autocomplete="name" aria-label="Nombre del contacto">
+        <div class="field-error" id="err-contacto">
+          <span class="material-symbols-rounded">error</span>
+          El nombre del representante es obligatorio.
+        </div>
+      </div>
+
+      <div class="two-col">
+        <div class="field" id="field-tel">
+          <div class="field-label">
+            <span class="material-symbols-rounded">phone</span>
+            WhatsApp / Teléfono <span class="req">*</span>
+          </div>
+          <input type="tel" id="telefono" placeholder="+57 300 000 0000" autocomplete="tel" aria-label="Teléfono o WhatsApp">
+          <div class="field-error" id="err-tel">
+            <span class="material-symbols-rounded">error</span>
+            Mínimo 10 dígitos.
+          </div>
+        </div>
+        <div class="field" id="field-email">
+          <div class="field-label">
+            <span class="material-symbols-rounded">mail</span>
+            Correo electrónico <span class="req">*</span>
+          </div>
+          <input type="email" id="email" placeholder="contacto@negocio.com" autocomplete="email" aria-label="Correo electrónico">
+          <div class="field-error" id="err-email">
+            <span class="material-symbols-rounded">error</span>
+            Correo inválido.
+          </div>
+        </div>
+      </div>
+
+      <div class="field" id="field-desc">
+        <div class="field-label">
+          <span class="material-symbols-rounded">description</span>
+          Descripción del servicio <span class="req">*</span>
+        </div>
+        <div class="char-wrap">
+          <textarea id="descripcion" placeholder="Describí con detalle qué ofrecés, qué hace único tu lugar y por qué un turista debería visitarte. Escribí en tercera persona." maxlength="350" oninput="updateCount('descripcion','descCount',80,300,350)" aria-label="Descripción del servicio"></textarea>
+        </div>
+        <div class="char-count" id="descCount">0 / 350 (mínimo 80)</div>
+        <div class="field-hint">
+          <span class="material-symbols-rounded">info</span>
+          Escribí en tercera persona: "El restaurante ofrece…" no "Nosotros ofrecemos…"
+        </div>
+        <div class="field-error" id="err-desc">
+          <span class="material-symbols-rounded">error</span>
+          La descripción debe tener entre 80 y 350 caracteres.
+        </div>
+      </div>
+
+      <div class="field" id="field-precio">
+        <div class="field-label">
+          <span class="material-symbols-rounded">payments</span>
+          Precio base o rango de precios <span class="req">*</span>
+        </div>
+        <input type="text" id="precio" placeholder="Ej: Desde $25.000 COP · Menú del día $18.000 COP" aria-label="Precio o rango de precios">
+        <div class="field-hint">
+          <span class="material-symbols-rounded">info</span>
+          Incluí la moneda. Ej: $35.000 COP, $15 USD
+        </div>
+        <div class="field-error" id="err-precio">
+          <span class="material-symbols-rounded">error</span>
+          Indicá el precio e incluí la moneda (COP o USD).
+        </div>
+      </div>
+
+      <div class="field">
+        <div class="field-label">
+          <span class="material-symbols-rounded">link</span>
+          Sitio web o red social principal
+        </div>
+        <input type="url" id="web" placeholder="https://instagram.com/tu_negocio" aria-label="Sitio web o red social">
+      </div>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn btn-ghost" onclick="goStep(1)" aria-label="Volver al paso 1">
+        <span class="material-symbols-rounded">arrow_back</span>
+        Atrás
+      </button>
+      <button class="btn btn-primary" onclick="goStep(3)" aria-label="Ir al paso 3">
+        Siguiente
+        <span class="material-symbols-rounded">arrow_forward</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- ══════════ PASO 3 ══════════ -->
+  <div id="step3" class="hidden">
+
+    <div class="card">
+      <div class="section-eyebrow">
+        <span class="material-symbols-rounded">schedule</span>
+        Horario de atención
+      </div>
+      <h2 class="card-title">¿Cuándo pueden visitarte?</h2>
+      <div class="field" id="field-horario">
+        <div class="field-label">
+          <span class="material-symbols-rounded">schedule</span>
+          Horario de atención <span class="req">*</span>
+        </div>
+        <textarea id="horario" placeholder="Ej: Lunes a viernes 11am–10pm · Sábado 10am–12pm · Domingo cerrado" style="min-height:80px" aria-label="Horario de atención"></textarea>
+        <div class="field-error" id="err-horario">
+          <span class="material-symbols-rounded">error</span>
+          Completá el horario de atención.
+        </div>
+      </div>
+    </div>
+
+    <!-- Reto / Gamificación -->
+    <div class="card">
+      <div class="reto-card">
+        <div class="reto-header">
+          <div class="reto-icon-wrap">
+            <span class="material-symbols-rounded ms-fill">emoji_events</span>
+          </div>
+          <div>
+            <div class="reto-title">Reto para el viajero</div>
+            <div class="reto-subtitle">Opcional · Muy recomendado</div>
+          </div>
+        </div>
+        <textarea id="reto" placeholder="Ej: Pedí el roll especial de la casa que no está en el menú. Tomá una foto del plato para verificar tu visita." style="min-height:80px" maxlength="200" oninput="updateCount('reto','retoCount',0,200,200)" aria-label="Reto para el viajero"></textarea>
+        <div class="char-count" id="retoCount">0 / 200</div>
+        <div class="xp-badge">
+          <span class="material-symbols-rounded ms-fill">bolt</span>
+          Aumenta tu visibilidad en la app hasta 3× más
+        </div>
+      </div>
+    </div>
+
+    <!-- Descuento / QR -->
+    <div class="card">
+      <div class="section-eyebrow">
+        <span class="material-symbols-rounded ms-fill">local_offer</span>
+        Oferta especial para viajeros
+      </div>
+      <p style="font-size:13px;color:var(--fg-muted);margin:0 0 14px;line-height:1.6">
+        Definí un descuento o beneficio exclusivo para turistas de Rutero MDE. Aparecerá como un código QR en la app que el viajero mostrará en tu negocio para canjearlo. <strong style="color:var(--gold)">Opcional, pero muy recomendado.</strong>
+      </p>
+      <div class="field">
+        <div class="field-label">
+          <span class="material-symbols-rounded">sell</span>
+          Tu oferta (opcional)
+        </div>
+        <input type="text" id="descuento" maxlength="120"
+          placeholder="Ej: 10% de descuento mostrando este QR · Bebida gratis con compra mayor a $30.000"
+          oninput="updateCount('descuento','descuentoCount',0,120,120)"
+          aria-label="Oferta especial para viajeros Rutero MDE">
+        <div class="char-count" id="descuentoCount">0 / 120</div>
+      </div>
+      <div class="xp-badge" style="background:rgba(201,168,76,.1);border-color:rgba(201,168,76,.3);color:var(--gold)">
+        <span class="material-symbols-rounded ms-fill">qr_code_2</span>
+        Recibirás un QR único · Medimos clicks y canjes para vos
+      </div>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn btn-ghost" onclick="goStep(2)" aria-label="Volver al paso 2">
+        <span class="material-symbols-rounded">arrow_back</span>
+        Atrás
+      </button>
+      <button class="btn btn-primary" onclick="goStep(4)" aria-label="Ir al paso 4">
+        Siguiente
+        <span class="material-symbols-rounded">arrow_forward</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- ══════════ PASO 4 ══════════ -->
+  <div id="step4" class="hidden">
+
+    <!-- Preview ficha -->
+    <div class="card">
+      <div class="section-eyebrow">
+        <span class="material-symbols-rounded">preview</span>
+        Así quedará tu ficha en la app
+      </div>
+      <div class="ficha-preview" id="fichaPreview">
+        <div class="ficha-preview-body">
+          <div class="fp-cat" id="prevCat">Categoría</div>
+          <div class="fp-name" id="prevNombre">Nombre del negocio</div>
+          <div class="fp-meta">
+            <span class="material-symbols-rounded ms-fill">location_on</span>
+            <span id="prevZona">Zona · Ciudad</span>
+          </div>
+          <div class="fp-desc" id="prevDesc">Tu descripción aparecerá aquí…</div>
+          <div class="fp-price">
+            <span class="material-symbols-rounded ms-fill">payments</span>
+            <span id="prevPrecio">Precio</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Checklist -->
+    <div class="card">
+      <div class="section-eyebrow">
+        <span class="material-symbols-rounded">checklist</span>
+        Validación de calidad
+      </div>
+      <p style="font-size:13px;color:var(--fg-muted);margin:0 0 16px">Todos los puntos deben estar en verde para poder enviar.</p>
+
+      <div class="checklist-wrap">
+        <div class="checklist-header">
+          <span class="material-symbols-rounded ms-fill">fact_check</span>
+          Checklist Rutero MDE
+        </div>
+        <div class="check-item">
+          <div class="check-circle" id="ck1i"><span class="material-symbols-rounded">check</span></div>
+          <div class="check-label" id="ck1t">Nombre del negocio completado</div>
+        </div>
+        <div class="check-item">
+          <div class="check-circle" id="ck2i"><span class="material-symbols-rounded">check</span></div>
+          <div class="check-label" id="ck2t">Categoría seleccionada</div>
+        </div>
+        <div class="check-item">
+          <div class="check-circle" id="ck3i"><span class="material-symbols-rounded">check</span></div>
+          <div class="check-label" id="ck3t">Descripción entre 80 y 350 caracteres</div>
+        </div>
+        <div class="check-item">
+          <div class="check-circle" id="ck4i"><span class="material-symbols-rounded">check</span></div>
+          <div class="check-label" id="ck4t">Descripción en tercera persona (sin "nosotros" / "yo")</div>
+        </div>
+        <div class="check-item">
+          <div class="check-circle" id="ck5i"><span class="material-symbols-rounded">check</span></div>
+          <div class="check-label" id="ck5t">Precio incluye moneda (COP o USD)</div>
+        </div>
+        <div class="check-item">
+          <div class="check-circle" id="ck6i"><span class="material-symbols-rounded">check</span></div>
+          <div class="check-label" id="ck6t">Teléfono con formato válido (mínimo 10 dígitos)</div>
+        </div>
+        <div class="check-item">
+          <div class="check-circle" id="ck7i"><span class="material-symbols-rounded">check</span></div>
+          <div class="check-label" id="ck7t">Correo electrónico válido</div>
+        </div>
+        <div class="check-item">
+          <div class="check-circle" id="ck8i"><span class="material-symbols-rounded">check</span></div>
+          <div class="check-label" id="ck8t">Horario de atención completado</div>
+        </div>
+      </div>
+
+      <!-- Error global envío -->
+      <div class="field-error" id="err-envio" style="margin-bottom:16px;font-size:13px">
+        <span class="material-symbols-rounded">warning</span>
+        Corregí los ítems en rojo antes de enviar.
+      </div>
+
+      <div class="field">
+        <div class="field-label">
+          <span class="material-symbols-rounded">add_comment</span>
+          ¿Algo más que quieras agregár?
+        </div>
+        <textarea id="adicional" placeholder="Premios, reconocimientos, certificaciones, información adicional relevante…" style="min-height:80px" aria-label="Información adicional"></textarea>
+      </div>
+
+      <div class="legal-notice">
+        <span class="material-symbols-rounded ms-fill">verified_user</span>
+        Al enviar autorizás a Rutero MDE a revisar y, si aprueba, publicar tu información en la app. Recibirás una respuesta al correo registrado en un plazo de 3 días hábiles.
+      </div>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn btn-ghost" onclick="goStep(3)" aria-label="Volver al paso 3">
+        <span class="material-symbols-rounded">arrow_back</span>
+        Atrás
+      </button>
+      <button class="btn btn-primary" id="btnEnviar" onclick="enviar()" aria-label="Enviar ficha a revisión">
+        Enviar a revisión
+        <span class="material-symbols-rounded ms-fill">send</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- ══════════ ÉXITO ══════════ -->
+  <div id="stepSuccess" class="hidden">
+    <div class="success-screen">
+      <div class="success-icon-wrap">
+        <span class="material-symbols-rounded ms-fill">check_circle</span>
+      </div>
+      <div class="success-tag">Ficha enviada · Pendiente de revisión</div>
+      <h2 class="success-h">¡Tu negocio está<br>en el mapa!</h2>
+      <p class="success-desc">
+        El equipo de Rutero MDE revisará tu ficha y te responderá en los próximos <strong>3 días hábiles</strong> al correo que registraste. Si hay algo que ajustar, te lo haremos saber antes de publicar.
+      </p>
+      <div class="success-contact">
+        <span class="material-symbols-rounded ms-fill">chat</span>
+        <span>¿Tenés dudas? Escribinos:<br>
+          <strong>+57 319 484 0611</strong>
+        </span>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /wrap -->
+
+<script>
+/* ══════════════════════════════════════
+   Rutero MDE — ficha-aliados.js
+   ══════════════════════════════════════ */
+const STEPS = 4;
+let currentStep = 1;
+let selectedCat  = '';
+let selectedSub  = '';
+let selectedModal = '';
+
+const SUBS = {
+  'Gastronomía':       ['Restaurante', 'Bar / Coctelería', 'Café', 'Heladería / Panadería', 'Food truck', 'Comida saludable', 'Cocina internacional', 'Otro'],
+  'Alojamiento':       ['Hotel', 'Hostal', 'Apartamento turístico', 'Glamping', 'Finca', 'Otro'],
+  'Salud y Bienestar': ['Médico / Clínica', 'Odontología', 'Masoterapia / Masajes', 'Entrenamiento personal', 'Yoga / Pilates', 'Nutrición', 'Cuidado adulto mayor', 'Psicología', 'Otro'],
+  'Belleza':           ['Peluquería', 'Barbería', 'Spa', 'Uñas / Estética', 'Maquillaje', 'Otro'],
+  'Transporte':        ['Transfer aeropuerto', 'Tour en bus', 'Alquiler de vehículo', 'Conductor designado', 'Mototaxi turístico', 'Otro'],
+  'Experiencias':      ['Tour a pie', 'Tour en bici', 'Parapente', 'Rafting', 'Senderismo', 'Taller cultural', 'Fotografía', 'Otro'],
+  'Comercio':          ['Artesanías', 'Ropa y moda', 'Souvenirs', 'Tecnología', 'Librería', 'Otro'],
+  'Servicios Legales': ['Visados y migración', 'Asesoría jurídica', 'Trámites consulares', 'Derecho migratorio', 'Otro'],
+  'Educación':         ['Clases de español', 'Escuela de cocina', 'Clases de baile', 'Idiomas', 'Otro'],
+};
+
+/* ── Helpers ── */
+function g(id) { return document.getElementById(id); }
+function v(id) { return g(id).value.trim().length > 0; }
+function validEmail(e) { return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e); }
+function validPhone(t) { return t.replace(/\D/g,'').length >= 10; }
+
+function showErr(fieldId, errId, show) {
+  const field = g(fieldId);
+  const err   = g(errId);
+  if (!field || !err) return;
+  if (show) {
+    field.classList.add('has-error');
+    err.classList.add('show');
+  } else {
+    field.classList.remove('has-error');
+    err.classList.remove('show');
+  }
+}
+
+/* ── Categoría principal ── */
+document.querySelectorAll('#catGrid .cat-card').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('#catGrid .cat-card').forEach(b => b.classList.remove('sel'));
+    btn.classList.add('sel');
+    selectedCat = btn.dataset.cat;
+    selectedSub = '';
+
+    const subSec     = g('subSection');
+    const otroField  = g('catOtherField');
+
+    if (selectedCat === 'Otro') {
+      subSec.classList.add('hidden');
+      otroField.classList.remove('hidden');
+    } else {
+      otroField.classList.add('hidden');
+      const subs = SUBS[selectedCat];
+      if (subs) {
+        g('subLabel').textContent = 'Especialidad dentro de ' + selectedCat;
+        const pillsDiv = g('subPills');
+        pillsDiv.innerHTML = '';
+        subs.forEach(s => {
+          const p = document.createElement('button');
+          p.className = 'pill';
+          p.textContent = s;
+          p.type = 'button';
+          p.addEventListener('click', () => {
+            pillsDiv.querySelectorAll('.pill').forEach(x => x.classList.remove('sel'));
+            p.classList.add('sel');
+            selectedSub = s;
+            g('subOther').classList.toggle('hidden', s !== 'Otro');
+          });
+          pillsDiv.appendChild(p);
+        });
+        g('subOther').classList.add('hidden');
+        subSec.classList.remove('hidden');
+      } else {
+        subSec.classList.add('hidden');
+      }
+    }
+    // limpiar error al seleccionar
+    showErr('field-cat', 'err-cat', false);
+  });
+});
+
+/* ── Modalidad de atención ── */
+document.querySelectorAll('#modalGrid .modal-card').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('#modalGrid .modal-card').forEach(b => b.classList.remove('sel'));
+    btn.classList.add('sel');
+    selectedModal = btn.dataset.modal;
+    const campoDir = g('campoDir');
+    if (selectedModal === 'domicilio') {
+      campoDir.classList.add('hidden');
+      g('direccion').value = 'Solo a domicilio';
+    } else {
+      campoDir.classList.remove('hidden');
+      if (g('direccion').value === 'Solo a domicilio') g('direccion').value = '';
+    }
+    showErr('field-modal', 'err-modal', false);
+  });
+});
+
+/* ── Navegación ── */
+function goStep(n) {
+  if (n > currentStep && !validateStep(currentStep)) return;
+  const prev = g('step' + currentStep);
+  prev.classList.add('hidden');
+  currentStep = n;
+  const next = g('step' + currentStep);
+  next.classList.remove('hidden');
+  next.classList.add('step-panel');
+  // re-trigger animation
+  next.style.animation = 'none';
+  next.offsetHeight;
+  next.style.animation = '';
+  updateStepper();
+  if (n === 4) {
+    buildPreview();
+    runChecklist();
+  }
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function updateStepper() {
+  for (let i = 1; i <= STEPS; i++) {
+    const si = g('si' + i);
+    si.className = 'step-item';
+    if (i < currentStep) si.classList.add('done');
+    else if (i === currentStep) si.classList.add('active');
+  }
+}
+
+/* ── Validación inline ── */
+function validateStep(s) {
+  let ok = true;
+
+  if (s === 1) {
+    if (!selectedCat) {
+      showErr('field-cat', 'err-cat', true); ok = false;
+    } else {
+      showErr('field-cat', 'err-cat', false);
+    }
+    if (selectedCat === 'Otro' && !v('catOther')) {
+      showErr('catOtherField', 'err-catOther', true); ok = false;
+    } else {
+      showErr('catOtherField', 'err-catOther', false);
+    }
+    if (!v('nombre')) {
+      showErr('field-nombre', 'err-nombre', true); ok = false;
+    } else {
+      showErr('field-nombre', 'err-nombre', false);
+    }
+    if (!v('ciudad')) {
+      showErr('field-ciudad', 'err-ciudad', true); ok = false;
+    } else {
+      showErr('field-ciudad', 'err-ciudad', false);
+    }
+    if (!selectedModal) {
+      showErr('field-modal', 'err-modal', true); ok = false;
+    } else {
+      showErr('field-modal', 'err-modal', false);
+    }
+    if (selectedModal !== 'domicilio' && !v('direccion')) {
+      showErr('campoDir', 'err-dir', true); ok = false;
+    } else {
+      showErr('campoDir', 'err-dir', false);
+    }
+  }
+
+  if (s === 2) {
+    if (!v('contacto')) {
+      showErr('field-contacto', 'err-contacto', true); ok = false;
+    } else { showErr('field-contacto', 'err-contacto', false); }
+
+    if (!validPhone(g('telefono').value)) {
+      showErr('field-tel', 'err-tel', true); ok = false;
+    } else { showErr('field-tel', 'err-tel', false); }
+
+    if (!validEmail(g('email').value)) {
+      showErr('field-email', 'err-email', true); ok = false;
+    } else { showErr('field-email', 'err-email', false); }
+
+    const descLen = g('descripcion').value.trim().length;
+    if (descLen < 80 || descLen > 350) {
+      showErr('field-desc', 'err-desc', true); ok = false;
+    } else { showErr('field-desc', 'err-desc', false); }
+
+    if (!v('precio')) {
+      showErr('field-precio', 'err-precio', true); ok = false;
+    } else { showErr('field-precio', 'err-precio', false); }
+  }
+
+  if (s === 3) {
+    if (!v('horario')) {
+      showErr('field-horario', 'err-horario', true); ok = false;
+    } else { showErr('field-horario', 'err-horario', false); }
+
+  }
+
+  if (!ok) {
+    // Scroll al primer error visible
+    const firstErr = document.querySelector('.field-error.show');
+    if (firstErr) firstErr.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+  return ok;
+}
+
+/* ── Contador caracteres ── */
+function updateCount(inputId, countId, min, soft, max) {
+  const len = g(inputId).value.length;
+  const el  = g(countId);
+  el.textContent = len + ' / ' + max + (min ? ' (mínimo ' + min + ')' : '');
+  el.className = 'char-count';
+  if (min && len >= min && len <= soft) el.classList.add('ok');
+  else if (len >= soft || (min && len < min && len > 0)) el.classList.add('warn');
+}
+
+/* ── Build preview (step 4) ── */
+function buildPreview() {
+  const nombre = g('nombre').value.trim() || 'Nombre del negocio';
+  const cat    = selectedCat === 'Otro' ? (g('catOther').value.trim() || 'Categoría') : (selectedCat || 'Categoría');
+  const sub    = (selectedSub && selectedSub !== 'Otro') ? ' · ' + selectedSub : '';
+  const ciudad = g('ciudad').value || '';
+  const zona   = g('zona').value.trim();
+  const desc   = g('descripcion').value.trim() || 'Tu descripción aparecerá aquí…';
+  const precio = g('precio').value.trim() || 'Precio no indicado';
+
+  g('prevNombre').textContent = nombre;
+  g('prevCat').textContent    = cat + sub;
+  g('prevZona').textContent   = [zona, ciudad].filter(Boolean).join(' · ') || 'Zona · Ciudad';
+  g('prevDesc').textContent   = desc.length > 160 ? desc.slice(0, 157) + '…' : desc;
+  g('prevPrecio').textContent = precio;
+}
+
+/* ── Checklist ── */
+function runChecklist() {
+  const desc   = g('descripcion').value.trim();
+  const descL  = desc.toLowerCase();
+  const precio = g('precio').value.trim();
+
+  const checks = [
+    v('nombre'),
+    !!selectedCat,
+    (desc.length >= 80 && desc.length <= 350),
+    (!descL.includes('nosotros') && !descL.includes(' yo ') && !descL.includes('ofrecemos') && !descL.includes('tenemos')),
+    (/cop|usd|\$|pesos/i.test(precio) && precio.length > 0),
+    validPhone(g('telefono').value),
+    validEmail(g('email').value),
+    v('horario'),
+  ];
+
+  let allOk = true;
+  checks.forEach((ok, i) => {
+    const n    = i + 1;
+    const icon = g('ck' + n + 'i');
+    const txt  = g('ck' + n + 't');
+    icon.className = 'check-circle ' + (ok ? 'ok' : 'err');
+    txt.className  = 'check-label'   + (ok ? ' ok' : '');
+    if (!ok) allOk = false;
+  });
+
+  const btnEnviar = g('btnEnviar');
+  const errEnvio  = g('err-envio');
+  btnEnviar.disabled = !allOk;
+  if (!allOk) {
+    errEnvio.classList.add('show');
+  } else {
+    errEnvio.classList.remove('show');
+  }
+}
+
+/* ── Envío Firebase ── */
+async function enviar() {
+  const btn = g('btnEnviar');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="material-symbols-rounded" style="animation:spin .8s linear infinite">sync</span> Enviando…';
+
+  // css spin
+  if (!document.getElementById('spin-style')) {
+    const st = document.createElement('style');
+    st.id = 'spin-style';
+    st.textContent = '@keyframes spin{to{transform:rotate(360deg)}}';
+    document.head.appendChild(st);
+  }
+
+  try {
+    const catFinal = selectedCat === 'Otro'
+      ? g('catOther').value.trim()
+      : (selectedSub && selectedSub !== 'Otro'
+          ? selectedCat + ' · ' + selectedSub
+          : selectedCat);
+
+    const data = {
+      nombre:       g('nombre').value.trim(),
+      empresa:      g('nombre').value.trim(),
+      categoria:    catFinal,
+      categoriaBase: selectedCat,
+      subcategoria: selectedSub,
+      ciudad:       g('ciudad').value,
+      zona:         g('zona').value.trim(),
+      modalidad:    selectedModal,
+      direccion:    selectedModal === 'domicilio' ? 'Solo a domicilio' : g('direccion').value.trim(),
+      contacto:     g('contacto').value.trim(),
+      whatsapp:     g('telefono').value.trim(),
+      email:        g('email').value.trim(),
+      descripcion:  g('descripcion').value.trim(),
+      precio:       g('precio').value.trim(),
+      urlExterna:   g('web').value.trim(),
+      horario:      g('horario').value.trim(),
+      reto:         g('reto').value.trim(),
+      descuento:    g('descuento').value.trim(),
+      adicional:    g('adicional').value.trim(),
+      fotoURL:      '',
+      activo:       false,
+      estado:       'pendiente',
+      emoji:        '🤝',
+      logoURL:      '',
+      xp:           25,
+      codigoQR:     'RUT-' + (selectedCat || 'SRV').substring(0,3).toUpperCase() + '-' + Date.now().toString().slice(-5),
+      stats:        { qrVisto: 0, convertido: 0 },
+      fechaEnvio:   firebase.firestore.FieldValue.serverTimestamp(),
+    };
+
+    await db.collection('aliados_pendientes').add(data);
+
+    // Éxito
+    g('step4').classList.add('hidden');
+    g('stepSuccess').classList.remove('hidden');
+    for (let i = 1; i <= STEPS; i++) {
+      g('si' + i).className = 'step-item done';
+    }
+
+  } catch(err) {
+    console.error(err);
+    btn.disabled = false;
+    btn.innerHTML = 'Enviar a revisión <span class="material-symbols-rounded ms-fill">send</span>';
+
+    // Error inline
+    const errEl = g('err-envio');
+    errEl.innerHTML = '<span class="material-symbols-rounded">wifi_off</span> Error al enviar. Verificá tu conexión e intentá de nuevo.';
+    errEl.classList.add('show');
+  }
+}
+</script>
