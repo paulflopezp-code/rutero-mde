@@ -29,6 +29,7 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:qr_flutter/qr_flutter.dart';
+import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
 import 'dart:convert';
@@ -54,6 +55,20 @@ import 'package:share_plus/share_plus.dart';
 import 'package:app_links/app_links.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'design_system_rutero.dart';
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  FEATURE FLAGS — Activar/desactivar secciones sin recompilar lógica
+//  Cambiar a false para ocultar, a true para mostrar.
+// ─────────────────────────────────────────────────────────────────────────────
+const bool kSeccionPasaporte    = true;   // Chips y sección Pasaportes
+const bool kSeccionAlrededores  = true;   // Chip y sección Alrededores
+const bool kSeccionGastronomia  = true;   // Chip y sección Gastronomía / Comida Urbana
+const bool kSeccionServicios    = false;  // Chip y sección Servicios (pendiente revisión filtro)
+const bool kSeccionBogota       = false;  // Ciudad Bogotá activa en kCiudadesRegistradas
+const bool kSeccionRankings     = true;   // Sección Rankings / Insignias visible
+
+// WhatsApp Alianza Local Tours — movido de clase a constante top-level (TODO 16/05/2026)
+const String kWhatsappAlianza = '573148057983';  // Alianza Local Tours (confirmado 20/05/2026)
 
 // ─── GOOGLE PLACES PHOTO — eliminado 21/05/2026 ────────────────
 // Las fotos de referencia de sitios fueron removidas intencionalmente.
@@ -862,7 +877,7 @@ Future<void> toggleModoDemo() async {
 
 // Idioma global — ValueNotifier para que los widgets se reconstruyan
 final ValueNotifier<String> langNotifier = ValueNotifier<String>('es');
-final ValueNotifier<int> tabNotifier = ValueNotifier<int>(0); // Navegación global entre tabs
+final ValueNotifier<int> tabNotifier = ValueNotifier<int>(0); // Navegación global — 0 = Mapa como tab inicial
 
 Future<void> cargarIdiomaGuardado() async {
   try {
@@ -1243,6 +1258,7 @@ Future<void> _guardarFCMToken(String token) async {
   );
 }
 
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
@@ -1300,7 +1316,90 @@ void main() async {
     try { await tipsService.precargar(); } catch (_) {}
     try { await NotificationManager().programarFeria(); } catch (_) {}
     try { await DeepLinkManager().inicializar(); } catch (_) {}
+    try { await _inicializarFCM(); } catch (e) {
+      debugPrint('⚠️ FCM init falló: $e');
+    }
+    // ── Handlers FCM ─────────────────────────────────────────────────────────
+    // 1) App en primer plano — mostrar snackbar con el mensaje
+    FirebaseMessaging.onMessage.listen((RemoteMessage msg) {
+      final ctx = kNavKey.currentContext;
+      if (ctx == null) return;
+      final titulo = msg.notification?.title ?? '';
+      final body   = msg.notification?.body  ?? '';
+      if (titulo.isEmpty && body.isEmpty) return;
+      ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(
+        content: Row(children: [
+          const Text('🔔', style: TextStyle(fontSize: 18)),
+          const SizedBox(width: 10),
+          Expanded(child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (titulo.isNotEmpty)
+                Text(titulo,
+                  style: const TextStyle(fontWeight: FontWeight.w700,
+                    color: Colors.white, fontSize: 13)),
+              if (body.isNotEmpty)
+                Text(body,
+                  style: const TextStyle(color: Colors.white70, fontSize: 12),
+                  maxLines: 2, overflow: TextOverflow.ellipsis),
+            ])),
+        ]),
+        action: SnackBarAction(
+          label: 'Ver',
+          textColor: RDSColor.green,
+          onPressed: () => _abrirDesdeNotificacion(msg.data)),
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: const Color(0xFF1A1A1A),
+        duration: const Duration(seconds: 6)));
+    });
+    // 2) App en background — tap en la notificación la trae al frente
+    FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage msg) {
+      Future.delayed(const Duration(milliseconds: 500), () {
+        _abrirDesdeNotificacion(msg.data);
+      });
+    });
+    // 3) App terminada — tap la abrió desde cero
+    final initial = await FirebaseMessaging.instance.getInitialMessage();
+    if (initial != null) {
+      Future.delayed(const Duration(milliseconds: 1500), () {
+        _abrirDesdeNotificacion(initial.data);
+      });
+    }
   });
+}
+
+/// Navega al circuito correcto desde el payload de una notificación FCM.
+/// Payload esperado: { 'tipo': 'evento_bar', 'circuitoId': '...' }
+void _abrirDesdeNotificacion(Map<String, dynamic> data) {
+  try {
+    final tipo = data['tipo']?.toString() ?? '';
+    if (tipo != 'evento_bar') return;
+    final circuitoId = data['circuitoId']?.toString() ?? '';
+    if (circuitoId.isEmpty) return;
+
+    final ctx = kNavKey.currentContext;
+    if (ctx == null) return;
+
+    // Buscar el circuito en Firestore y navegar
+    FirebaseFirestore.instance
+      .collection('circuitos_festivales')
+      .doc(circuitoId)
+      .get()
+      .then((snap) {
+        if (!snap.exists) return;
+        // Paradas vacías — PasaporteDetalleScreen las carga desde Firestore
+        final circuito = CircuitoFestival.fromFirestore(
+          snap.id, snap.data()!, []);
+        Navigator.of(ctx, rootNavigator: true).push(
+          MaterialPageRoute(
+            builder: (_) => PasaporteDetalleScreen(circuito: circuito)));
+      }).catchError((e) {
+        debugPrint('⚠️ _abrirDesdeNotificacion error: $e');
+      });
+  } catch (e) {
+    debugPrint('⚠️ _abrirDesdeNotificacion error: $e');
+  }
 }
 
 // ─────────────────────────────────────────
@@ -1754,6 +1853,23 @@ class AuthService {
       });
   }
 
+  // Guardar insignia de circuito/festival al completarlo
+  static Future<void> guardarInsigniaCircuito(
+      String circuitoId, String nombre, String emoji) async {
+    if (currentUser == null) return;
+    final img = kInsigniaPorRuta[circuitoId] ?? '';
+    await _db.collection('usuarios').doc(currentUser!.uid)
+      .collection('insignias').doc(circuitoId).set({
+        'rutaNombre':        circuitoId,
+        'nombre':            nombre,
+        'emoji':             emoji,
+        'insigniaImg':       img,
+        'puntos':            350,
+        'fechaDesbloqueada': FieldValue.serverTimestamp(),
+        'tipo':              'circuito',
+      }, SetOptions(merge: true));
+  }
+
   // Obtener progreso de una ruta
   static Future<int> obtenerProgreso(String rutaNombre) async {
     if (currentUser == null) return 0;
@@ -1954,12 +2070,90 @@ class _MainShellState extends State<MainShell> {
         return;
       }
 
-      _navKeys[0].currentState?.push(
-        MaterialPageRoute(builder: (_) => RouteDetailScreen(
-          ruta: ruta,
-          progresoInicial: progreso,
-        )),
-      );
+      // Mostrar diálogo de confirmación — no navegar silenciosamente
+      final ctx = kNavKey.currentContext;
+      if (ctx == null) return;
+
+      Future.delayed(const Duration(milliseconds: 400), () {
+        if (!mounted) return;
+        final c = ruta;
+        final nombreDisplay = c['nombre']?.toString() ?? nombreRuta;
+        final sitiosList = c['sitiosList'] as List?;
+        final sitioNombre = (sitiosList != null && progreso < sitiosList.length)
+          ? ((sitiosList[progreso] as Map?)?['nombre']?.toString() ?? '')
+          : '';
+        showModalBottomSheet(
+          context: ctx,
+          backgroundColor: RDSColor.card,
+          shape: const RoundedRectangleBorder(
+            borderRadius: BorderRadius.vertical(top: Radius.circular(RDSRadius.xl))),
+          builder: (_) => Padding(
+            padding: const EdgeInsets.fromLTRB(24, 20, 24, 32),
+            child: Column(mainAxisSize: MainAxisSize.min, children: [
+              // Handle
+              Container(width: 36, height: 4,
+                margin: const EdgeInsets.only(bottom: 20),
+                decoration: BoxDecoration(
+                  color: RDSColor.borderSubtle,
+                  borderRadius: BorderRadius.circular(2))),
+              const Text('🧭', style: TextStyle(fontSize: 36)),
+              const SizedBox(height: 12),
+              Text(t('¿Continuar ruta?', 'Continue route?'),
+                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800,
+                  color: RDSColor.textPrimary)),
+              const SizedBox(height: 8),
+              Text(nombreDisplay,
+                textAlign: TextAlign.center,
+                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700,
+                  color: RDSColor.gold)),
+              if (sitioNombre.isNotEmpty) ...[
+                const SizedBox(height: 4),
+                Text(t('Próximo: $sitioNombre', 'Next: $sitioNombre'),
+                  textAlign: TextAlign.center,
+                  style: RDSType.bodyMd),
+              ],
+              const SizedBox(height: 20),
+              Row(children: [
+                // No, empezar de nuevo
+                Expanded(child: GestureDetector(
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    SesionManager().limpiarRutaActiva();
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    decoration: BoxDecoration(
+                      color: RDSColor.surface,
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: RDSColor.borderSubtle)),
+                    child: Text(t('No, gracias', 'No thanks'),
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700,
+                        color: RDSColor.textMuted))))),
+                const SizedBox(width: 12),
+                // Sí, continuar
+                Expanded(child: GestureDetector(
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    _navKeys[0].currentState?.push(
+                      MaterialPageRoute(builder: (_) => RouteDetailScreen(
+                        ruta: ruta,
+                        progresoInicial: progreso,
+                      )),
+                    );
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    decoration: BoxDecoration(
+                      color: RDSColor.green,
+                      borderRadius: BorderRadius.circular(14)),
+                    child: Text(t('Sí, continuar', 'Continue'),
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800,
+                        color: Colors.black))))),
+              ]),
+            ])));
+      });
     } catch (e) {
       debugPrint('⚠️ _restaurarRutaActiva error: $e');
       try { SesionManager().limpiarRutaActiva(); } catch (_) {}
@@ -2005,15 +2199,15 @@ class _MainShellState extends State<MainShell> {
                     builder: (_) => const FeriaScreen()),
                 ),
                 Navigator(
+                  key: _navKeys[1],
+                  onGenerateRoute: (settings) => MaterialPageRoute(
+                    builder: (_) => const MapScreen()),
+                ),
+                Navigator(
                   key: _navKeys[0],
                   onGenerateRoute: (settings) => MaterialPageRoute(
                     builder: (_) => HomeBody(
                       onTabChange: (i) => tabNotifier.value = i)),
-                ),
-                Navigator(
-                  key: _navKeys[1],
-                  onGenerateRoute: (settings) => MaterialPageRoute(
-                    builder: (_) => const MapScreen()),
                 ),
                 Navigator(
                   key: _navKeys[2],
@@ -2027,15 +2221,15 @@ class _MainShellState extends State<MainShell> {
                 ),
               ] : [
                 Navigator(
+                  key: _navKeys[1],
+                  onGenerateRoute: (settings) => MaterialPageRoute(
+                    builder: (_) => const MapScreen()),
+                ),
+                Navigator(
                   key: _navKeys[0],
                   onGenerateRoute: (settings) => MaterialPageRoute(
                     builder: (_) => HomeBody(
                       onTabChange: (i) => tabNotifier.value = i)),
-                ),
-                Navigator(
-                  key: _navKeys[1],
-                  onGenerateRoute: (settings) => MaterialPageRoute(
-                    builder: (_) => const MapScreen()),
                 ),
                 Navigator(
                   key: _navKeys[2],
@@ -3179,29 +3373,24 @@ class _CompraScreenState extends State<CompraScreen> {
         // Pago aún pendiente — sandbox puede tardar
         setState(() => _procesando = false);
         if (mounted) {
-          showDialog(
+          showRDSDialog(
             context: context,
-            builder: (_) => AlertDialog(
-              backgroundColor: RDSColor.card,
-              title: Text(t('Pago pendiente', 'Payment pending'),
-                style: const TextStyle(color: RDSColor.gold)),
-              content: Text(
-                t('Tu pago está siendo procesado. Si ya pagaste, espera unos minutos y vuelve a intentar.',
-                  'Your payment is being processed. If you already paid, wait a few minutes and try again.'),
-                style: const TextStyle(color: RDSColor.textMuted, fontSize: 13)),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: Text(t('Entendido', 'Got it'),
-                    style: const TextStyle(color: RDSColor.green))),
-                TextButton(
-                  onPressed: () async {
-                    Navigator.pop(context);
-                    await _verificarPago(referencia);
-                  },
-                  child: Text(t('Reintentar', 'Retry'),
-                    style: const TextStyle(color: RDSColor.gold))),
-              ]));
+            title: t('Pago pendiente', 'Payment pending'),
+            message: t(
+              'Tu pago está siendo procesado. Si ya pagaste, espera unos minutos y vuelve a intentar.',
+              'Your payment is being processed. If you already paid, wait a few minutes and try again.'),
+            actions: [
+              _RDSDialogAction(
+                label: t('Entendido', 'Got it'),
+                onTap: () => Navigator.pop(context)),
+              _RDSDialogAction(
+                label: t('Reintentar', 'Retry'),
+                isPrimary: true,
+                onTap: () async {
+                  Navigator.pop(context);
+                  await _verificarPago(referencia);
+                }),
+            ]);
         }
       }
     } catch (e) {
@@ -3718,33 +3907,18 @@ class _RegisterScreenState extends State<RegisterScreen> {
       if (cred == null) {
         setState(() => _error = AuthService._ultimoError ?? t('No se pudo crear la cuenta. Intenta de nuevo.','Could not create account. Please try again.'));
       } else {
-        await showDialog(
+        await showRDSDialog(
           context: context,
-          barrierDismissible: false,
-          builder: (_) => AlertDialog(
-            backgroundColor: RDSColor.card,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-            title: Row(children: [
-              const Icon(Icons.mark_email_unread_rounded, color: RDSColor.gold, size: 28),
-              const SizedBox(width: 12),
-              Text(t('Verifica tu correo', 'Verify your email'),
-                style: const TextStyle(color: RDSColor.textPrimary, fontSize: 18, fontWeight: FontWeight.w800)),
-            ]),
-            content: Text(
-              t('Te enviamos un correo de verificación. Verifica tu cuenta para acceder a todas las funciones.',
-                'We sent a verification email. Verify your account to access all features.'),
-              style: const TextStyle(color: RDSColor.textMuted, fontSize: 13, height: 1.5)),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                style: TextButton.styleFrom(
-                  backgroundColor: RDSColor.green,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                  child: Text(t('¡Vamos!', "Let's go!"),
-                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800)))),
-            ]));
+          title: t('📧 Verifica tu correo', '📧 Verify your email'),
+          message: t(
+            'Te enviamos un correo de verificación. Verifica tu cuenta para acceder a todas las funciones.',
+            'We sent a verification email. Verify your account to access all features.'),
+          actions: [
+            _RDSDialogAction(
+              label: t('¡Vamos!', "Let's go!"),
+              isPrimary: true,
+              onTap: () => Navigator.pop(context)),
+          ]);
         if (mounted) {
           Navigator.of(context, rootNavigator: true).pushAndRemoveUntil(
             MaterialPageRoute(builder: (_) => const MainShell()),
@@ -5153,32 +5327,49 @@ class _ServiciosScreenState extends State<ServiciosScreen> {
 
   // Normaliza la categoría desde Firestore (acepta todos los valores del formulario ficha-aliados.html
   // y variantes con/sin tilde, mayúsculas/minúsculas)
+  // Normaliza el campo `categoria` que llega desde Firestore (formulario ficha-aliados.html).
+  // Acepta: valor exacto del id, con/sin tilde, mayúsculas/minúsculas, inglés y aliases del formulario.
   String _normalizarCategoria(String raw) {
-    final r = raw.trim().toLowerCase();
-    // Match exacto (case-insensitive) contra los ids de kCategoriaServicio
+    final r = raw.trim().toLowerCase()
+        .replaceAll('á', 'a').replaceAll('é', 'e')
+        .replaceAll('í', 'i').replaceAll('ó', 'o')
+        .replaceAll('ú', 'u').replaceAll('ü', 'u');
+
+    // Match exacto normalizado contra ids de kCategoriaServicio
     for (final c in kCategoriaServicio) {
-      if (c.id.toLowerCase() == r) return c.id;
+      final id = c.id.toLowerCase()
+          .replaceAll('á', 'a').replaceAll('é', 'e')
+          .replaceAll('í', 'i').replaceAll('ó', 'o')
+          .replaceAll('ú', 'u').replaceAll('ü', 'u');
+      if (id == r) return c.id;
     }
-    // Aliases de Transporte
-    if (r == 'transport') return 'Transporte';
-    // Aliases de Guías
-    if (r == 'guia' || r == 'guias' || r == 'guía' || r == 'guide' || r == 'guides') return 'Guías';
-    // Aliases de Hospedaje — el formulario web usa "Alojamiento"
-    if (r == 'alojamiento' || r == 'lodging' || r == 'hotel' || r == 'accommodation') return 'Hospedaje';
-    // Aliases de Gastronomía
-    if (r == 'gastronomia' || r == 'food' || r == 'restaurante' || r == 'restaurant') return 'Gastronomía';
-    // Aliases de Tecnología
-    if (r == 'tecnologia' || r == 'tech') return 'Tecnología';
-    // Aliases de Belleza
-    if (r == 'beauty') return 'Belleza';
-    // Aliases de Experiencias
-    if (r == 'experiencia' || r == 'experience' || r == 'experiences') return 'Experiencias';
-    // Aliases de Salud y Bienestar
-    if (r == 'salud' || r == 'bienestar' || r == 'salud y bienestar' || r == 'wellness' || r == 'health') return 'Salud y Bienestar';
-    // Aliases de Comercio
-    if (r == 'comercio' || r == 'commerce' || r == 'tienda' || r == 'store' || r == 'shop') return 'Comercio';
-    // Servicios Legales y Educación → Otro (no tienen categoría propia en la app aún)
-    if (r == 'servicios legales' || r == 'legal' || r == 'educacion' || r == 'educación' || r == 'education') return 'Otro';
+    // Transporte
+    if (r.contains('transport') || r == 'taxi' || r == 'bus' || r == 'movilidad') return 'Transporte';
+    // Guías
+    if (r.contains('guia') || r.contains('guias') || r.contains('guide') || r == 'tour') return 'Guías';
+    // Hospedaje — formulario usa "Alojamiento"
+    if (r.contains('alojamiento') || r.contains('hospedaje') || r.contains('hotel')
+        || r.contains('hostal') || r.contains('lodging') || r.contains('accommodation')) return 'Hospedaje';
+    // Gastronomía
+    if (r.contains('gastronom') || r.contains('restaurante') || r.contains('restaurant')
+        || r == 'food' || r == 'comida' || r == 'bar' || r == 'cafe' || r == 'cafeteria') return 'Gastronomía';
+    // Experiencias
+    if (r.contains('experiencia') || r.contains('experience') || r.contains('actividad')
+        || r == 'adventure' || r == 'aventura') return 'Experiencias';
+    // Salud y Bienestar
+    if (r.contains('salud') || r.contains('bienestar') || r.contains('wellness')
+        || r.contains('health') || r.contains('spa') || r == 'medico' || r == 'medica') return 'Salud y Bienestar';
+    // Belleza
+    if (r.contains('belleza') || r.contains('beauty') || r.contains('estetica')
+        || r.contains('peluqueria') || r.contains('salon')) return 'Belleza';
+    // Tecnología
+    if (r.contains('tecnolog') || r.contains('tech') || r.contains('digital')
+        || r.contains('software') || r.contains('app')) return 'Tecnología';
+    // Comercio
+    if (r.contains('comercio') || r.contains('commerce') || r.contains('tienda')
+        || r == 'store' || r == 'shop' || r == 'mercado' || r == 'market') return 'Comercio';
+    // Legal / Educación → Otro
+    if (r.contains('legal') || r.contains('educac') || r.contains('education')) return 'Otro';
     return 'Otro';
   }
 
@@ -6004,7 +6195,7 @@ class _PlannerScreenState extends State<PlannerScreen> {
 
     final interesesStr   = _intereses.join(', ');
     final feriaStr       = _esFeria ? '\n- Las fechas coinciden con la Feria de las Flores 2026 (31 jul – 9 ago). Incluir eventos de Feria relevantes.' : '';
-    // Hotel partner — priorizar rutas del hotel en Felo
+    // Hotel partner — priorizar rutas del hotel en ValentINA
     final hotelPartner = await HotelPartnerService.getHotelActivo();
     final hotelStr = hotelPartner != null
       ? '\n- El turista se hospeda en ${hotelPartner.nombre} (zona ${hotelPartner.zona}). Priorizar rutas cercanas a su zona: ${hotelPartner.rutasDestacadas.join(", ")}.'
@@ -6020,7 +6211,7 @@ class _PlannerScreenState extends State<PlannerScreen> {
     final experienciaStr = '\n- Tipo de experiencia: $_tipoExperiencia.';
 
     final promptES = '''
-Sos Felo, la IA de turismo de Medellín, Colombia.
+Sos ValentINA, la IA de turismo de Medellín, Colombia.
 Creá un itinerario personalizado de $_dias día(s) para un viajero con estos datos:
 - Llegada: ${_formatFecha(_llegada)}, Salida: ${_formatFecha(_salida)}, Hora llegada: $_horaLlegada, Hora salida último día: $_horaSalida
 - Zona alojamiento: $_zonaHotel, Tipo: $_alojamiento
@@ -6039,7 +6230,7 @@ Respondé SOLO con JSON válido (sin markdown):
 ''';
 
     final promptEN = '''
-You are Felo, the tourism AI for Medellín, Colombia.
+You are BenjamINT, the tourism AI for Medellín, Colombia.
 Create a personalized ${_dias}-day itinerary for a traveler:
 - Arrival: ${_formatFecha(_llegada)}, Departure: ${_formatFecha(_salida)}, Arrival time: $_horaLlegada, Departure time last day: $_horaSalida
 - Accommodation zone: $_zonaHotel, Type: $_alojamiento
@@ -6105,7 +6296,7 @@ Respond ONLY with valid JSON (no markdown):
                 Expanded(child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                  Text(t('✦ FELO', '✦ FELO'),
+                  Text(t('✦ VALENTINA', '✦ BENJAMINT'),
                     style: const TextStyle(fontFamily: 'SpaceGrotesk', fontSize: 10, fontWeight: FontWeight.w700, letterSpacing: 2.0, color: RDSColor.textMuted).copyWith(
                       color: RDSColor.gold, letterSpacing: 2.5)),
                   const SizedBox(height: 2),
@@ -6168,8 +6359,8 @@ Respond ONLY with valid JSON (no markdown):
                     Expanded(child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                      Text(t('Felo guardó un plan para vos',
-                             'Felo saved a plan for you'),
+                      Text(t('ValentINA guardó un plan para vos',
+                             'BenjamINT saved a plan for you'),
                         style: RDSType.headlineMd.copyWith(
                           color: RDSColor.gold)),
                       Text(t('Tocá para verlo', 'Tap to view it'),
@@ -6207,7 +6398,7 @@ Respond ONLY with valid JSON (no markdown):
                   ? t('CONTINUAR', 'CONTINUE')
                   : _paso == 3
                     ? t('VER MI RESUMEN', 'SEE MY SUMMARY')
-                    : t('✦ PREGUNTALE A FELO', '✦ ASK FELO'),
+                    : t('✦ PREGUNTALE A VALENTINA', '✦ ASK BENJAMINT'),
             onTap: _siguiente)),
       ]),
     );
@@ -6225,8 +6416,8 @@ Respond ONLY with valid JSON (no markdown):
       Text(t('¿Cuándo llegás?', 'When are you arriving?'),
         style: RDSType3.displayXl.copyWith(fontSize: 28, height: 1.1)),
       const SizedBox(height: RDSSpace.xs),
-      Text(t('Felo arma tu itinerario completo · Gratis durante el lanzamiento',
-             'Felo builds your full itinerary · Free during launch'),
+      Text(t('ValentINA arma tu itinerario completo · Gratis durante el lanzamiento',
+             'BenjamINT builds your full itinerary · Free during launch'),
         style: RDSType.bodySm.copyWith(color: RDSColor.gold)),
       const SizedBox(height: RDSSpace.xl),
       Text(t('¿Cuántos días en Medellín?',
@@ -6837,16 +7028,16 @@ class _PlannerLoadingScreenState extends State<_PlannerLoadingScreen>
   late Animation<double> _anim;
   int _msgIdx = 0;
   final List<String> _msgs = [
-    'Felo está revisando tus preferencias...',
+    'ValentINA está revisando tus preferencias...',
     'Calculando distancias desde tu hospedaje...',
     'Eligiendo las mejores rutas para vos...',
-    'Felo está armando tu plan...',
+    'ValentINA está armando tu plan...',
   ];
   final List<String> _msgsEN = [
-    'Felo is checking your preferences...',
+    'BenjamINT is checking your preferences...',
     'Calculating distances from your stay...',
     'Picking the best routes for you...',
-    'Felo is building your plan...',
+    'BenjamINT is building your plan...',
   ];
 
   @override
@@ -6952,7 +7143,7 @@ class _PlannerLoadingScreenState extends State<_PlannerLoadingScreen>
             const SizedBox(height: RDSSpace.xxl),
             // Título editorial
             Text(
-              t('Felo está pensando tu plan', 'Felo is thinking your plan'),
+              t('ValentINA está pensando tu plan', 'BenjamINT is thinking your plan'),
               style: RDSType3.displayXl.copyWith(
                 fontSize: 28, height: 1.1),
               textAlign: TextAlign.center),
@@ -9419,8 +9610,8 @@ const Map<String, HotelPartner> kHotelesPartner = {
       'HUELLAS VIVAS DE EL POBLADO',
       'RUTA GUATAPÉ & LA PIEDRA',
     ],
-    bienvenida: '¡Bienvenido a Medellín! Desde Metropolitan HOUSY tenés todo el Centro al alcance. Felo te guía.',
-    bienvenidaEN: 'Welcome to Medellín! From Metropolitan HOUSY the whole city is within reach. Felo is your guide.',
+    bienvenida: '¡Bienvenido a Medellín! Desde Metropolitan HOUSY tenés todo el Centro al alcance. ValentINA te guía.',
+    bienvenidaEN: 'Welcome to Medellín! From Metropolitan HOUSY the whole city is within reach. BenjamINT is your guide.',
   ),
 
   // ── THE CHARLEE HOTEL (El Poblado) ──
@@ -10829,6 +11020,8 @@ const Map<String, String> kInsigniaPorRuta = {
   'VEREDAS DE SANTA ELENA':                      'assets/images/insignias/insignia_guardian_silletero.png',
   'FINCAS AGROTURÍSTICAS':                       'assets/images/insignias/insignia_silletero_mayor.png',
   'TRANSFORMACIÓN MEMORIA E HISTORIA':           'assets/images/insignias/insignia_guardian_memoria.png',
+  // ── Circuitos y Festivales ──
+  'rock_mde_2026':                               'assets/images/insignias/insignia_leyenda_rock_mde.png',
 };
 
 
@@ -11504,69 +11697,7 @@ class _HomeBodyState extends State<HomeBody> {
           physics: const BouncingScrollPhysics(),
           padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            // ── Banner Rutero Planner ─────────────────────────────────
-            // ── Banner Felo — editorial y premium ─────────────────────────
-            GestureDetector(
-              onTap: () => RuteroNav.push(context, const PlannerScreen()),
-              child: Container(
-                margin: const EdgeInsets.only(bottom: RDSSpace.xl),
-                decoration: BoxDecoration(
-                  color: RDSColor.surface,
-                  borderRadius: RDSRadius.bXl,
-                  border: Border.all(
-                    color: RDSColor.gold.withOpacity(0.25), width: 1.0)),
-                child: Stack(children: [
-                  // Glow sutil de fondo
-                  Positioned(right: -20, top: -20,
-                    child: Container(
-                      width: 120, height: 120,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        gradient: RadialGradient(colors: [
-                          RDSColor.green.withOpacity(0.08),
-                          Colors.transparent])))),
-                  Padding(
-                    padding: const EdgeInsets.all(RDSSpace.md),
-                    child: Row(children: [
-                      // Ícono — más integrado, menos "feature bubble"
-                      Container(
-                        width: 42, height: 42,
-                        decoration: BoxDecoration(
-                          color: RDSColor.gold.withOpacity(0.08),
-                          borderRadius: RDSRadius.bMd,
-                          border: Border.all(
-                            color: RDSColor.gold.withOpacity(0.3))),
-                        child: const Center(child: Icon(
-                          RDSIcons.planner,
-                          color: RDSColor.gold, size: 20))),
-                      const SizedBox(width: RDSSpace.md),
-                      Expanded(child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          // Tag premium
-                          Text(t('✦ FELO', '✦ FELO'),
-                            style: const TextStyle(fontFamily: 'SpaceGrotesk', fontSize: 10, fontWeight: FontWeight.w700, letterSpacing: 2.0, color: RDSColor.textMuted).copyWith(
-                              color: RDSColor.gold, letterSpacing: 2.5)),
-                          const SizedBox(height: 3),
-                          Text(
-                            t('Tu itinerario perfecto en segundos',
-                              'Your perfect itinerary in seconds'),
-                            style: RDSType.headlineMd),
-                        ])),
-                      // CTA mínimo
-                      const SizedBox(width: RDSSpace.sm),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: RDSSpace.md, vertical: RDSSpace.sm - 2),
-                        decoration: BoxDecoration(
-                          color: RDSColor.gold,
-                          borderRadius: RDSRadius.bMd),
-                        child: Text(t('Preguntale', 'Ask him'),
-                          style: RDSType.labelSm.copyWith(
-                            color: Colors.black,
-                            fontWeight: FontWeight.w900))),
-                    ])),
-                ]))),
+            // ── ValentINA vive en el Mapa — sin banner aquí ──────────────
             // ── Banner hotel activo ───────────────────────────────────────
             const _HotelBanner(),
             // ─────────────────────────────────────────────────────────
@@ -11577,7 +11708,7 @@ class _HomeBodyState extends State<HomeBody> {
                 style: const TextStyle(fontFamily: 'SpaceGrotesk', fontSize: 10, fontWeight: FontWeight.w700, letterSpacing: 2.0, color: RDSColor.textMuted).copyWith(
                   color: RDSColor.textMuted, letterSpacing: 2.5)),
               GestureDetector(
-                onTap: () => tabNotifier.value = 1,
+                onTap: () => tabNotifier.value = 0,
                 child: Row(children: [
                   Text(tVerMapa,
                     style: RDSType.labelSm.copyWith(
@@ -11629,29 +11760,39 @@ class _HomeBodyState extends State<HomeBody> {
                   activo: _filtroActivo == 'Ciudad',
                   onTap: () => setState(() => _filtroActivo = 'Ciudad')),
                 const SizedBox(width: RDSSpace.sm),
-                CategoryChip(
-                  label: t('Alrededores','Surroundings'),
-                  icon: RDSIcons.catNaturaleza,
-                  activo: _filtroActivo == 'Alrededores',
-                  onTap: () => setState(() => _filtroActivo = 'Alrededores')),
-                const SizedBox(width: RDSSpace.sm),
-                CategoryChip(
-                  label: t('Creadores','Creators'),
-                  icon: Icons.video_camera_back_rounded,
-                  activo: _filtroActivo == 'Creadores',
-                  onTap: () => setState(() => _filtroActivo = 'Creadores')),
-                const SizedBox(width: RDSSpace.sm),
-                CategoryChip(
-                  label: t('Gastronomía','Food'),
-                  icon: RDSIcons.catGastrono,
-                  activo: _filtroActivo == 'Comida Urbana',
-                  onTap: () => setState(() => _filtroActivo = 'Comida Urbana')),
-                const SizedBox(width: RDSSpace.sm),
-                CategoryChip(
-                  label: t('Servicios','Services'),
-                  icon: Icons.room_service_rounded,
-                  activo: _filtroActivo == 'Servicios',
-                  onTap: () => RuteroNav.push(context, const ServiciosScreen())),
+                if (kSeccionAlrededores) ...[
+                  CategoryChip(
+                    label: t('Alrededores','Surroundings'),
+                    icon: RDSIcons.catNaturaleza,
+                    activo: _filtroActivo == 'Alrededores',
+                    onTap: () => setState(() => _filtroActivo = 'Alrededores')),
+                  const SizedBox(width: RDSSpace.sm),
+                ],
+                if (kSeccionPasaporte) ...[
+                  CategoryChip(
+                    label: t('Pasaportes','Passports'),
+                    icon: Icons.card_travel_rounded,
+                    activo: _filtroActivo == 'Pasaportes',
+                    onTap: () => setState(() => _filtroActivo = 'Pasaportes')),
+                  const SizedBox(width: RDSSpace.sm),
+                ],
+                if (kSeccionGastronomia) ...[
+                  CategoryChip(
+                    label: t('Gastronomía','Food'),
+                    icon: RDSIcons.catGastrono,
+                    activo: _filtroActivo == 'Comida Urbana',
+                    onTap: () => setState(() => _filtroActivo = 'Comida Urbana')),
+                  const SizedBox(width: RDSSpace.sm),
+                ],
+                if (kSeccionServicios) ...[
+                  CategoryChip(
+                    label: t('Servicios','Services'),
+                    icon: Icons.room_service_outlined,
+                    activo: _filtroActivo == 'Servicios',
+                    onTap: () => setState(() => _filtroActivo = 'Servicios')),
+                  const SizedBox(width: RDSSpace.sm),
+                ],
+                // kSeccionServicios = false → oculto. Cambiar a true cuando esté listo filtro categorías
 
               ])),
             const SizedBox(height: 16),
@@ -11750,6 +11891,9 @@ class _HomeBodyState extends State<HomeBody> {
                 ruta: r, activa: !pausada,
                 proximaActivacion: pausada ? (r['tagPausada'] ?? '🚧 Próximamente') : '',
                 onTap: pausada ? null : () => RuteroNav.push(context, RouteDetailScreen(ruta: r))); }),
+            ] else if (_filtroActivo == 'Pasaportes') ...[
+              _PasaportesSection(
+                ciudadDetectada: (_ciudadDetectada ?? kCiudadesRegistradas[0]).ciudad),
             // TEMPORADA — desactivado oct 2026, reemplazado por Creadores.
             // Conservar para reactivar en 2027 (Feria de las Flores, festivales de temporada).
             // Para reactivar: cambiar chip Creadores→Temporada, restaurar filtro _rutasFiltradas
@@ -12770,42 +12914,35 @@ class _RouteDetailScreenState extends State<RouteDetailScreen> {
               padding: const EdgeInsets.only(top: 10),
               child: GestureDetector(
                 onTap: () {
-                  showDialog(
+                  showRDSDialog(
                     context: context,
-                    builder: (_) => AlertDialog(
-                      backgroundColor: RDSColor.card,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(RDSRadius.xl)),
-                      title: Text(
-                        t('¿Ya estás en el destino?', 'Already at the destination?'),
-                        style: const TextStyle(color: RDSColor.textPrimary, fontSize: 16, fontWeight: FontWeight.w800)),
-                      content: Text(
-                        t('Si ya estás en ${sitiosList[1]}, puedes saltar la terminal y empezar directo desde allí.',
-                          'If you are already at ${sitiosList[1]}, you can skip the terminal and start directly from there.'),
-                        style: const TextStyle(color: RDSColor.textMuted, fontSize: 13, height: 1.5)),
-                      actions: [
-                        TextButton(
-                          onPressed: () => Navigator.pop(context),
-                          child: Text(t('Cancelar', 'Cancel'),
-                            style: const TextStyle(color: RDSColor.textMuted))),
-                        TextButton(
-                          onPressed: () {
-                            Navigator.pop(context);
-                            setState(() {
-                              _completados = 1;
-                              _mostrarTipAvatar = true;
-                              _poseActual = 'señalando';
-                              final tipSitio2Raw = tipsService.getTip(sitiosList[1]);
-                              final tipSitio2 = tipSitio2Raw.isNotEmpty ? tipSitio2Raw : null;
-                              _tipActual = tipSitio2 != null
-                                ? '📍 ${t("Dirígete a", "Head to")}: ${sitiosList[1]}\n\n$tipSitio2'
-                                : t('¡Perfecto! Empezamos desde ${sitiosList[1]} 👉',
-                                    'Perfect! Starting from ${sitiosList[1]} 👉');
-                            });
-                            AuthService.guardarProgreso(widget.ruta['nombre'], 1, totalSitios);
-                          },
-                          child: Text(t('Sí, saltar inicio', 'Yes, skip start'),
-                            style: TextStyle(color: acento, fontWeight: FontWeight.w700))),
-                      ]));
+                    title: t('¿Ya estás en el destino?', 'Already at the destination?'),
+                    message: t(
+                      'Si ya estás en ${sitiosList[1]}, puedes saltar la terminal y empezar directo desde allí.',
+                      'If you are already at ${sitiosList[1]}, you can skip the terminal and start directly from there.'),
+                    actions: [
+                      _RDSDialogAction(
+                        label: t('Cancelar', 'Cancel'),
+                        onTap: () => Navigator.pop(context)),
+                      _RDSDialogAction(
+                        label: t('Sí, saltar inicio', 'Yes, skip start'),
+                        isPrimary: true,
+                        onTap: () {
+                          Navigator.pop(context);
+                          setState(() {
+                            _completados = 1;
+                            _mostrarTipAvatar = true;
+                            _poseActual = 'señalando';
+                            final tipSitio2Raw = tipsService.getTip(sitiosList[1]);
+                            final tipSitio2 = tipSitio2Raw.isNotEmpty ? tipSitio2Raw : null;
+                            _tipActual = tipSitio2 != null
+                              ? '📍 ${t("Dirígete a", "Head to")}: ${sitiosList[1]}\n\n$tipSitio2'
+                              : t('¡Perfecto! Empezamos desde ${sitiosList[1]} 👉',
+                                  'Perfect! Starting from ${sitiosList[1]} 👉');
+                          });
+                          AuthService.guardarProgreso(widget.ruta['nombre'], 1, totalSitios);
+                        }),
+                    ]);
                 },
                 child: Container(
                   width: double.infinity,
@@ -15481,19 +15618,19 @@ class ProfileScreen extends StatelessWidget {
             onTap: () async {
               final confirm = await showDialog<bool>(
                 context: context,
-                builder: (ctx) => AlertDialog(
-                  title: Text(t('¿Eliminar cuenta?', 'Delete account?')),
-                  content: Text(t(
+                builder: (ctx) => _RDSDialog(
+                  title: t('⚠️ ¿Eliminar cuenta?', '⚠️ Delete account?'),
+                  message: t(
                     'Se borrarán permanentemente tu cuenta y todos tus datos. Esta acción no se puede deshacer.',
-                    'Your account and all your data will be permanently deleted. This action cannot be undone.')),
+                    'Your account and all your data will be permanently deleted. This action cannot be undone.'),
                   actions: [
-                    TextButton(
-                      onPressed: () => Navigator.pop(ctx, false),
-                      child: Text(t('Cancelar', 'Cancel'))),
-                    TextButton(
-                      onPressed: () => Navigator.pop(ctx, true),
-                      style: TextButton.styleFrom(foregroundColor: Colors.red),
-                      child: Text(t('Eliminar', 'Delete'))),
+                    _RDSDialogAction(
+                      label: t('Cancelar', 'Cancel'),
+                      onTap: () => Navigator.pop(ctx, false)),
+                    _RDSDialogAction(
+                      label: t('Eliminar', 'Delete'),
+                      isPrimary: true,
+                      onTap: () => Navigator.pop(ctx, true)),
                   ]));
               if (confirm == true && context.mounted) {
                 try {
@@ -17217,6 +17354,28 @@ const Map<String, String> kTipsZona = {
   'Senderos del Arriero y la Montaña': '¡Bienvenido al suroeste antioqueño! Cultura arriera, café y naturaleza salvaje en Ciudad Bolívar. ¡Una experiencia que no se olvida! 🐎',
 };
 
+// Estilo oscuro compartido entre MapScreen y _MapaPasaporteScreen
+const String kRuteroMapStyle = '''[
+    {"elementType":"geometry","stylers":[{"color":"#0f1a0a"}]},
+    {"elementType":"labels.text.fill","stylers":[{"color":"#8a9278"}]},
+    {"elementType":"labels.text.stroke","stylers":[{"color":"#1a2b16"}]},
+    {"featureType":"administrative","elementType":"geometry","stylers":[{"color":"#2d4a24"}]},
+    {"featureType":"administrative.country","elementType":"labels.text.fill","stylers":[{"color":"#9e9e9e"}]},
+    {"featureType":"administrative.locality","elementType":"labels.text.fill","stylers":[{"color":"#bdbdbd"}]},
+    {"featureType":"poi","elementType":"labels.text.fill","stylers":[{"color":"#757575"}]},
+    {"featureType":"poi.park","elementType":"geometry","stylers":[{"color":"#1a2b16"}]},
+    {"featureType":"poi.park","elementType":"labels.text.fill","stylers":[{"color":"#4a6741"}]},
+    {"featureType":"road","elementType":"geometry.fill","stylers":[{"color":"#1c2918"}]},
+    {"featureType":"road","elementType":"geometry.stroke","stylers":[{"color":"#2c3d20"}]},
+    {"featureType":"road","elementType":"labels.text.fill","stylers":[{"color":"#8a9278"}]},
+    {"featureType":"road.arterial","elementType":"geometry","stylers":[{"color":"#243521"}]},
+    {"featureType":"road.highway","elementType":"geometry","stylers":[{"color":"#2f4a25"}]},
+    {"featureType":"road.highway.controlled_access","elementType":"geometry","stylers":[{"color":"#3d5e31"}]},
+    {"featureType":"transit","elementType":"geometry","stylers":[{"color":"#2f3948"}]},
+    {"featureType":"water","elementType":"geometry","stylers":[{"color":"#0a1a2e"}]},
+    {"featureType":"water","elementType":"labels.text.fill","stylers":[{"color":"#515c6d"}]}
+  ]''';
+
 class MapScreen extends StatefulWidget {
   const MapScreen({super.key});
   @override
@@ -18231,7 +18390,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
         onTap: () => setState(() { _fabExpandido = false; _mostrarEnCicla = !_mostrarEnCicla; })),
       _FabOpcion(icon: RDSIcons.transport,   label: _mostrarWhoosh ? t('Ocultar Whoosh','Hide Whoosh') : t('Ver Whoosh 🛴','Show Whoosh 🛴'), color: const Color(0xFFFFD700),
         onTap: () => setState(() { _fabExpandido = false; _mostrarWhoosh = !_mostrarWhoosh; })),
-      _FabOpcion(icon: RDSIcons.planner,     label: t('Ver Planner','View Planner'),    color: RDSColor.orchid,
+      _FabOpcion(icon: RDSIcons.planner,     label: t('Ver ValentINA','View BenjamINT'),    color: RDSColor.orchid,
         onTap: () { setState(() => _fabExpandido = false); _mostrarCapaPlanner(); }),
     ];
     return Column(
@@ -18305,18 +18464,18 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
     if (uid == null) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text(t('Iniciá sesión para ver el plan de Felo en el mapa',
+        content: Text(t('Iniciá sesión para ver el plan de ValentINA en el mapa',
                        'Sign in to see your Planner on the map')),
         backgroundColor: RDSColor.accent));
       return;
     }
     try {
-      // Leer itinerario real de Felo desde SharedPreferences
+      // Leer itinerario real de ValentINA desde SharedPreferences
       final prefs = await SharedPreferences.getInstance();
       final jsonStr = prefs.getString('planner_ultimo_itinerario');
       if (jsonStr == null || !mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text(t('Todavía no le preguntaste a Felo',
+          content: Text(t('Todavía no le preguntaste a ValentINA',
                          'You haven\'t generated an itinerary yet')),
           backgroundColor: RDSColor.card));
         return;
@@ -18336,8 +18495,8 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
 
       if (dias.isEmpty || !mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text(t('El itinerario de Felo no tiene rutas con coordenadas',
-                         'Felo\'s itinerary has no routes with coordinates')),
+          content: Text(t('El itinerario de ValentINA no tiene rutas con coordenadas',
+                         'BenjamINT\'s itinerary has no routes with coordinates')),
           backgroundColor: RDSColor.card));
         return;
       }
@@ -18348,7 +18507,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
 
       for (int i = 0; i < dias.length && i < 4; i++) {
         final dia = dias[i] as Map<String, dynamic>;
-        // El JSON de Felo usa 'bloques'; fallback a 'actividades' por compatibilidad
+        // El JSON de ValentINA usa 'bloques'; fallback a 'actividades' por compatibilidad
         final bloques = (dia['bloques'] as List<dynamic>?)
             ?? (dia['actividades'] as List<dynamic>?)
             ?? [];
@@ -18362,7 +18521,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
               ?? bloque['nombre']?.toString()
               ?? '';
           if (nombreRuta.isEmpty) continue;
-          // Evitar duplicar la misma ruta si Felo la repite en el mismo día
+          // Evitar duplicar la misma ruta si ValentINA la repite en el mismo día
           final yaAgregada = plannerDias.any((d) =>
             d['dia'] == i + 1 &&
             (d['ruta'] as Map)['nombre'] == nombreRuta);
@@ -18385,8 +18544,8 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
       if (!mounted) return;
       if (plannerDias.isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text(t('Felo no encontró rutas con coordenadas para mostrar en el mapa',
-                         'Felo couldn\'t find routes with coordinates to show on the map')),
+          content: Text(t('ValentINA no encontró rutas con coordenadas para mostrar en el mapa',
+                         'BenjamINT couldn\'t find routes with coordinates to show on the map')),
           backgroundColor: RDSColor.card));
         return;
       }
@@ -18396,7 +18555,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
       });
       _mapController?.animateCamera(CameraUpdate.newLatLngZoom(_centerCiudad, 12));
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text(t('Mostrando el plan de Felo en el mapa','Showing Felo\'s plan on the map')),
+        content: Text(t('Mostrando el plan de ValentINA en el mapa','Showing BenjamINT\'s plan on the map')),
         backgroundColor: RDSColor.green, duration: const Duration(seconds: 2)));
     } catch (e) {
       debugPrint('Planner mapa error: $e');
@@ -18446,7 +18605,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
           Row(children: [
             const Icon(RDSIcons.planner, size: 14, color: RDSColor.gold),
             const SizedBox(width: 4),
-            Text(t('Plan de Felo', 'Felo\'s Plan'), style: RDSType.labelSm.copyWith(color: RDSColor.gold)),
+            Text(t('Plan de ValentINA', 'BenjamINT\'s Plan'), style: RDSType.labelSm.copyWith(color: RDSColor.gold)),
             const SizedBox(width: 8),
             GestureDetector(
               onTap: () => setState(() { _mostrarCapaPlannerActiva = false; _plannerDias = []; }),
@@ -18520,28 +18679,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
                       style: TextStyle(color: Color(0xFFFFD000), fontSize: 16,
                         fontWeight: FontWeight.w900, letterSpacing: 1)))),
               ]),
-              const SizedBox(height: 14),
-              SingleChildScrollView(scrollDirection: Axis.horizontal,
-                child: Row(children: _filtros.map((f) {
-                  final isActive = _filtroRuta == f;
-                  return GestureDetector(
-                    onTap: () {
-                      setState(() { _filtroRuta = f; _sitioSeleccionado = null; });
-                      if (f != 'Todas') {
-                        final sitiosRuta = _sitiosFiltrados;
-                        if (sitiosRuta.isNotEmpty) {
-                          final lat = sitiosRuta.map((s) => s.posicion.latitude).reduce((a, b) => a + b) / sitiosRuta.length;
-                          final lng = sitiosRuta.map((s) => s.posicion.longitude).reduce((a, b) => a + b) / sitiosRuta.length;
-                          _mapController?.animateCamera(CameraUpdate.newLatLngZoom(LatLng(lat, lng), 14));
-                        }
-                      } else {
-                        _mapController?.animateCamera(CameraUpdate.newLatLngZoom(_centerCiudad, 13));
-                      }
-                    },
-                    child: Padding(
-                      padding: const EdgeInsets.only(right: 8),
-                      child: _FiltroChip(label: _filtroLabel(f), activo: isActive, onTap: () {})));
-                }).toList())),
+              // ── Filtro de rutas removido — mapa muestra todos los sitios ──
             ])),
           ]))),
         Expanded(child: Stack(children: [
@@ -18639,10 +18777,54 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
                       ])),
                     ]))))),
 
-          // Stats bar — cuando no hay sitio seleccionado
+          // Stats bar + ValentINA — cuando no hay sitio seleccionado
           if (_sitioSeleccionado == null)
             Positioned(bottom: 16, left: 16, right: 16,
-              child: Container(
+              child: Column(mainAxisSize: MainAxisSize.min, children: [
+                // ── Fila ValentINA — siempre visible encima del stats bar ──
+                if (!_mostrarCapaPlannerActiva)
+                  GestureDetector(
+                    onTap: () => RuteroNav.push(context, const PlannerScreen()),
+                    child: Container(
+                      margin: const EdgeInsets.only(bottom: 6),
+                      padding: const EdgeInsets.symmetric(horizontal: RDSSpace.md, vertical: RDSSpace.sm + 2),
+                      decoration: BoxDecoration(
+                        color: RDSColor.card.withOpacity(0.96),
+                        borderRadius: RDSRadius.bLg,
+                        border: Border.all(color: RDSColor.gold.withOpacity(0.40), width: 1.0),
+                        boxShadow: [
+                          BoxShadow(color: RDSColor.gold.withOpacity(0.12), blurRadius: 10, spreadRadius: 1),
+                          ...RDSElevation.high(),
+                        ]),
+                      child: Row(children: [
+                        Container(
+                          width: 32, height: 32,
+                          decoration: BoxDecoration(
+                            color: RDSColor.gold.withOpacity(0.10),
+                            borderRadius: RDSRadius.bMd,
+                            border: Border.all(color: RDSColor.gold.withOpacity(0.35))),
+                          child: const Center(child: Icon(RDSIcons.planner, color: RDSColor.gold, size: 17))),
+                        const SizedBox(width: RDSSpace.sm + 2),
+                        Expanded(child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(t('✦ VALENTINA', '✦ BENJAMINT'),
+                              style: const TextStyle(
+                                fontFamily: 'SpaceGrotesk', fontSize: 9,
+                                fontWeight: FontWeight.w700, letterSpacing: 2.0,
+                                color: RDSColor.gold)),
+                            const SizedBox(height: 1),
+                            Text(
+                              t('Tu guía local · Planea tu día',
+                                'Your local guide · Plan your day'),
+                              style: RDSType.bodySm.copyWith(fontSize: 11)),
+                          ])),
+                        const SizedBox(width: RDSSpace.sm),
+                        const Icon(RDSIcons.actionExplore, color: RDSColor.gold, size: 16),
+                      ]))),
+                // ── Stats bar ──
+                Container(
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 decoration: BoxDecoration(
                   color: RDSColor.card.withOpacity(0.95),
@@ -18679,7 +18861,8 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
                       child: Text(tRutasLabel,
                         style: const TextStyle(color: Colors.white, fontSize: 10,
                           fontWeight: FontWeight.w800, letterSpacing: 1)))),
-                ]))),
+                ])),  // fin stats bar Container
+              ])),    // fin Column del Positioned
         ])),
       ]),
     );
@@ -20029,7 +20212,7 @@ class _RouteCard extends StatelessWidget {
                     gradient: LinearGradient(
                       begin: Alignment.topCenter,
                       end: Alignment.bottomCenter,
-                      stops: [0.0, 0.35, 1.0],
+                      stops: [0.0, 1.0],
                       colors: RDSColor.gradientScrim))),
 
                 // ── Overlay estado inactivo ───────────────────────────────
@@ -20590,9 +20773,7 @@ class _TransporteAliadoCard extends StatefulWidget {
 }
 
 class _TransporteAliadoCardState extends State<_TransporteAliadoCard> {
-  // WhatsApp oficial de Alianza Local Tours (de su web alianzalocaltours.com)
-  // TODO(16/05/2026): mover a constante o Firestore cuando esté la estructura de aliados
-  static const String _whatsappAlianza = '573148057983';  // Alianza Local Tours (confirmado 20/05/2026)
+  // WhatsApp oficial de Alianza Local Tours — ver kWhatsappAlianza (top-level, línea ~24)
 
   late final String _codigo;
   late final String _destino;
@@ -20627,7 +20808,7 @@ class _TransporteAliadoCardState extends State<_TransporteAliadoCard> {
 
     final mensaje = kLang == 'en' ? mensajeEN : mensajeES;
     final urlMensaje = Uri.encodeComponent(mensaje);
-    final url = Uri.parse('https://wa.me/$_whatsappAlianza?text=$urlMensaje');
+    final url = Uri.parse('https://wa.me/$kWhatsappAlianza?text=$urlMensaje');
 
     try {
       final ok = await launchUrl(url, mode: LaunchMode.externalApplication);
@@ -21626,8 +21807,8 @@ class _BottomNav extends StatelessWidget {
     // Tabs base con íconos del Design System (RDSIcons).
     // Emojis eliminados de navegación; se conservan solo en logros/insignias.
     final base = [
-      _NavItem(icon: RDSIcons.navExplore, label: t('Explorar', 'Explore')),
       _NavItem(icon: RDSIcons.navMap,     label: t('Mapa', 'Map')),
+      _NavItem(icon: RDSIcons.navExplore, label: t('Explorar', 'Explore')),
       _NavItem(icon: RDSIcons.navAchiev,  label: t('Logros', 'Achievements')),
       _NavItem(icon: RDSIcons.navProfile, label: t('Perfil', 'Profile')),
     ];
@@ -23642,6 +23823,5486 @@ class _FechaValidacionInfo extends StatelessWidget {
   }
 }
 
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  PASAPORTES — Modelo, Servicio, Sección, Pantallas
+//  GPS-first: toda validación requiere presencia física en el lugar.
+//  Felo · Rutero MDE v1.0.16
+// ─────────────────────────────────────────────────────────────────────────────
+
+// ── Enums y Modelos ───────────────────────────────────────────────────────────
+
+enum ModoValidacion { gps, gpsQr, gpsKeyword }
+
+// Modelo de trivia embebida en una parada
+class TriviaParada {
+  final String pregunta;
+  final List<String> opciones;
+  final int correctaIndex;
+  final String explicacion;
+  final int puntosBonus;
+
+  const TriviaParada({
+    required this.pregunta,
+    required this.opciones,
+    required this.correctaIndex,
+    required this.explicacion,
+    this.puntosBonus = 30,
+  });
+
+  factory TriviaParada.fromMap(Map<String, dynamic> d) {
+    return TriviaParada(
+      pregunta: d['pregunta']?.toString() ?? '',
+      opciones: List<String>.from(d['opciones'] ?? []),
+      correctaIndex: (d['correctaIndex'] as num?)?.toInt() ?? 0,
+      explicacion: d['explicacion']?.toString() ?? '',
+      puntosBonus: (d['puntosBonus'] as num?)?.toInt() ?? 30,
+    );
+  }
+}
+
+class ParadaCircuito {
+  final String id;
+  final String sitioId;
+  final String nombre;
+  final String emoji;
+  final double lat;
+  final double lng;
+  final int radioMetros;
+  final ModoValidacion modoValidacion;
+  final String? qrToken;
+  final String? keywordHash;
+  final bool cuentaParaVisita;
+  final bool cuentaParaConsumo;
+  final TriviaParada? trivia;
+  final int puntosCheckin;
+  // Campos de detalle del museo
+  final String descripcion;
+  final String direccion;
+  final String barrio;
+  final String zona;
+  final String horario;
+  final String beneficioPasaporte;
+  final String entradaBase;
+  final String metroEstacion;
+  final String instagram;
+  final String tiktok;
+  final String whatsappBar;   // WhatsApp del bar (distinto del WhatsApp de Rutero)
+  final String sitioWeb;
+  final String imagenUrl;
+  final int puntosTrivia;
+  // Tips "antes de salir" — lista de recomendaciones gamificadas
+  final List<String> antesDeSalir;
+  // Calificación pública — promedio y total de votos
+  final double rating;
+  final int totalVotos;
+  // Misión épica — desafío especial que el bar propone al visitante (máx. 200 chars)
+  // Requerido por el formulario de inscripción de bares. Ej: "Tomá una foto con la
+  // guitarra del fondo y subila a stories con #CircuitoRockMDE"
+  final String misionEpica;
+  // Galería de fotos del bar — cargadas por John Quiroz tras aprobación
+  final String fotoFachada;
+  final String fotoAmbiente;
+  final String fotoTematica;
+  // Evento especial activo en el bar — se activa desde pantalla de gestión
+  final bool eventoActivo;
+  final String eventoNombre;
+  final String descripcionEvento;
+  final String eventoHora;
+
+  const ParadaCircuito({
+    required this.id,
+    required this.sitioId,
+    required this.nombre,
+    required this.emoji,
+    required this.lat,
+    required this.lng,
+    this.radioMetros = 150,
+    this.modoValidacion = ModoValidacion.gps,
+    this.qrToken,
+    this.keywordHash,
+    this.cuentaParaVisita = true,
+    this.cuentaParaConsumo = false,
+    this.trivia,
+    this.puntosCheckin = 50,
+    this.descripcion = '',
+    this.direccion = '',
+    this.barrio = '',
+    this.zona = '',
+    this.horario = '',
+    this.beneficioPasaporte = '',
+    this.entradaBase = '',
+    this.metroEstacion = '',
+    this.instagram = '',
+    this.tiktok = '',
+    this.whatsappBar = '',
+    this.sitioWeb = '',
+    this.imagenUrl = '',
+    this.puntosTrivia = 30,
+    this.antesDeSalir = const [],
+    this.rating = 0.0,
+    this.totalVotos = 0,
+    this.misionEpica = '',
+    this.fotoFachada = '',
+    this.fotoAmbiente = '',
+    this.fotoTematica = '',
+    this.eventoActivo = false,
+    this.eventoNombre = '',
+    this.descripcionEvento = '',
+    this.eventoHora = '',
+  });
+
+  factory ParadaCircuito.fromFirestore(String docId, Map<String, dynamic> d) {
+    final modoStr = d['modoValidacion']?.toString() ?? 'gps';
+    final modo = modoStr == 'gps_qr'
+        ? ModoValidacion.gpsQr
+        : modoStr == 'gps_keyword'
+            ? ModoValidacion.gpsKeyword
+            : ModoValidacion.gps;
+    final triviaMap = d['trivia'] as Map<String, dynamic>?;
+    return ParadaCircuito(
+      id: docId,
+      sitioId: d['sitioId']?.toString() ?? docId,
+      nombre: d['nombre']?.toString() ?? '',
+      emoji: d['emoji']?.toString() ?? '📍',
+      lat: (d['lat'] as num?)?.toDouble() ?? 0.0,
+      lng: (d['lng'] as num?)?.toDouble() ?? 0.0,
+      radioMetros: (d['radioMetros'] as num?)?.toInt() ?? 150,
+      modoValidacion: modo,
+      qrToken: d['qrToken']?.toString(),
+      keywordHash: d['keywordHash']?.toString(),
+      cuentaParaVisita: d['cuentaParaVisita'] as bool? ?? true,
+      cuentaParaConsumo: d['cuentaParaConsumo'] as bool? ?? false,
+      trivia: triviaMap != null ? TriviaParada.fromMap(triviaMap) : null,
+      puntosCheckin: (d['puntosCheckin'] as num?)?.toInt() ?? 50,
+      descripcion: d['descripcion']?.toString() ?? '',
+      direccion: d['direccion']?.toString() ?? '',
+      barrio: d['barrio']?.toString() ?? '',
+      zona: d['zona']?.toString() ?? '',
+      horario: (d['horario']?.toString().isNotEmpty == true
+          ? d['horario']
+          : d['horarios'])?.toString() ?? '',
+      beneficioPasaporte: d['beneficioPasaporte']?.toString() ?? '',
+      entradaBase: d['entradaBase']?.toString() ?? '',
+      metroEstacion: d['metroEstacion']?.toString() ?? '',
+      instagram: d['instagram']?.toString() ?? '',
+      tiktok: d['tiktok']?.toString() ?? '',
+      whatsappBar: d['whatsapp']?.toString() ?? '',
+      sitioWeb: d['sitioWeb']?.toString() ?? '',
+      imagenUrl: d['imagenUrl']?.toString() ?? '',
+      puntosTrivia: (d['puntosTrivia'] as num?)?.toInt() ?? 30,
+      antesDeSalir: (d['antesDeSalir'] as List<dynamic>?)
+          ?.map((e) => e.toString()).toList() ??
+          // fallback: campo 'consejos' como string separado por "|" o "\n"
+          ((d['consejos']?.toString() ?? '').isNotEmpty
+            ? (d['consejos'] as String)
+                .split(RegExp(r'[|\n]'))
+                .map((e) => e.trim())
+                .where((e) => e.isNotEmpty)
+                .toList()
+            : []),
+      rating: (d['rating'] as num?)?.toDouble() ?? 0.0,
+      totalVotos: (d['totalVotos'] as num?)?.toInt() ?? 0,
+      misionEpica: d['misionEpica']?.toString() ?? '',
+      fotoFachada: d['fotoFachada']?.toString() ?? '',
+      fotoAmbiente: d['fotoAmbiente']?.toString() ?? '',
+      fotoTematica: d['fotoTematica']?.toString() ?? '',
+      eventoActivo: d['eventoActivo'] as bool? ?? false,
+      eventoNombre: d['eventoNombre']?.toString() ?? '',
+      descripcionEvento: d['descripcionEvento']?.toString() ?? '',
+      eventoHora: d['eventoHora']?.toString() ?? '',
+    );
+  }
+}
+
+class CircuitoFestival {
+  final String id;
+  final String nombre;
+  final String ciudad;
+  final String tipo;
+  final String estado;
+  final DateTime fechaInicio;
+  final DateTime fechaFin;
+  final int paradasTotal;
+  final int paradasParaPremio;
+  final String premioNombre;
+  final String premioEmoji;
+  final List<String> gradienteHero;
+  final List<ParadaCircuito> paradas;
+  /// Ruta local del asset de imagen (ej: 'assets/images/rutas/circuito_rock_mde.jpg')
+  /// Si está vacío, se usa el gradiente como fondo hero.
+  final String imagenAsset;
+
+  /// Orden de aparición en la sección Pasaportes (1 = primero).
+  /// Se lee del campo `ordenDisplay` en Firestore. 999 = sin orden definido.
+  final int ordenDisplay;
+  /// Texto largo que explica la temática del circuito — qué es, qué va a vivir el usuario.
+  /// Se muestra encima de la lista de paradas. Vacío si no está en Firestore.
+  final String contexto;
+  /// Versión en inglés del campo `contexto`.
+  final String contextoEN;
+  /// Paso a paso de cómo participar — check-in, trivia, pines, premio final.
+  /// Se muestra como lista expandible encima de las paradas. Vacío si no está en Firestore.
+  final String instrucciones;
+  /// Versión en inglés del campo `instrucciones`.
+  final String instruccionesEN;
+  /// Nombre del circuito en inglés.
+  final String nombreEN;
+
+  const CircuitoFestival({
+    required this.id,
+    required this.nombre,
+    required this.ciudad,
+    required this.tipo,
+    required this.estado,
+    required this.fechaInicio,
+    required this.fechaFin,
+    required this.paradasTotal,
+    required this.paradasParaPremio,
+    required this.premioNombre,
+    required this.premioEmoji,
+    required this.gradienteHero,
+    required this.paradas,
+    this.imagenAsset = '',
+    this.ordenDisplay = 999,
+    this.contexto = '',
+    this.contextoEN = '',
+    this.instrucciones = '',
+    this.instruccionesEN = '',
+    this.nombreEN = '',
+  });
+
+  factory CircuitoFestival.fromFirestore(String docId, Map<String, dynamic> d,
+      List<ParadaCircuito> paradas) {
+    return CircuitoFestival(
+      id: docId,
+      nombre: d['nombre']?.toString() ?? '',
+      ciudad: d['ciudad']?.toString() ?? 'Medellín',
+      tipo: d['tipo']?.toString() ?? 'mixto',
+      estado: d['estado']?.toString() ?? 'proximo',
+      fechaInicio: (d['fechaInicio'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      fechaFin: (d['fechaFin'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      paradasTotal: (d['paradasTotal'] as num?)?.toInt() ?? (d['paradas'] as num?)?.toInt() ?? 0,
+      paradasParaPremio: (d['paradasParaPremio'] as num?)?.toInt() ?? 0,
+      premioNombre: d['premioNombre']?.toString() ?? 'Insignia',
+      premioEmoji: d['premioEmoji']?.toString() ?? '🏆',
+      gradienteHero: List<String>.from(d['gradienteHero'] as List? ?? ['#1A1A1A', '#2D2D2D']),
+      paradas: paradas,
+      imagenAsset: d['imagenAsset']?.toString() ?? '',
+      ordenDisplay: (d['ordenDisplay'] as num?)?.toInt() ?? 999,
+      contexto: d['contexto']?.toString() ?? '',
+      contextoEN: d['contextoEN']?.toString() ?? '',
+      instrucciones: d['instrucciones']?.toString() ?? '',
+      instruccionesEN: d['instruccionesEN']?.toString() ?? '',
+      nombreEN: d['nombreEN']?.toString() ?? '',
+    );
+  }
+
+  Color get colorGradienteA {
+    try { return Color(int.parse(gradienteHero[0].replaceAll('#', '0xFF'))); }
+    catch (_) { return RDSColor.surface; }
+  }
+
+  Color get colorGradienteB {
+    try {
+      return Color(int.parse(
+        (gradienteHero.length > 1 ? gradienteHero[1] : gradienteHero[0])
+          .replaceAll('#', '0xFF')));
+    } catch (_) { return RDSColor.card; }
+  }
+
+  bool get esActivo => estado == 'activo';
+  bool get esProximo => estado == 'proximo';
+
+  String get etiquetaFecha {
+    if (esActivo) return 'Hasta ${_fmtFecha(fechaFin)}';
+    final diff = fechaInicio.difference(DateTime.now()).inDays;
+    if (diff == 0) return 'Comienza hoy';
+    if (diff == 1) return 'Comienza mañana';
+    return 'Desde ${_fmtFecha(fechaInicio)}';
+  }
+
+  static const _meses = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+  static String _fmtFecha(DateTime d) => '${d.day} ${_meses[d.month - 1]}';
+}
+
+// ── Servicio ──────────────────────────────────────────────────────────────────
+
+class PasaportesService {
+  static final _cache = <String, List<CircuitoFestival>>{};
+  static final _cacheTs = <String, DateTime>{};
+  static const _ttl = Duration(minutes: 10);
+
+  static Future<List<CircuitoFestival>> obtenerPorCiudad(String ciudad) async {
+    final ahora = DateTime.now();
+    if (_cache.containsKey(ciudad) &&
+        ahora.difference(_cacheTs[ciudad]!) < _ttl) {
+      return _cache[ciudad]!;
+    }
+    try {
+      final snap = await FirebaseFirestore.instance
+          .collection('circuitos_festivales')
+          .where('ciudad', isEqualTo: ciudad)
+          .where('estado', whereIn: ['activo', 'proximo'])
+          .where('pausado', isEqualTo: false)
+          .get();
+
+      final circuitos = <CircuitoFestival>[];
+      for (final doc in snap.docs) {
+        final paradasSnap = await FirebaseFirestore.instance
+            .collection('circuitos_festivales')
+            .doc(doc.id)
+            .collection('paradas')
+            .orderBy('orden')
+            .get();
+        final paradas = paradasSnap.docs
+            .map((p) => ParadaCircuito.fromFirestore(p.id, p.data()))
+            .toList();
+        circuitos.add(CircuitoFestival.fromFirestore(doc.id, doc.data(), paradas));
+      }
+      circuitos.sort((a, b) {
+        // 1. Activos antes que próximos
+        if (a.esActivo && !b.esActivo) return -1;
+        if (!a.esActivo && b.esActivo) return 1;
+        // 2. Dentro del mismo estado: ordenDisplay (campo Firestore, 1 = primero)
+        final porOrden = a.ordenDisplay.compareTo(b.ordenDisplay);
+        if (porOrden != 0) return porOrden;
+        // 3. Desempate: fechaInicio
+        return a.fechaInicio.compareTo(b.fechaInicio);
+      });
+      _cache[ciudad] = circuitos;
+      _cacheTs[ciudad] = ahora;
+      return circuitos;
+    } catch (e) {
+      debugPrint('[PasaportesService] Error: $e');
+      return _cache[ciudad] ?? [];
+    }
+  }
+
+  static Future<Map<String, bool>> progresoCircuito(
+      String uid, String circuitoId) async {
+    try {
+      // Ruta debe coincidir exactamente con registrarCheckIn:
+      // usuarios/{uid}/pasaportes/{circuitoId}/paradas/
+      final snap = await FirebaseFirestore.instance
+          .collection('usuarios')
+          .doc(uid)
+          .collection('pasaportes')
+          .doc(circuitoId)
+          .collection('paradas')
+          .get();
+      return {for (final d in snap.docs) d.id: true};
+    } catch (_) { return {}; }
+  }
+
+  static Future<bool> registrarCheckIn({
+    required String uid,
+    required String circuitoId,
+    required String paradaId,
+    required bool esConsumo,
+    required double latUsuario,
+    required double lngUsuario,
+    String metodo = 'gps',
+    int puntosCheckin = 50,
+  }) async {
+    try {
+      final db = FirebaseFirestore.instance;
+      final batch = db.batch();
+
+      // 1. Registrar visita a la parada específica
+      final paradaRef = db.collection('usuarios').doc(uid)
+          .collection('pasaportes').doc(circuitoId)
+          .collection('paradas').doc(paradaId);
+      batch.set(paradaRef, {
+        'visitado': !esConsumo,
+        'consumo': esConsumo,
+        'timestamp': FieldValue.serverTimestamp(),
+        'metodo': metodo,
+        'lat': latUsuario,
+        'lng': lngUsuario,
+        'puntosCheckin': puntosCheckin,
+      }, SetOptions(merge: true));
+
+      // 2. Acumular puntos en el doc del circuito (para ranking del circuito)
+      final circuitoRef = db.collection('usuarios').doc(uid)
+          .collection('pasaportes').doc(circuitoId);
+      batch.set(circuitoRef, {
+        'puntosTotal': FieldValue.increment(puntosCheckin),
+        'uid': uid,
+        'circuitoId': circuitoId,
+        'ultimaActividad': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+
+      // 3. Sumar al perfil global del usuario — mismo esquema que guardarProgreso()
+      //    Cada parada del circuito cuenta como un sitio visitado en la app
+      final usuarioRef = db.collection('usuarios').doc(uid);
+      batch.set(usuarioRef, {
+        'sitiosVisitados': FieldValue.increment(1),
+        'puntosTotal':     FieldValue.increment(puntosCheckin),
+      }, SetOptions(merge: true));
+
+      // 4. Contadores desnormalizados en la parada del circuito — para métricas y reporte mensual
+      //    visitasTotal:     total acumulado de check-ins en esta parada
+      //    visitantesMes:    mapa {YYYY-MM: N} — visitas por mes calendario
+      //    ultimaVisita:     timestamp de la última visita
+      //    uidsMes:          array con UIDs del mes actual (para visitantes únicos)
+      //    La Cloud Function del reporte lee estos campos directamente sin
+      //    necesidad de recorrer subcollecciones de usuarios.
+      final mesActual = '${DateTime.now().year}-${DateTime.now().month.toString().padLeft(2, '0')}';
+      final paradaCircuitoRef = db
+          .collection('circuitos_festivales').doc(circuitoId)
+          .collection('paradas').doc(paradaId);
+      batch.set(paradaCircuitoRef, {
+        'visitasTotal':              FieldValue.increment(1),
+        'visitasMes.$mesActual':     FieldValue.increment(1),
+        'ultimaVisita':              FieldValue.serverTimestamp(),
+        'uidsMes.$mesActual':        FieldValue.arrayUnion([uid]),
+      }, SetOptions(merge: true));
+
+      await batch.commit();
+      return true;
+    } catch (_) { return false; }
+  }
+
+  // Completar circuito: insignia + bono global + rutasCompletadas
+  static Future<void> completarCircuito({
+    required String uid,
+    required String circuitoId,
+    required String nombreCircuito,
+    required String emojiCircuito,
+  }) async {
+    try {
+      final db  = FirebaseFirestore.instance;
+      final ref = db.collection('usuarios').doc(uid);
+
+      // Bono global al completar (mismo esquema que completar una ruta)
+      await ref.set({
+        'rutasCompletadas': FieldValue.increment(1),
+        'puntosTotal':      FieldValue.increment(50),
+      }, SetOptions(merge: true));
+
+      // Marcar circuito como completado (para mapa y logros)
+      await ref.collection('rutasCompletadas').doc(circuitoId).set({
+        'fechaCompletada': FieldValue.serverTimestamp(),
+        'tipo': 'circuito',
+      }, SetOptions(merge: true));
+
+      // Desbloquear insignia del circuito
+      final img = kInsigniaPorRuta[circuitoId] ?? '';
+      await ref.collection('insignias').doc(circuitoId).set({
+        'rutaNombre':        circuitoId,
+        'nombre':            nombreCircuito,
+        'emoji':             emojiCircuito,
+        'insigniaImg':       img,
+        'puntos':            350,
+        'fechaDesbloqueada': FieldValue.serverTimestamp(),
+        'tipo':              'circuito',
+      }, SetOptions(merge: true));
+
+      debugPrint('🏆 Circuito $circuitoId completado — insignia + bono global otorgados');
+    } catch (e) {
+      debugPrint('⚠️ completarCircuito error: $e');
+    }
+  }
+
+  // Ranking: top 20 exploradores de un circuito
+  static Future<List<Map<String, dynamic>>> rankingCircuito(
+      String circuitoId) async {
+    try {
+      final db = FirebaseFirestore.instance;
+      final ranking = <Map<String, dynamic>>[];
+
+      // 1) Intentar collectionGroup — requiere índice en Firestore
+      bool collGroupOk = false;
+      try {
+        final snap = await db.collectionGroup('pasaportes')
+            .where('circuitoId', isEqualTo: circuitoId)
+            .orderBy('puntosTotal', descending: true)
+            .limit(20)
+            .get();
+        for (final doc in snap.docs) {
+          final data = doc.data();
+          final uid = data['uid']?.toString().trim().isNotEmpty == true
+              ? data['uid'] as String
+              : doc.reference.parent.parent?.id ?? '';
+          if (uid.isEmpty) continue;
+          final userDoc = await db.collection('usuarios').doc(uid).get();
+          final userData = userDoc.data() ?? {};
+          final nombre = _nombreUsuario(userData);
+          ranking.add({
+            'uid': uid,
+            'nombre': nombre,
+            'foto': userData['foto']?.toString() ?? userData['photoURL']?.toString() ?? '',
+            'puntosTotal': (data['puntosTotal'] as num?)?.toInt() ?? 0,
+          });
+        }
+        collGroupOk = ranking.isNotEmpty || snap.docs.isNotEmpty;
+      } catch (e) {
+        debugPrint('ℹ️ collectionGroup no disponible, usando fallback: $e');
+      }
+
+      // 2) Fallback: recorrer usuarios y buscar el pasaporte directamente
+      if (!collGroupOk) {
+        final usuariosSnap = await db.collection('usuarios').limit(100).get();
+        final futures = usuariosSnap.docs.map((uDoc) async {
+          try {
+            final pasDoc = await db
+                .collection('usuarios').doc(uDoc.id)
+                .collection('pasaportes').doc(circuitoId).get();
+            if (!pasDoc.exists) return null;
+            final data = pasDoc.data()!;
+            final userData = uDoc.data();
+            final nombre = _nombreUsuario(userData);
+            return {
+              'uid': uDoc.id,
+              'nombre': nombre,
+              'foto': userData['foto']?.toString() ?? userData['photoURL']?.toString() ?? '',
+              'puntosTotal': (data['puntosTotal'] as num?)?.toInt() ?? 0,
+            };
+          } catch (_) { return null; }
+        });
+        final results = await Future.wait(futures);
+        for (final r in results) {
+          if (r != null) ranking.add(r);
+        }
+      }
+
+      ranking.sort((a, b) =>
+          (b['puntosTotal'] as int).compareTo(a['puntosTotal'] as int));
+      return ranking.take(20).toList();
+    } catch (e) {
+      debugPrint('⚠️ rankingCircuito error: $e');
+      return [];
+    }
+  }
+
+  static String _nombreUsuario(Map<String, dynamic> data) {
+    final n = (data['nombre'] as String?)?.trim() ?? '';
+    if (n.isNotEmpty) return n;
+    final d = (data['displayName'] as String?)?.trim() ?? '';
+    if (d.isNotEmpty) return d;
+    final e = (data['email'] as String?)?.trim() ?? '';
+    if (e.isNotEmpty) return e.split('@').first;
+    return 'Rutero';
+  }
+
+  static Future<bool> registrarTrivia({
+    required String uid,
+    required String circuitoId,
+    required String paradaId,
+    required bool acertada,
+    required int opcionElegida,
+    required int puntosBonus,
+  }) async {
+    try {
+      final ref = FirebaseFirestore.instance
+          .collection('usuarios')
+          .doc(uid)
+          .collection('pasaportes')
+          .doc(circuitoId)
+          .collection('paradas')
+          .doc(paradaId);
+      await ref.set({
+        'trivia': {
+          'acertada': acertada,
+          'opcionElegida': opcionElegida,
+          'puntosBonus': acertada ? puntosBonus : 0,
+          'timestamp': FieldValue.serverTimestamp(),
+        },
+      }, SetOptions(merge: true));
+      // Actualizar puntos totales del usuario en el circuito
+      final circuitoRef = FirebaseFirestore.instance
+          .collection('usuarios')
+          .doc(uid)
+          .collection('pasaportes')
+          .doc(circuitoId);
+      await circuitoRef.set({
+        'puntosTotal': FieldValue.increment(acertada ? puntosBonus : 0),
+      }, SetOptions(merge: true));
+      return true;
+    } catch (_) { return false; }
+  }
+
+  // ── Calificación de paradas (1 vez por usuario por parada) ──────────────────
+
+  /// Califica una parada. Solo 1 vez por usuario.
+  /// Guarda en: circuitos_festivales/{circuitoId}/paradas/{paradaId}/calificaciones/{uid}
+  /// Actualiza atomicamente: rating y totalVotos en la parada.
+  static Future<bool> calificarParada({
+    required String uid,
+    required String circuitoId,
+    required String paradaId,
+    required int estrellas,
+  }) async {
+    if (uid.isEmpty || estrellas < 1 || estrellas > 5) return false;
+    final db = FirebaseFirestore.instance;
+    final calRef = db
+        .collection('circuitos_festivales')
+        .doc(circuitoId)
+        .collection('paradas')
+        .doc(paradaId)
+        .collection('calificaciones')
+        .doc(uid);
+    final paradaRef = db
+        .collection('circuitos_festivales')
+        .doc(circuitoId)
+        .collection('paradas')
+        .doc(paradaId);
+    try {
+      final existing = await calRef.get();
+      if (existing.exists) return false; // Ya calificó — bloqueo
+      await db.runTransaction((tx) async {
+        final paradaSnap = await tx.get(paradaRef);
+        final data = paradaSnap.data() ?? {};
+        final totalVotosPrev = (data['totalVotos'] as num?)?.toInt() ?? 0;
+        final ratingPrev = (data['rating'] as num?)?.toDouble() ?? 0.0;
+        final nuevoTotal = totalVotosPrev + 1;
+        final nuevoRating = ((ratingPrev * totalVotosPrev) + estrellas) / nuevoTotal;
+        tx.set(calRef, {
+          'estrellas': estrellas,
+          'fecha': FieldValue.serverTimestamp(),
+          'uid': uid,
+        });
+        tx.update(paradaRef, {
+          'rating': double.parse(nuevoRating.toStringAsFixed(1)),
+          'totalVotos': nuevoTotal,
+        });
+      });
+      return true;
+    } catch (e) {
+      debugPrint('⚠️ calificarParada error: $e');
+      return false;
+    }
+  }
+
+  /// Obtiene la calificación que el usuario ya dio (null = no ha calificado).
+  static Future<int?> obtenerCalificacion({
+    required String uid,
+    required String circuitoId,
+    required String paradaId,
+  }) async {
+    if (uid.isEmpty) return null;
+    try {
+      final doc = await FirebaseFirestore.instance
+          .collection('circuitos_festivales')
+          .doc(circuitoId)
+          .collection('paradas')
+          .doc(paradaId)
+          .collection('calificaciones')
+          .doc(uid)
+          .get();
+      if (!doc.exists) return null;
+      return (doc.data()?['estrellas'] as num?)?.toInt();
+    } catch (_) { return null; }
+  }
+
+  // ── Ranking de bares por calificación ──────────────────────────────────────
+
+  /// Ranking de paradas de un circuito ordenadas por rating DESC.
+  static Future<List<Map<String, dynamic>>> rankingBares(
+      String circuitoId) async {
+    try {
+      final snap = await FirebaseFirestore.instance
+          .collection('circuitos_festivales')
+          .doc(circuitoId)
+          .collection('paradas')
+          .where('totalVotos', isGreaterThan: 0)
+          .orderBy('totalVotos', descending: true)
+          .get();
+      final lista = snap.docs.map((doc) {
+        final d = doc.data();
+        // Compatibilidad: campo puede ser 'nombre' o 'titulo'
+        final nombre = (d['nombre'] as String?)?.trim().isNotEmpty == true
+            ? d['nombre'] as String
+            : (d['titulo'] as String?)?.trim() ?? 'Sin nombre';
+        return {
+          'paradaId': doc.id,
+          'nombre': nombre,
+          'emoji': d['emoji'] ?? '🎸',
+          'barrio': d['barrio'] ?? d['zona'] ?? '',
+          'rating': (d['rating'] as num?)?.toDouble() ?? 0.0,
+          'totalVotos': (d['totalVotos'] as num?)?.toInt() ?? 0,
+        };
+      }).toList();
+      lista.sort((a, b) {
+        final cmpRating = (b['rating'] as double).compareTo(a['rating'] as double);
+        if (cmpRating != 0) return cmpRating;
+        return (b['totalVotos'] as int).compareTo(a['totalVotos'] as int);
+      });
+      return lista;
+    } catch (e) {
+      debugPrint('⚠️ rankingBares error: $e');
+      return [];
+    }
+  }
+
+  // ── Notificaciones FCM por circuito ────────────────────────────────────────
+
+  /// Suscribe al topic FCM del circuito.
+  /// Topic: 'circuito-{circuitoId}' — ej: 'circuito-rock-mde-2026'
+  static Future<void> suscribirFCMCircuito(String circuitoId) async {
+    try {
+      final topic = 'circuito-${circuitoId.replaceAll('_', '-')}';
+      await FirebaseMessaging.instance.subscribeToTopic(topic);
+      debugPrint('✅ FCM: suscrito a $topic');
+    } catch (e) {
+      debugPrint('⚠️ FCM subscribeToTopic error: $e');
+    }
+  }
+
+  /// Desuscribe del topic FCM del circuito.
+  static Future<void> desuscribirFCMCircuito(String circuitoId) async {
+    try {
+      final topic = 'circuito-${circuitoId.replaceAll('_', '-')}';
+      await FirebaseMessaging.instance.unsubscribeFromTopic(topic);
+      debugPrint('✅ FCM: desuscrito de $topic');
+    } catch (e) {
+      debugPrint('⚠️ FCM unsubscribeFromTopic error: $e');
+    }
+  }
+
+  // ── Niveles Rock desde Firestore ───────────────────────────────────────────
+
+  /// Caché en memoria de los niveles Rock (se recarga si tiene > 30 min).
+  /// Documento Firestore: configuracion/niveles_rock
+  /// Campos:
+  ///   niveles: [ { numero, nombre, emoji, minBares, siguiente, descripcion } ]
+  ///   totalBares: int  (para hacer que "Leyenda" sea siempre el total actual)
+  static List<_NivelPasaporte>? _nivelesRockCache;
+  static DateTime? _nivelesRockCacheTs;
+  static const _nivelesRockTTL = Duration(minutes: 30);
+
+  static Future<List<_NivelPasaporte>> obtenerNivelesRock() async {
+    final ahora = DateTime.now();
+    if (_nivelesRockCache != null &&
+        _nivelesRockCacheTs != null &&
+        ahora.difference(_nivelesRockCacheTs!) < _nivelesRockTTL) {
+      return _nivelesRockCache!;
+    }
+    try {
+      final doc = await FirebaseFirestore.instance
+          .collection('configuracion')
+          .doc('niveles_rock')
+          .get();
+      if (!doc.exists) {
+        _nivelesRockCache = _NivelPasaporte.nivelesRock;
+        _nivelesRockCacheTs = ahora;
+        return _nivelesRockCache!;
+      }
+      final data = doc.data()!;
+      final totalBares = (data['totalBares'] as num?)?.toInt() ?? 10;
+      final rawLista = data['niveles'] as List<dynamic>? ?? [];
+      if (rawLista.isEmpty) {
+        _nivelesRockCache = _NivelPasaporte.nivelesRock;
+        _nivelesRockCacheTs = ahora;
+        return _nivelesRockCache!;
+      }
+      final lista = rawLista.map((e) {
+        final m = e as Map<String, dynamic>;
+        final numero = (m['numero'] as num).toInt();
+        // El último nivel siempre usa totalBares como umbral (Leyenda dinámica)
+        final minBares = (m['minBares'] as num?)?.toInt() ??
+            (m['minMuseos'] as num?)?.toInt() ?? 0;
+        final esFinal = (m['siguiente'] as num?)?.toInt() == 0;
+        return _NivelPasaporte(
+          numero: numero,
+          nombre: m['nombre'] as String? ?? 'Nivel $numero',
+          emoji: m['emoji'] as String? ?? '🎸',
+          descripcion: m['descripcion'] as String? ?? '',
+          minMuseos: esFinal ? totalBares : minBares,
+          siguiente: (m['siguiente'] as num?)?.toInt() ?? 0,
+        );
+      }).toList();
+      lista.sort((a, b) => a.numero.compareTo(b.numero));
+      _nivelesRockCache = lista;
+      _nivelesRockCacheTs = ahora;
+      debugPrint('✅ Niveles Rock cargados desde Firestore (${lista.length} niveles, totalBares=$totalBares)');
+      return lista;
+    } catch (e) {
+      debugPrint('⚠️ obtenerNivelesRock error: $e — usando fallback local');
+      _nivelesRockCache = _NivelPasaporte.nivelesRock;
+      _nivelesRockCacheTs = ahora;
+      return _nivelesRockCache!;
+    }
+  }
+
+  /// Calcula el nivel Rock de un usuario dado el número de bares visitados.
+  /// Llama a [obtenerNivelesRock] para usar la lista dinámica de Firestore.
+  static Future<_NivelPasaporte> calcularNivelRock(int baresVisitados) async {
+    final niveles = await obtenerNivelesRock();
+    _NivelPasaporte actual = niveles.first;
+    for (final n in niveles) {
+      if (baresVisitados >= n.minMuseos) actual = n;
+    }
+    return actual;
+  }
+
+  // ── Sistema de pines físicos Rock ─────────────────────────────────────────
+  //
+  // Niveles que habilitan un pin físico (nombre exacto del nivel en _NivelPasaporte):
+  //   'Rockero'            → Pin Rocker  🎸
+  //   'Referente'          → Pin Referente 🤟
+  //   'Leyenda del Rock MDE' → Pin Leyenda 💀
+  //
+  // Firestore: usuarios/{uid}/pines_rock/{nivelNombre}
+  //   canjeado:    bool   → si ya se entregó el pin
+  //   tokenId:     String → ID del documento de tokens usado
+  //   paradaId:    String → bar donde se escaneó
+  //   circuitoId:  String → circuito (siempre 'rock_mde')
+  //   timestamp:   Timestamp → momento del canje
+  //   bartenderId: String → uid del bartender que escaneó
+
+  /// Nombres de niveles que otorgan pin físico (en orden de escala).
+  static const List<String> nivelesConPin = [
+    'Rockero',
+    'Referente',
+    'Leyenda del Rock MDE',
+  ];
+
+  /// Proporciones fijas de cada pin respecto al total de bares del circuito.
+  /// Leyenda siempre es 100% (totalBares).
+  static const Map<String, double> _proporcionPin = {
+    'Rockero':              0.40,
+    'Referente':            0.80,
+    'Leyenda del Rock MDE': 1.00,
+  };
+
+  /// Emoji y descripción base de cada pin.
+  static const Map<String, Map<String, String>> infoPines = {
+    'Rockero':              {'emoji': '🎸', 'pin': 'Pin Rocker',   'desc': 'Visitaste el 40% del Circuito Rock MDE'},
+    'Referente':            {'emoji': '🤟', 'pin': 'Pin Referente','desc': 'Visitaste el 80% del Circuito Rock MDE'},
+    'Leyenda del Rock MDE': {'emoji': '💀', 'pin': 'Pin Leyenda',  'desc': 'Completaste el Circuito Rock MDE 🤘'},
+  };
+
+  /// Calcula el umbral de bares necesarios para cada pin dado el total actual.
+  /// Siempre redondea hacia arriba para que sea exigente, excepto Leyenda = exacto.
+  static int umbralPin(String nivelNombre, int totalBares) {
+    if (totalBares <= 0) return 1;
+    final prop = _proporcionPin[nivelNombre] ?? 1.0;
+    if (prop >= 1.0) return totalBares; // Leyenda = totalidad
+    return (totalBares * prop).ceil().clamp(1, totalBares - 1);
+  }
+
+  /// Devuelve true si el usuario (con [baresVisitados]) ya tiene derecho
+  /// al pin [nivelNombre], teniendo en cuenta el total actual de bares.
+  static bool pinDesbloqueado(String nivelNombre, int baresVisitados, int totalBares) {
+    return baresVisitados >= umbralPin(nivelNombre, totalBares);
+  }
+
+  /// Descripción dinámica del pin con el umbral actual.
+  static String descPin(String nivelNombre, int totalBares) {
+    if (nivelNombre == 'Leyenda del Rock MDE') return 'Completaste el Circuito Rock MDE 🤘';
+    final u = umbralPin(nivelNombre, totalBares);
+    return 'Visitaste $u de $totalBares bares del Circuito Rock MDE';
+  }
+
+  /// Lee el estado de los pines del usuario.
+  /// Retorna un Map: { nivelNombre → { canjeado, tokenId, paradaId, timestamp } }
+  static Future<Map<String, Map<String, dynamic>>> estadoPinesRock(String uid) async {
+    final resultado = <String, Map<String, dynamic>>{};
+    if (uid.isEmpty) return resultado;
+    try {
+      final snap = await FirebaseFirestore.instance
+          .collection('usuarios').doc(uid)
+          .collection('pines_rock')
+          .get();
+      for (final doc in snap.docs) {
+        resultado[doc.id] = doc.data();
+      }
+    } catch (e) {
+      debugPrint('⚠️ estadoPinesRock error: $e');
+    }
+    return resultado;
+  }
+
+  /// Genera (o recupera) el token QR para un nivel específico.
+  /// Crea el doc en:  tokens_pines/{tokenId}
+  ///   uid:         String
+  ///   nivel:       String  (nombre del nivel, ej. 'Rockero')
+  ///   circuitoId:  String
+  ///   canjeado:    bool (false)
+  ///   creadoEn:    Timestamp
+  ///   expiresAt:   Timestamp (24h desde creación)
+  ///
+  /// Si el pin ya fue canjeado, retorna null.
+  /// Si ya hay un token válido y no expirado, lo retorna.
+  static Future<String?> obtenerTokenPin({
+    required String uid,
+    required String nivel,
+    required String circuitoId,
+    String paradaId = '',      // bar donde se genera el QR (para mostrar en validar-pin.html)
+    int totalBares = 10,       // se pasa desde _PinQRScreen para guardar en el token
+    int baresVisitados = 0,
+  }) async {
+    if (uid.isEmpty || !nivelesConPin.contains(nivel)) return null;
+    final db = FirebaseFirestore.instance;
+    try {
+      // Verificar si el pin ya fue canjeado
+      final estadoDoc = await db
+          .collection('usuarios').doc(uid)
+          .collection('pines_rock').doc(nivel)
+          .get();
+      if (estadoDoc.exists && estadoDoc.data()?['canjeado'] == true) return null;
+
+      // Buscar token existente no expirado y no canjeado
+      // Nota: no filtramos 'canjeado' en la query para evitar requerir índice compuesto.
+      // El filtro se aplica en memoria junto con la validación de expiresAt.
+      final ahora = Timestamp.now();
+      final snap = await db
+          .collection('tokens_pines')
+          .where('uid', isEqualTo: uid)
+          .where('nivel', isEqualTo: nivel)
+          .limit(5)
+          .get();
+
+      for (final doc in snap.docs) {
+        final data = doc.data();
+        if (data['canjeado'] == true) continue; // ya canjeado → ignorar
+        final exp = data['expiresAt'] as Timestamp?;
+        if (exp != null && exp.compareTo(ahora) > 0) {
+          return doc.id; // token válido existente
+        }
+      }
+
+      // Crear nuevo token — incluye snapshot del umbral en el momento del canje
+      final nuevoRef = db.collection('tokens_pines').doc();
+      await nuevoRef.set({
+        'uid':           uid,
+        'nivel':         nivel,
+        'circuitoId':    circuitoId,
+        if (paradaId.isNotEmpty) 'paradaId': paradaId,
+        'canjeado':      false,
+        'creadoEn':      FieldValue.serverTimestamp(),
+        'expiresAt':     Timestamp.fromDate(
+            DateTime.now().add(const Duration(hours: 24))),
+        // Auditoría: estado del circuito cuando se generó el QR
+        'totalBares':    totalBares,
+        'baresVisitados': baresVisitados,
+        'umbralAlGenerar': umbralPin(nivel, totalBares),
+      });
+      debugPrint('✅ Token pin creado: ${nuevoRef.id} para $nivel '
+          '($baresVisitados/$totalBares bares, umbral ${umbralPin(nivel, totalBares)})');
+      return nuevoRef.id;
+    } catch (e) {
+      debugPrint('⚠️ obtenerTokenPin error: $e');
+      return null;
+    }
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  _PinQRScreen — muestra el QR de un solo uso para canjear el pin físico
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _PinQRScreen extends StatefulWidget {
+  final String nivelNombre;
+  final String circuitoId;
+  final String paradaId;        // opcional — bar donde se solicita el pin
+  final Color colorAccent;
+  final int totalBares;
+  final int baresVisitados;
+  const _PinQRScreen({
+    required this.nivelNombre,
+    required this.circuitoId,
+    required this.colorAccent,
+    this.paradaId = '',
+    this.totalBares = 10,
+    this.baresVisitados = 0,
+  });
+  @override
+  State<_PinQRScreen> createState() => _PinQRScreenState();
+}
+
+class _PinQRScreenState extends State<_PinQRScreen> {
+  String? _tokenId;
+  bool _cargando = true;
+  bool _yaCanjeado = false;
+  Timer? _refresh;
+
+  @override
+  void initState() {
+    super.initState();
+    _cargarToken();
+    // Refresca el estado cada 10 s para detectar si el bartender ya escaneó
+    _refresh = Timer.periodic(const Duration(seconds: 10), (_) => _verificarCanje());
+  }
+
+  @override
+  void dispose() {
+    _refresh?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _cargarToken() async {
+    final uid = FirebaseAuth.instance.currentUser?.uid ?? '';
+    final tokenId = await PasaportesService.obtenerTokenPin(
+      uid: uid,
+      nivel: widget.nivelNombre,
+      circuitoId: widget.circuitoId,
+      paradaId: widget.paradaId,
+      totalBares: widget.totalBares,
+      baresVisitados: widget.baresVisitados,
+    );
+    if (!mounted) return;
+    setState(() {
+      _cargando = false;
+      _tokenId = tokenId;
+      _yaCanjeado = tokenId == null;
+    });
+  }
+
+  Future<void> _verificarCanje() async {
+    if (_tokenId == null || _yaCanjeado) return;
+    try {
+      final doc = await FirebaseFirestore.instance
+          .collection('tokens_pines').doc(_tokenId!)
+          .get();
+      if (!mounted) return;
+      if (doc.exists && doc.data()?['canjeado'] == true) {
+        setState(() => _yaCanjeado = true);
+        _refresh?.cancel();
+      }
+    } catch (_) {}
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final info = PasaportesService.infoPines[widget.nivelNombre]!;
+    return Scaffold(
+      backgroundColor: RDSColor.base,
+      appBar: AppBar(
+        backgroundColor: RDSColor.base,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new_rounded,
+            color: Colors.white, size: 18),
+          onPressed: () => Navigator.pop(context)),
+        title: Text('Pin ${info['pin']}',
+          style: const TextStyle(color: Colors.white, fontSize: 16,
+            fontWeight: FontWeight.w700)),
+        centerTitle: true),
+      body: SafeArea(
+        child: Center(child: SingleChildScrollView(
+          padding: const EdgeInsets.all(24),
+          child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+            // Header
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: RDSColor.card,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                  color: widget.colorAccent.withOpacity(0.4), width: 1.5)),
+              child: Column(children: [
+                Text(info['emoji']!, style: const TextStyle(fontSize: 56)),
+                const SizedBox(height: 8),
+                Text(info['pin']!,
+                  style: TextStyle(color: widget.colorAccent,
+                    fontSize: 22, fontWeight: FontWeight.w900)),
+                const SizedBox(height: 4),
+                Text(widget.nivelNombre,
+                  style: const TextStyle(color: RDSColor.textMuted, fontSize: 13)),
+                const SizedBox(height: 6),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: widget.colorAccent.withOpacity(0.12),
+                    borderRadius: BorderRadius.circular(20)),
+                  child: Text(info['desc']!,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: widget.colorAccent, fontSize: 11,
+                      fontWeight: FontWeight.w600))),
+              ])),
+            const SizedBox(height: 28),
+
+            if (_cargando) ...[
+              CircularProgressIndicator(color: widget.colorAccent),
+              const SizedBox(height: 16),
+              const Text('Generando tu código QR...',
+                style: TextStyle(color: RDSColor.textMuted, fontSize: 13)),
+            ] else if (_yaCanjeado) ...[
+              // ── Estado: pin ya canjeado ──
+              Container(
+                padding: const EdgeInsets.all(28),
+                decoration: BoxDecoration(
+                  color: RDSColor.card,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                    color: RDSColor.green.withOpacity(0.5), width: 1.5)),
+                child: Column(children: [
+                  const Text('✅', style: TextStyle(fontSize: 56)),
+                  const SizedBox(height: 12),
+                  const Text('¡Pin entregado!',
+                    style: TextStyle(color: RDSColor.green, fontSize: 20,
+                      fontWeight: FontWeight.w900)),
+                  const SizedBox(height: 8),
+                  Text('Tu ${info['pin']} ya fue canjeado.\n¡Lucilo con orgullo 🤘!',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(color: RDSColor.textMuted,
+                      fontSize: 13, height: 1.5)),
+                ])),
+            ] else if (_tokenId != null) ...[
+              // ── QR activo ──
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: [
+                    BoxShadow(color: widget.colorAccent.withOpacity(0.3),
+                      blurRadius: 24, spreadRadius: 2)
+                  ]),
+                child: QrImageView(
+                  // URL completa → bartender escanea → abre validar-pin.html (página dedicada)
+                  data: 'https://rutero-mde.web.app/validar-pin.html'
+                      '?token=${Uri.encodeComponent(_tokenId!)}'
+                      '&nivel=${Uri.encodeComponent(widget.nivelNombre)}'
+                      '&bar=${Uri.encodeComponent(widget.circuitoId)}',
+                  version: QrVersions.auto,
+                  size: 220,
+                  backgroundColor: Colors.white,
+                  eyeStyle: const QrEyeStyle(
+                    eyeShape: QrEyeShape.square,
+                    color: Colors.black),
+                  dataModuleStyle: const QrDataModuleStyle(
+                    dataModuleShape: QrDataModuleShape.square,
+                    color: Colors.black))),
+              const SizedBox(height: 20),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                decoration: BoxDecoration(
+                  color: RDSColor.card,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.white12)),
+                child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                  Icon(Icons.info_outline_rounded,
+                    color: widget.colorAccent, size: 16),
+                  const SizedBox(width: 8),
+                  const Flexible(child: Text(
+                    'Mostrá este QR al bartender para recibir tu pin físico.\n'
+                    'Válido por 24 horas · Uso único',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: RDSColor.textMuted,
+                      fontSize: 11, height: 1.5))),
+                ])),
+              const SizedBox(height: 12),
+              // ID corto para referencia visual
+              Text('Código: ${_tokenId!.substring(0, 8).toUpperCase()}',
+                style: const TextStyle(color: RDSColor.textMuted,
+                  fontSize: 10, letterSpacing: 1.5)),
+            ] else ...[
+              // Error o pin ya canjeado antes de cargar
+              const Icon(Icons.warning_amber_rounded,
+                color: RDSColor.textMuted, size: 48),
+              const SizedBox(height: 12),
+              const Text('No se pudo generar el QR',
+                style: TextStyle(color: RDSColor.textMuted, fontSize: 14)),
+            ],
+            const SizedBox(height: 32),
+          ])))));
+  }
+}
+
+// ── Sección inline en HomeBody ─────────────────────────────────────────────────
+
+class _PasaportesSection extends StatefulWidget {
+  final String ciudadDetectada;
+  const _PasaportesSection({required this.ciudadDetectada});
+  @override
+  State<_PasaportesSection> createState() => _PasaportesSectionState();
+}
+
+class _PasaportesSectionState extends State<_PasaportesSection> {
+  List<CircuitoFestival>? _circuitos;
+  bool _cargando = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _cargar();
+  }
+
+  Future<void> _cargar() async {
+    final data = await PasaportesService.obtenerPorCiudad(widget.ciudadDetectada);
+    if (mounted) setState(() { _circuitos = data; _cargando = false; });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_cargando) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 40),
+        child: Center(child: CircularProgressIndicator(
+          color: RDSColor.gold, strokeWidth: 2)));
+    }
+    final activos = _circuitos?.where((c) => c.esActivo).toList() ?? [];
+    final proximos = _circuitos?.where((c) => c.esProximo).toList() ?? [];
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      _SectionHeader(
+        titulo: t('🗂️ PASAPORTES', '🗂️ PASSPORTS'),
+        subtitulo: kLang == 'en'
+          ? '${activos.length} active · ${proximos.length} upcoming in ${widget.ciudadDetectada}'
+          : '${activos.length} activo${activos.length == 1 ? '' : 's'} · '
+            '${proximos.length} próximo${proximos.length == 1 ? '' : 's'} '
+            'en ${widget.ciudadDetectada}'),
+      const SizedBox(height: 12),
+      if (_circuitos!.isEmpty)
+        _PasaportesEmpty(ciudad: widget.ciudadDetectada)
+      else ...[
+        if (activos.isNotEmpty) ...[
+          _PasSubLabel(t('🟢 ACTIVOS AHORA', '🟢 ACTIVE NOW')),
+          ...activos.map((c) => _CircuitoCardGrande(circuito: c)),
+          const SizedBox(height: 4),
+        ],
+        if (proximos.isNotEmpty) ...[
+          _PasSubLabel(t('🔜 PRÓXIMOS', '🔜 UPCOMING')),
+          ...proximos.map((c) => _CircuitoCardChico(circuito: c)),
+        ],
+      ],
+      const SizedBox(height: 8),
+    ]);
+  }
+}
+
+Widget _PasSubLabel(String texto) => Padding(
+  padding: const EdgeInsets.only(bottom: 8, left: 2),
+  child: Text(texto,
+    style: const TextStyle(
+      color: RDSColor.gold, fontSize: 11,
+      fontWeight: FontWeight.w800, letterSpacing: 1.3)));
+
+// ── Card grande — circuito activo ──────────────────────────────────────────────
+
+class _CircuitoCardGrande extends StatelessWidget {
+  final CircuitoFestival circuito;
+  const _CircuitoCardGrande({required this.circuito});
+
+  String _labelTipo(String tipo) {
+    switch (tipo) {
+      case 'gastronomico': return t('🍽️ Gastronómico', '🍽️ Gastronomic');
+      case 'cultural':     return t('🎭 Cultural',      '🎭 Cultural');
+      case 'artistico':    return t('🎨 Artístico',     '🎨 Artistic');
+      case 'musico':       return t('🎸 Rock & Bar',    '🎸 Rock & Bar');
+      case 'novena':       return t('🕯️ Navideño',      '🕯️ Christmas');
+      default:             return t('✨ Mixto',          '✨ Mixed');
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final uid = FirebaseAuth.instance.currentUser?.uid ?? '';
+    final c = circuito;
+    return GestureDetector(
+      onTap: () => RuteroNav.push(context, PasaporteDetalleScreen(circuito: c)),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 14),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(18),
+          // Rock: borde dorado más pronunciado; otros: borde sutil
+          border: Border.all(
+            color: c.tipo == 'musico'
+                ? RDSColor.gold.withOpacity(0.55)
+                : RDSColor.gold.withOpacity(0.2)),
+          boxShadow: [BoxShadow(
+            color: c.tipo == 'musico'
+                ? Colors.black.withOpacity(0.5)
+                : Colors.black.withOpacity(0.35),
+            blurRadius: 14, offset: const Offset(0, 5))]),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(18),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            // Hero
+            Container(
+              height: c.tipo == 'musico' ? 170 : 156,
+              decoration: BoxDecoration(
+                color: c.tipo == 'musico' ? const Color(0xFF0A0A0A) : null,
+                gradient: c.tipo != 'musico' ? LinearGradient(
+                  colors: [c.colorGradienteA, c.colorGradienteB],
+                  begin: Alignment.topLeft, end: Alignment.bottomRight) : null),
+              child: Stack(children: [
+                // Imagen de fondo si existe, si no patrón decorativo
+                if (c.imagenAsset.isNotEmpty)
+                  Positioned.fill(child: Image.asset(
+                    c.imagenAsset, fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) =>
+                      CustomPaint(painter: _LeafPatternPainter())))
+                else
+                  Positioned.fill(child: CustomPaint(painter: _LeafPatternPainter())),
+                // Rock: overlay más oscuro para look nocturno
+                Positioned.fill(child: Container(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter, end: Alignment.bottomCenter,
+                      colors: c.tipo == 'musico'
+                          ? [
+                              Colors.black.withOpacity(0.45),
+                              Colors.black.withOpacity(0.80),
+                            ]
+                          : [
+                              Colors.black.withOpacity(0.35),
+                              Colors.black.withOpacity(0.65),
+                            ])))),
+                // Badge ACTIVO
+                Positioned(top: 12, left: 12,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: RDSColor.green.withOpacity(0.9),
+                      borderRadius: BorderRadius.circular(20)),
+                    child: Text(t('● ACTIVO', '● ACTIVE'),
+                      style: const TextStyle(color: Colors.white, fontSize: 10,
+                        fontWeight: FontWeight.w800, letterSpacing: 1)))),
+                // Badge de tipo — Rock tiene badge especial
+                Positioned(top: 12, right: 12,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: c.tipo == 'musico'
+                          ? RDSColor.gold.withOpacity(0.18)
+                          : Colors.black.withOpacity(0.45),
+                      borderRadius: BorderRadius.circular(12),
+                      border: c.tipo == 'musico'
+                          ? Border.all(color: RDSColor.gold.withOpacity(0.55))
+                          : null),
+                    child: Text(_labelTipo(c.tipo),
+                      style: TextStyle(
+                        color: c.tipo == 'musico' ? RDSColor.gold : Colors.white70,
+                        fontSize: 10, fontWeight: FontWeight.w700,
+                        fontFamily: c.tipo == 'musico' ? 'SpaceGrotesk' : null)))),
+                // Título — Rock: SpaceGrotesk más grande
+                Center(child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Text(kLang == 'en' && c.nombreEN.isNotEmpty ? c.nombreEN : c.nombre,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: c.tipo == 'musico' ? 22 : 18,
+                      fontWeight: FontWeight.w900,
+                      fontFamily: c.tipo == 'musico' ? 'SpaceGrotesk' : null,
+                      letterSpacing: c.tipo == 'musico' ? -0.5 : 0,
+                      shadows: const [Shadow(color: Colors.black54, blurRadius: 8)])))),
+                // Rock: número de paradas en la esquina inferior izquierda
+                if (c.tipo == 'musico')
+                  Positioned(bottom: 10, left: 12,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withOpacity(0.55),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: RDSColor.gold.withOpacity(0.35))),
+                      child: Text('${c.paradasTotal} ${t('bares', 'bars')}',
+                        style: const TextStyle(color: RDSColor.gold, fontSize: 10,
+                          fontWeight: FontWeight.w700, fontFamily: 'SpaceGrotesk')))),
+              ])),
+            // Cuerpo
+            Container(
+              color: c.tipo == 'musico' ? const Color(0xFF111410) : RDSColor.card,
+              padding: const EdgeInsets.all(14),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Row(children: [
+                  Icon(Icons.place_rounded, size: 13, color: RDSColor.textMuted),
+                  const SizedBox(width: 4),
+                  Text('${c.paradasTotal} ${c.tipo == 'musico' ? t('bares', 'bars') : t('paradas', 'stops')}',
+                    style: const TextStyle(color: RDSColor.textMuted, fontSize: 12)),
+                  const SizedBox(width: 10),
+                  Icon(Icons.calendar_today_rounded, size: 12, color: RDSColor.textMuted),
+                  const SizedBox(width: 4),
+                  Flexible(child: Text(c.etiquetaFecha,
+                    maxLines: 1, overflow: TextOverflow.ellipsis,
+                    style: TextStyle(color: RDSColor.textMuted, fontSize: 12))),
+                  const SizedBox(width: 8),
+                  Text(c.ciudad,
+                    maxLines: 1, overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(color: RDSColor.gold, fontSize: 11,
+                      fontWeight: FontWeight.w700)),
+                ]),
+                const SizedBox(height: 10),
+                if (uid != null)
+                  FutureBuilder<Map<String, bool>>(
+                    future: PasaportesService.progresoCircuito(uid, c.id),
+                    builder: (ctx, snap) {
+                      final visitadas = snap.data?.length ?? 0;
+                      final pct = c.paradasTotal > 0 ? visitadas / c.paradasTotal : 0.0;
+                      return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(4),
+                          child: LinearProgressIndicator(
+                            value: pct,
+                            backgroundColor: RDSColor.surface,
+                            // Rock: acento del circuito (rojo); otros: dorado
+                            color: c.tipo == 'musico' ? c.colorGradienteA : RDSColor.gold,
+                            minHeight: 5)),
+                        const SizedBox(height: 5),
+                        Text(c.tipo == 'musico'
+                            ? t('$visitadas / ${c.paradasTotal} bares visitados',
+                                '$visitadas / ${c.paradasTotal} bars visited')
+                            : t('$visitadas / ${c.paradasTotal} paradas visitadas',
+                                '$visitadas / ${c.paradasTotal} stops visited'),
+                          style: const TextStyle(color: RDSColor.textMuted, fontSize: 11)),
+                        const SizedBox(height: 10),
+                        // ── Accesos rápidos ────────────────────────────────
+                        Row(children: [
+                          _BotonAccesoRapido(
+                            icon: Icons.map_rounded,
+                            label: t('Mapa', 'Map'),
+                            color: const Color(0xFF5BAD6F),
+                            onTap: () => RuteroNav.push(context,
+                              _MapaPasaporteScreen(circuito: c, progreso: snap.data ?? {})),
+                          ),
+                          const SizedBox(width: 6),
+                          if (c.tipo == 'musico') ...[
+                            _BotonAccesoRapido(
+                              icon: Icons.star_rounded,
+                              label: t('Top Bares', 'Top Bars'),
+                              color: c.colorGradienteA,
+                              onTap: () => RuteroNav.push(context,
+                                _RankingBaresScreen(circuito: c)),
+                            ),
+                            const SizedBox(width: 6),
+                          ],
+                          _BotonAccesoRapido(
+                            icon: Icons.leaderboard_rounded,
+                            label: t('Clasificación', 'Ranking'),
+                            color: c.colorGradienteA,
+                            onTap: () => RuteroNav.push(context,
+                              _RankingPasaporteScreen(circuito: c)),
+                          ),
+                        ]),
+                      ]);
+                    }),
+                const SizedBox(height: 10),
+                Text('${c.premioEmoji} ${c.premioNombre}',
+                  maxLines: 2, overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(color: RDSColor.textPrimary, fontSize: 12,
+                    fontWeight: FontWeight.w600)),
+                const SizedBox(height: 10),
+                // Botón principal — Rock: rojo rock con texto blanco SpaceGrotesk
+                SizedBox(
+                  width: double.infinity,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+                    decoration: BoxDecoration(
+                      color: c.tipo == 'musico' ? c.colorGradienteA : RDSColor.gold,
+                      borderRadius: BorderRadius.circular(20)),
+                    child: Text(
+                      c.tipo == 'musico'
+                          ? t('Ver pasaporte →', 'View passport →')
+                          : t('Ver pasaporte →', 'View passport →'),
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: c.tipo == 'musico' ? Colors.white : Colors.black,
+                        fontSize: 12, fontWeight: FontWeight.w800,
+                        fontFamily: c.tipo == 'musico' ? 'SpaceGrotesk' : null)))),
+              ])),
+          ]))));
+  }
+}
+
+// ── Botón acceso rápido (Mapa / Top Bares / Ranking) ─────────────────────────
+
+class _BotonAccesoRapido extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final Color color;
+  final VoidCallback onTap;
+  const _BotonAccesoRapido({
+    required this.icon, required this.label,
+    required this.color, required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 7),
+          decoration: BoxDecoration(
+            color: RDSColor.surface,
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: color.withOpacity(0.25))),
+          child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+            Icon(icon, size: 13, color: color),
+            const SizedBox(width: 4),
+            Text(label,
+              style: TextStyle(color: color, fontSize: 11,
+                fontWeight: FontWeight.w700)),
+          ]))));
+  }
+}
+
+// ── Card chica — próximos ──────────────────────────────────────────────────────
+
+class _CircuitoCardChico extends StatelessWidget {
+  final CircuitoFestival circuito;
+  const _CircuitoCardChico({required this.circuito});
+
+  @override
+  Widget build(BuildContext context) {
+    final c = circuito;
+    return GestureDetector(
+      onTap: () => RuteroNav.push(context, PasaporteDetalleScreen(circuito: c)),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 10),
+        decoration: BoxDecoration(
+          color: c.tipo == 'musico' ? const Color(0xFF131510) : RDSColor.card,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: c.tipo == 'musico'
+                ? c.colorGradienteA.withOpacity(0.22)
+                : RDSColor.card.withOpacity(0.4))),
+        child: Row(children: [
+          Container(
+            width: 5, height: 70,
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [c.colorGradienteA, c.colorGradienteB],
+                begin: Alignment.topCenter, end: Alignment.bottomCenter),
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(14),
+                bottomLeft: Radius.circular(14)))),
+          const SizedBox(width: 12),
+          Expanded(child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 12),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(kLang == 'en' && c.nombreEN.isNotEmpty ? c.nombreEN : c.nombre,
+                style: TextStyle(
+                  color: RDSColor.textPrimary, fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  fontFamily: c.tipo == 'musico' ? 'SpaceGrotesk' : null),
+                maxLines: 1, overflow: TextOverflow.ellipsis),
+              const SizedBox(height: 3),
+              Text(
+                c.tipo == 'musico'
+                    ? '${c.paradasTotal} ${t('bares', 'bars')} · ${c.ciudad}'
+                    : '${c.paradasTotal} ${t('paradas', 'stops')} · ${c.ciudad}',
+                style: TextStyle(
+                  color: c.tipo == 'musico'
+                      ? c.colorGradienteA.withOpacity(0.7)
+                      : RDSColor.textMuted,
+                  fontSize: 11)),
+            ]))),
+          Container(
+            margin: const EdgeInsets.only(right: 12),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+            decoration: BoxDecoration(
+              color: c.tipo == 'musico'
+                  ? c.colorGradienteA.withOpacity(0.12)
+                  : RDSColor.surface,
+              borderRadius: BorderRadius.circular(12),
+              border: c.tipo == 'musico'
+                  ? Border.all(color: c.colorGradienteA.withOpacity(0.3))
+                  : null),
+            child: Text(c.etiquetaFecha,
+              style: TextStyle(
+                color: c.tipo == 'musico' ? c.colorGradienteA : RDSColor.gold,
+                fontSize: 10, fontWeight: FontWeight.w700,
+                fontFamily: c.tipo == 'musico' ? 'SpaceGrotesk' : null))),
+        ])));
+  }
+}
+
+// ── Empty state ────────────────────────────────────────────────────────────────
+
+class _PasaportesEmpty extends StatelessWidget {
+  final String ciudad;
+  const _PasaportesEmpty({required this.ciudad});
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(top: 20, bottom: 20),
+      padding: const EdgeInsets.all(28),
+      decoration: BoxDecoration(
+        color: RDSColor.card,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: RDSColor.gold.withOpacity(0.15))),
+      child: Column(children: [
+        const Text('🗂️', style: TextStyle(fontSize: 48)),
+        const SizedBox(height: 12),
+        Text(t('Próximamente en $ciudad', 'Coming soon to $ciudad'),
+          style: const TextStyle(color: RDSColor.textPrimary, fontSize: 15,
+            fontWeight: FontWeight.w700)),
+        const SizedBox(height: 6),
+        Text(t('Los primeros pasaportes temáticos están en camino.',
+          'The first themed passports are on their way.'),
+          textAlign: TextAlign.center,
+          style: const TextStyle(color: RDSColor.textMuted, fontSize: 13)),
+      ]));
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+//  _NivelPasaporte — lógica de niveles por museos visitados
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _NivelPasaporte {
+  final int numero;
+  final String nombre;
+  final String emoji;
+  final String descripcion;  // Texto de reto/provocación del nivel
+  final int minMuseos;
+  final int siguiente;    // sitios para el siguiente nivel (0 si es el máximo)
+
+  const _NivelPasaporte({
+    required this.numero,
+    required this.nombre,
+    required this.emoji,
+    this.descripcion = '',
+    required this.minMuseos,
+    required this.siguiente,
+  });
+
+  static const List<_NivelPasaporte> niveles = [
+    _NivelPasaporte(numero: 1, nombre: 'Curioso',              emoji: '🌱', minMuseos: 1,  siguiente: 5),
+    _NivelPasaporte(numero: 2, nombre: 'Explorador',           emoji: '🥉', minMuseos: 5,  siguiente: 11),
+    _NivelPasaporte(numero: 3, nombre: 'Viajero Cultural',     emoji: '🥈', minMuseos: 11, siguiente: 22),
+    _NivelPasaporte(numero: 4, nombre: 'Embajador Paisa',      emoji: '🥇', minMuseos: 22, siguiente: 33),
+    _NivelPasaporte(numero: 5, nombre: 'Maestro del Patrimonio', emoji: '🏆', minMuseos: 33, siguiente: 0),
+  ];
+
+  /// Fallback local — solo si Firestore no responde.
+  /// Los niveles reales vienen de: configuracion/niveles_rock (campo "niveles")
+  /// Para agregar un bar: cambia totalBares en Firestore, sin tocar el main.
+  static const List<_NivelPasaporte> nivelesRock = [
+    // minMuseos: 1 → el nivel se obtiene al visitar el 1er bar.
+    // Con 0 visitas el usuario no tiene nivel y no aparece en el ranking.
+    _NivelPasaporte(numero:  1, nombre: 'Poser',      emoji: '😏', minMuseos: 1,
+      descripcion: '¿Te gusta el rock o solo usar camisetas de bandas? ¡A ver cuántos bares recorres!',
+      siguiente: 2),
+    _NivelPasaporte(numero:  2, nombre: 'Explorador', emoji: '🗺️', minMuseos: 2,
+      descripcion: 'Conoces algunos bares de rock, pero aún creo que pides que te pongan Maná (ups).',
+      siguiente: 3),
+    _NivelPasaporte(numero:  3, nombre: 'Rookie',     emoji: '🎒', minMuseos: 3,
+      descripcion: 'Vas por buen recorrido, pero ponerte una chaqueta de cuero no te hace rockero.',
+      siguiente: 4),
+    _NivelPasaporte(numero:  4, nombre: 'Rockero',    emoji: '🎸', minMuseos: 4,
+      descripcion: '¿Ya tienes bar favorito? ¿Y tu banda favorita?',
+      siguiente: 5),
+    _NivelPasaporte(numero:  5, nombre: 'Clásico',    emoji: '🎵', minMuseos: 5,
+      descripcion: 'Ya se puede decir que conoces buenos lugares y buenas bandas, pero ¿te quedas en "lo de antes sí era rock"?',
+      siguiente: 6),
+    _NivelPasaporte(numero:  6, nombre: 'Melómano',   emoji: '🎧', minMuseos: 6,
+      descripcion: 'Avanzaste. ¿Encontraste nuevas bandas para escuchar? Y los conciertos de rock, ¿qué?',
+      siguiente: 7),
+    _NivelPasaporte(numero:  7, nombre: 'Bohemio',    emoji: '🕯️', minMuseos: 7,
+      descripcion: 'Parece que disfrutas de la cultura rockera. Ya debes tener tu concierto memorable. ¿Pero te vas a quedar solo en la nostalgia?',
+      siguiente: 8),
+    _NivelPasaporte(numero:  8, nombre: 'Referente',  emoji: '🤟', minMuseos: 8,
+      descripcion: 'Ya recorriste buena parte del circuito. Te pueden preguntar a dónde ir cuando se quiere rockear. ¿Y el rock local?',
+      siguiente: 9),
+    _NivelPasaporte(numero:  9, nombre: 'Veterano',   emoji: '🔥', minMuseos: 9,
+      descripcion: 'Ya tienes kilómetros de bares encima, historia y anécdotas para contar. ¡La leyenda está cerca!',
+      siguiente: 10),
+    // Pro: solo alcanzable cuando totalBares ≥ 11. Con 10 bares, Leyenda (minMuseos=10) lo supera.
+    _NivelPasaporte(numero: 10, nombre: 'Pro',        emoji: '⚡', minMuseos: 10,
+      descripcion: 'Esto ya es otro nivel. Pocos han recorrido tanto. Tienes casi todo el circuito en el bolsillo, pero todavía falta.',
+      siguiente: 11),
+    // Leyenda: minMuseos se sobreescribe dinámicamente con totalBares desde Firestore.
+    // En el fallback local usamos 10 (valor actual de totalBares).
+    _NivelPasaporte(numero: 11, nombre: 'Leyenda del Rock MDE', emoji: '💀', minMuseos: 10,
+      descripcion: '¡Qué recorrido el suyo! Ya se ganó su lugar entre los grandes del circuito. Ahora sí puede decir que se ha tomado Medellín a punta de rock.',
+      siguiente: 0),
+  ];
+
+  /// Devuelve el nivel activo para [visitados] sitios, o null si aún no alcanzó ninguno.
+  /// Usa [esRock] para elegir la tabla de niveles correcta.
+  /// [totalSitios] se usa en el circuito Rock para calcular el umbral del nivel Leyenda.
+  static _NivelPasaporte? actual(int visitados, {bool esRock = false, int totalSitios = 999}) {
+    final lista = _listaEfectiva(esRock, totalSitios);
+    _NivelPasaporte? resultado;
+    for (final n in lista) {
+      if (visitados >= n.minMuseos) resultado = n;
+    }
+    return resultado;
+  }
+
+  /// Devuelve el próximo nivel no alcanzado, o null si ya es el máximo.
+  static _NivelPasaporte? proximo(int visitados, {bool esRock = false, int totalSitios = 999}) {
+    final lista = _listaEfectiva(esRock, totalSitios);
+    for (final n in lista) {
+      if (visitados < n.minMuseos) return n;
+    }
+    return null;
+  }
+
+  /// Reemplaza el umbral 999 (Leyenda) por el total real del circuito Rock.
+  /// Si [listaRock] es provisto (cargado desde Firestore), lo usa en vez del fallback.
+  static List<_NivelPasaporte> _listaEfectiva(bool esRock, int totalSitios,
+      {List<_NivelPasaporte>? listaRock}) {
+    if (!esRock) return niveles;
+    final base = listaRock ?? nivelesRock;
+    // Solo ajustar el nivel final si totalSitios es un valor real (> 0)
+    if (totalSitios <= 0) return base;
+    return base.map((n) =>
+      n.siguiente == 0 && n.minMuseos != totalSitios
+          ? _NivelPasaporte(numero: n.numero, nombre: n.nombre, emoji: n.emoji,
+              descripcion: n.descripcion, minMuseos: totalSitios, siguiente: 0)
+          : n
+    ).toList();
+  }
+
+  static _NivelPasaporte? actualConLista(int visitados,
+      {bool esRock = false, int totalSitios = 999, List<_NivelPasaporte>? listaRock}) {
+    final lista = _listaEfectiva(esRock, totalSitios, listaRock: listaRock);
+    _NivelPasaporte? resultado;
+    for (final n in lista) {
+      if (visitados >= n.minMuseos) resultado = n;
+    }
+    return resultado;
+  }
+
+  static _NivelPasaporte? proximoConLista(int visitados,
+      {bool esRock = false, int totalSitios = 999, List<_NivelPasaporte>? listaRock}) {
+    final lista = _listaEfectiva(esRock, totalSitios, listaRock: listaRock);
+    for (final n in lista) {
+      if (visitados < n.minMuseos) return n;
+    }
+    return null;
+  }
+}
+
+//  _RankingPasaporteScreen
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _RankingPasaporteScreen extends StatefulWidget {
+  final CircuitoFestival circuito;
+  const _RankingPasaporteScreen({required this.circuito});
+  @override
+  State<_RankingPasaporteScreen> createState() => _RankingPasaporteScreenState();
+}
+
+class _RankingPasaporteScreenState extends State<_RankingPasaporteScreen> {
+  List<Map<String, dynamic>> _ranking = [];
+  List<_NivelPasaporte> _nivelesRock = _NivelPasaporte.nivelesRock;
+  bool _cargando = true;
+  String? _uidActual;
+
+  @override
+  void initState() {
+    super.initState();
+    _uidActual = FirebaseAuth.instance.currentUser?.uid;
+    _cargar();
+  }
+
+  Future<void> _cargar() async {
+    final results = await Future.wait([
+      PasaportesService.rankingCircuito(widget.circuito.id),
+      if (widget.circuito.tipo == 'musico')
+        PasaportesService.obtenerNivelesRock(),
+    ]);
+    if (!mounted) return;
+    setState(() {
+      _ranking = results[0] as List<Map<String, dynamic>>;
+      if (widget.circuito.tipo == 'musico' && results.length > 1) {
+        _nivelesRock = results[1] as List<_NivelPasaporte>;
+      }
+      _cargando = false;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final c = widget.circuito;
+    // Acento del circuito — viene de Firestore (gradienteHero[0])
+    final Color acento = c.colorGradienteA;
+    return Scaffold(
+      backgroundColor: const Color(0xFF0D110C),
+      body: CustomScrollView(slivers: [
+        SliverAppBar(
+          pinned: true,
+          backgroundColor: const Color(0xFF0D110C),
+          leading: GestureDetector(
+            onTap: () => Navigator.pop(context),
+            child: Container(
+              margin: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.white10, borderRadius: BorderRadius.circular(20)),
+              child: const Icon(Icons.arrow_back_ios_new_rounded,
+                color: Colors.white, size: 16))),
+          title: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text('Ranking', style: TextStyle(
+              color: acento, fontSize: 18,
+              fontWeight: FontWeight.w900, letterSpacing: 0.5,
+              fontFamily: c.tipo == 'musico' ? 'SpaceGrotesk' : null)),
+            Text(c.nombre, style: TextStyle(
+              color: Colors.white54, fontSize: 11,
+              fontFamily: c.tipo == 'musico' ? 'SpaceGrotesk' : null)),
+          ]),
+        ),
+        SliverToBoxAdapter(child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+          child: Row(children: [
+            const Icon(Icons.info_outline_rounded, color: Colors.white30, size: 13),
+            const SizedBox(width: 6),
+            const Expanded(child: Text(
+              'Explorador con más puntos = check-ins + trivias correctas',
+              style: TextStyle(color: Colors.white38, fontSize: 11))),
+          ]))),
+        if (_cargando)
+          SliverFillRemaining(child: Center(child: CircularProgressIndicator(
+            color: acento, strokeWidth: 2)))
+        else if (_ranking.isEmpty)
+          SliverFillRemaining(child: Center(child: Column(
+            mainAxisAlignment: MainAxisAlignment.center, children: [
+              Text(widget.circuito.tipo == 'musico' ? '🎸' : '🏛️',
+                style: const TextStyle(fontSize: 48)),
+              const SizedBox(height: 12),
+              const Text('Sé el primero en explorar',
+                style: TextStyle(color: Colors.white70, fontSize: 15,
+                  fontWeight: FontWeight.w700)),
+              const SizedBox(height: 4),
+              Text(widget.circuito.tipo == 'musico'
+                  ? 'Visita bares y acumula puntos'
+                  : 'Visita museos y acumula puntos',
+                style: const TextStyle(color: Colors.white38, fontSize: 12)),
+            ])))
+        else
+          SliverList(delegate: SliverChildBuilderDelegate(
+            (context, i) {
+              final entry = _ranking[i];
+              final pos = i + 1;
+              final esYo = entry['uid'] == _uidActual;
+              final String nombre = entry['nombre'] ?? 'Rutero';
+              final int pts = entry['puntosTotal'] ?? 0;
+              final String foto = entry['foto'] ?? '';
+              final String medalla = pos == 1 ? '🥇' : pos == 2 ? '🥈' : pos == 3 ? '🥉' : '';
+              return Container(
+                margin: EdgeInsets.fromLTRB(16, i == 0 ? 16 : 6, 16, 0),
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                decoration: BoxDecoration(
+                  color: esYo
+                      ? acento.withOpacity(0.13)
+                      : const Color(0xFF1C2018),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(
+                    color: esYo
+                        ? acento.withOpacity(0.5)
+                        : pos <= 3
+                            ? acento.withOpacity(0.18)
+                            : Colors.transparent,
+                    width: esYo ? 1.5 : 1)),
+                child: Row(children: [
+                  // Posición
+                  SizedBox(width: 32, child: medalla.isNotEmpty
+                      ? Text(medalla, style: const TextStyle(fontSize: 20))
+                      : Text('$pos',
+                          style: const TextStyle(color: Colors.white38,
+                            fontSize: 14, fontWeight: FontWeight.w700))),
+                  const SizedBox(width: 10),
+                  // Avatar
+                  CircleAvatar(
+                    radius: 20,
+                    backgroundColor: const Color(0xFF2A3028),
+                    backgroundImage: foto.isNotEmpty ? NetworkImage(foto) : null,
+                    child: foto.isEmpty
+                        ? Text(nombre.isNotEmpty ? nombre[0].toUpperCase() : 'R',
+                            style: TextStyle(color: acento,
+                              fontWeight: FontWeight.w900, fontSize: 15))
+                        : null),
+                  const SizedBox(width: 12),
+                  // Nombre + tag yo
+                  Expanded(child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Row(children: [
+                      Flexible(child: Text(nombre,
+                        maxLines: 1, overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: esYo ? acento : Colors.white,
+                          fontWeight: FontWeight.w700, fontSize: 13,
+                          fontFamily: c.tipo == 'musico' ? 'SpaceGrotesk' : null))),
+                      if (esYo) ...[
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: acento.withOpacity(0.2),
+                            borderRadius: BorderRadius.circular(8)),
+                          child: Text('Tú',
+                            style: TextStyle(color: acento,
+                              fontSize: 10, fontWeight: FontWeight.w700))),
+                      ],
+                    ]),
+                    Builder(builder: (_) {
+                      final bool esRock = widget.circuito.tipo == 'musico';
+                      // 30 pts por parada (esRock) · 80 pts por museo (cultural)
+                      final int sitiosEntry = pts ~/ (esRock ? 30 : 80);
+                      final nivel = _NivelPasaporte.actualConLista(sitiosEntry,
+                          esRock: esRock, totalSitios: widget.circuito.paradasTotal,
+                          listaRock: esRock ? _nivelesRock : null);
+                      final String unidad = esRock
+                          ? 'bar${sitiosEntry != 1 ? "es" : ""}'
+                          : 'museo${sitiosEntry != 1 ? "s" : ""}';
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                        Row(children: [
+                          if (nivel != null) ...[
+                            Text(nivel.emoji,
+                              style: const TextStyle(fontSize: 11)),
+                            const SizedBox(width: 3),
+                            Text(nivel.nombre,
+                              style: TextStyle(
+                                color: acento, fontSize: 10,
+                                fontWeight: FontWeight.w600)),
+                            const SizedBox(width: 6),
+                          ],
+                          Text(sitiosEntry > 0
+                              ? '$sitiosEntry $unidad'
+                              : esRock ? 'Sin bares visitados aún' : 'Sin visitas aún',
+                            style: const TextStyle(color: Colors.white38, fontSize: 10)),
+                        ]),
+                        if (nivel != null && nivel.descripcion.isNotEmpty)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 2),
+                            child: Text(nivel.descripcion,
+                              maxLines: 2, overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                color: Colors.white38, fontSize: 9,
+                                fontStyle: FontStyle.italic))),
+                      ]);
+                    }),
+                  ])),
+                  // Puntos
+                  Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
+                    Text('$pts',
+                      style: TextStyle(color: acento,
+                        fontSize: 18, fontWeight: FontWeight.w900,
+                        fontFamily: 'SpaceGrotesk')),
+                    Text('pts',
+                      style: TextStyle(
+                        color: Colors.white38, fontSize: 10,
+                        fontFamily: c.tipo == 'musico' ? 'SpaceGrotesk' : null)),
+                  ]),
+                ]));
+            },
+            childCount: _ranking.length)),
+        // Pie — créditos
+        SliverToBoxAdapter(child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 24, 16, 48),
+          child: Text(
+            'DNDA 1-2025-110420 · Créame Alcaldía de Medellín · Participante BTIF 2026',
+            textAlign: TextAlign.center,
+            style: const TextStyle(color: Colors.white24, fontSize: 10)))),
+      ]));
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  PasaporteDetalleScreen
+// ─────────────────────────────────────────────────────────────────────────────
+
+class PasaporteDetalleScreen extends StatefulWidget {
+  final CircuitoFestival circuito;
+  const PasaporteDetalleScreen({super.key, required this.circuito});
+  @override
+  State<PasaporteDetalleScreen> createState() => _PasaporteDetalleScreenState();
+}
+
+class _PasaporteDetalleScreenState extends State<PasaporteDetalleScreen> {
+  Map<String, bool> _progreso = {};
+  List<_NivelPasaporte> _nivelesRock = _NivelPasaporte.nivelesRock;
+  bool _cargando = true;
+  String _filtroTab = 'todos';
+  bool _instruccionesExpandido = false;
+  bool _contextoExpandido = false;
+  String _filtroZona = 'todos';
+  _NivelPasaporte? _nivelPrevio;
+
+  @override
+  void initState() {
+    super.initState();
+    _cargarProgreso();
+    PasaportesService.suscribirFCMCircuito(widget.circuito.id);
+  }
+
+  Future<void> _cargarProgreso({bool verificarNivel = false}) async {
+    final uid = FirebaseAuth.instance.currentUser?.uid ?? '';
+    if (uid.isEmpty) { setState(() => _cargando = false); return; }
+    final bool esRock = widget.circuito.tipo == 'musico';
+    // Cargar progreso y niveles en paralelo
+    final results = await Future.wait([
+      PasaportesService.progresoCircuito(uid, widget.circuito.id),
+      if (esRock) PasaportesService.obtenerNivelesRock(),
+    ]);
+    if (!mounted) return;
+    final p = results[0] as Map<String, bool>;
+    final nivelesActuales = (esRock && results.length > 1)
+        ? results[1] as List<_NivelPasaporte>
+        : _nivelesRock;
+    final nuevoNivel = _NivelPasaporte.actualConLista(p.length,
+        esRock: esRock, totalSitios: widget.circuito.paradasTotal,
+        listaRock: esRock ? nivelesActuales : null);
+    if (verificarNivel && nuevoNivel != null && nuevoNivel.numero != (_nivelPrevio?.numero ?? 0)) {
+      setState(() {
+        _progreso = p; _cargando = false; _nivelPrevio = nuevoNivel;
+        if (esRock) _nivelesRock = nivelesActuales;
+      });
+      await Future.delayed(const Duration(milliseconds: 300));
+      if (mounted) _mostrarCelebracionNivel(nuevoNivel);
+    } else {
+      setState(() {
+        _progreso = p; _cargando = false; _nivelPrevio = nuevoNivel;
+        if (esRock) _nivelesRock = nivelesActuales;
+      });
+    }
+  }
+
+  void _mostrarCelebracionNivel(_NivelPasaporte nivel) {
+    final tienePin = PasaportesService.nivelesConPin.contains(nivel.nombre);
+    final infoPin  = tienePin ? PasaportesService.infoPines[nivel.nombre] : null;
+    showRDSDialog(
+      context: context,
+      title: '${nivel.emoji} ¡Nuevo nivel!',
+      message: nivel.descripcion.isNotEmpty
+          ? '¡Ahora eres ${nivel.nombre}!\n\n"${nivel.descripcion}"'
+              + (tienePin ? '\n\n🎖 ¡Desbloqueaste el ${infoPin!['pin']}!\nMostrá tu QR al bartender para reclamarlo.' : '')
+          : 'Alcanzaste el nivel\n"${nivel.nombre}"\nSeguís explorando Medellín 🎉'
+              + (tienePin ? '\n\n🎖 ¡Desbloqueaste el ${infoPin!['pin']}!\nMostrá tu QR al bartender para reclamarlo.' : ''),
+      actions: [
+        if (tienePin)
+          _RDSDialogAction(
+            label: '🎖 Ver mi QR de pin',
+            isPrimary: true,
+            onTap: () {
+              Navigator.pop(context);
+              RuteroNav.push(context, _PinQRScreen(
+                nivelNombre: nivel.nombre,
+                circuitoId: widget.circuito.id,
+                colorAccent: widget.circuito.colorGradienteA,
+                totalBares: widget.circuito.paradasTotal,
+                baresVisitados: _visitadas));
+            }),
+        _RDSDialogAction(
+          label: tienePin ? 'Después' : '¡A rockear!',
+          isPrimary: !tienePin,
+          onTap: () => Navigator.pop(context)),
+      ]);
+  }
+
+  int get _visitadas => _progreso.length;
+  int get _total => widget.circuito.paradasTotal;
+  bool get _completado => _visitadas >= widget.circuito.paradasParaPremio;
+
+  List<ParadaCircuito> get _paradasFiltradas {
+    var lista = widget.circuito.paradas;
+    // Filtro por estado
+    switch (_filtroTab) {
+      case 'pendientes':
+        lista = lista.where((p) => !(_progreso[p.id] ?? false)).toList();
+        break;
+      case 'visitados':
+        lista = lista.where((p) => _progreso[p.id] ?? false).toList();
+        break;
+    }
+    // Filtro por zona
+    if (_filtroZona != 'todos') {
+      lista = lista.where((p) => p.zona == _filtroZona).toList();
+    }
+    return lista;
+  }
+
+  /// Zonas únicas presentes en el circuito (en orden de aparición)
+  List<String> get _zonasDisponibles {
+    final seen = <String>{};
+    return widget.circuito.paradas
+        .map((p) => p.zona)
+        .where((z) => z.isNotEmpty && seen.add(z))
+        .toList();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final c = widget.circuito;
+    return Scaffold(
+      backgroundColor: RDSColor.base,
+      body: CustomScrollView(slivers: [
+        SliverAppBar(
+          expandedHeight: 230,
+          pinned: true,
+          backgroundColor: RDSColor.base,
+          leading: GestureDetector(
+            onTap: () => Navigator.pop(context),
+            child: Container(
+              margin: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.black54, borderRadius: BorderRadius.circular(20)),
+              child: const Icon(Icons.arrow_back_ios_new_rounded,
+                color: Colors.white, size: 16))),
+          actions: [
+            GestureDetector(
+              onTap: () => RuteroNav.push(context,
+                _MapaPasaporteScreen(circuito: widget.circuito, progreso: _progreso)),
+              child: Container(
+                margin: const EdgeInsets.only(left: 6, top: 8, bottom: 8),
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                decoration: BoxDecoration(
+                  color: Colors.black54, borderRadius: BorderRadius.circular(20)),
+                child: Row(mainAxisSize: MainAxisSize.min, children: [
+                  const Icon(Icons.map_rounded,
+                    color: Color(0xFF5BAD6F), size: 16),
+                  const SizedBox(width: 4),
+                  Text(t('Mapa', 'Map'),
+                    style: const TextStyle(color: Colors.white, fontSize: 11,
+                      fontWeight: FontWeight.w700)),
+                ]))),
+            // Botón Top Bares — solo para circuito Rock (tipo musico)
+            if (c.tipo == 'musico')
+              GestureDetector(
+                onTap: () => RuteroNav.push(context,
+                  _RankingBaresScreen(circuito: widget.circuito)),
+                child: Container(
+                  margin: const EdgeInsets.only(left: 4, top: 8, bottom: 8),
+                  padding: const EdgeInsets.symmetric(horizontal: 10),
+                  decoration: BoxDecoration(
+                    color: Colors.black54, borderRadius: BorderRadius.circular(20)),
+                  child: Row(mainAxisSize: MainAxisSize.min, children: [
+                    Icon(Icons.star_rounded,
+                      color: c.colorGradienteA, size: 16),
+                    const SizedBox(width: 4),
+                    Text(t('Top Bares', 'Top Bars'),
+                      style: const TextStyle(color: Colors.white, fontSize: 11,
+                        fontWeight: FontWeight.w700)),
+                  ]))),
+            GestureDetector(
+              onTap: () => RuteroNav.push(context,
+                _RankingPasaporteScreen(circuito: widget.circuito)),
+              child: Container(
+                margin: const EdgeInsets.only(right: 12, top: 8, bottom: 8),
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                decoration: BoxDecoration(
+                  color: Colors.black54, borderRadius: BorderRadius.circular(20)),
+                child: Row(mainAxisSize: MainAxisSize.min, children: [
+                  Icon(Icons.leaderboard_rounded,
+                    color: c.colorGradienteA, size: 16),
+                  const SizedBox(width: 4),
+                  Text(t('Ranking', 'Ranking'),
+                    style: const TextStyle(color: Colors.white, fontSize: 11,
+                      fontWeight: FontWeight.w700)),
+                ]))),
+          ],
+          flexibleSpace: FlexibleSpaceBar(
+            background: Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [c.colorGradienteA, c.colorGradienteB],
+                  begin: Alignment.topLeft, end: Alignment.bottomRight)),
+              child: Stack(children: [
+                // Imagen hero si existe
+                if (c.imagenAsset.isNotEmpty)
+                  Positioned.fill(child: Image.asset(
+                    c.imagenAsset, fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) =>
+                      CustomPaint(painter: _LeafPatternPainter())))
+                else
+                  Positioned.fill(child: CustomPaint(painter: _LeafPatternPainter())),
+                // Overlay oscuro para legibilidad (Rock: más oscuro)
+                Positioned.fill(child: Container(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter, end: Alignment.bottomCenter,
+                      colors: c.tipo == 'musico'
+                          ? [
+                              Colors.black.withOpacity(0.35),
+                              Colors.black.withOpacity(0.80),
+                            ]
+                          : [
+                              Colors.black.withOpacity(0.2),
+                              Colors.black.withOpacity(0.7),
+                            ])))),
+                Center(child: Padding(
+                  padding: const EdgeInsets.only(top: 60, left: 20, right: 20),
+                  child: Column(mainAxisSize: MainAxisSize.min, children: [
+                    Text(kLang == 'en' && c.nombreEN.isNotEmpty ? c.nombreEN : c.nombre,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: c.tipo == 'musico' ? 26 : 20,
+                        fontWeight: FontWeight.w900,
+                        fontFamily: c.tipo == 'musico' ? 'SpaceGrotesk' : null,
+                        letterSpacing: c.tipo == 'musico' ? -0.5 : 0,
+                        shadows: const [Shadow(color: Colors.black54, blurRadius: 8)])),
+                    const SizedBox(height: 4),
+                    Text(c.tipo == 'musico'
+                        ? '${c.paradasTotal} ${t('bares', 'bars')} · ${c.etiquetaFecha}'
+                        : '${c.paradasTotal} ${t('paradas', 'stops')} · ${c.etiquetaFecha}',
+                      style: TextStyle(
+                        color: c.tipo == 'musico'
+                            ? RDSColor.gold.withOpacity(0.85)
+                            : Colors.white70,
+                        fontSize: 13,
+                        fontFamily: c.tipo == 'musico' ? 'SpaceGrotesk' : null)),
+                  ]))),
+              ])))),
+        SliverToBoxAdapter(child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start, children: [
+          // Tarjeta progreso
+          Container(
+            margin: const EdgeInsets.all(16),
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: RDSColor.card,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: _completado
+                    ? c.colorGradienteA
+                    : c.colorGradienteA.withOpacity(0.2))),
+            child: _cargando
+              ? LinearProgressIndicator(color: c.colorGradienteA)
+              : Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Row(children: [
+                    Builder(builder: (_) {
+                      final bool esRock2 = c.tipo == 'musico';
+                      return Text(
+                        '$_visitadas / $_total ${esRock2 ? t("bares", "bars") : t("paradas", "stops")}',
+                        style: const TextStyle(color: RDSColor.textPrimary, fontSize: 14,
+                          fontWeight: FontWeight.w700));
+                    }),
+                    const Spacer(),
+                    if (_completado)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: c.colorGradienteA,
+                          borderRadius: BorderRadius.circular(12)),
+                        child: Text('${c.premioEmoji} ${t('¡Completo!', 'Complete!')}',
+                          style: const TextStyle(color: Colors.black, fontSize: 11,
+                            fontWeight: FontWeight.w800))),
+                  ]),
+                  const SizedBox(height: 8),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(4),
+                    child: LinearProgressIndicator(
+                      value: _total > 0 ? _visitadas / _total : 0,
+                      backgroundColor: RDSColor.surface,
+                      color: c.colorGradienteA,
+                      minHeight: 6)),
+                  const SizedBox(height: 12),
+                  // ── Widget de nivel ──────────────────────────────────────
+                  Builder(builder: (_) {
+                    final bool esRock = c.tipo == 'musico';
+                    final nivelActual = _NivelPasaporte.actualConLista(_visitadas,
+                        esRock: esRock, totalSitios: c.paradasTotal,
+                        listaRock: esRock ? _nivelesRock : null);
+                    final proximo = _NivelPasaporte.proximoConLista(_visitadas,
+                        esRock: esRock, totalSitios: c.paradasTotal,
+                        listaRock: esRock ? _nivelesRock : null);
+                    // Nivel 1 (Poser) ya tiene minMuseos=0, así que siempre habrá nivelActual
+                    final String primerUnidad = esRock ? 'bar' : 'museo';
+                    if (nivelActual == null && proximo == null) return const SizedBox.shrink();
+                    return Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: RDSColor.surface,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: nivelActual != null
+                              ? c.colorGradienteA.withOpacity(0.35)
+                              : Colors.white12)),
+                      child: nivelActual == null
+                        ? Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                            Row(children: [
+                              const Text('🎸', style: TextStyle(fontSize: 22)),
+                              const SizedBox(width: 10),
+                                      Expanded(child: Text(t('¡Empieza tu recorrido!', 'Start your journey!'),
+                                style: TextStyle(color: c.colorGradienteA,
+                                  fontSize: 13, fontWeight: FontWeight.w800))),
+                            ]),
+                            const SizedBox(height: 6),
+                            Text(
+                              t('Visitá tu primer $primerUnidad para desbloquear tu nivel rockero y aparecer en el ranking.',
+                                'Visit your first ${esRock ? 'bar' : 'stop'} to unlock your rock level and appear in the ranking.'),
+                              style: const TextStyle(color: RDSColor.textMuted,
+                                fontSize: 11, height: 1.4)),
+                          ])
+                        : Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                            // ── Fila: emoji + nombre del nivel ──
+                            Row(children: [
+                              Text(nivelActual.emoji,
+                                style: const TextStyle(fontSize: 22)),
+                              const SizedBox(width: 10),
+                              Expanded(child: Text(nivelActual.nombre,
+                                style: TextStyle(color: c.colorGradienteA,
+                                  fontSize: 13, fontWeight: FontWeight.w800))),
+                              if (proximo == null)
+                                const Text('🎊', style: TextStyle(fontSize: 18)),
+                            ]),
+                            // ── Barra de progreso (ancho completo del card) ──
+                            if (proximo != null) ...[
+                              const SizedBox(height: 8),
+                              ClipRRect(
+                                borderRadius: BorderRadius.circular(4),
+                                child: LinearProgressIndicator(
+                                  value: ((_visitadas - nivelActual.minMuseos) /
+                                          (proximo.minMuseos - nivelActual.minMuseos))
+                                      .clamp(0.0, 1.0),
+                                  backgroundColor: Colors.white10,
+                                  color: c.colorGradienteA,
+                                  minHeight: 5)),
+                              const SizedBox(height: 4),
+                              Builder(builder: (_) {
+                                final int falta = proximo.minMuseos - _visitadas;
+                                final String unidad = esRock
+                                    ? (falta != 1 ? 'bares' : 'bar')
+                                    : (falta != 1 ? 'museos' : 'museo');
+                                return Text(
+                                  t('Faltan $falta $unidad para ${proximo.emoji} ${proximo.nombre}',
+                                    '$falta ${esRock ? (falta != 1 ? 'bars' : 'bar') : (falta != 1 ? 'stops' : 'stop')} to go for ${proximo.emoji} ${proximo.nombre}'),
+                                  style: const TextStyle(
+                                    color: RDSColor.textMuted, fontSize: 10));
+                              }),
+                            ] else ...[
+                              const SizedBox(height: 4),
+                              Text(t('¡Nivel máximo alcanzado! 🎊', 'Max level reached! 🎊'),
+                                style: const TextStyle(color: RDSColor.green,
+                                  fontSize: 11, fontWeight: FontWeight.w600)),
+                            ],
+                            // ── Descripción / leyenda del nivel ──
+                            if (nivelActual.descripcion.isNotEmpty) ...[
+                              const SizedBox(height: 8),
+                              Container(
+                                width: double.infinity,
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 10, vertical: 7),
+                                decoration: BoxDecoration(
+                                  color: c.colorGradienteA.withOpacity(0.07),
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(
+                                    color: c.colorGradienteA.withOpacity(0.18),
+                                    width: 0.8)),
+                                child: Text(nivelActual.descripcion,
+                                  style: TextStyle(
+                                    color: c.colorGradienteA.withOpacity(0.85),
+                                    fontSize: 11,
+                                    fontStyle: FontStyle.italic,
+                                    height: 1.5))),
+                            ],
+                            // ── Botón "Reclamar pin" si el nivel tiene pin físico ──
+                            if (PasaportesService.nivelesConPin.contains(nivelActual.nombre)) ...[
+                              const SizedBox(height: 10),
+                              GestureDetector(
+                                onTap: () => RuteroNav.push(context, _PinQRScreen(
+                                  nivelNombre: nivelActual.nombre,
+                                  circuitoId: c.id,
+                                  colorAccent: c.colorGradienteA,
+                                  totalBares: c.paradasTotal,
+                                  baresVisitados: _visitadas)),
+                                child: Container(
+                                  width: double.infinity,
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 12, vertical: 9),
+                                  decoration: BoxDecoration(
+                                    gradient: LinearGradient(
+                                      colors: [c.colorGradienteA, c.colorGradienteB]),
+                                    borderRadius: BorderRadius.circular(10)),
+                                  child: Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      const Text('🎖', style: TextStyle(fontSize: 15)),
+                                      const SizedBox(width: 6),
+                                      Text(
+                                        'Reclamar ${PasaportesService.infoPines[nivelActual.nombre]!['pin']!}',
+                                        style: const TextStyle(
+                                          color: Colors.black,
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w800)),
+                                    ]))),
+                            ],
+                          ]));
+                  }),
+                  // Card premio: solo visible cuando el usuario ya inició el circuito
+                  if (_visitadas > 0) ...[
+                  const SizedBox(height: 10),
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: RDSColor.surface,
+                      borderRadius: BorderRadius.circular(10)),
+                    child: Row(children: [
+                      Text(c.premioEmoji, style: const TextStyle(fontSize: 22)),
+                      const SizedBox(width: 10),
+                      Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                        Text(c.premioNombre,
+                          style: const TextStyle(color: RDSColor.textPrimary,
+                            fontSize: 13, fontWeight: FontWeight.w700)),
+                        Text(t('Visita ${c.paradasParaPremio} paradas para ganar',
+                          'Visit ${c.paradasParaPremio} stops to earn it'),
+                          style: const TextStyle(color: RDSColor.textMuted, fontSize: 11)),
+                      ])),
+                      if (!_completado)
+                        Text(t('Faltan ${c.paradasParaPremio - _visitadas}',
+                          '${c.paradasParaPremio - _visitadas} to go'),
+                          style: TextStyle(color: c.colorGradienteA, fontSize: 11,
+                            fontWeight: FontWeight.w700)),
+                    ])),
+                  ],
+                ])),
+          // ── Contexto del circuito (colapsable) ──────────────────────────
+          if (c.contexto.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+              child: GestureDetector(
+                onTap: () => setState(() => _contextoExpandido = !_contextoExpandido),
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: RDSColor.card,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: c.colorGradienteA.withOpacity(0.25))),
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Row(children: [
+                      Icon(Icons.info_outline_rounded, color: c.colorGradienteA, size: 16),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(t('Sobre este circuito', 'About this circuit'),
+                          style: TextStyle(color: c.colorGradienteA, fontSize: 11,
+                            fontWeight: FontWeight.w700, letterSpacing: 0.8))),
+                      Icon(
+                        _contextoExpandido
+                            ? Icons.keyboard_arrow_up_rounded
+                            : Icons.keyboard_arrow_down_rounded,
+                        color: c.colorGradienteA, size: 18),
+                    ]),
+                    AnimatedCrossFade(
+                      firstChild: const SizedBox.shrink(),
+                      secondChild: Padding(
+                        padding: const EdgeInsets.only(top: 8),
+                        child: Text(
+                          kLang == 'en' && c.contextoEN.isNotEmpty ? c.contextoEN : c.contexto,
+                          style: const TextStyle(color: RDSColor.textMuted,
+                            fontSize: 13, height: 1.5))),
+                      crossFadeState: _contextoExpandido
+                          ? CrossFadeState.showSecond
+                          : CrossFadeState.showFirst,
+                      duration: const Duration(milliseconds: 250)),
+                  ])))),
+
+          // ── Instrucciones del circuito ───────────────────────────────────
+          if (c.instrucciones.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+              child: GestureDetector(
+                onTap: () => setState(() => _instruccionesExpandido = !_instruccionesExpandido),
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: RDSColor.card,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: c.colorGradienteA.withOpacity(0.25))),
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Row(children: [
+                      Icon(Icons.list_alt_rounded, color: c.colorGradienteA, size: 16),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(t('Cómo participar', 'How to participate'),
+                          style: TextStyle(color: c.colorGradienteA, fontSize: 11,
+                            fontWeight: FontWeight.w700, letterSpacing: 0.8))),
+                      Icon(
+                        _instruccionesExpandido
+                            ? Icons.keyboard_arrow_up_rounded
+                            : Icons.keyboard_arrow_down_rounded,
+                        color: c.colorGradienteA, size: 18),
+                    ]),
+                    AnimatedCrossFade(
+                      firstChild: const SizedBox.shrink(),
+                      secondChild: Padding(
+                        padding: const EdgeInsets.only(top: 8),
+                        child: Text(
+                          kLang == 'en' && c.instruccionesEN.isNotEmpty ? c.instruccionesEN : c.instrucciones,
+                          style: const TextStyle(color: RDSColor.textMuted,
+                            fontSize: 13, height: 1.5))),
+                      crossFadeState: _instruccionesExpandido
+                          ? CrossFadeState.showSecond
+                          : CrossFadeState.showFirst,
+                      duration: const Duration(milliseconds: 250)),
+                  ])))),
+
+          // Tabs estado
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Row(children: [
+              _PasTabFiltro(t('Todos', 'All'), 'todos', _filtroTab,
+                () => setState(() => _filtroTab = 'todos'),
+                esRock: c.tipo == 'musico', acento: c.colorGradienteA),
+              const SizedBox(width: 8),
+              _PasTabFiltro(t('Pendientes', 'Pending'), 'pendientes', _filtroTab,
+                () => setState(() => _filtroTab = 'pendientes'),
+                esRock: c.tipo == 'musico', acento: c.colorGradienteA),
+              const SizedBox(width: 8),
+              _PasTabFiltro(t('Visitados ✓', 'Visited ✓'), 'visitados', _filtroTab,
+                () => setState(() => _filtroTab = 'visitados'),
+                esRock: c.tipo == 'musico', acento: c.colorGradienteA),
+            ])),
+          // Filtro zona — solo si hay más de una zona en el circuito
+          if (_zonasDisponibles.length > 1) ...[
+            const SizedBox(height: 10),
+            SizedBox(
+              height: 32,
+              child: ListView(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                children: [
+                  _buildZonaChip(t('📍 Todas', '📍 All'), 'todos'),
+                  ..._zonasDisponibles.map((z) => _buildZonaChip(z, z)),
+                ])),
+          ],
+          const SizedBox(height: 12),
+          // Lista paradas
+          ..._paradasFiltradas.map((parada) {
+            final visitada = _progreso[parada.id] ?? false;
+            return GestureDetector(
+              onTap: () async {
+                await RuteroNav.push(context, PasaporteParadaScreen(
+                  circuito: c, parada: parada, visitada: visitada));
+                _cargarProgreso(verificarNivel: true);
+              },
+              child: Container(
+                margin: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: c.tipo == 'musico'
+                      ? (visitada
+                          ? RDSColor.card
+                          : const Color(0xFF111410))
+                      : RDSColor.card,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(
+                    color: visitada
+                        ? RDSColor.green.withOpacity(0.4)
+                        : (c.tipo == 'musico'
+                            ? c.colorGradienteA.withOpacity(0.18)
+                            : RDSColor.card.withOpacity(0.3)))),
+                child: Row(children: [
+                  Stack(clipBehavior: Clip.none, children: [
+                    Container(
+                      width: 44, height: 44,
+                      decoration: BoxDecoration(
+                        color: RDSColor.surface,
+                        borderRadius: BorderRadius.circular(12),
+                        // Rock: borde sutil acento en icono
+                        border: c.tipo == 'musico' && !visitada
+                            ? Border.all(color: c.colorGradienteA.withOpacity(0.25))
+                            : null),
+                      child: Center(child: Text(parada.emoji,
+                        style: const TextStyle(fontSize: 22)))),
+                    if (visitada)
+                      Positioned(bottom: -3, right: -3,
+                        child: Container(
+                          width: 18, height: 18,
+                          decoration: const BoxDecoration(
+                            color: RDSColor.green, shape: BoxShape.circle),
+                          child: const Icon(Icons.check_rounded,
+                            color: Colors.white, size: 11))),
+                  ]),
+                  const SizedBox(width: 12),
+                  Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                    Text(parada.nombre,
+                      style: TextStyle(
+                        // Rock visitado: color muted pero SIN tachado
+                        color: visitada ? RDSColor.textMuted : RDSColor.textPrimary,
+                        fontSize: 13, fontWeight: FontWeight.w700,
+                        fontFamily: c.tipo == 'musico' ? 'SpaceGrotesk' : null,
+                        decoration: (visitada && c.tipo != 'musico')
+                            ? TextDecoration.lineThrough : null,
+                        decorationColor: RDSColor.textMuted)),
+                    const SizedBox(height: 3),
+                    if (visitada)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: RDSColor.green.withOpacity(0.12),
+                          borderRadius: BorderRadius.circular(20)),
+                        child: Row(mainAxisSize: MainAxisSize.min, children: [
+                          const Icon(Icons.check_circle_rounded,
+                            color: RDSColor.green, size: 10),
+                          const SizedBox(width: 3),
+                          const Text('Visitado',
+                            style: TextStyle(color: RDSColor.green,
+                              fontSize: 10, fontWeight: FontWeight.w700)),
+                        ]))
+                    else if (c.tipo == 'musico' && parada.zona.isNotEmpty)
+                      // Rock: mostrar zona/barrio en lugar de modo de validación
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: RDSColor.surface,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: c.colorGradienteA.withOpacity(0.2))),
+                        child: Text(parada.zona,
+                          style: TextStyle(
+                            color: c.colorGradienteA.withOpacity(0.75),
+                            fontSize: 10, fontWeight: FontWeight.w600,
+                            fontFamily: 'SpaceGrotesk')))
+                    else
+                      _PasBadgeModo(parada.modoValidacion),
+                  ])),
+                  if (visitada)
+                    const Icon(Icons.check_circle_rounded, color: RDSColor.green, size: 18)
+                  else
+                    Icon(
+                      c.tipo == 'musico'
+                          ? Icons.arrow_forward_ios_rounded
+                          : Icons.chevron_right_rounded,
+                      color: c.tipo == 'musico'
+                          ? c.colorGradienteA.withOpacity(0.5)
+                          : RDSColor.textMuted.withOpacity(0.5),
+                      size: c.tipo == 'musico' ? 14 : 20),
+                ])));
+          }),
+          const SizedBox(height: 24),
+        ])),
+      ]));
+  }
+
+  Widget _buildZonaChip(String label, String value) {
+    final sel = _filtroZona == value;
+    final c = widget.circuito;
+    return GestureDetector(
+      onTap: () => setState(() => _filtroZona = value),
+      child: Container(
+        margin: const EdgeInsets.only(right: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: sel ? c.colorGradienteA.withOpacity(0.18) : RDSColor.surface,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: sel ? c.colorGradienteA.withOpacity(0.6) : RDSColor.borderSubtle)),
+        child: Text(label,
+          style: TextStyle(
+            color: sel ? c.colorGradienteA : RDSColor.textMuted,
+            fontSize: 11, fontWeight: sel ? FontWeight.w800 : FontWeight.w500))));
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  _MapaPasaporteScreen — mapa de pines del pasaporte (gris=pendiente / color=visitado)
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _MapaPasaporteScreen extends StatefulWidget {
+  final CircuitoFestival circuito;
+  final Map<String, bool> progreso;
+  const _MapaPasaporteScreen({required this.circuito, required this.progreso});
+  @override
+  State<_MapaPasaporteScreen> createState() => _MapaPasaporteScreenState();
+}
+
+class _MapaPasaporteScreenState extends State<_MapaPasaporteScreen> {
+  final Map<String, BitmapDescriptor> _pinCache = {};
+  Set<Marker> _markers = {};
+  bool _cargando = true;
+  ParadaCircuito? _paradaSeleccionada;
+  GoogleMapController? _mapaCtrl;
+
+  // ── Sponsor del circuito — viene de Firestore, nulo = no mostrar ──
+  Map<String, dynamic>? _sponsor;
+
+  @override
+  void initState() {
+    super.initState();
+    _pedirPermisoUbicacion();
+    _inicializar();
+    _cargarSponsor();
+  }
+
+  /// Carga el sponsor desde Firestore.
+  /// Doc: circuitos/{circuitoId}/config/sponsor
+  /// Campos esperados: nombre (String), tagline (String), logoUrl (String, opcional),
+  ///                   urlExterna (String, opcional), activo (bool)
+  Future<void> _cargarSponsor() async {
+    try {
+      final doc = await FirebaseFirestore.instance
+          .collection('circuitos').doc(widget.circuito.id)
+          .collection('config').doc('sponsor')
+          .get();
+      if (!mounted) return;
+      final data = doc.data();
+      if (data != null && data['activo'] == true) {
+        setState(() => _sponsor = data);
+      }
+    } catch (_) {} // falla silenciosamente — el mapa sigue funcionando
+  }
+
+  Future<void> _pedirPermisoUbicacion() async {
+    try {
+      var status = await Geolocator.checkPermission();
+      if (status == LocationPermission.denied) {
+        status = await Geolocator.requestPermission();
+      }
+    } catch (_) {}
+  }
+
+  /// Genera un BitmapDescriptor en forma de pin con icono de museo dibujado en Canvas.
+  /// Para circuitos de tipo 'museo' o 'museos': dibuja una fachada neoclásica (frontón + columnas).
+  /// Para otros circuitos: usa el emoji de la parada (comportamiento original).
+  static Future<BitmapDescriptor> _crearPinMuseo({
+    required String emoji,
+    required bool visitado,
+    required bool esMuseo,  // true → icono arquitectónico; false → emoji
+    Color colorVisitado = const Color(0xFFC9A84C),
+  }) async {
+    const double w = 76.0, h = 92.0, r = 30.0;
+    final Offset center = Offset(w / 2, r + 7);
+
+    final rec = ui.PictureRecorder();
+    final canvas = Canvas(rec);
+
+    // ── Sombra exterior ──
+    canvas.drawCircle(
+      Offset(center.dx, center.dy + 4), r + 2,
+      Paint()
+        ..color = Colors.black.withOpacity(0.45)
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 7),
+    );
+
+    // ── Borde blanco exterior ──
+    canvas.drawCircle(center, r + 3, Paint()..color = Colors.white);
+
+    // ── Fondo del pin ──
+    final Color fondo = visitado ? colorVisitado : const Color(0xFF3A3A3A);
+    canvas.drawCircle(center, r, Paint()..color = fondo);
+
+    // ── Anillo interior si visitado ──
+    if (visitado) {
+      canvas.drawCircle(center, r - 3,
+        Paint()
+          ..color = const Color(0xFF5BAD6F)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 2.0);
+    }
+
+    if (esMuseo) {
+      // ── Icono arquitectónico: fachada neoclásica ──
+      final iconColor = visitado ? Colors.white : const Color(0xFFBBBBBB);
+      final paintIcon = Paint()
+        ..color = iconColor
+        ..style = PaintingStyle.fill;
+      final paintStroke = Paint()
+        ..color = iconColor
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.3
+        ..strokeCap = StrokeCap.round;
+
+      final double cx = center.dx;
+      final double cy = center.dy;
+
+      // Escala relativa al radio
+      const double sc = 0.72; // factor de escala visual
+      final double bw = r * sc * 1.6;  // ancho base del edificio
+      final double bh = r * sc * 1.1;  // alto del cuerpo
+      final double th = r * sc * 0.35; // alto del frontón (triángulo)
+      final double roofH = r * sc * 0.18; // banda del tejado
+      final double baseH = r * sc * 0.2;  // escalón base
+
+      final double left  = cx - bw / 2;
+      final double right = cx + bw / 2;
+      final double bodyTop = cy - bh / 2 + 1;
+      final double bodyBot = cy + bh / 2;
+
+      // Escalón base
+      canvas.drawRect(
+        Rect.fromLTWH(left - 2, bodyBot - baseH, bw + 4, baseH),
+        paintIcon);
+
+      // Cuerpo central
+      canvas.drawRect(
+        Rect.fromLTWH(left, bodyTop + th + roofH, bw, bh - th - roofH - baseH),
+        paintIcon);
+
+      // Banda horizontal sobre columnas (entablamento)
+      canvas.drawRect(
+        Rect.fromLTWH(left, bodyTop + th, bw, roofH),
+        paintIcon);
+
+      // Frontón triangular
+      final fronton = Path()
+        ..moveTo(cx, bodyTop)
+        ..lineTo(right + 2, bodyTop + th)
+        ..lineTo(left - 2, bodyTop + th)
+        ..close();
+      canvas.drawPath(fronton, paintIcon);
+
+      // Columnas (5 columnas)
+      const int nCols = 5;
+      final double colW   = bw * 0.085;
+      final double colH   = bh - th - roofH - baseH;
+      final double colTop = bodyTop + th + roofH;
+      final double gap    = (bw - nCols * colW) / (nCols + 1);
+      for (int i = 0; i < nCols; i++) {
+        final double colX = left + gap + i * (colW + gap);
+        canvas.drawRect(
+          Rect.fromLTWH(colX, colTop, colW, colH),
+          paintIcon);
+      }
+
+      // Puerta central pequeña
+      final double doorW = bw * 0.18;
+      final double doorH = colH * 0.55;
+      final double doorX = cx - doorW / 2;
+      final double doorY = bodyBot - baseH - doorH;
+      final doorPath = Path()
+        ..addRRect(RRect.fromRectAndCorners(
+          Rect.fromLTWH(doorX, doorY, doorW, doorH),
+          topLeft: const Radius.circular(2),
+          topRight: const Radius.circular(2)));
+      canvas.drawPath(doorPath,
+        Paint()..color = fondo); // recorte del fondo = "hueco" de la puerta
+      canvas.drawPath(doorPath, paintStroke);
+
+    } else {
+      // ── Emoji centrado (circuitos no-museo) ──
+      final tp = TextPainter(
+        text: TextSpan(text: emoji, style: const TextStyle(fontSize: 24)),
+        textDirection: TextDirection.ltr,
+      )..layout();
+      tp.paint(canvas,
+        Offset(center.dx - tp.width / 2, center.dy - tp.height / 2 - 1));
+    }
+
+    // ── Badge de check (esquina inferior derecha) si visitado ──
+    if (visitado) {
+      final badgeCenter = Offset(center.dx + r * 0.52, center.dy + r * 0.52);
+      canvas.drawCircle(badgeCenter, 9.5, Paint()..color = const Color(0xFF5BAD6F));
+      canvas.drawCircle(badgeCenter, 9.5,
+        Paint()
+          ..color = Colors.white
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1.5);
+      final check = TextPainter(
+        text: const TextSpan(text: '✓',
+          style: TextStyle(fontSize: 11, color: Colors.white,
+            fontWeight: FontWeight.w900)),
+        textDirection: TextDirection.ltr,
+      )..layout();
+      check.paint(canvas,
+        Offset(badgeCenter.dx - check.width / 2,
+               badgeCenter.dy - check.height / 2));
+    }
+
+    // ── Punta del pin ──
+    final tri = Path()
+      ..moveTo(w / 2 - 9, center.dy + r - 1)
+      ..lineTo(w / 2, h - 4)
+      ..lineTo(w / 2 + 9, center.dy + r - 1)
+      ..close();
+    canvas.drawPath(tri, Paint()..color = fondo);
+    canvas.drawPath(tri,
+      Paint()
+        ..color = Colors.white
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.5);
+
+    final img = await rec.endRecording().toImage(w.toInt(), h.toInt());
+    final bytes = await img.toByteData(format: ui.ImageByteFormat.png);
+    return BitmapDescriptor.fromBytes(bytes!.buffer.asUint8List());
+  }
+
+  Future<void> _inicializar() async {
+    // Pre-generar los dos tipos de pins (visitado / pendiente)
+    // con un emoji genérico de museo; luego se usa por parada
+    final markers = <Marker>{};
+
+    // Circuitos de museos usan el ícono arquitectónico; los demás usan el emoji
+    final bool esCircuitoMuseo = widget.circuito.tipo == 'museo' ||
+        widget.circuito.tipo == 'museos' ||
+        widget.circuito.id.contains('museo');
+
+    for (final parada in widget.circuito.paradas) {
+      final visitado = widget.progreso[parada.id] ?? false;
+      // Incluir tipo en cacheKey para diferenciar museo vs rock
+      final cacheKey = '${esCircuitoMuseo ? 'museo' : parada.emoji}_${visitado ? 'v' : 'p'}';
+
+      if (!_pinCache.containsKey(cacheKey)) {
+        try {
+          _pinCache[cacheKey] = await _crearPinMuseo(
+            emoji: parada.emoji,
+            visitado: visitado,
+            esMuseo: esCircuitoMuseo,
+            colorVisitado: widget.circuito.colorGradienteA);
+        } catch (_) {
+          _pinCache[cacheKey] = visitado
+              ? BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueYellow)
+              : BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueAzure);
+        }
+      }
+
+      markers.add(Marker(
+        markerId: MarkerId(parada.id),
+        position: LatLng(parada.lat, parada.lng),
+        icon: _pinCache[cacheKey]!,
+        infoWindow: InfoWindow(
+          title: parada.nombre,
+          snippet: visitado ? '✓ Visitado' : 'Sin visitar',
+        ),
+        onTap: () => setState(() => _paradaSeleccionada = parada),
+      ));
+    }
+
+    if (mounted) setState(() { _markers = markers; _cargando = false; });
+  }
+
+  /// Centro del mapa = centroide de todas las paradas
+  LatLng get _centroMapa {
+    if (widget.circuito.paradas.isEmpty) return const LatLng(6.2442, -75.5812);
+    double sumLat = 0, sumLng = 0;
+    for (final p in widget.circuito.paradas) {
+      sumLat += p.lat; sumLng += p.lng;
+    }
+    final n = widget.circuito.paradas.length;
+    return LatLng(sumLat / n, sumLng / n);
+  }
+
+  int get _visitadas => widget.progreso.values.where((v) => v).length;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = widget.circuito;
+    final Color acento = c.colorGradienteA;
+    return Scaffold(
+      backgroundColor: RDSColor.base,
+      body: Stack(children: [
+        // Mapa
+        _cargando
+          ? Center(child: CircularProgressIndicator(color: acento))
+          : GoogleMap(
+              initialCameraPosition: CameraPosition(
+                target: _centroMapa, zoom: 13.5),
+              markers: _markers,
+              mapType: MapType.normal,
+              myLocationEnabled: true,
+              myLocationButtonEnabled: false,   // ← desactivado: botón nativo queda bajo batería
+              zoomControlsEnabled: false,
+              mapToolbarEnabled: false,
+              style: kRuteroMapStyle,
+              onMapCreated: (ctrl) => _mapaCtrl = ctrl,
+              onTap: (_) => setState(() => _paradaSeleccionada = null),
+            ),
+
+        // AppBar flotante
+        Positioned(
+          top: 0, left: 0, right: 0,
+          child: Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [RDSColor.base, RDSColor.base.withOpacity(0)],
+                begin: Alignment.topCenter, end: Alignment.bottomCenter)),
+            child: SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                child: Row(children: [
+                  GestureDetector(
+                    onTap: () => Navigator.pop(context),
+                    child: Container(
+                      width: 36, height: 36,
+                      decoration: BoxDecoration(
+                        color: RDSColor.card,
+                        borderRadius: BorderRadius.circular(18),
+                        border: Border.all(color: acento.withOpacity(0.3))),
+                      child: const Icon(Icons.arrow_back_ios_new_rounded,
+                        color: Colors.white, size: 15))),
+                  const SizedBox(width: 10),
+                  Expanded(child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(c.nombre,
+                        style: TextStyle(
+                          color: RDSColor.textPrimary,
+                          fontSize: 14, fontWeight: FontWeight.w800,
+                          fontFamily: c.tipo == 'musico' ? 'SpaceGrotesk' : null)),
+                      Text('$_visitadas / ${c.paradasTotal} '
+                        '${c.tipo == "musico" ? "bares" : "paradas"} visitados',
+                        style: TextStyle(
+                          color: c.tipo == 'musico'
+                              ? acento.withOpacity(0.65)
+                              : RDSColor.textMuted,
+                          fontSize: 11,
+                          fontFamily: c.tipo == 'musico' ? 'SpaceGrotesk' : null)),
+                    ])),
+                  // Leyenda mini
+                  Row(children: [
+                    _LeyendaPin(color: acento, label: 'Visitado'),
+                    const SizedBox(width: 8),
+                    _LeyendaPin(color: const Color(0xFF4A4A4A), label: 'Pendiente'),
+                  ]),
+                ])))),
+        ),
+
+        // ── Banner sponsor del circuito — aparece solo si está activo en Firestore ──
+        if (_sponsor != null)
+          Positioned(
+            top: 0, left: 0, right: 0,
+            child: SafeArea(
+              bottom: false,
+              child: Padding(
+                padding: const EdgeInsets.only(top: 68), // deja espacio al AppBar flotante
+                child: _BannerSponsorCircuito(
+                  sponsor: _sponsor!,
+                  acento: acento,
+                ),
+              ),
+            ),
+          ),
+
+        // ── Botón "Mi ubicación" — esquina inferior IZQUIERDA (SOS ocupa la derecha) ──
+        Positioned(
+          bottom: _paradaSeleccionada != null ? 170 : 32,
+          left: 16,
+          child: GestureDetector(
+            onTap: () async {
+              try {
+                final pos = await Geolocator.getCurrentPosition(
+                  desiredAccuracy: LocationAccuracy.high);
+                _mapaCtrl?.animateCamera(CameraUpdate.newLatLngZoom(
+                  LatLng(pos.latitude, pos.longitude), 15.5));
+              } catch (_) {}
+            },
+            child: Container(
+              width: 42, height: 42,
+              decoration: BoxDecoration(
+                color: RDSColor.card,
+                shape: BoxShape.circle,
+                border: Border.all(color: acento.withOpacity(0.35)),
+                boxShadow: [BoxShadow(
+                  color: Colors.black.withOpacity(0.35),
+                  blurRadius: 8, offset: const Offset(0, 3))]),
+              child: Icon(Icons.my_location_rounded,
+                color: acento, size: 20)),
+          ),
+        ),
+
+        // Tarjeta info parada seleccionada — toca para abrir detalle, X para cerrar
+        if (_paradaSeleccionada != null)
+          Positioned(
+            bottom: 24, left: 16, right: 16,
+            child: GestureDetector(
+              onTap: () async {
+                final parada   = _paradaSeleccionada!;
+                final visitada = widget.progreso[parada.id] ?? false;
+                await RuteroNav.push(
+                  context,
+                  PasaporteParadaScreen(
+                    circuito: widget.circuito,
+                    parada:   parada,
+                    visitada: visitada,
+                  ),
+                );
+              },
+              child: Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: RDSColor.card,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: (widget.progreso[_paradaSeleccionada!.id] ?? false)
+                        ? acento.withOpacity(0.5)
+                        : RDSColor.surface)),
+                child: Row(children: [
+                  Container(
+                    width: 48, height: 48,
+                    decoration: BoxDecoration(
+                      color: (widget.progreso[_paradaSeleccionada!.id] ?? false)
+                          ? RDSColor.gold.withOpacity(0.15)
+                          : RDSColor.surface,
+                      borderRadius: BorderRadius.circular(12)),
+                    child: Center(child: Text(_paradaSeleccionada!.emoji,
+                      style: const TextStyle(fontSize: 26)))),
+                  const SizedBox(width: 12),
+                  Expanded(child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(_paradaSeleccionada!.nombre,
+                        style: TextStyle(
+                          color: RDSColor.textPrimary,
+                          fontSize: 14, fontWeight: FontWeight.w700,
+                          fontFamily: c.tipo == 'musico' ? 'SpaceGrotesk' : null)),
+                      const SizedBox(height: 4),
+                      Row(children: [
+                        if (widget.progreso[_paradaSeleccionada!.id] ?? false) ...[
+                          const Icon(Icons.check_circle_rounded,
+                            color: RDSColor.green, size: 13),
+                          const SizedBox(width: 4),
+                          const Text('Visitado',
+                            style: TextStyle(color: RDSColor.green, fontSize: 11,
+                              fontWeight: FontWeight.w600)),
+                        ] else ...[
+                          const Icon(Icons.radio_button_unchecked_rounded,
+                            color: RDSColor.textMuted, size: 13),
+                          const SizedBox(width: 4),
+                          const Text('Sin visitar',
+                            style: TextStyle(color: RDSColor.textMuted, fontSize: 11)),
+                        ],
+                      ]),
+                    ])),
+                  // Chevron → indica que se puede abrir el detalle
+                  const Icon(Icons.chevron_right_rounded,
+                    color: RDSColor.textMuted, size: 20),
+                  const SizedBox(width: 4),
+                  // X para cerrar sin navegar
+                  GestureDetector(
+                    onTap: () => setState(() => _paradaSeleccionada = null),
+                    child: const Icon(Icons.close_rounded,
+                      color: RDSColor.textMuted, size: 18)),
+                ]))),
+          ),
+      ]),
+    );
+  }
+}
+
+Widget _LeyendaPin({required Color color, required String label}) =>
+  Row(mainAxisSize: MainAxisSize.min, children: [
+    Container(
+      width: 10, height: 10,
+      decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
+    const SizedBox(width: 4),
+    Text(label, style: const TextStyle(color: RDSColor.textMuted, fontSize: 10)),
+  ]);
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  _BannerSponsorCircuito
+//  Strip horizontal con el sponsor del circuito.
+//  Se muestra SOLO si el doc circuitos/{id}/config/sponsor existe y activo=true.
+//  Campos Firestore: nombre, tagline, logoUrl (opcional), urlExterna (opcional)
+// ─────────────────────────────────────────────────────────────────────────────
+class _BannerSponsorCircuito extends StatelessWidget {
+  final Map<String, dynamic> sponsor;
+  final Color acento;
+  const _BannerSponsorCircuito({required this.sponsor, required this.acento});
+
+  @override
+  Widget build(BuildContext context) {
+    final nombre    = sponsor['nombre']    as String? ?? '';
+    final tagline   = sponsor['tagline']   as String? ?? '';
+    final logoUrl   = sponsor['logoUrl']   as String? ?? '';
+    final urlExt    = sponsor['urlExterna'] as String? ?? '';
+
+    Widget inner = Container(
+      margin: const EdgeInsets.symmetric(horizontal: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+      decoration: BoxDecoration(
+        color: RDSColor.card.withOpacity(0.92),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: acento.withOpacity(0.35)),
+        boxShadow: [BoxShadow(
+          color: Colors.black.withOpacity(0.25),
+          blurRadius: 8, offset: const Offset(0, 2))]),
+      child: Row(children: [
+        // Logo o marca placeholder
+        if (logoUrl.isNotEmpty)
+          ClipRRect(
+            borderRadius: BorderRadius.circular(6),
+            child: Image.network(logoUrl,
+              width: 32, height: 32, fit: BoxFit.contain,
+              errorBuilder: (_, __, ___) =>
+                const Text('🍺', style: TextStyle(fontSize: 22))))
+        else if (nombre.isNotEmpty)
+          Container(
+            width: 36, height: 36,
+            decoration: BoxDecoration(
+              color: acento.withOpacity(0.12),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: acento.withOpacity(0.3))),
+            child: const Center(
+              child: Text('🍺', style: TextStyle(fontSize: 20))))
+        else
+          Container(
+            width: 36, height: 36,
+            decoration: BoxDecoration(
+              color: acento.withOpacity(0.12),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: acento.withOpacity(0.3))),
+            child: const Center(
+              child: Text('🍺', style: TextStyle(fontSize: 20)))),
+        const SizedBox(width: 10),
+        Expanded(child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              nombre.isNotEmpty ? nombre : 'Perno Lager',
+              style: const TextStyle(color: RDSColor.textPrimary,
+                fontSize: 12, fontWeight: FontWeight.w800,
+                fontFamily: 'SpaceGrotesk', letterSpacing: -0.3)),
+            Text(
+              tagline.isNotEmpty ? tagline : 'La cerveza del rock medellinense 🤘',
+              style: TextStyle(color: acento.withOpacity(0.75),
+                fontSize: 10, fontFamily: 'SpaceGrotesk')),
+          ])),
+        // Badge "Patrocinador Oficial"
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
+          decoration: BoxDecoration(
+            color: acento.withOpacity(0.15),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: acento.withOpacity(0.45))),
+          child: Text('Patrocinador\nOficial',
+            textAlign: TextAlign.center,
+            style: TextStyle(color: acento,
+              fontSize: 8, fontWeight: FontWeight.w800,
+              fontFamily: 'SpaceGrotesk', letterSpacing: 0.3,
+              height: 1.3))),
+      ]));
+
+    // Si tiene URL externa, hacerlo tappable
+    if (urlExt.isNotEmpty) {
+      return GestureDetector(
+        onTap: () async {
+          final uri = Uri.tryParse(urlExt);
+          if (uri != null && await canLaunchUrl(uri)) {
+            await launchUrl(uri, mode: LaunchMode.externalApplication);
+          }
+        },
+        child: inner);
+    }
+    return inner;
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
+Widget _PasTabFiltro(String label, String valor, String activo, VoidCallback onTap,
+    {bool esRock = false, Color acento = RDSColor.gold}) {
+  final sel = valor == activo;
+  // Rock: tab activo usa acento del circuito (rojo) con borde; inactivo es superficie oscura
+  return GestureDetector(
+    onTap: onTap,
+    child: Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+      decoration: BoxDecoration(
+        color: esRock
+            ? (sel ? acento.withOpacity(0.18) : RDSColor.surface)
+            : (sel ? RDSColor.gold : RDSColor.surface),
+        borderRadius: BorderRadius.circular(20),
+        border: esRock
+            ? Border.all(
+                color: sel ? acento.withOpacity(0.65) : Colors.transparent,
+                width: 1.2)
+            : null),
+      child: Text(label,
+        style: TextStyle(
+          color: esRock
+              ? (sel ? acento : RDSColor.textMuted)
+              : (sel ? Colors.black : RDSColor.textMuted),
+          fontSize: 12, fontWeight: FontWeight.w700,
+          fontFamily: esRock ? 'SpaceGrotesk' : null))));
+}
+
+Widget _PasBadgeModo(ModoValidacion modo) {
+  switch (modo) {
+    case ModoValidacion.gpsQr:      return _PasBadgeChip('QR', Icons.qr_code_rounded);
+    case ModoValidacion.gpsKeyword: return _PasBadgeChip('Keyword', Icons.key_rounded);
+    default:                        return _PasBadgeChip('GPS', Icons.location_on_rounded);
+  }
+}
+
+Widget _PasBadgeChip(String label, IconData icon) => Container(
+  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+  decoration: BoxDecoration(
+    color: RDSColor.surface, borderRadius: BorderRadius.circular(8)),
+  child: Row(mainAxisSize: MainAxisSize.min, children: [
+    Icon(icon, size: 10, color: RDSColor.textMuted),
+    const SizedBox(width: 3),
+    Text(label, style: TextStyle(color: RDSColor.textMuted, fontSize: 10,
+      fontWeight: FontWeight.w600)),
+  ]));
+
+class _RedSocialBtn extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final Color colorBg;
+  final Color colorBorder;
+  final Color colorText;
+  final VoidCallback onTap;
+  const _RedSocialBtn({
+    required this.icon, required this.label,
+    required this.colorBg, required this.colorBorder,
+    required this.colorText, required this.onTap});
+  @override
+  Widget build(BuildContext context) => GestureDetector(
+    onTap: onTap,
+    child: Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: colorBg,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: colorBorder)),
+      child: Row(mainAxisSize: MainAxisSize.min, children: [
+        Icon(icon, size: 14, color: colorText),
+        const SizedBox(width: 6),
+        Text(label,
+          style: TextStyle(color: colorText, fontSize: 12,
+            fontWeight: FontWeight.w700, fontFamily: 'SpaceGrotesk')),
+      ])));
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  PasaporteParadaScreen — Detalle + check-in GPS / QR / Keyword
+// ─────────────────────────────────────────────────────────────────────────────
+
+class PasaporteParadaScreen extends StatefulWidget {
+  final CircuitoFestival circuito;
+  final ParadaCircuito parada;
+  final bool visitada;
+  const PasaporteParadaScreen({
+    super.key, required this.circuito,
+    required this.parada, required this.visitada});
+  @override
+  State<PasaporteParadaScreen> createState() => _PasaporteParadaScreenState();
+}
+
+class _PasaporteParadaScreenState extends State<PasaporteParadaScreen> {
+  bool _checkinHecho = false;
+  bool _procesando = false;
+  bool _dentroDelRadio = false;
+  Position? _posActual;
+  final _keywordCtrl = TextEditingController();
+  String? _errorKeyword;
+  // Keyword semanal dinámica — cargada desde Firestore
+  // Si Firestore no tiene el doc, se usa keywordHash del seed como fallback
+  String? _keywordSemana;
+  // Carrusel de fotos
+  final _pageCtrl = PageController();
+  int _fotoActual = 0;
+  // Misión épica
+  final _pickerMision = ImagePicker();
+  bool _generandoMision = false;
+  bool _misionCumplida = false;
+
+  // Trivia
+  bool _triviaDisponible = false;
+  bool _triviaCompletada = false;
+  bool _triviaAcertada = false;
+
+  // Parada local — se recarga desde Firestore al volver de gestión
+  ParadaCircuito? _paradaLocal;
+  ParadaCircuito get p => _paradaLocal ?? widget.parada;
+
+  Future<void> _recargarParada() async {
+    try {
+      final snap = await FirebaseFirestore.instance
+        .collection('circuitos_festivales')
+        .doc(widget.circuito.id)
+        .collection('paradas')
+        .doc(widget.parada.id)
+        .get();
+      if (snap.exists && mounted) {
+        setState(() {
+          _paradaLocal = ParadaCircuito.fromFirestore(snap.id, snap.data()!);
+        });
+      }
+    } catch (e) {
+      debugPrint('⚠️ _recargarParada error: $e');
+    }
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _checkinHecho = widget.visitada;
+    _verificarGPS();
+    _cargarKeywordSemana();
+    if (_checkinHecho) _verificarTrivia();
+    _verificarMisionCumplida();
+  }
+
+  /// Verifica si el usuario ya cumplió la misión épica de esta parada.
+  Future<void> _verificarMisionCumplida() async {
+    final uid = FirebaseAuth.instance.currentUser?.uid ?? '';
+    if (uid.isEmpty) return;
+    try {
+      final doc = await FirebaseFirestore.instance
+          .collection('usuarios').doc(uid)
+          .collection('pasaportes').doc(widget.circuito.id)
+          .collection('paradas').doc(widget.parada.id)
+          .get();
+      final cumplida = doc.data()?['misionEpicaCumplida'] == true;
+      if (mounted && cumplida) setState(() => _misionCumplida = true);
+    } catch (_) {}
+  }
+
+  /// Registra la misión épica en Firestore (una sola vez) y suma 75 puntos.
+  Future<void> _registrarMisionFirestore() async {
+    final uid = FirebaseAuth.instance.currentUser?.uid ?? '';
+    if (uid.isEmpty) return;
+    const puntosMision = 75;
+    try {
+      final db = FirebaseFirestore.instance;
+      final batch = db.batch();
+      // Marcar misión cumplida en la parada del usuario
+      final paradaRef = db.collection('usuarios').doc(uid)
+          .collection('pasaportes').doc(widget.circuito.id)
+          .collection('paradas').doc(widget.parada.id);
+      batch.set(paradaRef, {
+        'misionEpicaCumplida': true,
+        'misionEpicaTimestamp': FieldValue.serverTimestamp(),
+        'puntosMision': puntosMision,
+      }, SetOptions(merge: true));
+      // Acumular puntos en el doc del circuito
+      final circuitoRef = db.collection('usuarios').doc(uid)
+          .collection('pasaportes').doc(widget.circuito.id);
+      batch.set(circuitoRef, {
+        'puntosTotal': FieldValue.increment(puntosMision),
+        'ultimaActividad': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+      // Sumar al perfil global
+      batch.set(db.collection('usuarios').doc(uid), {
+        'puntosTotal': FieldValue.increment(puntosMision),
+      }, SetOptions(merge: true));
+      await batch.commit();
+      if (mounted) setState(() => _misionCumplida = true);
+    } catch (e) {
+      debugPrint('Error registrando misión épica: $e');
+    }
+  }
+
+  /// Convierte el texto de horario a un formato legible para mostrar en pantalla.
+  ///
+  /// Formato pipe → muestra sólo los días que NO son cerrado, en columnas compactas.
+  /// Ej: "lunes: cerrado | viernes: 18:00–02:00 | sabado: 18:00–03:00"
+  ///   → "Vie  18:00 – 02:00\nSáb  18:00 – 03:00"
+  ///
+  /// Formato rango → retorna el texto tal cual (ya es legible).
+  String _formatearHorario(String horario) {
+    if (!horario.contains('|')) return horario; // formato rango → sin cambio
+
+    const abrevDia = {
+      'lunes': 'Lun', 'martes': 'Mar', 'miercoles': 'Mié', 'miércoles': 'Mié',
+      'jueves': 'Jue', 'viernes': 'Vie', 'sabado': 'Sáb', 'sábado': 'Sáb',
+      'domingo': 'Dom',
+    };
+    const ordenDias = [
+      'lunes', 'martes', 'miercoles', 'miércoles',
+      'jueves', 'viernes', 'sabado', 'sábado', 'domingo',
+    ];
+    const diaWeekday = {
+      'lunes': 1, 'martes': 2, 'miercoles': 3, 'miércoles': 3,
+      'jueves': 4, 'viernes': 5, 'sabado': 6, 'sábado': 6, 'domingo': 7,
+    };
+
+    final hoy = DateTime.now().weekday;
+    final mapa = <String, String>{};
+    for (final parte in horario.split('|')) {
+      final seg = parte.trim().toLowerCase();
+      final idx = seg.indexOf(':');
+      if (idx < 0) continue;
+      final dia   = seg.substring(0, idx).trim();
+      final valor = seg.substring(idx + 1).trim();
+      mapa[dia] = valor;
+    }
+
+    final lineas = <String>[];
+    for (final dia in ordenDias) {
+      if (!mapa.containsKey(dia)) continue;
+      // evitar duplicados (miercoles / miércoles)
+      if (dia == 'miercoles' && mapa.containsKey('miércoles')) continue;
+      if (dia == 'sabado'    && mapa.containsKey('sábado'))    continue;
+      final valor  = mapa[dia]!;
+      final abrev  = abrevDia[dia] ?? dia;
+      final esHoy  = (diaWeekday[dia] ?? -1) == hoy;
+      final sufijo = esHoy ? ' ◀' : '';
+      if (valor == 'cerrado' || valor.isEmpty) {
+        lineas.add('$abrev  Cerrado$sufijo');
+      } else {
+        lineas.add('$abrev  $valor$sufijo');
+      }
+    }
+
+    if (lineas.isEmpty) return horario;
+    return lineas.join('\n');
+  }
+
+  /// Verifica si el bar está abierto según su campo `horario`.
+  ///
+  /// Soporta dos formatos:
+  ///   A) Formato seed (rango de días):  "Mar–Dom: 4pm – 2am" / "Lun–Dom: 5pm – 3am"
+  ///   B) Formato form (pipe-separado):  "lunes: cerrado | martes: 18:00–02:00 | ..."
+  ///
+  /// Retorna true si la hora actual cae dentro del rango del día de hoy,
+  /// o si el formato no se puede parsear (evita bloquear por error de parsing).
+  bool _dentroDeHorario() {
+    final horario = widget.parada.horario;
+    if (horario.isEmpty) return true;
+
+    try {
+      // ── Formato B: pipe-separado ───────────────────────────────────────────
+      if (horario.contains('|')) {
+        return _dentroDeHorarioPipe(horario);
+      }
+
+      // ── Formato A: rango de días + horas 12h ──────────────────────────────
+      return _dentroDeHorarioRango(horario);
+    } catch (_) {
+      return true; // ante cualquier error → no bloquear
+    }
+  }
+
+  /// Parsea formato "lunes: cerrado | martes: cerrado | viernes: 18:00–02:00 | ..."
+  bool _dentroDeHorarioPipe(String horario) {
+    // Mapa de nombre de día (es) → índice weekday (1=lun … 7=dom)
+    const diaNombre = {
+      'lunes': 1, 'martes': 2, 'miercoles': 3, 'miércoles': 3,
+      'jueves': 4, 'viernes': 5, 'sabado': 6, 'sábado': 6, 'domingo': 7,
+    };
+
+    final hoy = DateTime.now().weekday; // 1=lun … 7=dom
+    final partes = horario.split('|');
+
+    for (final parte in partes) {
+      final segmento = parte.trim().toLowerCase();
+      final colonIdx = segmento.indexOf(':');
+      if (colonIdx < 0) continue;
+
+      final nombreDia = segmento.substring(0, colonIdx).trim();
+      final idx = diaNombre[nombreDia];
+      if (idx == null || idx != hoy) continue;
+
+      // Encontramos el día de hoy
+      final valorHorario = segmento.substring(colonIdx + 1).trim();
+      if (valorHorario == 'cerrado' || valorHorario.isEmpty) return false;
+
+      // Parsear rango "18:00–02:00" o "6pm–2am"
+      return _rangoAbierto(valorHorario);
+    }
+
+    // Si el día de hoy no aparece en la lista → no bloquear
+    return true;
+  }
+
+  /// Parsea formato "Mar–Dom: 4pm – 2am"
+  bool _dentroDeHorarioRango(String horario) {
+    final regexHora = RegExp(r'(\d{1,2})(am|pm)\s*[–\-]\s*(\d{1,2})(am|pm)',
+        caseSensitive: false);
+    final match = regexHora.firstMatch(horario);
+    if (match == null) return true;
+
+    int parseAmPm(String h, String periodo) {
+      int hora = int.parse(h);
+      final p = periodo.toLowerCase();
+      if (p == 'pm' && hora != 12) hora += 12;
+      if (p == 'am' && hora == 12) hora = 0;
+      return hora;
+    }
+
+    final aperturaH = parseAmPm(match.group(1)!, match.group(2)!);
+    final cierreH   = parseAmPm(match.group(3)!, match.group(4)!);
+    final ahora     = TimeOfDay.now();
+    final minutos   = ahora.hour * 60 + ahora.minute;
+    final apertura  = aperturaH * 60;
+    final cierre    = cierreH * 60;
+
+    if (apertura <= cierre) {
+      return minutos >= apertura && minutos < cierre;
+    } else {
+      // Cruza medianoche: ej 7pm (1140) – 3am (180)
+      return minutos >= apertura || minutos < cierre;
+    }
+  }
+
+  /// Recibe un rango como "18:00–02:00" o "6pm–2am" y retorna true si
+  /// la hora actual cae dentro.
+  bool _rangoAbierto(String rango) {
+    // Intentar formato 24h: "18:00–02:00"
+    final regex24 = RegExp(r'(\d{1,2}):(\d{2})\s*[–\-]\s*(\d{1,2}):(\d{2})');
+    final m24 = regex24.firstMatch(rango);
+    if (m24 != null) {
+      final apertura = int.parse(m24.group(1)!) * 60 + int.parse(m24.group(2)!);
+      final cierre   = int.parse(m24.group(3)!) * 60 + int.parse(m24.group(4)!);
+      final ahora    = TimeOfDay.now();
+      final minutos  = ahora.hour * 60 + ahora.minute;
+      if (apertura <= cierre) {
+        return minutos >= apertura && minutos < cierre;
+      } else {
+        return minutos >= apertura || minutos < cierre;
+      }
+    }
+
+    // Intentar formato 12h: "6pm–2am"
+    final regex12 = RegExp(r'(\d{1,2})(am|pm)\s*[–\-]\s*(\d{1,2})(am|pm)',
+        caseSensitive: false);
+    final m12 = regex12.firstMatch(rango);
+    if (m12 != null) {
+      int parseAmPm(String h, String p) {
+        int hora = int.parse(h);
+        if (p.toLowerCase() == 'pm' && hora != 12) hora += 12;
+        if (p.toLowerCase() == 'am' && hora == 12) hora = 0;
+        return hora;
+      }
+      final apertura = parseAmPm(m12.group(1)!, m12.group(2)!) * 60;
+      final cierre   = parseAmPm(m12.group(3)!, m12.group(4)!) * 60;
+      final ahora    = TimeOfDay.now();
+      final minutos  = ahora.hour * 60 + ahora.minute;
+      if (apertura <= cierre) {
+        return minutos >= apertura && minutos < cierre;
+      } else {
+        return minutos >= apertura || minutos < cierre;
+      }
+    }
+
+    return true; // formato no reconocido → no bloquear
+  }
+
+  /// Carga la keyword semanal de este bar específico desde Firestore.
+  /// Doc: configuracion/keywords_semana/{circuitoId}
+  /// Campo: keywords (Map<String, String>) — clave: paradaId · valor: keyword
+  /// Rutero actualiza ese doc cada lunes con las keywords de todos los bares.
+  /// Si el doc no existe o falla, _keywordSemana queda null y se usa el
+  /// keywordHash estático del seed como fallback.
+  Future<void> _cargarKeywordSemana() async {
+    try {
+      final doc = await FirebaseFirestore.instance
+          .collection('configuracion')
+          .doc('keywords_semana')
+          .collection(widget.circuito.id)
+          .doc('actual')
+          .get();
+      if (doc.exists) {
+        final keywords = doc.data()?['keywords'] as Map<String, dynamic>?;
+        if (keywords != null) {
+          final kw = keywords[widget.parada.id]?.toString();
+          if (kw != null && kw.isNotEmpty && mounted) {
+            setState(() => _keywordSemana = kw.trim().toLowerCase());
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('⚠️ _cargarKeywordSemana error: $e');
+    }
+  }
+
+  @override
+  void dispose() {
+    _keywordCtrl.dispose();
+    _pageCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _verificarTrivia() async {
+    final uid = FirebaseAuth.instance.currentUser?.uid ?? '';
+    if (uid.isEmpty) return;
+    // Solo si la parada tiene trivia
+    if (widget.parada.trivia == null) return;
+    // Verificar si ya respondió
+    try {
+      final doc = await FirebaseFirestore.instance
+          .collection('usuarios')
+          .doc(uid)
+          .collection('pasaportes')
+          .doc(widget.circuito.id)
+          .collection('paradas')
+          .doc(widget.parada.id)
+          .get();
+      final data = doc.data();
+      if (data == null) return;
+      final triviaData = data['trivia'] as Map<String, dynamic>?;
+      if (triviaData != null) {
+        if (mounted) setState(() {
+          _triviaCompletada = true;
+          _triviaAcertada = triviaData['acertada'] == true;
+          _triviaDisponible = false;
+        });
+      } else {
+        if (mounted) setState(() => _triviaDisponible = true);
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _verificarGPS() async {
+    try {
+      bool servicioActivo = await Geolocator.isLocationServiceEnabled();
+      if (!servicioActivo) return;
+      LocationPermission perm = await Geolocator.checkPermission();
+      if (perm == LocationPermission.denied) {
+        perm = await Geolocator.requestPermission();
+      }
+      if (perm == LocationPermission.denied ||
+          perm == LocationPermission.deniedForever) return;
+      final pos = await Geolocator.getCurrentPosition(
+          desiredAccuracy: LocationAccuracy.high);
+      final dist = Geolocator.distanceBetween(
+          pos.latitude, pos.longitude,
+          widget.parada.lat, widget.parada.lng);
+      if (mounted) setState(() {
+        _posActual = pos;
+        _dentroDelRadio = kModoDemo || dist <= widget.parada.radioMetros;
+      });
+    } catch (_) {}
+  }
+
+  Future<void> _checkInGPS() async {
+    if (!_dentroDelRadio || _procesando || _checkinHecho) return;
+    if (!kModoDemo && !_dentroDeHorario()) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('El bar está cerrado en este momento. Volvé en horario de apertura.'),
+        backgroundColor: Colors.deepOrange));
+      return;
+    }
+    final uid = FirebaseAuth.instance.currentUser?.uid ?? '';
+    if (uid.isEmpty) return;
+    setState(() => _procesando = true);
+    // En modo demo puede no haber GPS real — usamos coords del museo como fallback
+    final lat = _posActual?.latitude ?? widget.parada.lat;
+    final lng = _posActual?.longitude ?? widget.parada.lng;
+    final ok = await PasaportesService.registrarCheckIn(
+      uid: uid, circuitoId: widget.circuito.id, paradaId: widget.parada.id,
+      esConsumo: false,
+      latUsuario: lat, lngUsuario: lng,
+      metodo: kModoDemo ? 'demo' : 'gps');
+    if (mounted) setState(() { _procesando = false; if (ok) { _checkinHecho = true; _onCheckinExitoso(); } });
+  }
+
+  Future<void> _abrirQRScanner() async {
+    if (!_dentroDelRadio || _procesando || _checkinHecho) return;
+    if (!kModoDemo && !_dentroDeHorario()) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('El bar está cerrado en este momento. Volvé en horario de apertura.'),
+        backgroundColor: Colors.deepOrange));
+      return;
+    }
+    final uid = FirebaseAuth.instance.currentUser?.uid ?? '';
+    if (uid.isEmpty) return;
+
+    final resultado = await Navigator.push<String>(
+      context,
+      MaterialPageRoute(builder: (_) => _QRScannerScreen(
+        nombreParada: widget.parada.nombre,
+        paradaId: widget.parada.id,
+        tipoCircuito: widget.circuito.tipo,
+      )),
+    );
+
+    if (resultado == null || !mounted) return;
+
+    // El QR válido debe contener el ID de la parada
+    if (resultado != widget.parada.id) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('QR no corresponde a ${widget.circuito.tipo == "musico" ? "este bar" : "este museo"}. Intenta de nuevo.'),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
+      return;
+    }
+
+    setState(() => _procesando = true);
+    final lat = _posActual?.latitude ?? widget.parada.lat;
+    final lng = _posActual?.longitude ?? widget.parada.lng;
+    final ok = await PasaportesService.registrarCheckIn(
+      uid: uid,
+      circuitoId: widget.circuito.id,
+      paradaId: widget.parada.id,
+      esConsumo: false,
+      latUsuario: lat,
+      lngUsuario: lng,
+      metodo: kModoDemo ? 'demo_qr' : 'gps_qr',
+    );
+    if (mounted) setState(() { _procesando = false; if (ok) { _checkinHecho = true; _onCheckinExitoso(); } });
+  }
+
+  Future<void> _checkInKeyword() async {
+    if (!_dentroDelRadio || _procesando || _checkinHecho) return;
+    if (!kModoDemo && !_dentroDeHorario()) {
+      setState(() => _errorKeyword = 'El bar está cerrado ahora. Volvé en horario de apertura.');
+      return;
+    }
+    final keyword = _keywordCtrl.text.trim().toLowerCase();
+    if (keyword.isEmpty) return;
+    final uid = FirebaseAuth.instance.currentUser?.uid ?? '';
+    if (uid.isEmpty) return;
+
+    // ── Validación de keyword ─────────────────────────────────────────────────
+    // 1. Prioridad: keyword semanal de ESTE BAR desde Firestore (única por bar)
+    //    Doc: configuracion/keywords_semana/{circuitoId}/actual
+    //    Map: keywords[paradaId] — se actualiza cada lunes para todos los bares
+    // 2. Fallback: keywordHash estático del seed (evita bloquear si Firestore falla)
+    final keywordDinamica = _keywordSemana;
+    final keywordFallback = widget.parada.keywordHash?.toLowerCase();
+    final esValida = (keywordDinamica != null && keyword == keywordDinamica)
+        || (keywordDinamica == null && keywordFallback != null && keyword == keywordFallback);
+
+    if (!esValida) {
+      setState(() => _errorKeyword = 'Palabra clave incorrecta. Consumí en el bar y pedísela al bartender.');
+      return;
+    }
+    // ─────────────────────────────────────────────────────────────────────────
+
+    setState(() { _procesando = true; _errorKeyword = null; });
+    // Usar coordenadas reales del GPS si están disponibles; de lo contrario,
+    // usar las coordenadas del bar registrado en Firestore como fallback seguro.
+    final lat = _posActual?.latitude ?? widget.parada.lat;
+    final lng = _posActual?.longitude ?? widget.parada.lng;
+    final ok = await PasaportesService.registrarCheckIn(
+      uid: uid, circuitoId: widget.circuito.id, paradaId: widget.parada.id,
+      esConsumo: true,
+      latUsuario: lat, lngUsuario: lng,
+      metodo: 'gps_keyword');
+    if (mounted) setState(() { _procesando = false; if (ok) { _checkinHecho = true; _onCheckinExitoso(); } });
+  }
+
+  void _onCheckinExitoso() {
+    if (widget.parada.trivia != null) {
+      setState(() => _triviaDisponible = true);
+    }
+    // Verificar si el usuario acaba de completar el circuito
+    _verificarCircuitoCompletado();
+  }
+
+  Future<void> _verificarCircuitoCompletado() async {
+    final uid = FirebaseAuth.instance.currentUser?.uid ?? '';
+    if (uid.isEmpty) return;
+    final c = widget.circuito;
+    if (c.paradasParaPremio <= 0) return;
+
+    try {
+      final db = FirebaseFirestore.instance;
+      // Contar paradas visitadas hasta ahora
+      final snap = await db
+          .collection('usuarios').doc(uid)
+          .collection('pasaportes').doc(c.id)
+          .collection('paradas')
+          .get();
+      final visitadas = snap.docs
+          .where((d) => (d['visitado'] == true || d['consumo'] == true))
+          .length;
+
+      if (visitadas >= c.paradasParaPremio) {
+        // Verificar que no se haya otorgado el premio antes
+        final premioDoc = await db
+            .collection('usuarios').doc(uid)
+            .collection('premios').doc('pin_${c.id}')
+            .get();
+        if (premioDoc.exists) return; // ya fue otorgado
+
+        // ¡Completado! Otorgar insignia + bono global + premio físico
+        await PasaportesService.completarCircuito(
+          uid: uid,
+          circuitoId: c.id,
+          nombreCircuito: c.nombre,
+          emojiCircuito: c.premioEmoji,
+        );
+
+        // Guardar premio (pin físico) — mismo flujo que rutas clásicas
+        final img = kInsigniaPorRuta[c.id] ?? '';
+        await AuthService.guardarPremio('pin_${c.id}', {
+          'nombre':      c.nombre,
+          'premio':      'Pin oficial ${c.nombre} — retíralo en Rutero',
+          'insignia':    '${c.premioEmoji} ${c.nombre}',
+          'insigniaImg': img,
+          'emoji':       c.premioEmoji,
+        });
+
+        if (!mounted) return;
+        _mostrarCelebracionCircuito();
+      }
+    } catch (e) {
+      debugPrint('⚠️ _verificarCircuitoCompletado error: $e');
+    }
+  }
+
+  void _mostrarCelebracionCircuito() {
+    final c = widget.circuito;
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => Dialog(
+        backgroundColor: Colors.transparent,
+        child: Container(
+          padding: const EdgeInsets.all(28),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [c.colorGradienteA, c.colorGradienteB],
+              begin: Alignment.topLeft, end: Alignment.bottomRight),
+            borderRadius: BorderRadius.circular(24),
+          ),
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+            Text('🏆', style: const TextStyle(fontSize: 56)),
+            const SizedBox(height: 12),
+            Text('¡Circuito Completado!',
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                color: Colors.white, fontSize: 22,
+                fontWeight: FontWeight.w800)),
+            const SizedBox(height: 8),
+            Text(c.nombre,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                color: Colors.white70, fontSize: 15,
+                fontWeight: FontWeight.w600)),
+            const SizedBox(height: 16),
+            Text(
+              '¡Desbloqueaste la insignia ${c.premioEmoji} y ganaste un pin físico!\n'
+              '+350 pts + bono de 50 pts añadidos a tu perfil.',
+              textAlign: TextAlign.center,
+              style: const TextStyle(color: Colors.white70, fontSize: 13, height: 1.5)),
+            const SizedBox(height: 24),
+            GestureDetector(
+              onTap: () => Navigator.pop(context),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(14)),
+                child: Text('¡Increíble!',
+                  style: TextStyle(
+                    color: c.colorGradienteA,
+                    fontWeight: FontWeight.w800,
+                    fontSize: 15)),
+              ),
+            ),
+          ]),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _abrirTrivia() async {
+    if (widget.parada.trivia == null) return;
+    final resultado = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(builder: (_) => _TriviaMuseoScreen(
+        circuitoId: widget.circuito.id,
+        parada: widget.parada,
+      )),
+    );
+    if (!mounted) return;
+    setState(() {
+      _triviaDisponible = false;
+      _triviaCompletada = true;
+      _triviaAcertada = resultado == true;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // p es el getter — usa _paradaLocal si ya se recargó, sino widget.parada
+    final c = widget.circuito;
+    // Acento viene del gradiente configurado en Firestore para cada circuito
+    // Rock: rojo (#E53935), Museos: gold — pero el gradiente es la fuente de verdad
+    final Color acento = c.colorGradienteA;
+
+    return Scaffold(
+      backgroundColor: RDSColor.base,
+      appBar: AppBar(
+        backgroundColor: RDSColor.base,
+        elevation: 0,
+        systemOverlayStyle: const SystemUiOverlayStyle(
+          statusBarBrightness: Brightness.dark,
+          statusBarIconBrightness: Brightness.light),
+        leading: GestureDetector(
+          onTap: () => Navigator.pop(context),
+          child: const Icon(Icons.arrow_back_ios_new_rounded,
+            color: RDSColor.textPrimary, size: 18)),
+        title: Text(kLang == 'en' && c.nombreEN.isNotEmpty ? c.nombreEN : c.nombre,
+          style: TextStyle(
+            color: acento, fontSize: 13, fontWeight: FontWeight.w700,
+            fontFamily: c.tipo == 'musico' ? 'SpaceGrotesk' : null)),
+        centerTitle: true,
+        actions: [
+          if (esAdmin)
+            IconButton(
+              icon: Icon(
+                p.eventoActivo
+                  ? Icons.local_fire_department_rounded
+                  : Icons.edit_calendar_rounded,
+                color: p.eventoActivo ? RDSColor.gold : RDSColor.textMuted,
+                size: 20),
+              tooltip: t('Gestionar evento', 'Manage event'),
+              onPressed: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => GestionEventoScreen(
+                  circuitoId: c.id,
+                  parada: p,
+                ))).then((_) => _recargarParada()),
+            ),
+        ]),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+
+          // ── HERO parada — carrusel de fotos ─────────────────────────────────
+          _buildCarruselHero(p, acento),
+
+          // ── BANNER EVENTO ESPECIAL ────────────────────────────────────────────
+          if (p.eventoActivo) ...[
+            const SizedBox(height: 10),
+            _buildBannerEvento(p, acento),
+          ],
+
+          const SizedBox(height: 12),
+
+          // ── DESCRIPCIÓN ──────────────────────────────────────────────────────
+          if (p.descripcion.isNotEmpty)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(14),
+              margin: const EdgeInsets.only(bottom: 10),
+              decoration: BoxDecoration(
+                color: RDSColor.card, borderRadius: BorderRadius.circular(14)),
+              child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text(p.emoji, style: const TextStyle(fontSize: 22)),
+                const SizedBox(width: 12),
+                Expanded(child: Text(p.descripcion,
+                  style: const TextStyle(color: RDSColor.textMuted,
+                    fontSize: 13, height: 1.6))),
+              ])),
+
+          // ── DETALLES PRÁCTICOS ───────────────────────────────────────────────
+          Container(
+            padding: const EdgeInsets.all(14),
+            margin: const EdgeInsets.only(bottom: 12),
+            decoration: BoxDecoration(
+              color: RDSColor.card, borderRadius: BorderRadius.circular(14)),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              if (p.horario.isNotEmpty) ...[
+                _InfoFila(icon: Icons.access_time_rounded, label: t('Horario', 'Hours'),
+                  valor: _formatearHorario(p.horario)),
+                const SizedBox(height: 10),
+              ],
+              if (p.entradaBase.isNotEmpty) ...[
+                _InfoFila(icon: Icons.confirmation_number_outlined, label: t('Entrada', 'Entry'), valor: p.entradaBase),
+                const SizedBox(height: 10),
+              ],
+              if (p.direccion.isNotEmpty) ...[
+                _InfoFila(icon: Icons.location_on_outlined, label: t('Dirección', 'Address'),
+                  valor: p.barrio.isNotEmpty ? '${p.direccion} · ${p.barrio}' : p.direccion),
+                const SizedBox(height: 10),
+              ],
+              if (p.metroEstacion.isNotEmpty) ...[
+                _InfoFila(icon: Icons.train_rounded, label: t('Metro / Bus', 'Metro / Bus'), valor: p.metroEstacion),
+                const SizedBox(height: 10),
+              ],
+              // ── Botón Cómo llegar — acento del circuito ──────────────────
+              GestureDetector(
+                onTap: () async {
+                  final uri = Uri.parse(
+                    'https://www.google.com/maps/dir/?api=1'
+                    '&destination=${p.lat},${p.lng}&travelmode=transit');
+                  if (await canLaunchUrl(uri)) {
+                    await launchUrl(uri, mode: LaunchMode.externalApplication);
+                  }
+                },
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(vertical: 11, horizontal: 12),
+                  decoration: BoxDecoration(
+                    color: acento.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: acento.withOpacity(0.35))),
+                  child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                    Icon(Icons.directions_rounded, color: acento, size: 16),
+                    const SizedBox(width: 8),
+                    Text(t('Cómo llegar', 'Get directions'),
+                      style: TextStyle(color: acento, fontSize: 13,
+                        fontWeight: FontWeight.w700)),
+                  ]))),
+            ])),
+
+          // ── REDES SOCIALES — estilo Rutero ──────────────────────────────────
+          if (p.instagram.isNotEmpty || p.tiktok.isNotEmpty || p.whatsappBar.isNotEmpty || p.sitioWeb.isNotEmpty) ...[
+            const SizedBox(height: 4),
+            Container(
+              margin: const EdgeInsets.only(bottom: 12),
+              decoration: BoxDecoration(
+                color: RDSColor.card,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: acento.withOpacity(0.18))),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                // Header — Rock: acento dorado y ícono
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(14, 12, 14, 10),
+                  child: Row(children: [
+                    Container(
+                      width: 3, height: 14,
+                      decoration: BoxDecoration(
+                        color: acento, borderRadius: BorderRadius.circular(2))),
+                    const SizedBox(width: 8),
+                    if (c.tipo == 'musico') ...[
+                      Icon(Icons.alternate_email_rounded,
+                        size: 12, color: acento.withOpacity(0.7)),
+                      const SizedBox(width: 5),
+                    ],
+                    Text(t('REDES Y CONTACTO', 'SOCIAL & CONTACT'),
+                      style: TextStyle(
+                        color: c.tipo == 'musico' ? acento : RDSColor.textPrimary,
+                        fontSize: 10, fontWeight: FontWeight.w900,
+                        letterSpacing: 1.5, fontFamily: 'SpaceGrotesk')),
+                  ])),
+                const Divider(height: 1, color: Color(0xFF1E1E1E)),
+                // Botones
+                Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Wrap(spacing: 8, runSpacing: 8, children: [
+                    if (p.instagram.isNotEmpty)
+                      _RedSocialBtn(
+                        icon: Icons.photo_camera_outlined,
+                        label: p.instagram.startsWith('@')
+                            ? p.instagram : '@${p.instagram}',
+                        colorBg: const Color(0xFFE1306C).withOpacity(0.12),
+                        colorBorder: const Color(0xFFE1306C).withOpacity(0.5),
+                        colorText: const Color(0xFFE1306C),
+                        onTap: () async {
+                          final handle = p.instagram.startsWith('@')
+                              ? p.instagram.substring(1) : p.instagram;
+                          final uri = Uri.parse('https://www.instagram.com/$handle');
+                          if (await canLaunchUrl(uri)) launchUrl(uri, mode: LaunchMode.inAppWebView);
+                        }),
+                    if (p.tiktok.isNotEmpty)
+                      _RedSocialBtn(
+                        icon: Icons.music_note_outlined,
+                        label: p.tiktok.startsWith('@')
+                            ? p.tiktok : '@${p.tiktok}',
+                        colorBg: RDSColor.surface,
+                        colorBorder: RDSColor.borderSubtle,
+                        colorText: RDSColor.textPrimary,
+                        onTap: () async {
+                          final handle = p.tiktok.startsWith('@')
+                              ? p.tiktok.substring(1) : p.tiktok;
+                          final uri = Uri.parse('https://www.tiktok.com/@$handle');
+                          if (await canLaunchUrl(uri)) launchUrl(uri, mode: LaunchMode.inAppWebView);
+                        }),
+                    if (p.whatsappBar.isNotEmpty)
+                      _RedSocialBtn(
+                        icon: Icons.chat_bubble_outline_rounded,
+                        label: 'WhatsApp',
+                        colorBg: const Color(0xFF25D366).withOpacity(0.12),
+                        colorBorder: const Color(0xFF25D366).withOpacity(0.5),
+                        colorText: const Color(0xFF25D366),
+                        onTap: () async {
+                          final num = p.whatsappBar.replaceAll(RegExp(r'[^0-9]'), '');
+                          final msg = Uri.encodeComponent(t(
+                            'Hola 👋 vengo de Rutero MDE y me gustaría más info sobre ${p.nombre}.',
+                            'Hi 👋 I\'m coming from Rutero MDE and I\'d like more info about ${p.nombre}.'));
+                          final uri = Uri.parse('https://wa.me/57$num?text=$msg');
+                          // WhatsApp requiere app externa — no funciona en WebView
+                          if (await canLaunchUrl(uri)) launchUrl(uri, mode: LaunchMode.externalApplication);
+                        }),
+                    if (p.sitioWeb.isNotEmpty)
+                      _RedSocialBtn(
+                        icon: Icons.language_rounded,
+                        label: t('Sitio web', 'Website'),
+                        colorBg: acento.withOpacity(0.1),
+                        colorBorder: acento.withOpacity(0.4),
+                        colorText: acento,
+                        onTap: () async {
+                          final uri = Uri.parse(p.sitioWeb.startsWith('http')
+                              ? p.sitioWeb : 'https://${p.sitioWeb}');
+                          if (await canLaunchUrl(uri)) launchUrl(uri, mode: LaunchMode.inAppWebView);
+                        }),
+                  ])),
+              ])),
+          ],
+
+          // ── ANTES DE SALIR / RECOMENDACIONES ─────────────────────────────────
+          if (p.antesDeSalir.isNotEmpty) ...[
+            const SizedBox(height: 4),
+            Container(
+              margin: const EdgeInsets.only(bottom: 12),
+              decoration: BoxDecoration(
+                color: RDSColor.card,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: acento.withOpacity(0.18))),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                // Header — Rock: acento e ícono
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(14, 12, 14, 10),
+                  child: Row(children: [
+                    Container(
+                      width: 3, height: 14,
+                      decoration: BoxDecoration(
+                        color: acento, borderRadius: BorderRadius.circular(2))),
+                    const SizedBox(width: 8),
+                    if (c.tipo == 'musico') ...[
+                      Icon(Icons.bolt_rounded,
+                        size: 12, color: acento.withOpacity(0.7)),
+                      const SizedBox(width: 5),
+                    ],
+                    Text(t('ANTES DE SALIR', 'BEFORE YOU GO'),
+                      style: TextStyle(
+                        color: c.tipo == 'musico' ? acento : RDSColor.textPrimary,
+                        fontSize: 10, fontWeight: FontWeight.w900,
+                        letterSpacing: 1.5, fontFamily: 'SpaceGrotesk')),
+                  ])),
+                const Divider(height: 1, color: Color(0xFF1E1E1E)),
+                Padding(
+                  padding: const EdgeInsets.all(14),
+                  child: Column(
+                    children: p.antesDeSalir.asMap().entries.map((e) => Padding(
+                      padding: EdgeInsets.only(
+                        bottom: e.key < p.antesDeSalir.length - 1 ? 10 : 0),
+                      child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                        Container(
+                          width: 22, height: 22,
+                          decoration: BoxDecoration(
+                            color: acento.withOpacity(0.15),
+                            shape: BoxShape.circle),
+                          child: Center(
+                            child: Text('${e.key + 1}',
+                              style: TextStyle(color: acento, fontSize: 11,
+                                fontWeight: FontWeight.w800)))),
+                        const SizedBox(width: 10),
+                        Expanded(child: Text(e.value,
+                          style: const TextStyle(color: RDSColor.textMuted,
+                            fontSize: 12, height: 1.5))),
+                      ]))).toList())),
+              ])),
+          ],
+
+          // ── MISIÓN ÉPICA ─────────────────────────────────────────────────────
+          if (p.misionEpica.isNotEmpty) ...[
+            const SizedBox(height: 4),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(14),
+              margin: const EdgeInsets.only(bottom: 12),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [acento.withOpacity(0.18), acento.withOpacity(0.06)],
+                  begin: Alignment.topLeft, end: Alignment.bottomRight),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: acento.withOpacity(0.45))),
+              child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                const Text('⚡', style: TextStyle(fontSize: 26)),
+                const SizedBox(width: 12),
+                Expanded(child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(t('Misión épica', 'Epic mission'),
+                      style: TextStyle(color: acento, fontSize: 13,
+                        fontWeight: FontWeight.w800, letterSpacing: 0.3)),
+                    const SizedBox(height: 4),
+                    Text(p.misionEpica,
+                      style: const TextStyle(color: RDSColor.textPrimary,
+                        fontSize: 13, height: 1.5)),
+                    const SizedBox(height: 12),
+                    GestureDetector(
+                      onTap: (_generandoMision || _misionCumplida)
+                          ? null
+                          : () => _cumplirMision(p, acento),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(vertical: 10),
+                        decoration: BoxDecoration(
+                          gradient: _misionCumplida
+                              ? null
+                              : LinearGradient(
+                                  colors: [acento, acento.withOpacity(0.75)]),
+                          color: _misionCumplida
+                              ? RDSColor.surface
+                              : null,
+                          borderRadius: BorderRadius.circular(10),
+                          border: _misionCumplida
+                              ? Border.all(color: RDSColor.green.withOpacity(0.4))
+                              : null,
+                          boxShadow: _misionCumplida ? null : [BoxShadow(
+                            color: acento.withOpacity(0.35),
+                            blurRadius: 8, offset: const Offset(0, 3))]),
+                        child: Row(mainAxisAlignment: MainAxisAlignment.center,
+                          children: _generandoMision
+                              ? [SizedBox(width: 16, height: 16,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2, color: Colors.white))]
+                              : _misionCumplida
+                                  ? [
+                                      const Icon(Icons.check_circle_rounded,
+                                        color: RDSColor.green, size: 16),
+                                      const SizedBox(width: 6),
+                                      const Text('Misión cumplida +75pts',
+                                        style: TextStyle(
+                                          color: RDSColor.green, fontSize: 13,
+                                          fontWeight: FontWeight.w700,
+                                          fontFamily: 'SpaceGrotesk')),
+                                    ]
+                                  : [
+                                      Icon(
+                                        Icons.camera_alt_rounded,
+                                        color: Colors.white, size: 16),
+                                      const SizedBox(width: 6),
+                                      Text(t('Cumplir misión', 'Complete mission'),
+                                        style: const TextStyle(
+                                          color: Colors.white, fontSize: 13,
+                                          fontWeight: FontWeight.w800,
+                                          fontFamily: 'SpaceGrotesk')),
+                                    ]))),
+                  ])),
+              ])),
+          ],
+
+          // ── INDICADOR GPS (toca para actualizar) ────────────────────────────
+          GestureDetector(
+            onTap: _verificarGPS,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              margin: const EdgeInsets.only(bottom: 16),
+              decoration: BoxDecoration(
+                color: _dentroDelRadio
+                    ? RDSColor.green.withOpacity(0.1) : RDSColor.surface,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(
+                  color: _dentroDelRadio
+                      ? RDSColor.green.withOpacity(0.4)
+                      : RDSColor.textMuted.withOpacity(0.2))),
+              child: Row(children: [
+                Icon(
+                  _dentroDelRadio
+                      ? Icons.location_on_rounded
+                      : Icons.location_searching_rounded,
+                  color: _dentroDelRadio ? RDSColor.green : RDSColor.textMuted,
+                  size: 20),
+                const SizedBox(width: 10),
+                Expanded(child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      _dentroDelRadio
+                          ? t('📍 Estás en el lugar', '📍 You\'re here')
+                          : t('Debes estar aquí para validar', 'You must be here to check in'),
+                      style: TextStyle(
+                        color: _dentroDelRadio ? RDSColor.green : RDSColor.textPrimary,
+                        fontSize: 13, fontWeight: FontWeight.w700)),
+                    Text(
+                      _dentroDelRadio
+                          ? t('Check-in disponible — ¡validá tu visita!', 'Check-in available — confirm your visit!')
+                          : t('Radio: ${p.radioMetros}m · Toca para actualizar', 'Radius: ${p.radioMetros}m · Tap to refresh'),
+                      style: TextStyle(
+                        color: _dentroDelRadio
+                            ? RDSColor.green.withOpacity(0.7)
+                            : RDSColor.textMuted,
+                        fontSize: 11)),
+                  ])),
+                if (!_dentroDelRadio)
+                  Icon(Icons.refresh_rounded, color: RDSColor.textMuted, size: 18),
+              ]))),
+
+          // ── ADVERTENCIA HORARIO (bar cerrado) ───────────────────────────────
+          if (!_checkinHecho && widget.parada.horario.isNotEmpty
+              && !kModoDemo && !_dentroDeHorario()) ...[
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              margin: const EdgeInsets.only(bottom: 12),
+              decoration: BoxDecoration(
+                color: Colors.deepOrange.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: Colors.deepOrange.withOpacity(0.4))),
+              child: Row(children: [
+                const Text('🕐', style: TextStyle(fontSize: 22)),
+                const SizedBox(width: 10),
+                Expanded(child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('Bar cerrado en este momento',
+                      style: TextStyle(color: Colors.deepOrange, fontSize: 13,
+                        fontWeight: FontWeight.w700)),
+                    const SizedBox(height: 2),
+                    Text('Horario: ${_formatearHorario(widget.parada.horario)}',
+                      style: TextStyle(color: Colors.deepOrange.withOpacity(0.7),
+                        fontSize: 11)),
+                  ])),
+              ])),
+          ],
+
+          // ── VALIDACIÓN — check-in hecho ──────────────────────────────────────
+          if (_checkinHecho) ...[
+            Container(
+              padding: const EdgeInsets.all(16),
+              margin: const EdgeInsets.only(bottom: 8),
+              decoration: BoxDecoration(
+                color: RDSColor.green.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: RDSColor.green.withOpacity(0.4))),
+              child: Row(children: [
+                const Text('✅', style: TextStyle(fontSize: 28)),
+                const SizedBox(width: 12),
+                Expanded(child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(c.tipo == 'musico'
+                        ? 'Bar visitado — ¡seguí el circuito!'
+                        : 'Visita completada — ¡seguí explorando!',
+                      style: const TextStyle(color: RDSColor.green, fontSize: 15,
+                        fontWeight: FontWeight.w800, fontFamily: 'SpaceGrotesk')),
+                    const SizedBox(height: 2),
+                    Text('+${widget.parada.puntosCheckin} puntos · ${c.tipo == "musico" ? "Este bar ya está completo 🤘" : "Esta parada ya está completa ✓"}',
+                      style: TextStyle(color: RDSColor.green.withOpacity(0.7),
+                        fontSize: 12, fontWeight: FontWeight.w600)),
+                  ])),
+              ])),
+            // Botón "Siguiente bar" — lleva de regreso al listado del pasaporte
+            GestureDetector(
+              onTap: () => Navigator.pop(context),
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                margin: const EdgeInsets.only(bottom: 12),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [acento, acento.withOpacity(0.75)],
+                    begin: Alignment.centerLeft, end: Alignment.centerRight),
+                  borderRadius: BorderRadius.circular(14)),
+                child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                  Text(c.tipo == 'musico' ? 'Ir al siguiente bar' : 'Ir a la siguiente parada',
+                    style: const TextStyle(color: Colors.white, fontSize: 15,
+                      fontWeight: FontWeight.w800, fontFamily: 'SpaceGrotesk')),
+                  const SizedBox(width: 8),
+                  const Icon(Icons.arrow_forward_rounded, color: Colors.white, size: 20),
+                ]))),
+          ],
+          // ── TRIVIA (post check-in) ────────────────────────────────────────────
+          if (_checkinHecho && widget.parada.trivia != null) ...[
+            const SizedBox(height: 4),
+            if (_triviaDisponible)
+              GestureDetector(
+                onTap: _abrirTrivia,
+                child: Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [acento.withOpacity(0.15), acento.withOpacity(0.05)]),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: acento.withOpacity(0.5))),
+                  child: Row(children: [
+                    const Text('🧠', style: TextStyle(fontSize: 28)),
+                    const SizedBox(width: 12),
+                    Expanded(child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(c.tipo == 'musico'
+                            ? t('Trivia del bar', 'Bar trivia')
+                            : t('Trivia del museo', 'Museum trivia'),
+                          style: TextStyle(color: acento, fontSize: 15,
+                            fontWeight: FontWeight.w800)),
+                        const SizedBox(height: 2),
+                        Text(t('Respondé y ganá +30 pts extra · 1 oportunidad',
+                          'Answer and earn +30 extra pts · 1 chance'),
+                          style: const TextStyle(color: RDSColor.textMuted, fontSize: 12)),
+                      ])),
+                    Icon(Icons.arrow_forward_ios_rounded, color: acento, size: 16),
+                  ]))),
+            if (_triviaCompletada)
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: (_triviaAcertada
+                      ? RDSColor.green : Colors.redAccent).withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(
+                    color: (_triviaAcertada
+                        ? RDSColor.green : Colors.redAccent).withOpacity(0.4))),
+                child: Row(children: [
+                  Text(_triviaAcertada ? '🎯' : '📖',
+                    style: const TextStyle(fontSize: 26)),
+                  const SizedBox(width: 12),
+                  Expanded(child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(_triviaAcertada ? '¡Correcto! Trivia completada' : 'Trivia respondida',
+                        style: TextStyle(
+                          color: _triviaAcertada ? RDSColor.green : Colors.redAccent,
+                          fontSize: 14, fontWeight: FontWeight.w800)),
+                      const SizedBox(height: 2),
+                      Text(_triviaAcertada
+                          ? '+30 pts bonus ganados 🎉'
+                          : c.tipo == 'musico'
+                              ? '¡Seguí conociendo el bar!'
+                              : '¡Seguí aprendiendo del museo!',
+                        style: TextStyle(
+                          color: (_triviaAcertada
+                              ? RDSColor.green : Colors.redAccent).withOpacity(0.7),
+                          fontSize: 12)),
+                    ])),
+                ])),
+          ],  // ← cierre bloque if(checkinHecho && trivia != null)
+
+          // ── CALIFICACIÓN DEL BAR (post check-in, independiente de trivia) ───────
+          if (_checkinHecho && widget.circuito.tipo == 'musico') ...[
+            const SizedBox(height: 4),
+            _CalificacionWidget(
+              uid: FirebaseAuth.instance.currentUser?.uid ?? '',
+              circuitoId: widget.circuito.id,
+              paradaId: widget.parada.id,
+              ratingActual: widget.parada.rating,
+              totalVotos: widget.parada.totalVotos,
+              acento: acento,
+            ),
+          ],
+
+          // ── Botones de validación (solo cuando aún no hay check-in) ─────────────
+          if (!_checkinHecho) ...[
+            // ── Botones de validación ──────────────────────────────────────────
+            if (p.modoValidacion == ModoValidacion.gps)
+              _PasBtnCheckIn(
+                activo: _dentroDelRadio && !_procesando,
+                cargando: _procesando,
+                label: c.tipo == 'musico'
+                    ? t('Validar visita al bar', 'Validate bar visit')
+                    : t('📍 Validar visita', '📍 Validate visit'),
+                acento: acento,
+                esRock: c.tipo == 'musico',
+                onTap: _checkInGPS),
+            if (p.modoValidacion == ModoValidacion.gpsQr)
+              _PasBtnCheckIn(
+                activo: _dentroDelRadio && !_procesando,
+                cargando: _procesando,
+                label: c.tipo == 'musico'
+                    ? t('Escanear QR del bar', 'Scan bar QR')
+                    : t('📷 Escanear QR del museo', '📷 Scan museum QR'),
+                acento: acento,
+                esRock: c.tipo == 'musico',
+                onTap: _abrirQRScanner),
+            if (p.modoValidacion == ModoValidacion.gpsKeyword) ...[
+              TextField(
+                controller: _keywordCtrl,
+                enabled: _dentroDelRadio && !_procesando,
+                style: RDSType.bodyLg,
+                textCapitalization: TextCapitalization.none,
+                decoration: InputDecoration(
+                  hintText: c.tipo == 'musico'
+                      ? t('Palabra clave del bartender...', 'Bartender keyword...')
+                      : 'Código de visita...',
+                  hintStyle: RDSType.bodyMd,
+                  filled: true, fillColor: RDSColor.surface,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide.none),
+                  errorText: _errorKeyword,
+                  prefixIcon: Icon(Icons.key_rounded,
+                    color: _dentroDelRadio ? acento : RDSColor.textMuted,
+                    size: 18))),
+              const SizedBox(height: 10),
+              _PasBtnCheckIn(
+                activo: _dentroDelRadio && !_procesando,
+                cargando: _procesando,
+                label: c.tipo == 'musico'
+                    ? t('Confirmar visita al bar', 'Confirm bar visit')
+                    : t('🔑 Confirmar consumo', '🔑 Confirm visit'),
+                acento: acento,
+                esRock: c.tipo == 'musico',
+                onTap: _checkInKeyword),
+            ],
+          ],
+
+          // ── HINT código de visita ─────────────────────────────────────────────
+          if (!_checkinHecho && p.modoValidacion != ModoValidacion.gps) ...[
+            const SizedBox(height: 10),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              decoration: BoxDecoration(
+                color: acento.withOpacity(0.06),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: acento.withOpacity(0.2))),
+              child: Row(children: [
+                Text(c.tipo == 'musico' ? '🎸' : '🎟️',
+                  style: const TextStyle(fontSize: 20)),
+                const SizedBox(width: 10),
+                Expanded(child: Text(
+                  c.tipo == 'musico'
+                      ? t('1. Consumí en el bar  ·  2. Pedí la palabra clave al bartender  ·  3. Ingresála aquí para validar tu visita 🤘', '1. Order at the bar  ·  2. Ask the bartender for the weekly keyword  ·  3. Enter it here to validate your visit 🤘')
+                      : 'Solicitá el código de visita en la recepción del museo.',
+                  style: TextStyle(
+                    color: RDSColor.textMuted, fontSize: 12,
+                    fontFamily: c.tipo == 'musico' ? 'SpaceGrotesk' : null))),
+              ])),
+          ],
+
+          const SizedBox(height: 32),
+        ])));
+  }
+
+  /// Fallback hero con gradiente y emoji cuando no hay imagen
+  Widget _heroFallback(String emoji, Color acento) {
+    return Container(
+      height: 160,
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            acento.withOpacity(0.25),
+            acento.withOpacity(0.08),
+          ])),
+      child: Center(child: Text(emoji,
+        style: const TextStyle(fontSize: 72))));
+  }
+
+  /// Carrusel de fotos del bar + nombre + barrio + badge beneficio
+  Widget _buildCarruselHero(ParadaCircuito p, Color acento) {
+    // Construir lista de URLs disponibles (prioridad: fachada, ambiente, temática, imagenUrl legacy)
+    final fotos = <String>[
+      if (p.fotoFachada.isNotEmpty) p.fotoFachada,
+      if (p.fotoAmbiente.isNotEmpty) p.fotoAmbiente,
+      if (p.fotoTematica.isNotEmpty) p.fotoTematica,
+      if (p.fotoFachada.isEmpty && p.fotoAmbiente.isEmpty && p.fotoTematica.isEmpty && p.imagenUrl.isNotEmpty)
+        p.imagenUrl,
+    ];
+    final tieneFotos = fotos.isNotEmpty;
+
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: RDSColor.card,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: acento.withOpacity(0.2))),
+      child: Column(children: [
+        // ── Área de imagen / carrusel ──────────────────────────────────────
+        ClipRRect(
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+          child: tieneFotos
+              ? Stack(children: [
+                  SizedBox(
+                    height: 200,
+                    child: PageView.builder(
+                      controller: _pageCtrl,
+                      itemCount: fotos.length,
+                      onPageChanged: (i) => setState(() => _fotoActual = i),
+                      itemBuilder: (_, i) => Image.network(
+                        fotos[i],
+                        width: double.infinity,
+                        height: 200,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => _heroFallback(p.emoji, acento),
+                      ),
+                    ),
+                  ),
+                  // Indicadores de punto (dots) — solo si hay más de 1 foto
+                  if (fotos.length > 1)
+                    Positioned(
+                      bottom: 10,
+                      left: 0, right: 0,
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: List.generate(fotos.length, (i) => AnimatedContainer(
+                          duration: const Duration(milliseconds: 200),
+                          margin: const EdgeInsets.symmetric(horizontal: 3),
+                          width: _fotoActual == i ? 18 : 6,
+                          height: 6,
+                          decoration: BoxDecoration(
+                            color: _fotoActual == i
+                                ? acento
+                                : Colors.white.withOpacity(0.55),
+                            borderRadius: BorderRadius.circular(3)),
+                        )),
+                      ),
+                    ),
+                  // Etiqueta de la foto actual
+                  if (fotos.length > 1)
+                    Positioned(
+                      top: 10, right: 10,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: Colors.black54,
+                          borderRadius: BorderRadius.circular(10)),
+                        child: Text(
+                          _labelFoto(_fotoActual, p),
+                          style: const TextStyle(
+                            color: Colors.white, fontSize: 10,
+                            fontWeight: FontWeight.w600)),
+                      ),
+                    ),
+                ])
+              : _heroFallback(p.emoji, acento)),
+        // ── Info del bar ──────────────────────────────────────────────────
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
+          child: Column(children: [
+            Text(p.nombre, textAlign: TextAlign.center,
+              style: const TextStyle(color: RDSColor.textPrimary, fontSize: 20,
+                fontWeight: FontWeight.w900, fontFamily: 'SpaceGrotesk')),
+            const SizedBox(height: 4),
+            if (p.barrio.isNotEmpty)
+              Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                Icon(Icons.location_on_rounded, size: 11, color: acento),
+                const SizedBox(width: 3),
+                Text(p.barrio.toUpperCase(),
+                  style: TextStyle(color: acento, fontSize: 10,
+                    fontWeight: FontWeight.w800, letterSpacing: 1.5,
+                    fontFamily: 'SpaceGrotesk')),
+              ]),
+            if (p.beneficioPasaporte.isNotEmpty) ...[
+              const SizedBox(height: 10),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+                decoration: BoxDecoration(
+                  color: _colorBeneficio(p.beneficioPasaporte).withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                    color: _colorBeneficio(p.beneficioPasaporte).withOpacity(0.5))),
+                child: Row(mainAxisSize: MainAxisSize.min, children: [
+                  Icon(Icons.local_offer_rounded,
+                    size: 11, color: _colorBeneficio(p.beneficioPasaporte)),
+                  const SizedBox(width: 5),
+                  Text(_labelBeneficio(p.beneficioPasaporte),
+                    style: TextStyle(color: _colorBeneficio(p.beneficioPasaporte),
+                      fontSize: 12, fontWeight: FontWeight.w700,
+                      fontFamily: 'SpaceGrotesk')),
+                ])),
+            ],
+          ])),
+      ]));
+  }
+
+  /// Etiqueta descriptiva para cada slide del carrusel
+  String _labelFoto(int index, ParadaCircuito p) {
+    final fotos = [
+      if (p.fotoFachada.isNotEmpty) 'Fachada',
+      if (p.fotoAmbiente.isNotEmpty) 'Ambiente',
+      if (p.fotoTematica.isNotEmpty) 'Temática',
+    ];
+    if (index < fotos.length) return fotos[index];
+    return '${index + 1}';
+  }
+
+  Widget _buildBannerEvento(ParadaCircuito p, Color acento) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [acento.withOpacity(0.18), acento.withOpacity(0.06)],
+          begin: Alignment.centerLeft,
+          end: Alignment.centerRight),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: acento.withOpacity(0.45))),
+      child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Container(
+          padding: const EdgeInsets.all(7),
+          decoration: BoxDecoration(
+            color: acento.withOpacity(0.18),
+            shape: BoxShape.circle),
+          child: Icon(Icons.local_fire_department_rounded, color: acento, size: 18)),
+        const SizedBox(width: 10),
+        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(
+            p.eventoNombre.isNotEmpty ? p.eventoNombre : t('¡Evento especial esta noche!', 'Special event tonight!'),
+            style: TextStyle(
+              color: acento, fontSize: 13,
+              fontWeight: FontWeight.w800, fontFamily: 'SpaceGrotesk')),
+          if (p.descripcionEvento.isNotEmpty) ...[
+            const SizedBox(height: 3),
+            Text(p.descripcionEvento,
+              style: const TextStyle(
+                color: RDSColor.textMuted, fontSize: 12, height: 1.4)),
+          ],
+          if (p.eventoHora.isNotEmpty) ...[
+            const SizedBox(height: 4),
+            Row(children: [
+              Icon(Icons.access_time_rounded, color: acento.withOpacity(0.7), size: 12),
+              const SizedBox(width: 4),
+              Text(p.eventoHora,
+                style: TextStyle(
+                  color: acento.withOpacity(0.85), fontSize: 11,
+                  fontWeight: FontWeight.w600)),
+            ]),
+          ],
+        ])),
+      ]));
+  }
+
+  // ── Misión épica: cámara → watermark → preview → compartir ───────────────
+  Future<void> _cumplirMision(ParadaCircuito p, Color acento) async {
+    // Bloquear orientación
+    await SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
+    try {
+      final XFile? foto = await _pickerMision.pickImage(
+        source: ImageSource.camera,
+        imageQuality: 85, maxWidth: 1080, maxHeight: 1920,
+        preferredCameraDevice: CameraDevice.rear,
+      );
+      await SystemChrome.setPreferredOrientations([
+        DeviceOrientation.portraitUp,
+        DeviceOrientation.landscapeLeft,
+        DeviceOrientation.landscapeRight,
+      ]);
+      if (foto == null || !mounted) return;
+
+      setState(() => _generandoMision = true);
+      final archivoFinal = await _componerFotoMision(File(foto.path), p);
+      if (!mounted) return;
+      setState(() => _generandoMision = false);
+
+      if (archivoFinal == null) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('No se pudo procesar la foto. Intentá de nuevo.'),
+          backgroundColor: Colors.red));
+        return;
+      }
+
+      // Preview + compartir (el registro en Firestore ocurre solo al compartir)
+      await _mostrarPreviewMision(archivoFinal, p);
+    } catch (e) {
+      await SystemChrome.setPreferredOrientations([
+        DeviceOrientation.portraitUp,
+        DeviceOrientation.landscapeLeft,
+        DeviceOrientation.landscapeRight,
+      ]);
+      if (mounted) setState(() => _generandoMision = false);
+      debugPrint('Error misión épica: $e');
+    }
+  }
+
+  Future<File?> _componerFotoMision(File foto, ParadaCircuito p) async {
+    try {
+      final fotoBytes = await foto.readAsBytes();
+      final fotoImg = await decodeImageFromList(fotoBytes);
+      final logoData = await rootBundle.load('assets/images/logo_rutero_badge.png');
+      final logoImg = await decodeImageFromList(logoData.buffer.asUint8List());
+
+      final recorder = ui.PictureRecorder();
+      final canvas = Canvas(recorder);
+      final w = fotoImg.width.toDouble();
+      final h = fotoImg.height.toDouble();
+      final escala = w / 1080;
+
+      // Foto de fondo
+      canvas.drawImage(fotoImg, Offset.zero, Paint());
+
+      // Marco inferior (20% de la altura)
+      final marcoH = h * 0.20;
+      // Gradiente sobre la foto antes del marco
+      final gradPaint = Paint()..shader = const LinearGradient(
+        begin: Alignment.topCenter, end: Alignment.bottomCenter,
+        colors: [Colors.transparent, Color(0xF00A0F08)],
+      ).createShader(Rect.fromLTWH(0, h - marcoH - 60, w, 60));
+      canvas.drawRect(Rect.fromLTWH(0, h - marcoH - 60, w, 60), gradPaint);
+      // Fondo sólido del marco
+      canvas.drawRect(
+        Rect.fromLTWH(0, h - marcoH, w, marcoH),
+        Paint()..color = const Color(0xF00A0F08));
+
+      // Logo — esquina inferior izquierda
+      final logoH = marcoH * 0.65;
+      final logoW = logoImg.width * (logoH / logoImg.height);
+      final logoY = h - marcoH + (marcoH - logoH) / 2;
+      canvas.drawImageRect(
+        logoImg,
+        Rect.fromLTWH(0, 0, logoImg.width.toDouble(), logoImg.height.toDouble()),
+        Rect.fromLTWH(20, logoY, logoW, logoH),
+        Paint());
+
+      // Separador vertical
+      canvas.drawLine(
+        Offset(logoW + 30, h - marcoH + 14),
+        Offset(logoW + 30, h - 14),
+        Paint()..color = const Color(0xFFD4AF7A).withOpacity(0.4)..strokeWidth = 1);
+
+      final textX = logoW + 44;
+
+      // Nombre del bar (línea 1)
+      final tpBar = TextPainter(
+        text: TextSpan(text: p.nombre,
+          style: TextStyle(color: Colors.white, fontSize: 52 * escala,
+            fontWeight: FontWeight.w800)),
+        textDirection: TextDirection.ltr, maxLines: 1, ellipsis: '...');
+      tpBar.layout(maxWidth: w - textX - 20);
+      tpBar.paint(canvas, Offset(textX, h - marcoH + marcoH * 0.10));
+
+      // Nombre del circuito (línea 2 — color dorado)
+      final nombreCircuito = widget.circuito.nombre;
+      final tpCircuito = TextPainter(
+        text: TextSpan(text: nombreCircuito,
+          style: TextStyle(color: const Color(0xFFD4AF7A).withOpacity(0.9),
+            fontSize: 34 * escala, fontWeight: FontWeight.w600)),
+        textDirection: TextDirection.ltr, maxLines: 1, ellipsis: '...');
+      tpCircuito.layout(maxWidth: w - textX - 20);
+      tpCircuito.paint(canvas, Offset(textX, h - marcoH + marcoH * 0.47));
+
+      // Fecha (línea 3 — tenue)
+      final hoy = DateTime.now();
+      final fecha = '${hoy.day}/${hoy.month}/${hoy.year}';
+      final tpFecha = TextPainter(
+        text: TextSpan(text: fecha,
+          style: TextStyle(color: Colors.white.withOpacity(0.55),
+            fontSize: 26 * escala)),
+        textDirection: TextDirection.ltr);
+      tpFecha.layout();
+      tpFecha.paint(canvas, Offset(textX, h - marcoH + marcoH * 0.73));
+
+      // Exportar
+      final img = await recorder.endRecording().toImage(fotoImg.width, fotoImg.height);
+      final byteData = await img.toByteData(format: ui.ImageByteFormat.png);
+      final composedBytes = byteData!.buffer.asUint8List();
+
+      final dir = await getApplicationDocumentsDirectory();
+      final ruteroDir = Directory('${dir.path}/RuteroMDE');
+      if (!await ruteroDir.exists()) await ruteroDir.create(recursive: true);
+      final ts = DateTime.now().millisecondsSinceEpoch;
+      final archivo = File('${ruteroDir.path}/mision_$ts.png');
+      await archivo.writeAsBytes(composedBytes);
+
+      // Guardar en galería del sistema
+      await Gal.putImage(archivo.path, album: 'Rutero MDE');
+      return archivo;
+    } catch (e) {
+      debugPrint('Error componiendo foto misión: $e');
+      return null;
+    }
+  }
+
+  Future<void> _mostrarPreviewMision(File archivo, ParadaCircuito p) async {
+    if (!mounted) return;
+    final nombreCircuito = widget.circuito.nombre;
+    // Texto sugerido para compartir (hashtags aquí, no en la imagen)
+    final textoCompartir =
+        '¡Cumplí la misión épica en ${p.nombre}! 🤘\n'
+        '$nombreCircuito · Rutero MDE\n'
+        '#CircuitoRockMDE #RuteroMDE #${p.nombre.replaceAll(' ', '')}';
+
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => Container(
+        height: MediaQuery.of(context).size.height * 0.88,
+        decoration: const BoxDecoration(
+          color: Color(0xFF0D0D0D),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+        child: Column(children: [
+          // Handle
+          Center(child: Container(
+            margin: const EdgeInsets.only(top: 12),
+            width: 36, height: 3,
+            decoration: BoxDecoration(
+              color: RDSColor.textMuted.withOpacity(0.3),
+              borderRadius: BorderRadius.circular(2)))),
+          const SizedBox(height: 10),
+          const Text('MISIÓN CUMPLIDA 🤘',
+            style: TextStyle(fontFamily: 'SpaceGrotesk', fontSize: 11,
+              fontWeight: FontWeight.w700, letterSpacing: 2.0,
+              color: RDSColor.textMuted)),
+          const SizedBox(height: 10),
+          // Preview foto
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(16),
+                child: Image.file(archivo, fit: BoxFit.cover,
+                  width: double.infinity)))),
+          const SizedBox(height: 12),
+          // Texto para copiar y pegar en TikTok / Instagram
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
+            child: Builder(builder: (ctx) => Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              decoration: BoxDecoration(
+                color: RDSColor.surface,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: RDSColor.borderSubtle)),
+              child: Row(children: [
+                Expanded(child: Text(textoCompartir,
+                  style: const TextStyle(
+                    color: RDSColor.textMuted, fontSize: 11,
+                    fontFamily: 'SpaceGrotesk', height: 1.4))),
+                const SizedBox(width: 8),
+                GestureDetector(
+                  onTap: () {
+                    Clipboard.setData(ClipboardData(text: textoCompartir));
+                    ScaffoldMessenger.of(ctx).showSnackBar(const SnackBar(
+                      content: Text('Texto copiado 📋'),
+                      duration: Duration(seconds: 2),
+                      behavior: SnackBarBehavior.floating));
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: RDSColor.green.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8)),
+                    child: const Icon(Icons.copy_rounded,
+                      color: RDSColor.green, size: 18))),
+              ])))),
+          const SizedBox(height: 12),
+          // Botones
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 32),
+            child: Row(children: [
+              // Guardar solo
+              GestureDetector(
+                onTap: () => Navigator.pop(context),
+                child: Container(
+                  width: 52, height: 52,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: RDSColor.surface,
+                    border: Border.all(color: RDSColor.borderSubtle)),
+                  child: const Icon(Icons.download_done_rounded,
+                    color: RDSColor.textMuted, size: 22))),
+              const SizedBox(width: 12),
+              // Compartir — CTA principal (aquí se registran los puntos)
+              Expanded(child: GestureDetector(
+                onTap: () async {
+                  Navigator.pop(context);
+                  // Registrar misión en Firestore solo al compartir (una sola vez)
+                  if (!_misionCumplida) await _registrarMisionFirestore();
+                  await Share.shareXFiles(
+                    [XFile(archivo.path)],
+                    text: textoCompartir,
+                    subject: 'Misión épica — $nombreCircuito');
+                },
+                child: Container(
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(colors: RDSColor.gradientPrimary),
+                    borderRadius: BorderRadius.circular(12),
+                    boxShadow: RDSElevation.glow(
+                      color: RDSColor.green, opacity: 0.4)),
+                  child: const Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.share_rounded, color: Colors.white, size: 18),
+                      SizedBox(width: 8),
+                      Text('Compartir',
+                        style: TextStyle(
+                          color: Colors.white, fontSize: 14,
+                          fontWeight: FontWeight.w800,
+                          fontFamily: 'SpaceGrotesk')),
+                    ])))),
+            ])),
+        ])));
+  }
+}
+
+Color _colorBeneficio(String b) {
+  switch (b) {
+    case 'gratuito':           return RDSColor.green;
+    case 'ingreso_2x1':        return RDSColor.gold;
+    case 'tarifa_preferencial': return RDSColor.orchid;
+    case 'aporte_voluntario':  return Colors.lightBlue;
+    case 'mixto':              return Colors.orange;
+    default:                   return RDSColor.textMuted;
+  }
+}
+
+String _labelBeneficio(String b) {
+  switch (b) {
+    case 'gratuito':           return '🎫 Entrada gratuita';
+    case 'ingreso_2x1':        return '🎟️ 2x1 con pasaporte';
+    case 'tarifa_preferencial': return '💰 Tarifa especial';
+    case 'aporte_voluntario':  return '🤝 Aporte voluntario';
+    case 'mixto':              return '🎁 Beneficio mixto';
+    default:                   return b;
+  }
+}
+
+class _InfoFila extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String valor;
+  const _InfoFila({required this.icon, required this.label, required this.valor});
+  @override
+  Widget build(BuildContext context) {
+    final esMultilinea = valor.contains('\n');
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, size: 16, color: RDSColor.textMuted),
+        const SizedBox(width: 8),
+        Expanded(child: esMultilinea
+          ? Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text('$label:',
+                style: const TextStyle(color: RDSColor.textMuted, fontSize: 12,
+                  fontWeight: FontWeight.w700)),
+              const SizedBox(height: 4),
+              Text(valor,
+                style: const TextStyle(color: RDSColor.textPrimary, fontSize: 12,
+                  fontWeight: FontWeight.w500, fontFamily: 'monospace', height: 1.6)),
+            ])
+          : RichText(text: TextSpan(children: [
+              TextSpan(text: '$label: ',
+                style: const TextStyle(color: RDSColor.textMuted, fontSize: 12,
+                  fontWeight: FontWeight.w700)),
+              TextSpan(text: valor,
+                style: const TextStyle(color: RDSColor.textPrimary, fontSize: 12,
+                  fontWeight: FontWeight.w500)),
+            ]))),
+      ]);
+  }
+}
+
+class _PasBtnCheckIn extends StatelessWidget {
+  final bool activo;
+  final bool cargando;
+  final String label;
+  final VoidCallback onTap;
+  final Color acento;
+  final bool esRock;
+  const _PasBtnCheckIn({
+    required this.activo, required this.cargando,
+    required this.label, required this.onTap,
+    this.acento = RDSColor.gold,
+    this.esRock = false,
+  });
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: activo ? onTap : null,
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(vertical: 16),
+        decoration: BoxDecoration(
+          // Rock activo: gradient rojo / Rock inactivo: superficie oscura borde dorado
+          // Otros: color sólido acento
+          gradient: (esRock && activo)
+              ? LinearGradient(
+                  colors: [acento, acento.withOpacity(0.75)],
+                  begin: Alignment.centerLeft, end: Alignment.centerRight)
+              : null,
+          color: (esRock && activo) ? null
+              : (activo ? acento : RDSColor.surface),
+          borderRadius: BorderRadius.circular(14),
+          border: (esRock && !activo)
+              ? Border.all(color: RDSColor.gold.withOpacity(0.3))
+              : null),
+        child: cargando
+            ? Center(child: SizedBox(width: 20, height: 20,
+                child: CircularProgressIndicator(
+                  color: activo ? Colors.white : RDSColor.textMuted,
+                  strokeWidth: 2)))
+            : Text(label, textAlign: TextAlign.center,
+                style: TextStyle(
+                  // Rock activo: texto blanco; otros: negro sobre color claro
+                  color: activo
+                      ? (esRock ? Colors.white : Colors.black)
+                      : RDSColor.textMuted,
+                  fontSize: 14, fontWeight: FontWeight.w800,
+                  fontFamily: esRock ? 'SpaceGrotesk' : null))));
+  }
+}
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  _CalificacionWidget — Estrellas 1-5, 1 vez por usuario por parada
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _CalificacionWidget extends StatefulWidget {
+  final String uid;
+  final String circuitoId;
+  final String paradaId;
+  final double ratingActual;
+  final int totalVotos;
+  final Color acento;
+
+  const _CalificacionWidget({
+    required this.uid,
+    required this.circuitoId,
+    required this.paradaId,
+    required this.ratingActual,
+    required this.totalVotos,
+    required this.acento,
+  });
+
+  @override
+  State<_CalificacionWidget> createState() => _CalificacionWidgetState();
+}
+
+class _CalificacionWidgetState extends State<_CalificacionWidget> {
+  int? _calificacionPrevia;
+  int _seleccion = 0;
+  bool _cargando = true;
+  bool _enviando = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _verificarCalificacion();
+  }
+
+  Future<void> _verificarCalificacion() async {
+    final prev = await PasaportesService.obtenerCalificacion(
+      uid: widget.uid,
+      circuitoId: widget.circuitoId,
+      paradaId: widget.paradaId,
+    );
+    if (mounted) {
+      setState(() {
+        _calificacionPrevia = prev;
+        _seleccion = prev ?? 0;
+        _cargando = false;
+      });
+    }
+  }
+
+  Future<void> _enviarCalificacion() async {
+    if (_seleccion == 0 || _enviando) return;
+    setState(() => _enviando = true);
+    final ok = await PasaportesService.calificarParada(
+      uid: widget.uid,
+      circuitoId: widget.circuitoId,
+      paradaId: widget.paradaId,
+      estrellas: _seleccion,
+    );
+    if (!mounted) return;
+    setState(() { _enviando = false; if (ok) _calificacionPrevia = _seleccion; });
+    if (ok) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Row(children: [
+            const Text('⭐', style: TextStyle(fontSize: 18)),
+            const SizedBox(width: 8),
+            Text('¡Gracias por tu calificación! $_seleccion estrella${_seleccion > 1 ? "s" : ""}'),
+          ]),
+          backgroundColor: widget.acento,
+          duration: const Duration(seconds: 2),
+        ));
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Solo podés calificar una vez por bar.'),
+          backgroundColor: Colors.red));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_cargando) {
+      return Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: RDSColor.card,
+          borderRadius: BorderRadius.circular(14)),
+        child: const Center(child: SizedBox(
+          width: 20, height: 20,
+          child: CircularProgressIndicator(strokeWidth: 2))));
+    }
+
+    final yaCalificado = _calificacionPrevia != null;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: RDSColor.card,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: yaCalificado
+              ? widget.acento.withOpacity(0.35)
+              : Colors.white.withOpacity(0.07))),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          const Text('⭐', style: TextStyle(fontSize: 20)),
+          const SizedBox(width: 8),
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            const Text('Calificá este bar',
+              style: TextStyle(color: RDSColor.textPrimary, fontSize: 14,
+                fontWeight: FontWeight.w700)),
+            if (widget.totalVotos > 0)
+              Text('${widget.ratingActual.toStringAsFixed(1)} ★  ·  ${widget.totalVotos} voto${widget.totalVotos > 1 ? "s" : ""}',
+                style: const TextStyle(color: RDSColor.textMuted, fontSize: 11)),
+          ])),
+        ]),
+        const SizedBox(height: 14),
+        if (yaCalificado) ...[
+          Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+            ...List.generate(5, (i) => Icon(
+              Icons.star_rounded,
+              color: i < (_calificacionPrevia!) ? widget.acento : Colors.white24,
+              size: 32)),
+          ]),
+          const SizedBox(height: 8),
+          Center(child: Text('Tu calificación: $_calificacionPrevia ★',
+            style: TextStyle(color: widget.acento, fontSize: 12,
+              fontWeight: FontWeight.w600))),
+        ] else ...[
+          Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+            ...List.generate(5, (i) {
+              final estrella = i + 1;
+              return GestureDetector(
+                onTap: () => setState(() => _seleccion = estrella),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 4),
+                  child: Icon(
+                    Icons.star_rounded,
+                    color: estrella <= _seleccion ? widget.acento : Colors.white24,
+                    size: 36)));
+            }),
+          ]),
+          const SizedBox(height: 14),
+          GestureDetector(
+            onTap: _seleccion > 0 ? _enviarCalificacion : null,
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 11),
+              decoration: BoxDecoration(
+                color: _seleccion > 0 ? widget.acento : RDSColor.surface,
+                borderRadius: BorderRadius.circular(10)),
+              child: Center(child: _enviando
+                  ? const SizedBox(width: 18, height: 18,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2, color: Colors.black))
+                  : Text(
+                      _seleccion > 0
+                          ? 'Enviar calificación · $_seleccion ★'
+                          : 'Tocá las estrellas para calificar',
+                      style: TextStyle(
+                        color: _seleccion > 0 ? Colors.black : RDSColor.textMuted,
+                        fontSize: 13, fontWeight: FontWeight.w700))))),
+        ],
+      ]));
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  _RankingBaresScreen — Ranking público de bares por calificación
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _RankingBaresScreen extends StatefulWidget {
+  final CircuitoFestival circuito;
+  const _RankingBaresScreen({required this.circuito});
+  @override
+  State<_RankingBaresScreen> createState() => _RankingBaresScreenState();
+}
+
+class _RankingBaresScreenState extends State<_RankingBaresScreen> {
+  List<Map<String, dynamic>> _ranking = [];
+  bool _cargando = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _cargar();
+  }
+
+  Future<void> _cargar() async {
+    final data = await PasaportesService.rankingBares(widget.circuito.id);
+    if (mounted) setState(() { _ranking = data; _cargando = false; });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final c = widget.circuito;
+    return Scaffold(
+      backgroundColor: RDSColor.base,
+      appBar: AppBar(
+        backgroundColor: RDSColor.base,
+        elevation: 0,
+        leading: GestureDetector(
+          onTap: () => Navigator.pop(context),
+          child: const Icon(Icons.arrow_back_ios_new_rounded,
+            color: RDSColor.textPrimary, size: 18)),
+        title: Row(mainAxisSize: MainAxisSize.min, children: [
+          Icon(Icons.star_rounded, color: c.colorGradienteA, size: 18),
+          const SizedBox(width: 6),
+          Text('Top Bares',
+            style: TextStyle(
+              color: RDSColor.textPrimary, fontSize: 15,
+              fontWeight: FontWeight.w800,
+              fontFamily: c.tipo == 'musico' ? 'SpaceGrotesk' : null)),
+        ]),
+        centerTitle: true,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh_rounded, color: RDSColor.textMuted, size: 20),
+            onPressed: () {
+              setState(() => _cargando = true);
+              _cargar();
+            }),
+        ]),
+      body: _cargando
+          ? const Center(child: CircularProgressIndicator(color: RDSColor.gold))
+          : _ranking.isEmpty
+              ? _EmptyRankingBares(acento: c.colorGradienteA)
+              : ListView.builder(
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
+                  itemCount: _ranking.length,
+                  itemBuilder: (_, i) {
+                    final item = _ranking[i];
+                    final pos = i + 1;
+                    final rating = (item['rating'] as double);
+                    final votos = (item['totalVotos'] as int);
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: 10),
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: c.tipo == 'musico'
+                            ? const Color(0xFF131510)
+                            : RDSColor.card,
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(
+                          color: pos == 1
+                              ? c.colorGradienteA.withOpacity(0.55)
+                              : c.tipo == 'musico'
+                                  ? c.colorGradienteA.withOpacity(0.12)
+                                  : Colors.white.withOpacity(0.06))),
+                      child: Row(children: [
+                        SizedBox(
+                          width: 36,
+                          child: Text(
+                            pos == 1 ? '🥇' : pos == 2 ? '🥈' : pos == 3 ? '🥉' : '#$pos',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontSize: pos <= 3 ? 22 : 14,
+                              color: pos <= 3 ? null : RDSColor.textMuted,
+                              fontWeight: FontWeight.w700,
+                              fontFamily: c.tipo == 'musico' ? 'SpaceGrotesk' : null))),
+                        const SizedBox(width: 12),
+                        Text(item['emoji'] as String,
+                          style: const TextStyle(fontSize: 24)),
+                        const SizedBox(width: 10),
+                        Expanded(child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(item['nombre'] as String,
+                              style: TextStyle(color: RDSColor.textPrimary,
+                                fontSize: 14, fontWeight: FontWeight.w700,
+                                fontFamily: c.tipo == 'musico' ? 'SpaceGrotesk' : null),
+                              maxLines: 1, overflow: TextOverflow.ellipsis),
+                            const SizedBox(height: 2),
+                            Text('${item['barrio']}',
+                              style: TextStyle(
+                                color: c.tipo == 'musico'
+                                    ? c.colorGradienteA.withOpacity(0.65)
+                                    : RDSColor.textMuted,
+                                fontSize: 11,
+                                fontFamily: c.tipo == 'musico' ? 'SpaceGrotesk' : null)),
+                          ])),
+                        Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
+                          Row(mainAxisSize: MainAxisSize.min, children: [
+                            Icon(Icons.star_rounded,
+                              color: c.colorGradienteA, size: 16),
+                            const SizedBox(width: 3),
+                            Text(rating.toStringAsFixed(1),
+                              style: TextStyle(color: c.colorGradienteA,
+                                fontSize: 15, fontWeight: FontWeight.w900,
+                                fontFamily: c.tipo == 'musico' ? 'SpaceGrotesk' : null)),
+                          ]),
+                          Text('$votos voto${votos > 1 ? "s" : ""}',
+                            style: TextStyle(
+                              color: RDSColor.textMuted, fontSize: 10,
+                              fontFamily: c.tipo == 'musico' ? 'SpaceGrotesk' : null)),
+                        ]),
+                      ]));
+                  }));
+  }
+}
+
+class _EmptyRankingBares extends StatelessWidget {
+  final Color acento;
+  const _EmptyRankingBares({required this.acento});
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          Icon(Icons.star_border_rounded, size: 56, color: acento.withOpacity(0.4)),
+          const SizedBox(height: 16),
+          const Text('Aún sin calificaciones',
+            style: TextStyle(color: RDSColor.textPrimary, fontSize: 16,
+              fontWeight: FontWeight.w700)),
+          const SizedBox(height: 8),
+          const Text('Visitá los bares y sé el primero\nen dejar tu calificación.',
+            textAlign: TextAlign.center,
+            style: TextStyle(color: RDSColor.textMuted, fontSize: 13, height: 1.5)),
+        ])));
+  }
+}
+
 // ─── PAINTER FERIA ─────────────────────────────────────────────────────────────
 class _FeriaPatternPainter extends CustomPainter {
   @override
@@ -23691,3 +29352,663 @@ class _LeafPatternPainter extends CustomPainter {
   @override
   bool shouldRepaint(_) => false;
 }  
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  _QRScannerScreen — Pantalla de escaneo QR para validación de museos
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _QRScannerScreen extends StatefulWidget {
+  final String nombreParada;
+  final String paradaId;
+  final String tipoCircuito;
+  const _QRScannerScreen({
+    required this.nombreParada,
+    required this.paradaId,
+    this.tipoCircuito = 'museo',
+  });
+
+  @override
+  State<_QRScannerScreen> createState() => _QRScannerScreenState();
+}
+
+class _QRScannerScreenState extends State<_QRScannerScreen> {
+  final MobileScannerController _controller = MobileScannerController(
+    detectionSpeed: DetectionSpeed.noDuplicates,
+    facing: CameraFacing.back,
+    torchEnabled: false,
+  );
+  bool _escaneado = false;
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _onDetect(BarcodeCapture capture) {
+    if (_escaneado) return;
+    final barcode = capture.barcodes.firstOrNull;
+    final valor = barcode?.rawValue;
+    if (valor == null || valor.isEmpty) return;
+    _escaneado = true;
+    _controller.stop();
+    Navigator.pop(context, valor);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.black,
+      appBar: AppBar(
+        backgroundColor: Colors.black,
+        elevation: 0,
+        leading: GestureDetector(
+          onTap: () => Navigator.pop(context),
+          child: const Icon(Icons.arrow_back_ios_new_rounded,
+              color: Colors.white, size: 18),
+        ),
+        title: Text(
+          widget.nombreParada,
+          style: const TextStyle(color: Colors.white, fontSize: 14,
+              fontWeight: FontWeight.w700),
+          overflow: TextOverflow.ellipsis,
+        ),
+        actions: [
+          IconButton(
+            icon: ValueListenableBuilder(
+              valueListenable: _controller,
+              builder: (_, state, __) {
+                final torchOn = state.torchState == TorchState.on;
+                return Icon(
+                  torchOn ? Icons.flash_on_rounded : Icons.flash_off_rounded,
+                  color: torchOn ? RDSColor.gold : Colors.white54,
+                );
+              },
+            ),
+            onPressed: () => _controller.toggleTorch(),
+          ),
+        ],
+      ),
+      body: Stack(
+        children: [
+          // Scanner
+          MobileScanner(
+            controller: _controller,
+            onDetect: _onDetect,
+          ),
+          // Overlay con ventana de escaneo
+          CustomPaint(
+            painter: _QROverlayPainter(),
+            child: const SizedBox.expand(),
+          ),
+          // Instrucción inferior
+          Positioned(
+            bottom: 60,
+            left: 24,
+            right: 24,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+              decoration: BoxDecoration(
+                color: Colors.black.withOpacity(0.7),
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(widget.tipoCircuito == 'musico'
+                      ? 'Apunta al código QR del bar'
+                      : 'Apunta al código QR del museo',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: Colors.white, fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      fontFamily: widget.tipoCircuito == 'musico' ? 'SpaceGrotesk' : null,
+                      letterSpacing: widget.tipoCircuito == 'musico' ? -0.3 : null)),
+                  const SizedBox(height: 4),
+                  Text('El QR está en la entrada de ${widget.nombreParada}',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: Colors.white60, fontSize: 12,
+                      fontFamily: widget.tipoCircuito == 'musico' ? 'SpaceGrotesk' : null)),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// Painter del overlay con la ventana cuadrada de escaneo
+class _QROverlayPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final dimPaint = Paint()..color = Colors.black.withOpacity(0.55);
+    final clearPaint = Paint()..blendMode = BlendMode.clear;
+    final borderPaint = Paint()
+      ..color = RDSColor.gold
+      ..strokeWidth = 3
+      ..style = PaintingStyle.stroke;
+
+    final windowSize = size.width * 0.68;
+    final left = (size.width - windowSize) / 2;
+    final top = (size.height - windowSize) / 2 - 30;
+    final window = Rect.fromLTWH(left, top, windowSize, windowSize);
+    final radius = const Radius.circular(16);
+
+    // Fondo oscuro con hueco
+    canvas.saveLayer(Offset.zero & size, Paint());
+    canvas.drawRect(Offset.zero & size, dimPaint);
+    canvas.drawRRect(RRect.fromRectAndRadius(window, radius), clearPaint);
+    canvas.restore();
+
+    // Borde dorado
+    canvas.drawRRect(RRect.fromRectAndRadius(window, radius), borderPaint);
+
+    // Esquinas decorativas
+    const cornerLen = 24.0;
+    final cp = Paint()
+      ..color = RDSColor.gold
+      ..strokeWidth = 4
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round;
+
+    // Top-left
+    canvas.drawLine(Offset(left, top + cornerLen), Offset(left, top), cp);
+    canvas.drawLine(Offset(left, top), Offset(left + cornerLen, top), cp);
+    // Top-right
+    canvas.drawLine(Offset(left + windowSize - cornerLen, top),
+        Offset(left + windowSize, top), cp);
+    canvas.drawLine(Offset(left + windowSize, top),
+        Offset(left + windowSize, top + cornerLen), cp);
+    // Bottom-left
+    canvas.drawLine(Offset(left, top + windowSize - cornerLen),
+        Offset(left, top + windowSize), cp);
+    canvas.drawLine(Offset(left, top + windowSize),
+        Offset(left + cornerLen, top + windowSize), cp);
+    // Bottom-right
+    canvas.drawLine(Offset(left + windowSize - cornerLen, top + windowSize),
+        Offset(left + windowSize, top + windowSize), cp);
+    canvas.drawLine(Offset(left + windowSize, top + windowSize - cornerLen),
+        Offset(left + windowSize, top + windowSize), cp);
+  }
+
+  @override
+  bool shouldRepaint(_) => false;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  _TriviaMuseoScreen — Pantalla de trivia post check-in (1 intento)
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _TriviaMuseoScreen extends StatefulWidget {
+  final String circuitoId;
+  final ParadaCircuito parada;
+
+  const _TriviaMuseoScreen({
+    required this.circuitoId,
+    required this.parada,
+  });
+
+  @override
+  State<_TriviaMuseoScreen> createState() => _TriviaMuseoScreenState();
+}
+
+class _TriviaMuseoScreenState extends State<_TriviaMuseoScreen> {
+  int? _opcionSeleccionada;
+  bool _respondida = false;
+  bool _acertada = false;
+  bool _guardando = false;
+
+  TriviaParada get trivia => widget.parada.trivia!;
+
+  Future<void> _responder(int index) async {
+    if (_respondida || _guardando) return;
+    final uid = FirebaseAuth.instance.currentUser?.uid ?? '';
+    if (uid.isEmpty) return;
+
+    final esCorrecta = index == trivia.correctaIndex;
+    setState(() {
+      _opcionSeleccionada = index;
+      _respondida = true;
+      _acertada = esCorrecta;
+      _guardando = true;
+    });
+
+    await PasaportesService.registrarTrivia(
+      uid: uid,
+      circuitoId: widget.circuitoId,
+      paradaId: widget.parada.id,
+      acertada: esCorrecta,
+      opcionElegida: index,
+      puntosBonus: trivia.puntosBonus,
+    );
+
+    if (mounted) setState(() => _guardando = false);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: RDSColor.base,
+      appBar: AppBar(
+        backgroundColor: RDSColor.base,
+        elevation: 0,
+        leading: GestureDetector(
+          onTap: () => Navigator.pop(context, _respondida ? _acertada : null),
+          child: const Icon(Icons.arrow_back_ios_new_rounded,
+            color: RDSColor.textPrimary, size: 18)),
+        title: Text(
+          widget.parada.nombre,
+          style: const TextStyle(color: RDSColor.textPrimary, fontSize: 14,
+            fontWeight: FontWeight.w700),
+          overflow: TextOverflow.ellipsis),
+      ),
+      body: WillPopScope(
+        onWillPop: () async {
+          Navigator.pop(context, _respondida ? _acertada : null);
+          return false;
+        },
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(20),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+
+            // Header trivia
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft, end: Alignment.bottomRight,
+                  colors: [
+                    RDSColor.gold.withOpacity(0.18),
+                    RDSColor.gold.withOpacity(0.06),
+                  ]),
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(color: RDSColor.gold.withOpacity(0.35))),
+              child: Column(children: [
+                const Text('🧠', style: TextStyle(fontSize: 42)),
+                const SizedBox(height: 10),
+                const Text('Trivia de observación',
+                  style: TextStyle(color: RDSColor.gold, fontSize: 13,
+                    fontWeight: FontWeight.w700, letterSpacing: 1)),
+                const SizedBox(height: 4),
+                Text(
+                  _respondida
+                    ? (_acertada ? '+${trivia.puntosBonus} pts ganados 🎯' : 'Mejor suerte la próxima')
+                    : '+${trivia.puntosBonus} pts si aciertas · Solo 1 intento',
+                  style: TextStyle(
+                    color: _respondida
+                      ? (_acertada ? RDSColor.green : Colors.redAccent)
+                      : RDSColor.textMuted,
+                    fontSize: 12),
+                  textAlign: TextAlign.center),
+              ])),
+            const SizedBox(height: 24),
+
+            // Pregunta
+            Text(trivia.pregunta,
+              style: const TextStyle(
+                color: RDSColor.textPrimary, fontSize: 17,
+                fontWeight: FontWeight.w800, height: 1.4)),
+            const SizedBox(height: 20),
+
+            // Opciones
+            ...List.generate(trivia.opciones.length, (i) {
+              final esSeleccionada = _opcionSeleccionada == i;
+              final esCorrecta = i == trivia.correctaIndex;
+
+              Color borderColor = RDSColor.textMuted.withOpacity(0.2);
+              Color bgColor = RDSColor.card;
+              Color textColor = RDSColor.textPrimary;
+              Widget? trailingIcon;
+
+              if (_respondida) {
+                if (esCorrecta) {
+                  borderColor = RDSColor.green.withOpacity(0.6);
+                  bgColor = RDSColor.green.withOpacity(0.1);
+                  textColor = RDSColor.green;
+                  trailingIcon = const Icon(Icons.check_circle_rounded,
+                    color: RDSColor.green, size: 20);
+                } else if (esSeleccionada) {
+                  borderColor = Colors.redAccent.withOpacity(0.6);
+                  bgColor = Colors.redAccent.withOpacity(0.08);
+                  textColor = Colors.redAccent;
+                  trailingIcon = const Icon(Icons.cancel_rounded,
+                    color: Colors.redAccent, size: 20);
+                } else {
+                  textColor = RDSColor.textMuted;
+                }
+              } else {
+                if (esSeleccionada) {
+                  borderColor = RDSColor.gold.withOpacity(0.6);
+                  bgColor = RDSColor.gold.withOpacity(0.1);
+                  textColor = RDSColor.gold;
+                }
+              }
+
+              return GestureDetector(
+                onTap: _respondida ? null : () => _responder(i),
+                child: Container(
+                  width: double.infinity,
+                  margin: const EdgeInsets.only(bottom: 10),
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                  decoration: BoxDecoration(
+                    color: bgColor,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: borderColor)),
+                  child: Row(children: [
+                    Container(
+                      width: 26, height: 26,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: _respondida && esCorrecta
+                          ? RDSColor.green.withOpacity(0.2)
+                          : _respondida && esSeleccionada && !esCorrecta
+                            ? Colors.redAccent.withOpacity(0.15)
+                            : RDSColor.surface),
+                      child: Center(
+                        child: Text(
+                          ['A', 'B', 'C', 'D'][i],
+                          style: TextStyle(
+                            color: textColor, fontSize: 12,
+                            fontWeight: FontWeight.w800)))),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(trivia.opciones[i],
+                        style: TextStyle(
+                          color: textColor, fontSize: 14,
+                          fontWeight: esSeleccionada || (_respondida && esCorrecta)
+                            ? FontWeight.w700 : FontWeight.w500))),
+                    if (trailingIcon != null) trailingIcon,
+                  ])));
+            }),
+
+            // Explicación (aparece después de responder)
+            if (_respondida) ...[
+              const SizedBox(height: 20),
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: RDSColor.surface,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(
+                    color: RDSColor.textMuted.withOpacity(0.15))),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Row(children: [
+                      Text('💡', style: TextStyle(fontSize: 16)),
+                      SizedBox(width: 8),
+                      Text('¿Sabías que?',
+                        style: TextStyle(color: RDSColor.gold, fontSize: 13,
+                          fontWeight: FontWeight.w700)),
+                    ]),
+                    const SizedBox(height: 8),
+                    Text(trivia.explicacion,
+                      style: const TextStyle(
+                        color: RDSColor.textMuted, fontSize: 13, height: 1.5)),
+                  ])),
+              const SizedBox(height: 24),
+
+              // Botón continuar
+              GestureDetector(
+                onTap: () => Navigator.pop(context, _acertada),
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  decoration: BoxDecoration(
+                    color: RDSColor.gold,
+                    borderRadius: BorderRadius.circular(14)),
+                  child: const Text('Continuar',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: Colors.black, fontSize: 15,
+                      fontWeight: FontWeight.w800)))),
+            ],
+
+            const SizedBox(height: 40),
+          ]),
+        ),
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  GestionEventoScreen — Admin: activar/desactivar evento en una parada
+// ─────────────────────────────────────────────────────────────────────────────
+
+class GestionEventoScreen extends StatefulWidget {
+  final String circuitoId;
+  final ParadaCircuito parada;
+  const GestionEventoScreen({
+    super.key, required this.circuitoId, required this.parada});
+  @override
+  State<GestionEventoScreen> createState() => _GestionEventoScreenState();
+}
+
+class _GestionEventoScreenState extends State<GestionEventoScreen> {
+  late bool _eventoActivo;
+  late TextEditingController _nombreCtrl;
+  late TextEditingController _descripcionCtrl;
+  late TextEditingController _horaCtrl;
+  bool _guardando = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _eventoActivo   = widget.parada.eventoActivo;
+    _nombreCtrl     = TextEditingController(text: widget.parada.eventoNombre);
+    _descripcionCtrl= TextEditingController(text: widget.parada.descripcionEvento);
+    _horaCtrl       = TextEditingController(text: widget.parada.eventoHora);
+  }
+
+  @override
+  void dispose() {
+    _nombreCtrl.dispose();
+    _descripcionCtrl.dispose();
+    _horaCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _guardar() async {
+    setState(() => _guardando = true);
+    try {
+      final data = <String, dynamic>{
+        'eventoActivo':     _eventoActivo,
+        'eventoNombre':     _nombreCtrl.text.trim(),
+        'descripcionEvento': _descripcionCtrl.text.trim(),
+        'eventoHora':       _horaCtrl.text.trim(),
+      };
+      await FirebaseFirestore.instance
+        .collection('circuitos_festivales')
+        .doc(widget.circuitoId)
+        .collection('paradas')
+        .doc(widget.parada.id)
+        .update(data);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(_eventoActivo
+            ? t('🔥 Evento activado — push enviado a inscritos', '🔥 Event activated — push sent to registered users')
+            : t('✅ Evento desactivado', '✅ Event deactivated')),
+          backgroundColor: _eventoActivo ? RDSColor.gold : RDSColor.green,
+          behavior: SnackBarBehavior.floating));
+        Navigator.pop(context);
+      }
+    } catch (e) {
+      setState(() => _guardando = false);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Error: $e'),
+          backgroundColor: Colors.red,
+          behavior: SnackBarBehavior.floating));
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: RDSColor.base,
+      appBar: AppBar(
+        backgroundColor: RDSColor.base,
+        elevation: 0,
+        leading: GestureDetector(
+          onTap: () => Navigator.pop(context),
+          child: const Icon(Icons.arrow_back_ios_new_rounded,
+            color: RDSColor.textPrimary, size: 18)),
+        title: Text(t('Gestionar evento', 'Manage event'),
+          style: const TextStyle(
+            color: RDSColor.textPrimary, fontSize: 15,
+            fontWeight: FontWeight.w700)),
+        centerTitle: true),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(20, 16, 20, 40),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+
+          // ── Info parada ──────────────────────────────────────────────────
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: RDSColor.card,
+              borderRadius: BorderRadius.circular(14)),
+            child: Row(children: [
+              Text(widget.parada.emoji,
+                style: const TextStyle(fontSize: 28)),
+              const SizedBox(width: 12),
+              Expanded(child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(widget.parada.nombre,
+                    style: const TextStyle(
+                      color: RDSColor.textPrimary,
+                      fontSize: 15, fontWeight: FontWeight.w700)),
+                  if (widget.parada.barrio.isNotEmpty)
+                    Text(widget.parada.barrio,
+                      style: const TextStyle(
+                        color: RDSColor.textMuted, fontSize: 12)),
+                ])),
+            ])),
+
+          const SizedBox(height: 20),
+
+          // ── Toggle evento activo ─────────────────────────────────────────
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: BoxDecoration(
+              color: _eventoActivo
+                ? RDSColor.gold.withOpacity(0.12)
+                : RDSColor.card,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                color: _eventoActivo
+                  ? RDSColor.gold.withOpacity(0.5)
+                  : RDSColor.borderSubtle)),
+            child: Row(children: [
+              Icon(Icons.local_fire_department_rounded,
+                color: _eventoActivo ? RDSColor.gold : RDSColor.textMuted,
+                size: 22),
+              const SizedBox(width: 12),
+              Expanded(child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(t('Evento activo ahora', 'Event active now'),
+                    style: TextStyle(
+                      color: _eventoActivo
+                        ? RDSColor.gold : RDSColor.textPrimary,
+                      fontSize: 14, fontWeight: FontWeight.w700)),
+                  Text(_eventoActivo
+                    ? t('Se notificará a los inscritos', 'Registered users will be notified')
+                    : t('Sin evento en curso', 'No active event'),
+                    style: const TextStyle(
+                      color: RDSColor.textMuted, fontSize: 12)),
+                ])),
+              Switch(
+                value: _eventoActivo,
+                onChanged: (v) => setState(() => _eventoActivo = v),
+                activeColor: RDSColor.gold),
+            ])),
+
+          const SizedBox(height: 20),
+
+          // ── Campos del evento ────────────────────────────────────────────
+          Text(t('Nombre del evento', 'Event name'),
+            style: const TextStyle(
+              color: RDSColor.textMuted, fontSize: 12,
+              fontWeight: FontWeight.w600)),
+          const SizedBox(height: 6),
+          _campo(_nombreCtrl, t('🎸 Noche de Open Mic', '🎸 Open Mic Night'), maxLines: 1),
+
+          const SizedBox(height: 14),
+
+          Text(t('Descripción', 'Description'),
+            style: const TextStyle(
+              color: RDSColor.textMuted, fontSize: 12,
+              fontWeight: FontWeight.w600)),
+          const SizedBox(height: 6),
+          _campo(_descripcionCtrl,
+            t('Entrada libre · 2x1 en cervezas artesanales',
+              'Free entry · 2x1 on craft beers'),
+            maxLines: 2),
+
+          const SizedBox(height: 14),
+
+          Text(t('Horario del evento', 'Event schedule'),
+            style: const TextStyle(
+              color: RDSColor.textMuted, fontSize: 12,
+              fontWeight: FontWeight.w600)),
+          const SizedBox(height: 6),
+          _campo(_horaCtrl, '8:00 PM – 11:00 PM', maxLines: 1),
+
+          const SizedBox(height: 28),
+
+          // ── Botón guardar ────────────────────────────────────────────────
+          GestureDetector(
+            onTap: _guardando ? null : _guardar,
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              decoration: BoxDecoration(
+                color: _eventoActivo ? RDSColor.gold : RDSColor.green,
+                borderRadius: BorderRadius.circular(14)),
+              child: _guardando
+                ? const Center(child: SizedBox(
+                    width: 20, height: 20,
+                    child: CircularProgressIndicator(
+                      color: Colors.black, strokeWidth: 2)))
+                : Text(
+                    _eventoActivo ? t('🔥 Activar evento', '🔥 Activate event') : t('✅ Guardar cambios', '✅ Save changes'),
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      color: Colors.black, fontSize: 15,
+                      fontWeight: FontWeight.w800)))),
+        ])));
+  }
+
+  Widget _campo(TextEditingController ctrl, String hint,
+      {int maxLines = 1}) {
+    return TextField(
+      controller: ctrl,
+      maxLines: maxLines,
+      style: const TextStyle(color: RDSColor.textPrimary, fontSize: 14),
+      decoration: InputDecoration(
+        hintText: hint,
+        hintStyle: const TextStyle(color: RDSColor.textMuted, fontSize: 13),
+        filled: true,
+        fillColor: RDSColor.card,
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 14, vertical: 12),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide: const BorderSide(color: RDSColor.borderSubtle)),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide: const BorderSide(color: RDSColor.borderSubtle)),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide: const BorderSide(color: RDSColor.gold))));
+  }
+}
