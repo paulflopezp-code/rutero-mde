@@ -2,8 +2,6 @@ workflows:
   default-workflow:
     name: Default Workflow
     max_build_duration: 90
-    integrations:
-      app_store_connect: Codemagic
     environment:
       flutter: stable
       xcode: latest
@@ -38,5 +36,7 @@ workflows:
       - /tmp/xcodebuild_logs/*.log
     publishing:
       app_store_connect:
-        auth: integration
+        api_key: $APP_STORE_CONNECT_PRIVATE_KEY
+        key_id: $APP_STORE_CONNECT_KEY_IDENTIFIER
+        issuer_id: $APP_STORE_CONNECT_ISSUER_ID
         submit_to_testflight: true
