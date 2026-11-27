@@ -41,6 +41,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:cloud_firestore/cloud_firestore.dart' as cf;
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:sign_in_with_apple/sign_in_with_apple.dart';
@@ -62,7 +63,7 @@ import 'design_system_rutero.dart';
 // ─────────────────────────────────────────────────────────────────────────────
 const bool kSeccionPasaporte    = true;   // Chips y sección Pasaportes
 const bool kSeccionAlrededores  = true;   // Chip y sección Alrededores
-const bool kSeccionGastronomia  = true;   // Chip y sección Gastronomía / Comida Urbana
+const bool kSeccionGastronomia  = false;  // Chip y sección Gastronomía / Comida Urbana
 const bool kSeccionServicios    = false;  // Chip y sección Servicios (pendiente revisión filtro)
 const bool kSeccionBogota       = false;  // Ciudad Bogotá activa en kCiudadesRegistradas
 const bool kSeccionRankings     = true;   // Sección Rankings / Insignias visible
@@ -783,34 +784,61 @@ List<String> parseSitiosList(Map<String, dynamic> ruta) {
       .toList();
 }
 
+/// Normaliza texto para comparación: minúsculas + sin tildes básicas.
+/// 'Medellín' → 'medellin', 'Bogotá' → 'bogota'. Evita falsos negativos por codificación.
+String _normCiudad(String s) => s
+    .toLowerCase()
+    .replaceAll('á', 'a').replaceAll('é', 'e').replaceAll('í', 'i')
+    .replaceAll('ó', 'o').replaceAll('ú', 'u').replaceAll('ü', 'u')
+    .replaceAll('ñ', 'n').trim();
+
 List<Map<String, dynamic>> filtrarRutasPorCiudad(_CiudadRegistrada? ciudad) {
+  final todasRutas = RutasService().rutas;
+  debugPrint('🔍 filtrarRutasPorCiudad: total=${todasRutas.length}, ciudad=${ciudad?.ciudad}');
   // Excluir rutas pausadas o inactivas (no visibles para el usuario)
-  final rutasActivas = RutasService().rutas.where((r) {
+  final rutasActivas = todasRutas.where((r) {
     if (r['pausada'] == true) return false;
-    if (r['activa'] == false) return false;
+    // activa puede ser bool false o String "false"
+    final activaVal = r['activa'];
+    if (activaVal == false) return false;
+    if (activaVal?.toString().toLowerCase() == 'false') return false;
     return true;
   }).toList();
-  // Admin siempre ve todas las rutas activas de todas las ciudades
-  if (esAdmin) return rutasActivas;
+  debugPrint('🔍 rutasActivas (no pausadas, no inactivas): ${rutasActivas.length}');
+  // En la app, SIEMPRE se filtra por ciudad — el admin ve la ciudad donde está,
+  // igual que cualquier usuario. El panel web tiene su propio filtro independiente.
   if (ciudad == null) return rutasActivas.where((r) {
     final rutaCiudad = (r['ciudad']?.toString() ?? 'Medellín').trim();
-    return rutaCiudad.toLowerCase() == kCiudadesRegistradas[0].ciudad.toLowerCase();
+    return _normCiudad(rutaCiudad) == _normCiudad(kCiudadesRegistradas[0].ciudad);
   }).toList();
-  return rutasActivas.where((r) {
+  final resultado = rutasActivas.where((r) {
     final rutaCiudad = (r['ciudad']?.toString() ?? 'Medellín').trim();
     final rutaPais = r['pais']?.toString().trim();
     // Rutas de temporada de Feria (Santa Elena, corregimientos) → siempre en Medellín
     final tempMeses = r['temporadaMeses'];
-    if (tempMeses is List && tempMeses.contains(7) || tempMeses is List && tempMeses.contains(8)) {
+    if (tempMeses is List && (tempMeses.contains(7) || tempMeses.contains(8))) {
       if ((rutaPais == null || rutaPais.isEmpty || rutaPais.toLowerCase() == 'colombia') &&
-          (rutaCiudad == 'Medellín' || rutaCiudad == 'Santa Elena')) {
-        return ciudad.ciudad == 'Medellín';
+          (_normCiudad(rutaCiudad) == 'medellin' || _normCiudad(rutaCiudad) == 'santa elena')) {
+        return _normCiudad(ciudad.ciudad) == 'medellin';
       }
     }
-    if (rutaCiudad.toLowerCase() != ciudad.ciudad.toLowerCase()) return false;
+    if (_normCiudad(rutaCiudad) != _normCiudad(ciudad.ciudad)) return false;
     if (rutaPais == null || rutaPais.isEmpty) return true;
     return rutaPais.toLowerCase() == ciudad.pais.toLowerCase();
   }).toList();
+
+  // Fallback: si el GPS detectó una ciudad sin rutas (ej: Bogotá sin contenido),
+  // mostrar las rutas de Medellín para que la app no quede vacía.
+  if (resultado.isEmpty && _normCiudad(ciudad.ciudad) != _normCiudad(kCiudadesRegistradas[0].ciudad)) {
+    debugPrint('⚠️ filtrarRutasPorCiudad: 0 rutas para ${ciudad.ciudad}, fallback a ${kCiudadesRegistradas[0].ciudad}');
+    return rutasActivas.where((r) {
+      final rutaCiudad = (r['ciudad']?.toString() ?? 'Medellín').trim();
+      return _normCiudad(rutaCiudad) == _normCiudad(kCiudadesRegistradas[0].ciudad);
+    }).toList();
+  }
+
+  debugPrint('🔍 filtrarRutasPorCiudad resultado: ${resultado.length} rutas para ${ciudad.ciudad}');
+  return resultado;
 }
 // ─────────────────────────────────────────────────────────────────────────
 
@@ -894,6 +922,59 @@ void setLang(String lang) {
   SharedPreferences.getInstance().then((prefs) => prefs.setString('app_lang', lang));
 }
 String t(String es, String en) => kLang == 'en' ? en : es;
+
+/// Hashtags por circuito / ruta — para los textos de compartir en redes sociales.
+/// Los hashtags NO van en la imagen (marca de agua), solo en el texto compartido.
+/// [contexto] puede ser nombre del circuito, ruta o sitio — se hace lowercase para match.
+String _hashtagsPorContexto(String contexto, {String restaurante = '', String barrio = ''}) {
+  final ctx = contexto.toLowerCase();
+
+  // ── Batalla de Sushi MDE ────────────────────────────────────────────────────
+  if (ctx.contains('sushi') || ctx.contains('batalla')) {
+    final tags = ['#SushiMDE', '#BatallaDeSushiMDE', '#RuteroMDE', '#GastronomíaMDE'];
+    if (barrio.isNotEmpty) tags.add('#${barrio.replaceAll(' ', '')}');
+    if (restaurante.isNotEmpty) tags.add('#${restaurante.replaceAll(' ', '').replaceAll('\'', '')}');
+    return tags.join(' ');
+  }
+
+  // ── Go Rock Nea ─────────────────────────────────────────────────────────────
+  if (ctx.contains('rock') || ctx.contains('nea') || ctx.contains('epicentro')) {
+    return '#GoRockNea #CircuitoRockMDE #RuteroMDE #RockMedellín #MúsicaMDE';
+  }
+
+  // ── Circuito de la Pola / cerveza ───────────────────────────────────────────
+  if (ctx.contains('pola') || ctx.contains('cerveza') || ctx.contains('craft') || ctx.contains('birra')) {
+    return '#CircuitoPola #CervezaMDE #CraftBeerMedellín #RuteroMDE #PolaConAmigos';
+  }
+
+  // ── Feria de las Flores ─────────────────────────────────────────────────────
+  if (ctx.contains('flores') || ctx.contains('feria') || ctx.contains('silletero')) {
+    return '#FeriaDeFlores #FeriaFlores2026 #Medellín #RuteroMDE #Silleteros';
+  }
+
+  // ── Rutas del patrimonio / cultura / historia ────────────────────────────────
+  if (ctx.contains('patrimonio') || ctx.contains('historia') || ctx.contains('cultura') || ctx.contains('memoria')) {
+    return '#PatrimonioMedellín #CulturaMDE #RuteroMDE #TurismoMedellín #Medellín';
+  }
+
+  // ── Rutas de naturaleza / ecoturismo ────────────────────────────────────────
+  if (ctx.contains('natur') || ctx.contains('eco') || ctx.contains('parque') || ctx.contains('cerro')) {
+    return '#EcoturismoMDE #NaturalezaMedellín #RuteroMDE #Medellín #TurismoSostenible';
+  }
+
+  // ── Rutas de arte / grafiti / cultura urbana ─────────────────────────────────
+  if (ctx.contains('arte') || ctx.contains('grafiti') || ctx.contains('urban') || ctx.contains('street')) {
+    return '#ArteMedellín #GrafitiMDE #CulturaUrbana #RuteroMDE #Medellín';
+  }
+
+  // ── Rutas gastronómicas genéricas ────────────────────────────────────────────
+  if (ctx.contains('gastro') || ctx.contains('comida') || ctx.contains('sabor') || ctx.contains('culinari')) {
+    return '#GastronomíaMDE #ComidaMedellín #RuteroMDE #SaborMDE #Medellín';
+  }
+
+  // ── Default genérico Rutero MDE ─────────────────────────────────────────────
+  return '#RuteroMDE #Medellín #TurismoMedellín #DescubreMedellín';
+}
 
 /// Elimina precios individuales de descripciones de sitios
 /// Ej: "Desayuno paisa · $60.000" → "Desayuno paisa"
@@ -6193,6 +6274,34 @@ class _PlannerScreenState extends State<PlannerScreen> {
       })
       .take(30).join('\n');
 
+    // ── Bares y restaurantes de circuitos activos ─────────────────────────
+    String lugaresCircuitosStr = '';
+    try {
+      final circuitos = await PasaportesService.obtenerPorCiudad('Medellín');
+      final activos = circuitos.where((c) => c.esActivo).toList();
+      if (activos.isNotEmpty) {
+        final buffer = StringBuffer();
+        for (final c in activos) {
+          if (c.paradas.isEmpty) continue;
+          final tipoLabel = c.tipo == 'musico' ? 'bar/rock' : c.tipo == 'gastronomico' ? 'restaurante' : 'lugar';
+          buffer.writeln('Circuito ${c.nombre} (${c.tipo}):');
+          for (final p in c.paradas) {
+            final barrio = p.barrio.isNotEmpty ? ', ${p.barrio}' : '';
+            final horario = p.horario.isNotEmpty ? ', horario:${p.horario}' : '';
+            buffer.writeln('  - ${p.nombre} ($tipoLabel$barrio$horario)');
+          }
+        }
+        lugaresCircuitosStr = buffer.toString().trim();
+      }
+    } catch (_) {}
+
+    final circuitosPromptES = lugaresCircuitosStr.isNotEmpty
+      ? '\n\nLugares reales de circuitos activos en Medellín (bares, restaurantes — podés incluirlos como actividades de noche o gastronomía):\n$lugaresCircuitosStr'
+      : '';
+    final circuitosPromptEN = lugaresCircuitosStr.isNotEmpty
+      ? '\n\nReal venues from active circuits in Medellín (bars, restaurants — include them as nightlife or gastronomy activities):\n$lugaresCircuitosStr'
+      : '';
+
     final interesesStr   = _intereses.join(', ');
     final feriaStr       = _esFeria ? '\n- Las fechas coinciden con la Feria de las Flores 2026 (31 jul – 9 ago). Incluir eventos de Feria relevantes.' : '';
     // Hotel partner — priorizar rutas del hotel en ValentINA
@@ -6223,7 +6332,7 @@ ${_horaSalida != 'No sé aún' ? '- Hora salida último día: $_horaSalida. Ajus
 ${_primeraVez ? '\nIMPORTANTE: incluir íconos de Medellín mapeados a rutas Rutero: Provenza=HUELLAS VIVAS DE EL POBLADO, Pueblito Paisa=DEL ORIGEN PAISA A LA MEDELLIN MODERNA, Escaleras=RUTA TRANSFORMACION URBANA, Botero=DEL ORIGEN PAISA A LA MEDELLIN MODERNA. Si 2+ días incluir RUTA GUATAPE.' : ''}
 
 Rutas disponibles:
-$rutasDisponibles
+$rutasDisponibles$circuitosPromptES
 
 Respondé SOLO con JSON válido (sin markdown):
 {"saludo":"...","saludoEN":"...","dias":[{"numero":1,"fecha":"...","esFeria":false,"bloques":[{"periodo":"Mañana","periodoEN":"Morning","emoji":"🌅","rutaNombre":"NOMBRE EXACTO","descripcion":"...","descripcionEN":"...","duracion":"2-3 horas","precio":"Gratis","transporte":"Metro L.A → Est. Acevedo"}]}],"resumen":{"rutas":3,"horasTotales":"6-8 horas","costoEstimado":"~40.000 COP","puntosPosibles":350,"insignias":["Explorador Urbano"]},"tip":"...","tipEN":"..."}
@@ -6242,7 +6351,7 @@ ${_horaSalida != 'No sé aún' ? '- Departure time last day: $_horaSalida. Adjus
 ${_primeraVez ? '\nIMPORTANT: include Medellín icons mapped to routes: Provenza=HUELLAS VIVAS DE EL POBLADO, Pueblito Paisa=DEL ORIGEN PAISA A LA MEDELLIN MODERNA, Comuna 13=RUTA TRANSFORMACION URBANA, Botero=DEL ORIGEN PAISA A LA MEDELLIN MODERNA. If 2+ days add RUTA GUATAPE.' : ''}
 
 Available routes:
-$rutasDisponibles
+$rutasDisponibles$circuitosPromptEN
 
 Respond ONLY with valid JSON (no markdown):
 {"saludoEN":"...","saludo":"...","dias":[{"numero":1,"fecha":"...","esFeria":false,"bloques":[{"periodo":"Morning","periodoEN":"Morning","emoji":"🌅","rutaNombre":"EXACT NAME","descripcion":"...","descripcionEN":"...","duracion":"2-3 hours","precio":"Free","transporte":"Metro L.A → Est. Acevedo"}]}],"resumen":{"rutas":3,"horasTotales":"6-8 hours","costoEstimado":"~40,000 COP","puntosPosibles":350,"insignias":["Urban Explorer"]},"tip":"...","tipEN":"..."}
@@ -7295,7 +7404,8 @@ class _PlannerResultScreenState extends State<_PlannerResultScreen> {
                           return '📅 ${d['fecha']}\n' + bloques.map((b) =>
                             '  ${b['emoji']} ${b['rutaNombre']} · ${b['duracion']}').join('\n');
                         }).join('\n\n')
-                      + '\n\n🌿 Rutero MDE → rutero-mde.web.app';
+                      + '\n\n#RuteroMDE #Medellín #TurismoMedellín #DescubreMedellín\n'
+                      + '🌿 Rutero MDE → rutero-mde.web.app';
                     Share.share(texto);
                   },
                   child: Container(
@@ -8044,8 +8154,11 @@ class _CapturasDeCampoScreenState extends State<CapturasDeCampoScreen> {
       final imgFinal = await picture.toImage(img.width, img.height);
       final byteData = await imgFinal.toByteData(format: ui.ImageByteFormat.png);
       if (byteData != null) {
-        final tempDir = await getTemporaryDirectory();
-        final tempFile = File('${tempDir.path}/rutero_${DateTime.now().millisecondsSinceEpoch}.png');
+        // Directorio persistente (no temporal — el SO puede limpiar getTemporaryDirectory)
+        final docsDir = await getApplicationDocumentsDirectory();
+        final ruteroDir = Directory('${docsDir.path}/RuteroMDE');
+        if (!await ruteroDir.exists()) await ruteroDir.create(recursive: true);
+        final tempFile = File('${ruteroDir.path}/rutero_${DateTime.now().millisecondsSinceEpoch}.png');
         await tempFile.writeAsBytes(byteData.buffer.asUint8List());
         pathFinal = tempFile.path;
       }
@@ -8056,6 +8169,9 @@ class _CapturasDeCampoScreenState extends State<CapturasDeCampoScreen> {
     // Guardar en galería del celular
     bool guardadaEnGaleria = false;
     try {
+      // Android 14+ requiere solicitar acceso antes de escribir en galería
+      final tieneAcceso = await Gal.hasAccess(toAlbum: true);
+      if (!tieneAcceso) await Gal.requestAccess(toAlbum: true);
       await Gal.putImage(pathFinal, album: 'Rutero MDE');
       guardadaEnGaleria = true;
     } catch (e) {
@@ -11204,12 +11320,13 @@ class RutasService {
     Future.microtask(() async {
       QuerySnapshot<Map<String, dynamic>> snap;
       try {
-        // Forzar lectura directa del servidor — evita mostrar datos
-        // desactualizados que estén en la caché local persistente del SDK.
+        // serverAndCache: retorna caché inmediata si existe, luego sincroniza
+        // con servidor en background. Evita el timeout de 15s que dejaba
+        // la colección vacía cuando la red era lenta al arrancar.
         snap = await FirebaseFirestore.instance
             .collection('rutas')
-            .get(const GetOptions(source: cf.Source.server))
-            .timeout(const Duration(seconds: 15));
+            .get(const GetOptions(source: cf.Source.serverAndCache))
+            .timeout(const Duration(seconds: 20));
       } catch (e) {
         debugPrint('⚠️ RutasService: server falló, intentando caché. ' + e.toString());
         try {
@@ -11219,6 +11336,9 @@ class RutasService {
               .timeout(const Duration(seconds: 60));
         } catch (e2) {
           debugPrint('⚠️ RutasService: fallback hardcode. ' + e2.toString());
+          // Sin red ni caché — marcar cargado para evitar spinner infinito
+          _cargado = true;
+          _notificar();
           return;
         }
       }
@@ -11241,11 +11361,10 @@ class RutasService {
             if (imagenLocal != null) ruta['imagen'] = imagenLocal;
 
             ruta['insigniaImg'] ??= kInsigniaPorRuta[nombre];
-            // Enriquecer zona si Firestore no la trae (solo cuando no aplicó override)
-            if (!ruta.containsKey('zona') || ruta['zona'] == null) {
-              final zonaLocal = kZonaPorRuta[nombre];
-              if (zonaLocal != null) ruta['zona'] = zonaLocal;
-            }
+            // Enriquecer zona — siempre usar kZonaPorRuta como fuente de verdad
+            // (sobreescribe Firestore si trae null, "" o valor incorrecto como 'ciudad' minúscula)
+            final zonaLocal = kZonaPorRuta[nombre];
+            if (zonaLocal != null) ruta['zona'] = zonaLocal;
             // Enriquecer con campos locales que Firestore normalmente no almacena
             // (consejos, momentoClave, descripciones, hooks, colores, etc.)
             final localData = kRutasData.firstWhere(
@@ -11293,11 +11412,25 @@ class RutasService {
             seenNombres.add(n);
             return true;
           }).toList();
+          debugPrint('✅ RutasService: ${_rutas.length} rutas cargadas de Firestore');
+          debugPrint('   Zonas: ${_rutas.map((r) => r["zona"]).toSet()}');
+          debugPrint('   Ciudades: ${_rutas.map((r) => r["ciudad"]).toSet()}');
+          debugPrint('   Ciudad rutas: ${_rutas.where((r) => r["zona"] == "Ciudad").length}');
+          debugPrint('   Alrededores rutas: ${_rutas.where((r) => r["zona"] == "Alrededores").length}');
           _cargado = true;
           _notificar(); // Avisar a la UI que hay datos nuevos
+        } else {
+          // Firestore respondió pero sin docs — marcar como cargado igual
+          // para que el spinner no quede infinito
+          debugPrint('⚠️ RutasService: Firestore respondió con 0 docs en colección rutas');
+          _cargado = true;
+          _notificar();
         }
       } catch (e) {
         debugPrint('⚠️ RutasService: fallback hardcode. ' + e.toString());
+        // Marcar como cargado aunque falle para evitar spinner infinito
+        _cargado = true;
+        _notificar();
       }
     });
   }
@@ -11546,8 +11679,9 @@ class _HomeBodyState extends State<HomeBody> {
         if (!nombre.contains(q) && !sub.contains(q) &&
             !sitios.contains(q) && !ciudad.contains(q)) return false;
       }
-      if (_filtroActivo == 'Ciudad' && r['zona'] != 'Ciudad') return false;
-      if (_filtroActivo == 'Alrededores' && r['zona'] != 'Alrededores') return false;
+      final _zonaR = r['zona']?.toString().toLowerCase().trim() ?? '';
+      if (_filtroActivo == 'Ciudad' && _zonaR != 'ciudad') return false;
+      if (_filtroActivo == 'Alrededores' && _zonaR != 'alrededores') return false;
       if (_filtroActivo == 'Creadores') return false; // Creadores tiene su propia sección, no filtra rutas
       if (_filtroActivo == 'Comida Urbana' && r['zona'] != 'Comida Urbana') return false;
       if (_filtroActivo == 'Eventos' && r['zona'] != 'Eventos') return false;
@@ -11818,17 +11952,29 @@ class _HomeBodyState extends State<HomeBody> {
                   diasParaActivacion: _diasParaActivacion(r),
                   onTap: activa ? () => RuteroNav.push(context, RouteDetailScreen(ruta: r)) : null); }),
             ] else if (_filtroActivo == 'Ciudad') ...[
+              if (!RutasService().cargado)
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 56),
+                  child: Center(child: CircularProgressIndicator(
+                    color: RDSColor.gold, strokeWidth: 2)))
+              else ...[
               _SectionHeader(
                 titulo: t('🏙️ EN ${(_ciudadDetectada?.ciudad ?? "MEDELLÍN").toUpperCase()}','🏙️ IN ${(_ciudadDetectada?.ciudad ?? "MEDELLÍN").toUpperCase()}'),
-                subtitulo: '${_rutas.where((r) => r["zona"] == "Ciudad").length} ${t("rutas disponibles","routes available")}'),
+                subtitulo: '${_rutas.where((r) => r["zona"]?.toString().toLowerCase().trim() == "ciudad").length} ${t("rutas disponibles","routes available")}'),
               const SizedBox(height: 10),
               // ── Agrupar por sectores ──
               ...(() {
                 final rutasCiudad = _rutas.where((r) {
-                  if (r['zona'] != 'Ciudad') return false;
+                  final zona = r['zona']?.toString().toLowerCase().trim() ?? '';
+                  if (zona != 'ciudad') return false;
+                  // Admin ve todas las ciudades sin filtro adicional
+                  if (esAdmin) return true;
+                  // _rutas ya viene filtrado por ciudad desde filtrarRutasPorCiudad,
+                  // pero re-filtramos con _normCiudad por si acaso Firestore tiene
+                  // variantes de escritura (sin tilde, mayúsculas distintas, etc.)
                   final _ciudadFiltro = _ciudadDetectada ?? kCiudadesRegistradas[0];
-                  final rutaCiudad = r['ciudad']?.toString() ?? 'Medellín';
-                  return rutaCiudad == _ciudadFiltro.ciudad;
+                  final rutaCiudad = (r['ciudad']?.toString() ?? 'Medellín').trim();
+                  return _normCiudad(rutaCiudad) == _normCiudad(_ciudadFiltro.ciudad);
                 }).toList();
 
                 // Detectar sector por nombre de ruta
@@ -11882,15 +12028,88 @@ class _HomeBodyState extends State<HomeBody> {
                 }
                 return widgets;
               })(),
+              ], // end else (RutasService cargado)
             ] else if (_filtroActivo == 'Alrededores') ...[
-              _SectionHeader(
-                titulo: t('🗻 ALREDEDORES','🗻 SURROUNDINGS'),
-                subtitulo: '${_rutas.where((r) => r["zona"] == "Alrededores").length} ${t("rutas disponibles","routes available")}'),
-              const SizedBox(height: 10),
-              ..._rutas.where((r) => r['zona'] == 'Alrededores' && (r['ciudad']?.toString() ?? 'Medellín') == (_ciudadDetectada ?? kCiudadesRegistradas[0]).ciudad).map((r) { final pausada = r['pausada'] == true; return _RouteCard(
-                ruta: r, activa: !pausada,
-                proximaActivacion: pausada ? (r['tagPausada'] ?? '🚧 Próximamente') : '',
-                onTap: pausada ? null : () => RuteroNav.push(context, RouteDetailScreen(ruta: r))); }),
+              Builder(builder: (ctx) {
+                final ciudadActual = (_ciudadDetectada ?? kCiudadesRegistradas[0]).ciudad;
+                // Buscar en todas las rutas del servicio (merge Firestore + local)
+                var alrededores = RutasService().rutas.where((r) {
+                  final zona = r['zona']?.toString().toLowerCase().trim() ?? '';
+                  if (zona != 'alrededores') return false;
+                  if (r['pausada'] == true) return false;
+                  final activaVal = r['activa'];
+                  if (activaVal == false || activaVal?.toString().toLowerCase() == 'false') return false;
+                  // Admin ve todas las ciudades
+                  if (esAdmin) return true;
+                  final rutaCiudad = (r['ciudad']?.toString() ?? 'Medellín').trim();
+                  return _normCiudad(rutaCiudad) == _normCiudad(ciudadActual);
+                }).toList();
+                // Fallback: si Firestore no trajo las rutas con zona correcta,
+                // inyectar directamente desde kRutasData + kCiudadZonaOverride
+                if (alrededores.isEmpty) {
+                  final nombresFirestore = RutasService().rutas.map((r) => r['nombre']?.toString() ?? '').toSet();
+                  alrededores = kRutasData.where((r) {
+                    final nombre = r['nombre']?.toString() ?? '';
+                    final override = kCiudadZonaOverride[nombre];
+                    final zona = override?['zona'] ?? r['zona']?.toString() ?? '';
+                    final ciudad = override?['ciudad'] ?? r['ciudad']?.toString() ?? 'Medellín';
+                    return zona == 'Alrededores' &&
+                        _normCiudad(ciudad) == _normCiudad(ciudadActual) &&
+                        r['pausada'] != true &&
+                        r['activa'] != false &&
+                        !nombresFirestore.contains(nombre);
+                  }).map((r) {
+                    // Enriquecer con override de ciudad/zona
+                    final nombre = r['nombre']?.toString() ?? '';
+                    final override = kCiudadZonaOverride[nombre];
+                    if (override != null) {
+                      return <String, dynamic>{...r, 'ciudad': override['ciudad'], 'zona': override['zona']};
+                    }
+                    return r;
+                  }).toList();
+                  // Si sigue vacío, incluir las migradas con zona override
+                  if (alrededores.isEmpty) {
+                    alrededores = kCiudadZonaOverride.entries.where((e) {
+                      return e.value['zona'] == 'Alrededores' && _normCiudad(e.value['ciudad']!) == _normCiudad(ciudadActual);
+                    }).map((e) {
+                      final nombre = e.key;
+                      final base = kRutasData.firstWhere(
+                        (r) => r['nombre']?.toString() == nombre, orElse: () => <String,dynamic>{});
+                      return <String, dynamic>{...base, 'nombre': nombre,
+                        'ciudad': e.value['ciudad'], 'zona': e.value['zona'],
+                        'imagen': kImagenPorRuta[nombre] ?? '',
+                        'insigniaImg': kInsigniaPorRuta[nombre] ?? '',
+                        'comoLlegar': kComoLlegarPorRuta[nombre] ?? '',
+                      };
+                    }).where((r) => r['pausada'] != true).toList();
+                  }
+                }
+                return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  _SectionHeader(
+                    titulo: t('🗻 ALREDEDORES','🗻 SURROUNDINGS'),
+                    subtitulo: '${alrededores.length} ${t("rutas disponibles","routes available")}'),
+                  const SizedBox(height: 10),
+                  if (alrededores.isEmpty)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 32, horizontal: 16),
+                      child: Center(child: Column(children: [
+                        const Text('🗻', style: TextStyle(fontSize: 40)),
+                        const SizedBox(height: 8),
+                        Text(t('Próximamente más rutas de alrededores',
+                               'More surroundings routes coming soon'),
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(color: RDSColor.textMuted, fontSize: 13)),
+                      ])))
+                  else
+                    ...alrededores.map((r) {
+                      final pausada = r['pausada'] == true;
+                      return _RouteCard(
+                        ruta: r, activa: !pausada,
+                        proximaActivacion: pausada ? (r['tagPausada'] ?? '🚧 Próximamente') : '',
+                        onTap: pausada ? null : () => RuteroNav.push(context, RouteDetailScreen(ruta: r)));
+                    }),
+                ]);
+              }),
             ] else if (_filtroActivo == 'Pasaportes') ...[
               _PasaportesSection(
                 ciudadDetectada: (_ciudadDetectada ?? kCiudadesRegistradas[0]).ciudad),
@@ -11918,7 +12137,7 @@ class _HomeBodyState extends State<HomeBody> {
                 titulo: t('🍟 COMIDA URBANA','🍟 STREET FOOD'),
                 subtitulo: '${_rutas.where((r) => r["zona"] == "Comida Urbana").length} ${t("rutas · Street Food MDE","routes · Street Food MDE")}'),
               const SizedBox(height: 10),
-              ..._rutas.where((r) => r['zona'] == 'Comida Urbana' && (r['ciudad']?.toString() ?? 'Medellín') == (_ciudadDetectada ?? kCiudadesRegistradas[0]).ciudad).map((r) { final pausada = r['pausada'] == true; return _RouteCard(
+              ..._rutas.where((r) => r['zona'] == 'Comida Urbana' && _normCiudad(r['ciudad']?.toString() ?? 'Medellín') == _normCiudad((_ciudadDetectada ?? kCiudadesRegistradas[0]).ciudad)).map((r) { final pausada = r['pausada'] == true; return _RouteCard(
                 ruta: r, activa: !pausada,
                 proximaActivacion: pausada ? (r['tagPausada'] ?? '🚧 Próximamente') : '',
                 onTap: pausada ? null : () => RuteroNav.push(context, RouteDetailScreen(ruta: r))); }),
@@ -13964,6 +14183,9 @@ class _CameraScreenState extends State<CameraScreen> with SingleTickerProviderSt
       await archivo.writeAsBytes(composedBytes);
 
       // Guardar en galería del sistema (aparece en Fotos del celular)
+      // Android 14+ requiere solicitar acceso antes de escribir en galería
+      final tieneAcceso = await Gal.hasAccess(toAlbum: true);
+      if (!tieneAcceso) await Gal.requestAccess(toAlbum: true);
       await Gal.putImage(archivo.path, album: 'Rutero MDE');
       return archivo.path; // retornar path local para MisFotosScreen
 
@@ -14513,16 +14735,17 @@ class _RewardScreenState extends State<RewardScreen>
     final insignia = widget.ruta['insignia']?.toString() ?? 'Medalla Rutero';
     final linkLogro = DeepLinkManager.linkLogro(nombreUsuario, insignia);
     final linkRuta = DeepLinkManager.linkRuta(widget.ruta['nombre'].toString());
+    final tags = _hashtagsPorContexto(rutaNombre?.toString() ?? '');
     final textoES =
         '¡Acabo de validar "${widget.sitioNombre}" en $rutaNombre! '
         '$progreso sitios · +$puntos puntos 🏆\n'
-        '🌿 Descarga Rutero MDE: rutero-mde.web.app\n'
-        '#RuteroMDE #Medellín';
+        '\n$tags\n'
+        '🌿 Descarga Rutero MDE: rutero-mde.web.app';
     final textoEN =
         'Just validated "${widget.sitioNombre}" on $rutaNombre! '
         '$progreso spots · +$puntos points 🏆\n'
-        '🌿 Download Rutero MDE: rutero-mde.web.app\n'
-        '#RuteroMDE #Medellin';
+        '\n#RuteroMDE #Medellin #TourismMedellin\n'
+        '🌿 Download Rutero MDE: rutero-mde.web.app';
     final texto = kLang == 'en' ? textoEN : textoES;
     // Dialog primero — evita que Share.share() en iOS bloquee el contexto
     // y deje el dialog sin respuesta (bug conocido share_plus en iOS)
@@ -15550,8 +15773,12 @@ class ProfileScreen extends StatelessWidget {
               final nombre = user?.displayName ?? user?.email?.split('@').first ?? 'Rutero';
               final link = DeepLinkManager.linkPerfil(nombre);
               final texto = t(
-                '¡Mira mis insignias en Rutero MDE! 🌿\n$link\n#RuteroMDE #Medellín',
-                'Check out my badges on Rutero MDE! 🌿\n$link\n#RuteroMDE #Medellin');
+                '¡Mira mis insignias en Rutero MDE! 🌿\n'
+                '\n#RuteroMDE #Medellín #TurismoMedellín #DescubreMedellín\n'
+                '$link',
+                'Check out my badges on Rutero MDE! 🌿\n'
+                '\n#RuteroMDE #Medellin #TourismMedellin\n'
+                '$link');
               Share.share(texto);
             }),
 
@@ -17393,7 +17620,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
   bool _mostrarEnCicla = true; // siempre visible — puntos fijos en el mapa
   List<Map<String, dynamic>> _estacionesEnCicla = [];
   Map<String, dynamic>? _estacionEnCiclaSeleccionada;
-  double _zoomActual = 13.0; // zoom inicial — EnCicla visible desde 13.5
+  double _zoomActual = 13.5; // zoom inicial — EnCicla/Whoosh visible desde 12.0
 
   // ── Capa Whoosh ──────────────────────────────────────────────────────────
   bool _mostrarWhoosh = false;
@@ -17412,6 +17639,15 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
   final Map<String, BitmapDescriptor> _iconCache = {};
   bool _iconsLoaded = false;
 
+  // ── Caché de marcadores y throttle de zoom ───────────────────────────────
+  Set<Marker>? _markersCache;
+  Timer? _zoomThrottle;
+  bool _rutasDesbloqueadasCargadas = false;
+
+  // ── Caché de sitios filtrados (evita reconstruir la lista en cada build) ──
+  List<_SitioMapa>? _sitiosFiltradosCache;
+  String _filtroRutaCache = '';  // para detectar cambios de filtro
+
   @override
   void initState() {
     super.initState();
@@ -17421,33 +17657,49 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
     )..repeat(reverse: true);
     _pulseAnim = Tween<double>(begin: 0.92, end: 1.08).animate(
       CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut));
-    _cargarIconos();
-    _cargarRutasDesbloqueadas();
-    _detectarCiudadMapa();
-    _cargarEstacionesEnCicla();
-    _cargarEstacionesWhoosh();
     // ── Escuchar cuando RutasService termina de cargar de Firestore ──
     RutasService().addListener(_onRutasCargadasMapa);
-    // ── Forzar carga si aún no está lista ──────────────────────────
-    if (!RutasService().cargado) {
-      RutasService().cargarEnBackground();
-    } else {
-      // Ya cargado — reconstruir markers en el siguiente frame
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) setState(() {});
+    // ── Diferir cargas pesadas: el mapa renderiza primero ─────────
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _cargarIconos();
+      Future.delayed(const Duration(milliseconds: 300), () {
+        if (!mounted) return;
+        _cargarRutasDesbloqueadas();
+        _detectarCiudadMapa();
       });
-    }
+      Future.delayed(const Duration(milliseconds: 600), () {
+        if (!mounted) return;
+        _cargarEstacionesEnCicla();
+        _cargarEstacionesWhoosh();
+      });
+      // ── Forzar carga si aún no está lista ──────────────────────────
+      if (!RutasService().cargado) {
+        RutasService().cargarEnBackground();
+      } else {
+        setState(() {});
+      }
+    });
   }
 
   void _onRutasCargadasMapa() {
     if (mounted) {
-      _cargarRutasDesbloqueadas();
-      setState(() {});
+      if (!_rutasDesbloqueadasCargadas) _cargarRutasDesbloqueadas();
+      // Invalidar ambas cachés cuando llegan datos nuevos de Firestore
+      setState(() { _markersCache = null; _sitiosFiltradosCache = null; });
+      // Reaplicar estilo después del setState — el rebuild del mapa puede perder el estilo
+      Future.microtask(() { if (mounted) _reaplicarEstilo(); });
     }
   }
 
-  void _reaplicarEstilo() {
-    _mapController?.setMapStyle(_mapStyle);
+  Future<void> _reaplicarEstilo() async {
+    final ctrl = _mapController;
+    if (ctrl == null) return;
+    try {
+      await ctrl.setMapStyle(_mapStyle);
+    } catch (e) {
+      debugPrint('⚠️ setMapStyle falló: $e');
+    }
   }
 
   Future<void> _cargarEstacionesEnCicla() async {
@@ -17461,7 +17713,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
         final lista = (data['estaciones'] as List<dynamic>? ?? [])
             .map((e) => Map<String, dynamic>.from(e as Map))
             .toList();
-        if (mounted) setState(() => _estacionesEnCicla = lista);
+        if (mounted) setState(() { _estacionesEnCicla = lista; _markersCache = null; });
       }
     } catch (e) {
       debugPrint('EnCicla: error cargando estaciones — $e');
@@ -17473,13 +17725,16 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
     if (mounted) {
       setState(() => _ciudadMapa = ciudad ?? kCiudadesRegistradas[0]);
       _mapController?.animateCamera(
-        CameraUpdate.newLatLngZoom(_centerCiudad, 13));
+        CameraUpdate.newLatLngZoom(_centerCiudad, 13.5));
+      // Reaplicar estilo tras el setState — el rebuild puede borrar el estilo aplicado
+      Future.microtask(() { if (mounted) _reaplicarEstilo(); });
     }
   }
 
   @override
   void dispose() {
     _pulseController.dispose();
+    _zoomThrottle?.cancel();
     RutasService().removeListener(_onRutasCargadasMapa);
     super.dispose();
   }
@@ -17624,7 +17879,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
         final lista = (data['estaciones'] as List<dynamic>? ?? [])
             .map((e) => Map<String, dynamic>.from(e as Map))
             .toList();
-        if (mounted) setState(() => _estacionesWhoosh = lista);
+        if (mounted) setState(() { _estacionesWhoosh = lista; _markersCache = null; });
       }
     } catch (e) {
       debugPrint('Whoosh: error cargando estaciones — $e');
@@ -17678,6 +17933,8 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
   }
 
   Future<void> _cargarRutasDesbloqueadas() async {
+    if (_rutasDesbloqueadasCargadas) return;
+    _rutasDesbloqueadasCargadas = true;
     // Rutas siempre visibles (punto de entrada gratuito)
     final rutasBase = {
       'RUTA TRANSFORMACIÓN URBANA',
@@ -17685,7 +17942,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
 
     final user = AuthService.currentUser;
     if (user == null) {
-      if (mounted) setState(() => _rutasDesbloqueadas = rutasBase);
+      if (mounted) setState(() { _rutasDesbloqueadas = rutasBase; _markersCache = null; });
       return;
     }
     try {
@@ -17707,10 +17964,11 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
 
       if (mounted) setState(() {
         _rutasDesbloqueadas = {...rutasBase, ...completadas, ...completadasProgreso, ...compradas};
+        _markersCache = null;
       });
     } catch (e) {
       debugPrint('Error cargando rutas mapa: $e');
-      if (mounted) setState(() => _rutasDesbloqueadas = rutasBase);
+      if (mounted) setState(() { _rutasDesbloqueadas = rutasBase; _markersCache = null; });
     }
   }
 
@@ -17718,30 +17976,16 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
   // Ruta desbloqueada → todos sus sitios visibles
   // Ruta bloqueada → solo el primer sitio (pin 🔒 en el punto de inicio de la ruta)
   bool _sitioVisible(_SitioMapa sitio) {
+    // Ruta desbloqueada → todos los sitios visibles
     if (_rutasDesbloqueadas.contains(sitio.ruta)) return true;
-    // Buscar el primer sitio con coords de esta ruta en Firestore
-    final ruta = RutasService().rutas.firstWhere(
-      (r) => r['nombre']?.toString() == sitio.ruta,
-      orElse: () => <String, dynamic>{});
-    if (ruta.isEmpty) {
-      // Fallback: kSitiosMapa
-      final sitiosDeRuta = kSitiosMapa.where((s) => s.ruta == sitio.ruta).toList();
-      return sitiosDeRuta.isNotEmpty && sitiosDeRuta.first.nombre == sitio.nombre;
-    }
-    // Obtener primer sitio con coords válidas
-    final detalle = parseSitiosDetalle(ruta['sitiosDetalle']);
-    final gpsRaw = ruta['gpsSitios'];
-    final gpsList = gpsRaw is List ? gpsRaw : <dynamic>[];
-    final fuente = detalle.isNotEmpty ? detalle : gpsList;
-    for (final s in fuente) {
-      if (s is! Map) continue;
-      final lat = (s['lat'] as num?)?.toDouble();
-      final lng = (s['lng'] as num?)?.toDouble();
-      if (lat == null || lng == null) continue;
-      // Este es el primer sitio válido — es el único que debe mostrar el candado
-      return s['nombre']?.toString() == sitio.nombre;
-    }
-    return false;
+
+    // Ruta bloqueada → mostrar solo el primer sitio de esa ruta (pin 🔒).
+    // Usamos la caché de sitiosFiltrados para no reconstruir la lista.
+    final sitiosDeRuta = _sitiosFiltrados.where((s) => s.ruta == sitio.ruta);
+    final primero = sitiosDeRuta.isEmpty ? null : sitiosDeRuta.first;
+    if (primero == null) return false;
+    return sitio.posicion.latitude == primero.posicion.latitude &&
+           sitio.posicion.longitude == primero.posicion.longitude;
   }
 
   bool _rutaBloqueada(String ruta) => !_rutasDesbloqueadas.contains(ruta);
@@ -17777,7 +18021,18 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
     {"featureType":"transit","elementType":"geometry","stylers":[{"color":"#1a2a14"}]}
   ]''';
 
+  /// Devuelve los sitios filtrados, usando caché para evitar reconstruir en cada build.
+  /// Se invalida cuando cambia [_filtroRuta] o cuando RutasService notifica nuevas rutas.
   List<_SitioMapa> get _sitiosFiltrados {
+    if (_sitiosFiltradosCache != null && _filtroRutaCache == _filtroRuta) {
+      return _sitiosFiltradosCache!;
+    }
+    _sitiosFiltradosCache = _computarSitiosFiltrados();
+    _filtroRutaCache = _filtroRuta;
+    return _sitiosFiltradosCache!;
+  }
+
+  List<_SitioMapa> _computarSitiosFiltrados() {
     // Combinar sitios hardcodeados + sitios de Firestore (gpsSitios/sitiosDetalle)
     final todos = <_SitioMapa>[...kSitiosMapa];
 
@@ -17833,21 +18088,21 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
     }
 
     // Filtrar por ruta seleccionada
-    final porRuta = _filtroRuta == 'Todas'
-      ? todos
-      : todos.where((s) => s.ruta == _filtroRuta).toList();
-    return porRuta;
+    return _filtroRuta == 'Todas'
+        ? todos
+        : todos.where((s) => s.ruta == _filtroRuta).toList();
   }
 
   // Zona de cada ruta para elegir ícono
 
 
   Set<Marker> _buildMarkers() {
+    if (_markersCache != null) return _markersCache!;
     final bool selHay = _sitioSeleccionado != null;
     final Set<Marker> markers = {};
 
     // ── Marcadores Whoosh ─────────────────────────────────────────────────
-    if (_mostrarWhoosh && _zoomActual >= 13.5) {
+    if (_mostrarWhoosh && _zoomActual >= 12.0) {
       for (final est in _estacionesWhoosh) {
         final lat = (est['lat'] as num?)?.toDouble() ?? 0;
         final lng = (est['lng'] as num?)?.toDouble() ?? 0;
@@ -17877,7 +18132,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
     }
 
     // ── Marcadores EnCicla ────────────────────────────────────────────────
-    if (_mostrarEnCicla && _zoomActual >= 13.5) {
+    if (_mostrarEnCicla && _zoomActual >= 12.0) {
       for (final est in _estacionesEnCicla) {
         final lat = (est['lat'] as num?)?.toDouble() ?? 0;
         final lng = (est['lng'] as num?)?.toDouble() ?? 0;
@@ -17906,79 +18161,89 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
       }
     }
 
-    for (final sitio in _sitiosFiltrados) {
-      final bool bloqueado = _rutaBloqueada(sitio.ruta);
-      final bool visible = _sitioVisible(sitio);
-
-      // Solo mostrar el primer sitio de cada ruta bloqueada — el resto se
-      // revela a medida que el usuario visita y valida cada lugar.
-      // Esto evita que el mapa sirva de guía turística sin usar la app.
-      if (bloqueado && !visible) continue;
-
-      // Deduplicar pines bloqueados con mismas coordenadas
-      if (bloqueado) {
-        final String coordKey = sitio.posicion.latitude.toStringAsFixed(4) + ',' + sitio.posicion.longitude.toStringAsFixed(4);
-        final String lockId = 'lock_' + coordKey;
-        if (markers.any((m) => m.markerId.value == lockId)) continue;
-      }
-
-      final bool esSel = selHay && sitio.nombre == (_sitioSeleccionado?.nombre ?? '');
-      BitmapDescriptor icon;
-
-      // Fallback: marcador neutro — evita el pin verde nativo de Google Maps
-      // que aparecía debajo del logo Rutero cuando el icono custom tardaba en cargar.
-      // BitmapDescriptor.defaultMarker es el pin rojo estándar y no genera conflicto visual.
-      final BitmapDescriptor _logoFallback =
+    // ── Pre-computar estructuras auxiliares O(n) — evita O(n²) en el loop ──
+    final sitiosFilt = _sitiosFiltrados; // una sola lectura de la caché
+    final BitmapDescriptor logoFallback =
         _iconCache['Logo'] ?? BitmapDescriptor.defaultMarker;
 
-      if (bloqueado) {
-        final String coordKey = sitio.posicion.latitude.toStringAsFixed(4) + ',' + sitio.posicion.longitude.toStringAsFixed(4);
-        final int rutasEnPunto = _sitiosFiltrados.where((s) {
-          if (!_rutaBloqueada(s.ruta)) return false;
-          final primero = kSitiosMapa.where((x) => x.ruta == s.ruta).isNotEmpty
-              ? kSitiosMapa.where((x) => x.ruta == s.ruta).first
-              : null;
-          if (primero == null) return false;
-          return primero.posicion.latitude.toStringAsFixed(4) + ',' + primero.posicion.longitude.toStringAsFixed(4) == coordKey;
-        }).map((s) => s.ruta).toSet().length;
-
-        if (rutasEnPunto > 1) {
-          icon = _iconCache['Agrupado_${rutasEnPunto.clamp(2,4)}'] ?? _iconCache['PinBloqueado'] ?? _logoFallback;
-        } else {
-          icon = _iconCache['PinBloqueado'] ?? _logoFallback;
-        }
-      } else if (esSel) {
-        icon = _iconCache['LogoSel'] ?? _logoFallback;
-      } else if (sitio.visitado) {
-        icon = _iconCache['LogoVisitado'] ?? _logoFallback;
-      } else {
-        icon = _iconCache['Logo'] ?? _logoFallback;
-      }
-
-      // markerId único — sin escapado erróneo
-      final String mId = bloqueado
-        ? 'lock_${sitio.posicion.latitude.toStringAsFixed(4)},${sitio.posicion.longitude.toStringAsFixed(4)}'
-        : sitio.nombre;
-      markers.add(Marker(
-        markerId: MarkerId(mId),
-        position: sitio.posicion,
-        icon: icon,
-        zIndex: esSel ? 2.0 : (bloqueado ? 0.5 : 1.0),
-        anchor: const Offset(0.5, 1.0),
-        onTap: () {
-          if (bloqueado) {
-            setState(() { _sitioSeleccionado = sitio; _fabExpandido = false; });
-            _mapController?.animateCamera(
-              CameraUpdate.newLatLngZoom(sitio.posicion, 16));
-            _mostrarAlertaBloqueado(sitio.ruta);
-          } else {
-            setState(() { _sitioSeleccionado = sitio; _fabExpandido = false; });
-            _mapController?.animateCamera(
-              CameraUpdate.newLatLngZoom(sitio.posicion, 16));
-          }
-        },
-      ));
+    // Primer sitio de cada ruta (para saber qué pin de ruta bloqueada es visible)
+    final Map<String, _SitioMapa> primeroDeCadaRuta = {};
+    for (final s in sitiosFilt) {
+      primeroDeCadaRuta.putIfAbsent(s.ruta, () => s);
     }
+
+    // Para cada coordKey, cuántas rutas bloqueadas distintas tienen su primer pin ahí
+    final Map<String, Set<String>> rutasBloqueadasPorCoord = {};
+    for (final s in sitiosFilt) {
+      if (_rutaBloqueada(s.ruta)) {
+        final primero = primeroDeCadaRuta[s.ruta];
+        if (primero == null) continue;
+        final coordKey = '${primero.posicion.latitude.toStringAsFixed(4)},${primero.posicion.longitude.toStringAsFixed(4)}';
+        rutasBloqueadasPorCoord.putIfAbsent(coordKey, () => {}).add(s.ruta);
+      }
+    }
+
+    // IDs de markers de candado ya agregados (para deduplicar)
+    final Set<String> lockIdsAgregados = {};
+
+    for (final sitio in sitiosFilt) {
+      final bool bloqueado = _rutaBloqueada(sitio.ruta);
+
+      if (bloqueado) {
+        // Solo el primer sitio de cada ruta bloqueada lleva candado
+        final primero = primeroDeCadaRuta[sitio.ruta];
+        if (primero == null) continue;
+        final bool esPrimero =
+            sitio.posicion.latitude == primero.posicion.latitude &&
+            sitio.posicion.longitude == primero.posicion.longitude;
+        if (!esPrimero) continue;
+
+        final String coordKey = '${sitio.posicion.latitude.toStringAsFixed(4)},${sitio.posicion.longitude.toStringAsFixed(4)}';
+        final String lockId = 'lock_$coordKey';
+        if (lockIdsAgregados.contains(lockId)) continue;
+        lockIdsAgregados.add(lockId);
+
+        final int rutasEnPunto = rutasBloqueadasPorCoord[coordKey]?.length ?? 1;
+        final BitmapDescriptor icon = rutasEnPunto > 1
+            ? (_iconCache['Agrupado_${rutasEnPunto.clamp(2, 4)}'] ?? _iconCache['PinBloqueado'] ?? logoFallback)
+            : (_iconCache['PinBloqueado'] ?? logoFallback);
+
+        markers.add(Marker(
+          markerId: MarkerId(lockId),
+          position: sitio.posicion,
+          icon: icon,
+          zIndex: 0.5,
+          anchor: const Offset(0.5, 1.0),
+          onTap: () {
+            setState(() { _sitioSeleccionado = sitio; _fabExpandido = false; });
+            _mapController?.animateCamera(
+                CameraUpdate.newLatLngZoom(sitio.posicion, 16));
+            _mostrarAlertaBloqueado(sitio.ruta);
+          },
+        ));
+      } else {
+        final bool esSel = selHay && sitio.nombre == (_sitioSeleccionado?.nombre ?? '');
+        final BitmapDescriptor icon = esSel
+            ? (_iconCache['LogoSel'] ?? logoFallback)
+            : sitio.visitado
+                ? (_iconCache['LogoVisitado'] ?? logoFallback)
+                : logoFallback;
+
+        markers.add(Marker(
+          markerId: MarkerId(sitio.nombre),
+          position: sitio.posicion,
+          icon: icon,
+          zIndex: esSel ? 2.0 : 1.0,
+          anchor: const Offset(0.5, 1.0),
+          onTap: () {
+            setState(() { _sitioSeleccionado = sitio; _fabExpandido = false; });
+            _mapController?.animateCamera(
+                CameraUpdate.newLatLngZoom(sitio.posicion, 16));
+          },
+        ));
+      }
+    }
+    _markersCache = markers;
     return markers;
   }
 
@@ -18387,9 +18652,9 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
       _FabOpcion(icon: RDSIcons.navExplore,  label: t('Rutas cercanas','Nearby routes'), color: RDSColor.gold,
         onTap: () { setState(() => _fabExpandido = false); _mostrarRutasCercanas(); }),
       _FabOpcion(icon: RDSIcons.transport,   label: _mostrarEnCicla ? t('Ocultar EnCicla','Hide EnCicla') : t('Ver EnCicla','Show EnCicla'), color: const Color(0xFF0066CC),
-        onTap: () => setState(() { _fabExpandido = false; _mostrarEnCicla = !_mostrarEnCicla; })),
+        onTap: () => setState(() { _fabExpandido = false; _mostrarEnCicla = !_mostrarEnCicla; _markersCache = null; })),
       _FabOpcion(icon: RDSIcons.transport,   label: _mostrarWhoosh ? t('Ocultar Whoosh','Hide Whoosh') : t('Ver Whoosh 🛴','Show Whoosh 🛴'), color: const Color(0xFFFFD700),
-        onTap: () => setState(() { _fabExpandido = false; _mostrarWhoosh = !_mostrarWhoosh; })),
+        onTap: () => setState(() { _fabExpandido = false; _mostrarWhoosh = !_mostrarWhoosh; _markersCache = null; })),
       _FabOpcion(icon: RDSIcons.planner,     label: t('Ver ValentINA','View BenjamINT'),    color: RDSColor.orchid,
         onTap: () { setState(() => _fabExpandido = false); _mostrarCapaPlanner(); }),
     ];
@@ -18684,23 +18949,39 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
           ]))),
         Expanded(child: Stack(children: [
           GoogleMap(
-            initialCameraPosition: CameraPosition(target: _centerCiudad, zoom: 13),
+            initialCameraPosition: CameraPosition(target: _centerCiudad, zoom: 13.5),
+            mapType: MapType.normal,
+            // Estilo oscuro en el constructor — aplicado antes del primer render.
+            // Esto evita el problema de DEVELOPER_ERROR en Samsung/GMS restringido
+            // donde setMapStyle post-construcción se descarta silenciosamente.
+            style: _mapStyle,
             markers: _buildMarkers(),
             polylines: {..._polylines, ..._polylinaesPlanner},
             onMapCreated: (c) {
               _mapController = c;
-              // Primer intento — 600ms
-              Future.delayed(const Duration(milliseconds: 600), () {
+              // Intentos escalonados: el primer rebuild de _detectarCiudadMapa
+              // ocurre ~300ms después del frame; el estilo debe aplicarse después.
+              Future.delayed(const Duration(milliseconds: 400), () {
                 if (mounted) _reaplicarEstilo();
               });
-              // Segundo intento — por si el primero llega antes de que el mapa esté listo
-              Future.delayed(const Duration(milliseconds: 1500), () {
+              Future.delayed(const Duration(milliseconds: 900), () {
+                if (mounted) _reaplicarEstilo();
+              });
+              Future.delayed(const Duration(milliseconds: 2500), () {
                 if (mounted) _reaplicarEstilo();
               });
             },
+            onCameraIdle: () {
+              if (_mapController != null) _reaplicarEstilo();
+            },
             onTap: (_) => setState(() { _sitioSeleccionado = null; _fabExpandido = false; }),
             onCameraMove: (pos) {
-              if ((pos.zoom - _zoomActual).abs() > 0.3) setState(() => _zoomActual = pos.zoom);
+              // Throttle: 300ms — solo invalida markers (EnCicla/Whoosh aparecen en zoom ≥12)
+              _zoomActual = pos.zoom;
+              _zoomThrottle?.cancel();
+              _zoomThrottle = Timer(const Duration(milliseconds: 300), () {
+                if (mounted) setState(() { _markersCache = null; });
+              });
             },
             myLocationEnabled: true, myLocationButtonEnabled: false,
             zoomControlsEnabled: false, mapToolbarEnabled: false, compassEnabled: false),
@@ -19422,12 +19703,17 @@ class _MisFotosScreenState extends State<MisFotosScreen> {
     final localPath = data['localPath']?.toString();
 
     try {
-      // Texto de acompañamiento
+      // Texto de acompañamiento con hashtags según la ruta
+      final tags = _hashtagsPorContexto(ruta, restaurante: sitio);
       final texto = t(
         '📍 Visité $sitio en la ruta "$ruta" con Rutero MDE 🌿\n'
-        '¡Descubre Medellín de forma gamificada! 🗺️\nrutero-mde.web.app',
+        '¡Descubre Medellín de forma gamificada! 🗺️\n'
+        '\n$tags\n'
+        'rutero-mde.web.app',
         '📍 I visited $sitio on the "$ruta" route with Rutero MDE 🌿\n'
-        'Discover Medellín in a gamified way! 🗺️\nrutero-mde.web.app');
+        'Discover Medellín in a gamified way! 🗺️\n'
+        '\n#RuteroMDE #Medellin #TourismMedellin\n'
+        'rutero-mde.web.app');
 
       // Intentar compartir imagen si existe localmente
       // En iOS solo funciona desde directorio temporal
@@ -22815,8 +23101,8 @@ class _FeriaAgendaTabState extends State<_FeriaAgendaTab> {
                           final eventosHoy = eventosMostrar.map((e) =>
                             '${e['emoji'] ?? '🎶'} ${e['titulo']} · ${e['hora'] ?? ''} · ${e['lugar'] ?? ''}').join('\n');
                           Share.share(
-                            t('🌹 Feria de las Flores 2026 · HOY\n\n$eventosHoy\n\nDescubrí toda la programación en Rutero MDE → rutero-mde.web.app',
-                              '🌹 Feria de las Flores 2026 · TODAY\n\n$eventosHoy\n\nDiscover the full program on Rutero MDE → rutero-mde.web.app'),
+                            t('🌹 Feria de las Flores 2026 · HOY\n\n$eventosHoy\n\n#FeriaDeFlores #FeriaFlores2026 #Medellín #RuteroMDE #Silleteros\nDescubrí toda la programación en Rutero MDE → rutero-mde.web.app',
+                              '🌹 Feria de las Flores 2026 · TODAY\n\n$eventosHoy\n\n#FeriaDeFlores #FeriaFlores2026 #Medellin #RuteroMDE\nDiscover the full program on Rutero MDE → rutero-mde.web.app'),
                             subject: t('Feria de las Flores · Hoy en Medellín','Feria de las Flores · Today in Medellín'));
                         },
                         child: Container(
@@ -22970,7 +23256,7 @@ class _FeriaAgendaTabState extends State<_FeriaAgendaTab> {
                             final lugar = e['lugar'] ?? '';
                             final artistas = e['artistas'] != null ? '\n🎤 ${e['artistas']}' : '';
                             Share.share(
-                              '🌹 Feria de las Flores 2026\n\n${e['emoji']} $titulo\n📍 $lugar\n🕐 $hora$artistas\n\n¡Seguímoslo en Rutero MDE! → rutero-mde.web.app',
+                              '🌹 Feria de las Flores 2026\n\n${e['emoji']} $titulo\n📍 $lugar\n🕐 $hora$artistas\n\n#FeriaDeFlores #FeriaFlores2026 #Medellín #RuteroMDE #Silleteros\n¡Seguímoslo en Rutero MDE! → rutero-mde.web.app',
                               subject: 'Feria de las Flores · $titulo');
                           },
                           child: Container(
@@ -24048,6 +24334,10 @@ class CircuitoFestival {
   final String instruccionesEN;
   /// Nombre del circuito en inglés.
   final String nombreEN;
+  /// Skin visual del circuito — ej: 'arcade_sushi', 'rock_nea'. Vacío = genérico.
+  final String skin;
+  /// Indica si el circuito usa datos de demostración (fighters placeholder)
+  final bool esDemoData;
 
   const CircuitoFestival({
     required this.id,
@@ -24070,6 +24360,8 @@ class CircuitoFestival {
     this.instrucciones = '',
     this.instruccionesEN = '',
     this.nombreEN = '',
+    this.skin = '',
+    this.esDemoData = false,
   });
 
   factory CircuitoFestival.fromFirestore(String docId, Map<String, dynamic> d,
@@ -24082,7 +24374,7 @@ class CircuitoFestival {
       estado: d['estado']?.toString() ?? 'proximo',
       fechaInicio: (d['fechaInicio'] as Timestamp?)?.toDate() ?? DateTime.now(),
       fechaFin: (d['fechaFin'] as Timestamp?)?.toDate() ?? DateTime.now(),
-      paradasTotal: (d['paradasTotal'] as num?)?.toInt() ?? (d['paradas'] as num?)?.toInt() ?? 0,
+      paradasTotal: (d['paradasTotal'] as num?)?.toInt() ?? (d['totalParadas'] as num?)?.toInt() ?? (d['paradas'] as num?)?.toInt() ?? 0,
       paradasParaPremio: (d['paradasParaPremio'] as num?)?.toInt() ?? 0,
       premioNombre: d['premioNombre']?.toString() ?? 'Insignia',
       premioEmoji: d['premioEmoji']?.toString() ?? '🏆',
@@ -24095,8 +24387,15 @@ class CircuitoFestival {
       instrucciones: d['instrucciones']?.toString() ?? '',
       instruccionesEN: d['instruccionesEN']?.toString() ?? '',
       nombreEN: d['nombreEN']?.toString() ?? '',
+      skin:     d['skin']?.toString() ?? '',
+      esDemoData: d['esDemoData'] as bool? ?? false,
     );
   }
+
+  bool get esSushi    => skin == 'arcade_sushi' || id == 'sushi_mde_2027';
+  bool get esCerveza  => tipo == 'cerveza_artesanal' || skin == 'craft_beer';
+  // Circuitos prospecto que NO deben mostrarse en la lista pública todavía
+  bool get esProspecto => id.contains('museo') || id.contains('coleccionista');
 
   Color get colorGradienteA {
     try { return Color(int.parse(gradienteHero[0].replaceAll('#', '0xFF'))); }
@@ -24111,8 +24410,9 @@ class CircuitoFestival {
     } catch (_) { return RDSColor.card; }
   }
 
-  bool get esActivo => estado == 'activo';
-  bool get esProximo => estado == 'proximo';
+  // Sushi MDE siempre aparece como activo (lanzamiento manual override)
+  bool get esActivo => estado == 'activo' || esSushi;
+  bool get esProximo => estado == 'proximo' && !esSushi;
 
   String get etiquetaFecha {
     if (esActivo) return 'Hasta ${_fmtFecha(fechaFin)}';
@@ -24144,11 +24444,15 @@ class PasaportesService {
           .collection('circuitos_festivales')
           .where('ciudad', isEqualTo: ciudad)
           .where('estado', whereIn: ['activo', 'proximo'])
-          .where('pausado', isEqualTo: false)
+          // NOTA: NO filtrar por pausado==false aquí — documentos sin el campo
+          // quedarían excluidos. El filtro se aplica en Dart para manejar null→false.
           .get();
 
       final circuitos = <CircuitoFestival>[];
       for (final doc in snap.docs) {
+        final d = doc.data();
+        // Filtro Dart — excluir pausados (null se trata como false → incluir)
+        if (d['pausado'] == true) continue;
         final paradasSnap = await FirebaseFirestore.instance
             .collection('circuitos_festivales')
             .doc(doc.id)
@@ -24158,7 +24462,7 @@ class PasaportesService {
         final paradas = paradasSnap.docs
             .map((p) => ParadaCircuito.fromFirestore(p.id, p.data()))
             .toList();
-        circuitos.add(CircuitoFestival.fromFirestore(doc.id, doc.data(), paradas));
+        circuitos.add(CircuitoFestival.fromFirestore(doc.id, d, paradas));
       }
       circuitos.sort((a, b) {
         // 1. Activos antes que próximos
@@ -24922,8 +25226,10 @@ class _PasaportesSectionState extends State<_PasaportesSection> {
         child: Center(child: CircularProgressIndicator(
           color: RDSColor.gold, strokeWidth: 2)));
     }
-    final activos = _circuitos?.where((c) => c.esActivo).toList() ?? [];
-    final proximos = _circuitos?.where((c) => c.esProximo).toList() ?? [];
+    // Excluir circuitos marcados como prospecto (aún no vigentes públicamente)
+    final visibles = _circuitos?.where((c) => !c.esProspecto).toList() ?? [];
+    final activos = visibles.where((c) => c.esActivo).toList();
+    final proximos = visibles.where((c) => c.esProximo).toList();
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       _SectionHeader(
         titulo: t('🗂️ PASAPORTES', '🗂️ PASSPORTS'),
@@ -24933,7 +25239,7 @@ class _PasaportesSectionState extends State<_PasaportesSection> {
             '${proximos.length} próximo${proximos.length == 1 ? '' : 's'} '
             'en ${widget.ciudadDetectada}'),
       const SizedBox(height: 12),
-      if (_circuitos!.isEmpty)
+      if (visibles.isEmpty)
         _PasaportesEmpty(ciudad: widget.ciudadDetectada)
       else ...[
         if (activos.isNotEmpty) ...[
@@ -24969,8 +25275,9 @@ class _CircuitoCardGrande extends StatelessWidget {
       case 'gastronomico': return t('🍽️ Gastronómico', '🍽️ Gastronomic');
       case 'cultural':     return t('🎭 Cultural',      '🎭 Cultural');
       case 'artistico':    return t('🎨 Artístico',     '🎨 Artistic');
-      case 'musico':       return t('🎸 Rock & Bar',    '🎸 Rock & Bar');
-      case 'novena':       return t('🕯️ Navideño',      '🕯️ Christmas');
+      case 'musico':             return t('🎸 Rock & Bar',         '🎸 Rock & Bar');
+      case 'cerveza_artesanal': return t('🍺 Craft Beer',          '🍺 Craft Beer');
+      case 'novena':             return t('🕯️ Navideño',            '🕯️ Christmas');
       default:             return t('✨ Mixto',          '✨ Mixed');
     }
   }
@@ -24979,6 +25286,178 @@ class _CircuitoCardGrande extends StatelessWidget {
   Widget build(BuildContext context) {
     final uid = FirebaseAuth.instance.currentUser?.uid ?? '';
     final c = circuito;
+    // ── Sushi: card con skin arcade ──────────────────────────────────────────
+    if (c.esSushi) {
+      return GestureDetector(
+        onTap: () => RuteroNav.push(context, PasaporteDetalleScreen(circuito: c)),
+        child: Container(
+          margin: const EdgeInsets.only(bottom: 14),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: _ArcC.red.withOpacity(0.7), width: 1.5),
+            boxShadow: [
+              BoxShadow(color: _ArcC.red.withOpacity(0.25),
+                blurRadius: 18, spreadRadius: 1, offset: const Offset(0, 4)),
+              BoxShadow(color: Colors.black.withOpacity(0.6),
+                blurRadius: 10, offset: const Offset(0, 4)),
+            ]),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(17),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              // ── Hero arcade ──────────────────────────────────────────────
+              Container(
+                height: 182,
+                color: _ArcC.bg,
+                child: Stack(children: [
+                  // Imagen hardcodeada del torneo (asset local)
+                  Positioned.fill(child: Image.asset(
+                    'assets/images/rutas/Batalla de Sushi_ Arcade.jpg',
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => Image.asset(
+                      'assets/images/rutas/Batalla de Sushi_ Arcade.png',
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => Container(color: _ArcC.bg)))),
+                  // Overlay scanlines estilo arcade
+                  Positioned.fill(child: IgnorePointer(child: CustomPaint(
+                    painter: _ScanlinesPainter()))),
+                  // Overlay degradado sutil solo en bordes (preserva la imagen)
+                  Positioned.fill(child: Container(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter, end: Alignment.bottomCenter,
+                        colors: [
+                          _ArcC.bg.withOpacity(0.25),
+                          _ArcC.bg.withOpacity(0.55),
+                        ])))),
+                  // Badge ACTIVO (estilo pixel)
+                  Positioned(top: 12, left: 12,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: _ArcC.red.withOpacity(0.85),
+                        borderRadius: BorderRadius.circular(4),
+                        border: Border.all(color: _ArcC.red)),
+                      child: Text('▶ ACTIVO',
+                        style: _pxS(5, Colors.white)))),
+                  // Badge tipo — estilo arcade
+                  Positioned(top: 12, right: 12,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: _ArcC.bg2.withOpacity(0.80),
+                        borderRadius: BorderRadius.circular(4),
+                        border: Border.all(color: _ArcC.gold.withOpacity(0.6))),
+                      child: Text('⚔ BATALLA',
+                        style: _pxS(5, _ArcC.gold)))),
+                  // Número de restaurantes — esquina inferior izquierda
+                  Positioned(bottom: 10, left: 12,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: _ArcC.bg2.withOpacity(0.85),
+                        borderRadius: BorderRadius.circular(4),
+                        border: Border.all(color: _ArcC.red.withOpacity(0.5))),
+                      child: Text('${c.paradasTotal} ${t('restaurantes', 'restaurants')}',
+                        style: _pxS(5, _ArcC.red)))),
+                  // Ciudad — esquina inferior derecha
+                  Positioned(bottom: 10, right: 12,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: _ArcC.bg2.withOpacity(0.75),
+                        borderRadius: BorderRadius.circular(4)),
+                      child: Text(c.ciudad,
+                        style: _pxS(5, _ArcC.fg2)))),
+                ])),
+              // ── Línea arcade rojo→dorado→rojo ────────────────────────────
+              Container(height: 2,
+                decoration: const BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [_ArcC.red, _ArcC.gold, _ArcC.red]))),
+              // ── Cuerpo ───────────────────────────────────────────────────
+              Container(
+                color: _ArcC.bg2,
+                padding: const EdgeInsets.all(14),
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  // Info row
+                  Row(children: [
+                    Icon(Icons.place_rounded, size: 13, color: _ArcC.fg2),
+                    const SizedBox(width: 4),
+                    Text('${c.paradasTotal} ${t('restaurantes', 'restaurants')}',
+                      style: TextStyle(color: _ArcC.fg2, fontSize: 11)),
+                    const SizedBox(width: 10),
+                    Icon(Icons.calendar_today_rounded, size: 12, color: _ArcC.fg2),
+                    const SizedBox(width: 4),
+                    Flexible(child: Text(c.etiquetaFecha,
+                      maxLines: 1, overflow: TextOverflow.ellipsis,
+                      style: TextStyle(color: _ArcC.fg2, fontSize: 11))),
+                  ]),
+                  const SizedBox(height: 10),
+                  if (uid != null)
+                    FutureBuilder<Map<String, bool>>(
+                      future: PasaportesService.progresoCircuito(uid, c.id),
+                      builder: (ctx, snap) {
+                        final visitadas = snap.data?.length ?? 0;
+                        final pct = c.paradasTotal > 0 ? visitadas / c.paradasTotal : 0.0;
+                        return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                          // Barra de progreso arcade
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(2),
+                            child: LinearProgressIndicator(
+                              value: pct,
+                              backgroundColor: _ArcC.panel,
+                              color: _ArcC.red,
+                              minHeight: 4)),
+                          const SizedBox(height: 5),
+                          Text(t('$visitadas / ${c.paradasTotal} restaurantes visitados',
+                              '$visitadas / ${c.paradasTotal} restaurants visited'),
+                            style: TextStyle(color: _ArcC.fg3, fontSize: 10)),
+                          const SizedBox(height: 10),
+                          // Accesos rápidos — colores arcade
+                          Row(children: [
+                            _BotonAccesoRapido(
+                              icon: Icons.map_rounded,
+                              label: t('Mapa', 'Map'),
+                              color: _ArcC.cyan,
+                              onTap: () => RuteroNav.push(context,
+                                _MapaPasaporteScreen(circuito: c, progreso: snap.data ?? {})),
+                            ),
+                            const SizedBox(width: 6),
+                            _BotonAccesoRapido(
+                              icon: Icons.leaderboard_rounded,
+                              label: t('Ranking', 'Ranking'),
+                              color: _ArcC.gold,
+                              onTap: () => RuteroNav.push(context,
+                                _RankingPasaporteScreen(circuito: c)),
+                            ),
+                          ]),
+                        ]);
+                      }),
+                  const SizedBox(height: 10),
+                  Text('${c.premioEmoji} ${c.premioNombre}',
+                    maxLines: 2, overflow: TextOverflow.ellipsis,
+                    style: TextStyle(color: _ArcC.fg, fontSize: 11,
+                      fontWeight: FontWeight.w600)),
+                  const SizedBox(height: 10),
+                  // Botón principal arcade
+                  SizedBox(
+                    width: double.infinity,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: _ArcC.red,
+                        borderRadius: BorderRadius.circular(6),
+                        boxShadow: [BoxShadow(
+                          color: _ArcC.red.withOpacity(0.4),
+                          blurRadius: 8, offset: const Offset(0, 3))]),
+                      child: Text(t('▶ ENTRAR AL TORNEO', '▶ ENTER TOURNAMENT'),
+                        textAlign: TextAlign.center,
+                        style: _pxS(6.5, Colors.white)))),
+                ])),
+            ]))));
+    }
+
+    // ── GoRock / genérico ─────────────────────────────────────────────────────
     return GestureDetector(
       onTap: () => RuteroNav.push(context, PasaporteDetalleScreen(circuito: c)),
       child: Container(
@@ -24989,9 +25468,11 @@ class _CircuitoCardGrande extends StatelessWidget {
           border: Border.all(
             color: c.tipo == 'musico'
                 ? RDSColor.gold.withOpacity(0.55)
-                : RDSColor.gold.withOpacity(0.2)),
+                : c.esCerveza
+                    ? const Color(0xFFD4860A).withOpacity(0.60)
+                    : RDSColor.gold.withOpacity(0.2)),
           boxShadow: [BoxShadow(
-            color: c.tipo == 'musico'
+            color: c.tipo == 'musico' || c.esCerveza
                 ? Colors.black.withOpacity(0.5)
                 : Colors.black.withOpacity(0.35),
             blurRadius: 14, offset: const Offset(0, 5))]),
@@ -25000,10 +25481,11 @@ class _CircuitoCardGrande extends StatelessWidget {
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             // Hero
             Container(
-              height: c.tipo == 'musico' ? 170 : 156,
+              height: (c.tipo == 'musico' || c.esCerveza) ? 170 : 156,
               decoration: BoxDecoration(
-                color: c.tipo == 'musico' ? const Color(0xFF0A0A0A) : null,
-                gradient: c.tipo != 'musico' ? LinearGradient(
+                color: c.tipo == 'musico' ? const Color(0xFF0A0A0A)
+                     : c.esCerveza       ? const Color(0xFF0D0700) : null,
+                gradient: (c.tipo != 'musico' && !c.esCerveza) ? LinearGradient(
                   colors: [c.colorGradienteA, c.colorGradienteB],
                   begin: Alignment.topLeft, end: Alignment.bottomRight) : null),
               child: Stack(children: [
@@ -25011,24 +25493,22 @@ class _CircuitoCardGrande extends StatelessWidget {
                 if (c.imagenAsset.isNotEmpty)
                   Positioned.fill(child: Image.asset(
                     c.imagenAsset, fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) =>
-                      CustomPaint(painter: _LeafPatternPainter())))
+                    errorBuilder: (ctx, err, stack) {
+                      debugPrint('❌ imagenAsset falla: "${c.imagenAsset}" — $err');
+                      return CustomPaint(painter: _LeafPatternPainter());
+                    }))
                 else
                   Positioned.fill(child: CustomPaint(painter: _LeafPatternPainter())),
-                // Rock: overlay más oscuro para look nocturno
+                // Rock/Cerveza: overlay más oscuro para look nocturno
                 Positioned.fill(child: Container(
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
                       begin: Alignment.topCenter, end: Alignment.bottomCenter,
                       colors: c.tipo == 'musico'
-                          ? [
-                              Colors.black.withOpacity(0.45),
-                              Colors.black.withOpacity(0.80),
-                            ]
-                          : [
-                              Colors.black.withOpacity(0.35),
-                              Colors.black.withOpacity(0.65),
-                            ])))),
+                          ? [Colors.black.withOpacity(0.45), Colors.black.withOpacity(0.80)]
+                          : c.esCerveza
+                              ? [const Color(0xFF3D1C00).withOpacity(0.50), Colors.black.withOpacity(0.82)]
+                              : [Colors.black.withOpacity(0.35), Colors.black.withOpacity(0.65)])))),
                 // Badge ACTIVO
                 Positioned(top: 12, left: 12,
                   child: Container(
@@ -25039,57 +25519,76 @@ class _CircuitoCardGrande extends StatelessWidget {
                     child: Text(t('● ACTIVO', '● ACTIVE'),
                       style: const TextStyle(color: Colors.white, fontSize: 10,
                         fontWeight: FontWeight.w800, letterSpacing: 1)))),
-                // Badge de tipo — Rock tiene badge especial
+                // Badge de tipo — Rock/Cerveza tienen badge especial
                 Positioned(top: 12, right: 12,
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(
                       color: c.tipo == 'musico'
                           ? RDSColor.gold.withOpacity(0.18)
-                          : Colors.black.withOpacity(0.45),
+                          : c.esCerveza
+                              ? const Color(0xFFD4860A).withOpacity(0.20)
+                              : Colors.black.withOpacity(0.45),
                       borderRadius: BorderRadius.circular(12),
                       border: c.tipo == 'musico'
                           ? Border.all(color: RDSColor.gold.withOpacity(0.55))
-                          : null),
+                          : c.esCerveza
+                              ? Border.all(color: const Color(0xFFD4860A).withOpacity(0.70))
+                              : null),
                     child: Text(_labelTipo(c.tipo),
                       style: TextStyle(
-                        color: c.tipo == 'musico' ? RDSColor.gold : Colors.white70,
+                        color: c.tipo == 'musico'
+                            ? RDSColor.gold
+                            : c.esCerveza
+                                ? const Color(0xFFFFB347)
+                                : Colors.white70,
                         fontSize: 10, fontWeight: FontWeight.w700,
-                        fontFamily: c.tipo == 'musico' ? 'SpaceGrotesk' : null)))),
-                // Título — Rock: SpaceGrotesk más grande
-                Center(child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: Text(kLang == 'en' && c.nombreEN.isNotEmpty ? c.nombreEN : c.nombre,
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: c.tipo == 'musico' ? 22 : 18,
-                      fontWeight: FontWeight.w900,
-                      fontFamily: c.tipo == 'musico' ? 'SpaceGrotesk' : null,
-                      letterSpacing: c.tipo == 'musico' ? -0.5 : 0,
-                      shadows: const [Shadow(color: Colors.black54, blurRadius: 8)])))),
-                // Rock: número de paradas en la esquina inferior izquierda
-                if (c.tipo == 'musico')
+                        fontFamily: (c.tipo == 'musico' || c.esCerveza) ? 'SpaceGrotesk' : null)))),
+                // Título — solo para circuitos sin imagen propia
+                if (c.imagenAsset.isEmpty)
+                  Center(child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: Text(kLang == 'en' && c.nombreEN.isNotEmpty ? c.nombreEN : c.nombre,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: (c.tipo == 'musico' || c.esCerveza) ? 22 : 18,
+                        fontWeight: FontWeight.w900,
+                        fontFamily: (c.tipo == 'musico' || c.esCerveza) ? 'SpaceGrotesk' : null,
+                        letterSpacing: (c.tipo == 'musico' || c.esCerveza) ? -0.5 : 0,
+                        shadows: const [Shadow(color: Colors.black54, blurRadius: 8)])))),
+                // Rock/Cerveza: número de paradas en esquina inferior izquierda
+                if (c.tipo == 'musico' || c.esCerveza)
                   Positioned(bottom: 10, left: 12,
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                       decoration: BoxDecoration(
                         color: Colors.black.withOpacity(0.55),
                         borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: RDSColor.gold.withOpacity(0.35))),
-                      child: Text('${c.paradasTotal} ${t('bares', 'bars')}',
-                        style: const TextStyle(color: RDSColor.gold, fontSize: 10,
-                          fontWeight: FontWeight.w700, fontFamily: 'SpaceGrotesk')))),
+                        border: Border.all(
+                          color: c.esCerveza
+                              ? const Color(0xFFD4860A).withOpacity(0.50)
+                              : RDSColor.gold.withOpacity(0.35))),
+                      child: Text(
+                        c.esCerveza
+                            ? '${c.paradasTotal} ${t('cervecerías', 'breweries')}'
+                            : '${c.paradasTotal} ${t('bares', 'bars')}',
+                        style: TextStyle(
+                          color: c.esCerveza ? const Color(0xFFFFB347) : RDSColor.gold,
+                          fontSize: 10, fontWeight: FontWeight.w700,
+                          fontFamily: 'SpaceGrotesk')))),
               ])),
             // Cuerpo
             Container(
-              color: c.tipo == 'musico' ? const Color(0xFF111410) : RDSColor.card,
+              color: c.tipo == 'musico' ? const Color(0xFF111410)
+                   : c.esCerveza       ? const Color(0xFF100800)
+                   : RDSColor.card,
               padding: const EdgeInsets.all(14),
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Row(children: [
                   Icon(Icons.place_rounded, size: 13, color: RDSColor.textMuted),
                   const SizedBox(width: 4),
-                  Text('${c.paradasTotal} ${c.tipo == 'musico' ? t('bares', 'bars') : t('paradas', 'stops')}',
+                  Text('${c.paradasTotal} ${c.tipo == 'musico' ? t('bares', 'bars') : c.esCerveza ? t('cervecerías', 'breweries') : t('paradas', 'stops')}',
                     style: const TextStyle(color: RDSColor.textMuted, fontSize: 12)),
                   const SizedBox(width: 10),
                   Icon(Icons.calendar_today_rounded, size: 12, color: RDSColor.textMuted),
@@ -25117,14 +25616,17 @@ class _CircuitoCardGrande extends StatelessWidget {
                             value: pct,
                             backgroundColor: RDSColor.surface,
                             // Rock: acento del circuito (rojo); otros: dorado
-                            color: c.tipo == 'musico' ? c.colorGradienteA : RDSColor.gold,
+                            color: (c.tipo == 'musico' || c.esCerveza) ? c.colorGradienteA : RDSColor.gold,
                             minHeight: 5)),
                         const SizedBox(height: 5),
                         Text(c.tipo == 'musico'
                             ? t('$visitadas / ${c.paradasTotal} bares visitados',
                                 '$visitadas / ${c.paradasTotal} bars visited')
-                            : t('$visitadas / ${c.paradasTotal} paradas visitadas',
-                                '$visitadas / ${c.paradasTotal} stops visited'),
+                            : c.esCerveza
+                                ? t('$visitadas / ${c.paradasTotal} cervecerías visitadas',
+                                    '$visitadas / ${c.paradasTotal} breweries visited')
+                                : t('$visitadas / ${c.paradasTotal} paradas visitadas',
+                                    '$visitadas / ${c.paradasTotal} stops visited'),
                           style: const TextStyle(color: RDSColor.textMuted, fontSize: 11)),
                         const SizedBox(height: 10),
                         // ── Accesos rápidos ────────────────────────────────
@@ -25140,7 +25642,8 @@ class _CircuitoCardGrande extends StatelessWidget {
                           _BotonAccesoRapido(
                             icon: Icons.leaderboard_rounded,
                             label: t('Clasificación', 'Ranking'),
-                            color: c.colorGradienteA,
+                            // Sushi: usar dorado para máximo contraste sobre fondo oscuro arcade
+                            color: c.esSushi ? RDSColor.gold : c.colorGradienteA,
                             onTap: () => RuteroNav.push(context,
                               _RankingPasaporteScreen(circuito: c)),
                           ),
@@ -25159,17 +25662,19 @@ class _CircuitoCardGrande extends StatelessWidget {
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
                     decoration: BoxDecoration(
-                      color: c.tipo == 'musico' ? c.colorGradienteA : RDSColor.gold,
+                      color: c.tipo == 'musico'
+                          ? c.colorGradienteA
+                          : c.esCerveza
+                              ? const Color(0xFFD4860A)
+                              : RDSColor.gold,
                       borderRadius: BorderRadius.circular(20)),
                     child: Text(
-                      c.tipo == 'musico'
-                          ? t('Ver pasaporte →', 'View passport →')
-                          : t('Ver pasaporte →', 'View passport →'),
+                      t('Ver pasaporte →', 'View passport →'),
                       textAlign: TextAlign.center,
                       style: TextStyle(
-                        color: c.tipo == 'musico' ? Colors.white : Colors.black,
+                        color: (c.tipo == 'musico' || c.esCerveza) ? Colors.white : Colors.black,
                         fontSize: 12, fontWeight: FontWeight.w800,
-                        fontFamily: c.tipo == 'musico' ? 'SpaceGrotesk' : null)))),
+                        fontFamily: (c.tipo == 'musico' || c.esCerveza) ? 'SpaceGrotesk' : null)))),
               ])),
           ]))));
   }
@@ -25246,15 +25751,17 @@ class _CircuitoCardChico extends StatelessWidget {
                 style: TextStyle(
                   color: RDSColor.textPrimary, fontSize: 13,
                   fontWeight: FontWeight.w700,
-                  fontFamily: c.tipo == 'musico' ? 'SpaceGrotesk' : null),
+                  fontFamily: (c.tipo == 'musico' || c.esCerveza) ? 'SpaceGrotesk' : null),
                 maxLines: 1, overflow: TextOverflow.ellipsis),
               const SizedBox(height: 3),
               Text(
                 c.tipo == 'musico'
                     ? '${c.paradasTotal} ${t('bares', 'bars')} · ${c.ciudad}'
-                    : '${c.paradasTotal} ${t('paradas', 'stops')} · ${c.ciudad}',
+                    : c.esCerveza
+                        ? '${c.paradasTotal} ${t('cervecerías', 'breweries')} · ${c.ciudad}'
+                        : '${c.paradasTotal} ${t('paradas', 'stops')} · ${c.ciudad}',
                 style: TextStyle(
-                  color: c.tipo == 'musico'
+                  color: (c.tipo == 'musico' || c.esCerveza)
                       ? c.colorGradienteA.withOpacity(0.7)
                       : RDSColor.textMuted,
                   fontSize: 11)),
@@ -25263,18 +25770,18 @@ class _CircuitoCardChico extends StatelessWidget {
             margin: const EdgeInsets.only(right: 12),
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
             decoration: BoxDecoration(
-              color: c.tipo == 'musico'
+              color: (c.tipo == 'musico' || c.esCerveza)
                   ? c.colorGradienteA.withOpacity(0.12)
                   : RDSColor.surface,
               borderRadius: BorderRadius.circular(12),
-              border: c.tipo == 'musico'
+              border: (c.tipo == 'musico' || c.esCerveza)
                   ? Border.all(color: c.colorGradienteA.withOpacity(0.3))
                   : null),
             child: Text(c.etiquetaFecha,
               style: TextStyle(
-                color: c.tipo == 'musico' ? c.colorGradienteA : RDSColor.gold,
+                color: (c.tipo == 'musico' || c.esCerveza) ? c.colorGradienteA : RDSColor.gold,
                 fontSize: 10, fontWeight: FontWeight.w700,
-                fontFamily: c.tipo == 'musico' ? 'SpaceGrotesk' : null))),
+                fontFamily: (c.tipo == 'musico' || c.esCerveza) ? 'SpaceGrotesk' : null))),
         ])));
   }
 }
@@ -25452,6 +25959,8 @@ class _RankingPasaporteScreen extends StatefulWidget {
 class _RankingPasaporteScreenState extends State<_RankingPasaporteScreen> {
   List<Map<String, dynamic>> _ranking = [];
   List<_NivelPasaporte> _nivelesRock = _NivelPasaporte.nivelesRock;
+  // Para Sushi: ranking de fighters (platos)
+  List<_SushiFighter> _fightersRanking = [];
   bool _cargando = true;
   String? _uidActual;
 
@@ -25463,19 +25972,44 @@ class _RankingPasaporteScreenState extends State<_RankingPasaporteScreen> {
   }
 
   Future<void> _cargar() async {
-    final results = await Future.wait([
-      PasaportesService.rankingCircuito(widget.circuito.id),
-      if (widget.circuito.tipo == 'musico')
-        PasaportesService.obtenerNivelesRock(),
-    ]);
-    if (!mounted) return;
-    setState(() {
-      _ranking = results[0] as List<Map<String, dynamic>>;
-      if (widget.circuito.tipo == 'musico' && results.length > 1) {
-        _nivelesRock = results[1] as List<_NivelPasaporte>;
+    // ── Sushi: cargar fighters desde Firestore (o demo) ───────────────────────
+    if (widget.circuito.esSushi) {
+      List<_SushiFighter> fighters;
+      try {
+        final snap = await FirebaseFirestore.instance
+            .collection('circuitos_festivales').doc(widget.circuito.id)
+            .collection('paradas').orderBy('powerScore', descending: true)
+            .get();
+        final list = snap.docs
+            .map((d) => _SushiFighter.fromFirestore(d.id, d.data()))
+            .toList();
+        fighters = list.isNotEmpty ? list : _SushiFighter.demo;
+      } catch (_) {
+        fighters = _SushiFighter.demo;
       }
-      _cargando = false;
-    });
+      if (!mounted) return;
+      setState(() { _fightersRanking = fighters; _cargando = false; });
+      return;
+    }
+    // ── Otros circuitos: ranking de usuarios ──────────────────────────────────
+    try {
+      final results = await Future.wait([
+        PasaportesService.rankingCircuito(widget.circuito.id),
+        if (widget.circuito.tipo == 'musico')
+          PasaportesService.obtenerNivelesRock(),
+      ]);
+      if (!mounted) return;
+      setState(() {
+        _ranking = results[0] as List<Map<String, dynamic>>;
+        if (widget.circuito.tipo == 'musico' && results.length > 1) {
+          _nivelesRock = results[1] as List<_NivelPasaporte>;
+        }
+        _cargando = false;
+      });
+    } catch (e) {
+      debugPrint('⚠️ _RankingPasaporteScreen._cargar error: $e');
+      if (mounted) setState(() { _ranking = []; _cargando = false; });
+    }
   }
 
   @override
@@ -25483,6 +26017,107 @@ class _RankingPasaporteScreenState extends State<_RankingPasaporteScreen> {
     final c = widget.circuito;
     // Acento del circuito — viene de Firestore (gradienteHero[0])
     final Color acento = c.colorGradienteA;
+
+    // ── Sushi: render especial de ranking de fighters ─────────────────────────
+    if (c.esSushi) {
+      return Scaffold(
+        backgroundColor: _ArcC.bg,
+        body: Stack(children: [
+          Positioned.fill(child: IgnorePointer(child: CustomPaint(
+            painter: _ScanlinesPainter()))),
+          SafeArea(child: Column(children: [
+            // AppBar arcade
+            Container(
+              color: _ArcC.bg2,
+              padding: const EdgeInsets.fromLTRB(50, 10, 14, 10),
+              child: Row(children: [
+                Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text('⚔ POWER RANKING', style: _pxS(8, _ArcC.gold)),
+                  Text('BATALLA DE SUSHI MDE 2027', style: _pxS(5, _ArcC.red)),
+                ])),
+                Text('${_fightersRanking.length} LUCHADORES',
+                  style: _pxS(5, _ArcC.fg3)),
+              ])),
+            Container(height: 3,
+              decoration: const BoxDecoration(gradient: LinearGradient(
+                colors: [_ArcC.red, _ArcC.gold, _ArcC.red]))),
+            // Lista
+            if (_cargando)
+              const Expanded(child: Center(child: CircularProgressIndicator(
+                color: _ArcC.gold, strokeWidth: 2)))
+            else
+              Expanded(child: ListView.builder(
+                padding: const EdgeInsets.only(bottom: 80, top: 8),
+                itemCount: _fightersRanking.length,
+                itemBuilder: (context, i) {
+                  final f = _fightersRanking[i];
+                  final pos = i + 1;
+                  final medalla = pos == 1 ? '🥇' : pos == 2 ? '🥈' : pos == 3 ? '🥉' : '#$pos';
+                  final Color borderColor = pos == 1 ? _ArcC.gold
+                      : pos <= 3 ? _ArcC.red.withOpacity(0.5)
+                      : _ArcC.fg3.withOpacity(0.15);
+                  return GestureDetector(
+                    onTap: () => Navigator.push(context, MaterialPageRoute(
+                      builder: (_) => _SushiFighterDetalleScreen(
+                        fighter: f, rank: pos, circuito: widget.circuito))),
+                    child: Container(
+                      margin: EdgeInsets.fromLTRB(12, i == 0 ? 8 : 4, 12, 0),
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: pos == 1 ? _ArcC.gold.withOpacity(0.07) : _ArcC.panel,
+                        border: Border.all(color: borderColor, width: pos == 1 ? 1.5 : 1)),
+                      child: Row(children: [
+                        // Posición / medalla
+                        SizedBox(width: 36,
+                          child: Text(medalla,
+                            style: TextStyle(
+                              fontSize: pos <= 3 ? 20 : 13,
+                              color: _ArcC.gold,
+                              decoration: TextDecoration.none,
+                              fontWeight: FontWeight.w700))),
+                        // Emoji
+                        Text(f.emoji, style: const TextStyle(fontSize: 28)),
+                        const SizedBox(width: 10),
+                        // Info
+                        Expanded(child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start, children: [
+                          Text(f.nombre, style: _pxS(5.5, _ArcC.fg),
+                            maxLines: 1, overflow: TextOverflow.ellipsis),
+                          Text('${f.restaurante} · ${f.barrio}',
+                            style: _pxS(4.5, _ArcC.fg2),
+                            maxLines: 1, overflow: TextOverflow.ellipsis),
+                          if (f.subiendo)
+                            Text('▲ SUBIENDO', style: _pxS(4, _ArcC.cyan)),
+                        ])),
+                        // Score y votos
+                        Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
+                          Text(f.powerScore.toStringAsFixed(1),
+                            style: _pxS(10, _ArcC.gold)),
+                          Text('${f.votos}v', style: _pxS(4.5, _ArcC.fg3)),
+                        ]),
+                        const SizedBox(width: 6),
+                        const Icon(Icons.chevron_right_rounded,
+                          color: _ArcC.fg3, size: 16),
+                      ])));
+                })),
+          ])),
+          // Botón volver
+          Positioned(
+            top: MediaQuery.of(context).padding.top + 4, left: 8,
+            child: GestureDetector(
+              onTap: () => Navigator.pop(context),
+              child: Container(
+                width: 32, height: 32,
+                decoration: BoxDecoration(
+                  color: _ArcC.bg2,
+                  border: Border.all(color: _ArcC.red.withOpacity(0.6)),
+                  borderRadius: BorderRadius.circular(4)),
+                child: const Icon(Icons.arrow_back_ios_new_rounded,
+                  color: _ArcC.gold, size: 14)))),
+        ]));
+    }
+    // ── Fin bloque Sushi ──────────────────────────────────────────────────────
+
     return Scaffold(
       backgroundColor: const Color(0xFF0D110C),
       body: CustomScrollView(slivers: [
@@ -25603,6 +26238,7 @@ class _RankingPasaporteScreenState extends State<_RankingPasaporteScreen> {
                     ]),
                     Builder(builder: (_) {
                       final bool esRock = widget.circuito.tipo == 'musico';
+                      final bool esCerveza = widget.circuito.esCerveza;
                       // 30 pts por parada (esRock) · 80 pts por museo (cultural)
                       final int sitiosEntry = pts ~/ (esRock ? 30 : 80);
                       final nivel = _NivelPasaporte.actualConLista(sitiosEntry,
@@ -25610,7 +26246,9 @@ class _RankingPasaporteScreenState extends State<_RankingPasaporteScreen> {
                           listaRock: esRock ? _nivelesRock : null);
                       final String unidad = esRock
                           ? 'bar${sitiosEntry != 1 ? "es" : ""}'
-                          : 'museo${sitiosEntry != 1 ? "s" : ""}';
+                          : esCerveza
+                              ? 'cervecería${sitiosEntry != 1 ? "s" : ""}'
+                              : 'museo${sitiosEntry != 1 ? "s" : ""}';
                       return Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
@@ -25627,7 +26265,9 @@ class _RankingPasaporteScreenState extends State<_RankingPasaporteScreen> {
                           ],
                           Text(sitiosEntry > 0
                               ? '$sitiosEntry $unidad'
-                              : esRock ? 'Sin bares visitados aún' : 'Sin visitas aún',
+                              : esRock ? 'Sin bares visitados aún'
+                                : esCerveza ? 'Sin cervecerías visitadas aún'
+                                : 'Sin visitas aún',
                             style: const TextStyle(color: Colors.white38, fontSize: 10)),
                         ]),
                         if (nivel != null && nivel.descripcion.isNotEmpty)
@@ -25792,6 +26432,10 @@ class _PasaporteDetalleScreenState extends State<PasaporteDetalleScreen> {
   @override
   Widget build(BuildContext context) {
     final c = widget.circuito;
+    // ── Skin arcade sushi: delegar a screen especializada ─────────────────────
+    if (c.esSushi) {
+      return _SushiArcadeScreen(circuito: c);
+    }
     return Scaffold(
       backgroundColor: RDSColor.base,
       body: CustomScrollView(slivers: [
@@ -25852,24 +26496,22 @@ class _PasaporteDetalleScreenState extends State<PasaporteDetalleScreen> {
                 if (c.imagenAsset.isNotEmpty)
                   Positioned.fill(child: Image.asset(
                     c.imagenAsset, fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) =>
-                      CustomPaint(painter: _LeafPatternPainter())))
+                    errorBuilder: (ctx, err, stack) {
+                      debugPrint('❌ imagenAsset hero falla: "${c.imagenAsset}" — $err');
+                      return CustomPaint(painter: _LeafPatternPainter());
+                    }))
                 else
                   Positioned.fill(child: CustomPaint(painter: _LeafPatternPainter())),
-                // Overlay oscuro para legibilidad (Rock: más oscuro)
+                // Overlay oscuro para legibilidad (Rock/Cerveza: más oscuro)
                 Positioned.fill(child: Container(
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
                       begin: Alignment.topCenter, end: Alignment.bottomCenter,
                       colors: c.tipo == 'musico'
-                          ? [
-                              Colors.black.withOpacity(0.35),
-                              Colors.black.withOpacity(0.80),
-                            ]
-                          : [
-                              Colors.black.withOpacity(0.2),
-                              Colors.black.withOpacity(0.7),
-                            ])))),
+                          ? [Colors.black.withOpacity(0.35), Colors.black.withOpacity(0.80)]
+                          : c.esCerveza
+                              ? [const Color(0xFF3D1C00).withOpacity(0.40), Colors.black.withOpacity(0.85)]
+                              : [Colors.black.withOpacity(0.2), Colors.black.withOpacity(0.7)])))),
                 Center(child: Padding(
                   padding: const EdgeInsets.only(top: 60, left: 20, right: 20),
                   child: Column(mainAxisSize: MainAxisSize.min, children: [
@@ -25877,21 +26519,23 @@ class _PasaporteDetalleScreenState extends State<PasaporteDetalleScreen> {
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         color: Colors.white,
-                        fontSize: c.tipo == 'musico' ? 26 : 20,
+                        fontSize: (c.tipo == 'musico' || c.esCerveza) ? 26 : 20,
                         fontWeight: FontWeight.w900,
-                        fontFamily: c.tipo == 'musico' ? 'SpaceGrotesk' : null,
-                        letterSpacing: c.tipo == 'musico' ? -0.5 : 0,
+                        fontFamily: (c.tipo == 'musico' || c.esCerveza) ? 'SpaceGrotesk' : null,
+                        letterSpacing: (c.tipo == 'musico' || c.esCerveza) ? -0.5 : 0,
                         shadows: const [Shadow(color: Colors.black54, blurRadius: 8)])),
                     const SizedBox(height: 4),
                     Text(c.tipo == 'musico'
                         ? '${c.paradasTotal} ${t('bares', 'bars')} · ${c.etiquetaFecha}'
-                        : '${c.paradasTotal} ${t('paradas', 'stops')} · ${c.etiquetaFecha}',
+                        : c.esCerveza
+                            ? '${c.paradasTotal} ${t('cervecerías', 'breweries')} · ${c.etiquetaFecha}'
+                            : '${c.paradasTotal} ${t('paradas', 'stops')} · ${c.etiquetaFecha}',
                       style: TextStyle(
-                        color: c.tipo == 'musico'
-                            ? RDSColor.gold.withOpacity(0.85)
+                        color: (c.tipo == 'musico' || c.esCerveza)
+                            ? const Color(0xFFFFB347).withOpacity(0.90)
                             : Colors.white70,
                         fontSize: 13,
-                        fontFamily: c.tipo == 'musico' ? 'SpaceGrotesk' : null)),
+                        fontFamily: (c.tipo == 'musico' || c.esCerveza) ? 'SpaceGrotesk' : null)),
                   ]))),
               ])))),
         SliverToBoxAdapter(child: Column(
@@ -25913,8 +26557,9 @@ class _PasaporteDetalleScreenState extends State<PasaporteDetalleScreen> {
                   Row(children: [
                     Builder(builder: (_) {
                       final bool esRock2 = c.tipo == 'musico';
+                      final bool esCerveza2 = c.esCerveza;
                       return Text(
-                        '$_visitadas / $_total ${esRock2 ? t("bares", "bars") : t("paradas", "stops")}',
+                        '$_visitadas / $_total ${esRock2 ? t("bares", "bars") : esCerveza2 ? t("cervecerías", "breweries") : t("paradas", "stops")}',
                         style: const TextStyle(color: RDSColor.textPrimary, fontSize: 14,
                           fontWeight: FontWeight.w700));
                     }),
@@ -26006,10 +26651,12 @@ class _PasaporteDetalleScreenState extends State<PasaporteDetalleScreen> {
                                 final int falta = proximo.minMuseos - _visitadas;
                                 final String unidad = esRock
                                     ? (falta != 1 ? 'bares' : 'bar')
-                                    : (falta != 1 ? 'museos' : 'museo');
+                                    : c.esCerveza
+                                        ? (falta != 1 ? 'cervecerías' : 'cervecería')
+                                        : (falta != 1 ? 'museos' : 'museo');
                                 return Text(
                                   t('Faltan $falta $unidad para ${proximo.emoji} ${proximo.nombre}',
-                                    '$falta ${esRock ? (falta != 1 ? 'bars' : 'bar') : (falta != 1 ? 'stops' : 'stop')} to go for ${proximo.emoji} ${proximo.nombre}'),
+                                    '$falta ${esRock ? (falta != 1 ? 'bars' : 'bar') : c.esCerveza ? (falta != 1 ? 'breweries' : 'brewery') : (falta != 1 ? 'stops' : 'stop')} to go for ${proximo.emoji} ${proximo.nombre}'),
                                   style: const TextStyle(
                                     color: RDSColor.textMuted, fontSize: 10));
                               }),
@@ -26100,6 +26747,13 @@ class _PasaporteDetalleScreenState extends State<PasaporteDetalleScreen> {
                     ])),
                   ],
                 ])),
+          // ── Vaso de cerveza (solo circuito cerveza) ──────────────────────
+          if (c.esCerveza && !_cargando)
+            _VasoCerveza(
+              visitadas: _visitadas,
+              total: _total,
+              colorAccent: c.colorGradienteA,
+            ),
           // ── Contexto del circuito (colapsable) ──────────────────────────
           if (c.contexto.isNotEmpty)
             Padding(
@@ -26212,110 +26866,263 @@ class _PasaporteDetalleScreenState extends State<PasaporteDetalleScreen> {
                 ])),
           ],
           const SizedBox(height: 12),
-          // Lista paradas
-          ..._paradasFiltradas.map((parada) {
-            final visitada = _progreso[parada.id] ?? false;
-            return GestureDetector(
-              onTap: () async {
-                await RuteroNav.push(context, PasaporteParadaScreen(
-                  circuito: c, parada: parada, visitada: visitada));
-                _cargarProgreso(verificarNivel: true);
-              },
-              child: Container(
-                margin: const EdgeInsets.fromLTRB(16, 0, 16, 10),
-                padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(
-                  color: c.tipo == 'musico'
-                      ? (visitada
-                          ? RDSColor.card
-                          : const Color(0xFF111410))
-                      : RDSColor.card,
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(
-                    color: visitada
-                        ? RDSColor.green.withOpacity(0.4)
-                        : (c.tipo == 'musico'
-                            ? c.colorGradienteA.withOpacity(0.18)
-                            : RDSColor.card.withOpacity(0.3)))),
-                child: Row(children: [
-                  Stack(clipBehavior: Clip.none, children: [
-                    Container(
-                      width: 44, height: 44,
-                      decoration: BoxDecoration(
-                        color: RDSColor.surface,
-                        borderRadius: BorderRadius.circular(12),
-                        // Rock: borde sutil acento en icono
-                        border: c.tipo == 'musico' && !visitada
-                            ? Border.all(color: c.colorGradienteA.withOpacity(0.25))
-                            : null),
-                      child: Center(child: Text(parada.emoji,
-                        style: const TextStyle(fontSize: 22)))),
-                    if (visitada)
-                      Positioned(bottom: -3, right: -3,
-                        child: Container(
-                          width: 18, height: 18,
-                          decoration: const BoxDecoration(
-                            color: RDSColor.green, shape: BoxShape.circle),
-                          child: const Icon(Icons.check_rounded,
-                            color: Colors.white, size: 11))),
-                  ]),
-                  const SizedBox(width: 12),
-                  Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start,
+          // Lista paradas — Rock: con separadores de sección y cards enriquecidas
+          ...() {
+            final esRock = c.tipo == 'musico';
+            final paradas = _paradasFiltradas;
+            // Índice del primer bar pendiente (para marcar "SIGUIENTE PARADA")
+            final primerPendienteIdx = paradas.indexWhere(
+                (p) => !(_progreso[p.id] ?? false));
+            final widgets = <Widget>[];
+
+            // Separador sección estilo grunge-rock
+            Widget _separadorRock(String label) => Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 10),
+              child: Row(children: [
+                Text('//', style: TextStyle(
+                  color: c.colorGradienteA.withOpacity(0.45),
+                  fontSize: 11, fontWeight: FontWeight.w900,
+                  fontFamily: 'SpaceGrotesk', letterSpacing: 1.5)),
+                const SizedBox(width: 6),
+                Text(label.toUpperCase(), style: TextStyle(
+                  color: RDSColor.textMuted.withOpacity(0.55),
+                  fontSize: 10, fontWeight: FontWeight.w700,
+                  fontFamily: 'SpaceGrotesk', letterSpacing: 2.5)),
+                const SizedBox(width: 6),
+                Expanded(child: Container(
+                  height: 1,
+                  color: c.colorGradienteA.withOpacity(0.12))),
+                const SizedBox(width: 6),
+                Text('//', style: TextStyle(
+                  color: c.colorGradienteA.withOpacity(0.45),
+                  fontSize: 11, fontWeight: FontWeight.w900,
+                  fontFamily: 'SpaceGrotesk', letterSpacing: 1.5)),
+              ]));
+
+            // Si es modo Todos, agregar separadores entre pendientes y visitados
+            bool sepVisitadosAdded = false;
+            bool sepPendientesAdded = false;
+
+            for (int i = 0; i < paradas.length; i++) {
+              final parada = paradas[i];
+              final visitada = _progreso[parada.id] ?? false;
+              final esSiguiente = esRock && !visitada && i == primerPendienteIdx;
+
+              // Separadores de sección (solo en tab "todos" o si el filtro agrupa)
+              if (esRock && _filtroTab == 'todos') {
+                if (!visitada && !sepPendientesAdded) {
+                  sepPendientesAdded = true;
+                  if (primerPendienteIdx > 0)
+                    widgets.add(_separadorRock('Pendientes'));
+                }
+                if (visitada && !sepVisitadosAdded) {
+                  sepVisitadosAdded = true;
+                  widgets.add(_separadorRock('Conquistados'));
+                }
+              }
+
+              // Línea informativa secundaria — teaser del bar
+              String? _teaserText;
+              if (!visitada && esRock) {
+                if (parada.eventoActivo && parada.eventoNombre.isNotEmpty) {
+                  _teaserText = '⚡ ${parada.eventoNombre}';
+                } else if (parada.misionEpica.isNotEmpty) {
+                  final mision = parada.misionEpica.length > 55
+                      ? '${parada.misionEpica.substring(0, 52)}…'
+                      : parada.misionEpica;
+                  _teaserText = '🎯 $mision';
+                } else if (parada.beneficioPasaporte.isNotEmpty) {
+                  final beneficio = parada.beneficioPasaporte.length > 55
+                      ? '${parada.beneficioPasaporte.substring(0, 52)}…'
+                      : parada.beneficioPasaporte;
+                  _teaserText = '🎁 $beneficio';
+                } else if (parada.barrio.isNotEmpty) {
+                  _teaserText = '📍 ${parada.barrio}';
+                }
+              }
+
+              widgets.add(GestureDetector(
+                onTap: () async {
+                  await RuteroNav.push(context, PasaporteParadaScreen(
+                    circuito: c, parada: parada, visitada: visitada));
+                  _cargarProgreso(verificarNivel: true);
+                },
+                child: Container(
+                  margin: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+                  decoration: BoxDecoration(
+                    color: esRock
+                        ? (visitada ? RDSColor.card : const Color(0xFF111410))
+                        : RDSColor.card,
+                    borderRadius: BorderRadius.circular(14),
+                    // Rock "siguiente": borde acento más pronunciado
+                    border: Border.all(
+                      color: esSiguiente
+                          ? c.colorGradienteA.withOpacity(0.55)
+                          : visitada
+                              ? RDSColor.green.withOpacity(0.4)
+                              : (esRock
+                                  ? c.colorGradienteA.withOpacity(0.18)
+                                  : RDSColor.card.withOpacity(0.3))),
+                    // Brillo sutil en "siguiente parada"
+                    boxShadow: esSiguiente
+                        ? [BoxShadow(
+                            color: c.colorGradienteA.withOpacity(0.08),
+                            blurRadius: 12, offset: const Offset(0, 2))]
+                        : null),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                    Text(parada.nombre,
-                      style: TextStyle(
-                        // Rock visitado: color muted pero SIN tachado
-                        color: visitada ? RDSColor.textMuted : RDSColor.textPrimary,
-                        fontSize: 13, fontWeight: FontWeight.w700,
-                        fontFamily: c.tipo == 'musico' ? 'SpaceGrotesk' : null,
-                        decoration: (visitada && c.tipo != 'musico')
-                            ? TextDecoration.lineThrough : null,
-                        decorationColor: RDSColor.textMuted)),
-                    const SizedBox(height: 3),
-                    if (visitada)
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: RDSColor.green.withOpacity(0.12),
-                          borderRadius: BorderRadius.circular(20)),
-                        child: Row(mainAxisSize: MainAxisSize.min, children: [
-                          const Icon(Icons.check_circle_rounded,
-                            color: RDSColor.green, size: 10),
-                          const SizedBox(width: 3),
-                          const Text('Visitado',
-                            style: TextStyle(color: RDSColor.green,
-                              fontSize: 10, fontWeight: FontWeight.w700)),
-                        ]))
-                    else if (c.tipo == 'musico' && parada.zona.isNotEmpty)
-                      // Rock: mostrar zona/barrio en lugar de modo de validación
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: RDSColor.surface,
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(
-                            color: c.colorGradienteA.withOpacity(0.2))),
-                        child: Text(parada.zona,
-                          style: TextStyle(
-                            color: c.colorGradienteA.withOpacity(0.75),
-                            fontSize: 10, fontWeight: FontWeight.w600,
-                            fontFamily: 'SpaceGrotesk')))
-                    else
-                      _PasBadgeModo(parada.modoValidacion),
-                  ])),
-                  if (visitada)
-                    const Icon(Icons.check_circle_rounded, color: RDSColor.green, size: 18)
-                  else
-                    Icon(
-                      c.tipo == 'musico'
-                          ? Icons.arrow_forward_ios_rounded
-                          : Icons.chevron_right_rounded,
-                      color: c.tipo == 'musico'
-                          ? c.colorGradienteA.withOpacity(0.5)
-                          : RDSColor.textMuted.withOpacity(0.5),
-                      size: c.tipo == 'musico' ? 14 : 20),
-                ])));
-          }),
+                      // Badge "SIGUIENTE PARADA" — solo primer pendiente en rock
+                      if (esSiguiente)
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
+                          decoration: BoxDecoration(
+                            color: c.colorGradienteA.withOpacity(0.1),
+                            borderRadius: const BorderRadius.vertical(
+                              top: Radius.circular(13))),
+                          child: Row(children: [
+                            Icon(Icons.my_location_rounded,
+                              size: 10, color: c.colorGradienteA.withOpacity(0.8)),
+                            const SizedBox(width: 5),
+                            Text('SIGUIENTE PARADA', style: TextStyle(
+                              color: c.colorGradienteA,
+                              fontSize: 9, fontWeight: FontWeight.w900,
+                              fontFamily: 'SpaceGrotesk', letterSpacing: 2.0)),
+                          ])),
+                      // Fila principal
+                      Padding(
+                        padding: const EdgeInsets.all(14),
+                        child: Row(children: [
+                          Stack(clipBehavior: Clip.none, children: [
+                            Container(
+                              width: 44, height: 44,
+                              decoration: BoxDecoration(
+                                color: RDSColor.surface,
+                                borderRadius: BorderRadius.circular(12),
+                                border: esRock && !visitada
+                                    ? Border.all(color: c.colorGradienteA.withOpacity(
+                                        esSiguiente ? 0.45 : 0.25))
+                                    : null),
+                              child: Center(child: Text(parada.emoji,
+                                style: const TextStyle(fontSize: 22)))),
+                            if (visitada)
+                              Positioned(bottom: -3, right: -3,
+                                child: Container(
+                                  width: 18, height: 18,
+                                  decoration: const BoxDecoration(
+                                    color: RDSColor.green, shape: BoxShape.circle),
+                                  child: const Icon(Icons.check_rounded,
+                                    color: Colors.white, size: 11))),
+                          ]),
+                          const SizedBox(width: 12),
+                          Expanded(child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                            Text(parada.nombre,
+                              style: TextStyle(
+                                color: visitada ? RDSColor.textMuted : RDSColor.textPrimary,
+                                fontSize: 13, fontWeight: FontWeight.w700,
+                                fontFamily: esRock ? 'SpaceGrotesk' : null,
+                                decoration: (visitada && !esRock)
+                                    ? TextDecoration.lineThrough : null,
+                                decorationColor: RDSColor.textMuted)),
+                            const SizedBox(height: 4),
+                            // Fila de chips: zona/barrio + rating si tiene votos
+                            Row(children: [
+                              if (visitada)
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: RDSColor.green.withOpacity(0.12),
+                                    borderRadius: BorderRadius.circular(20)),
+                                  child: Row(mainAxisSize: MainAxisSize.min, children: [
+                                    const Icon(Icons.check_circle_rounded,
+                                      color: RDSColor.green, size: 10),
+                                    const SizedBox(width: 3),
+                                    const Text('Visitado', style: TextStyle(
+                                      color: RDSColor.green,
+                                      fontSize: 10, fontWeight: FontWeight.w700)),
+                                  ]))
+                              else if (esRock && parada.zona.isNotEmpty)
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 7, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: RDSColor.surface,
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(
+                                      color: c.colorGradienteA.withOpacity(0.2))),
+                                  child: Text(parada.zona.toUpperCase(),
+                                    style: TextStyle(
+                                      color: c.colorGradienteA.withOpacity(0.75),
+                                      fontSize: 9, fontWeight: FontWeight.w700,
+                                      fontFamily: 'SpaceGrotesk', letterSpacing: 1.0)))
+                              else
+                                _PasBadgeModo(parada.modoValidacion),
+                              // Rating si tiene votos
+                              if (parada.totalVotos > 0) ...[
+                                const SizedBox(width: 6),
+                                Row(mainAxisSize: MainAxisSize.min, children: [
+                                  Icon(Icons.star_rounded,
+                                    size: 10,
+                                    color: c.colorGradienteA.withOpacity(0.7)),
+                                  const SizedBox(width: 2),
+                                  Text(parada.rating.toStringAsFixed(1),
+                                    style: TextStyle(
+                                      color: RDSColor.textMuted,
+                                      fontSize: 10, fontWeight: FontWeight.w600,
+                                      fontFamily: esRock ? 'SpaceGrotesk' : null)),
+                                ]),
+                              ],
+                              // Evento activo badge
+                              if (!visitada && parada.eventoActivo) ...[
+                                const SizedBox(width: 6),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 6, vertical: 1),
+                                  decoration: BoxDecoration(
+                                    color: c.colorGradienteA.withOpacity(0.15),
+                                    borderRadius: BorderRadius.circular(6)),
+                                  child: Text('EN VIVO', style: TextStyle(
+                                    color: c.colorGradienteA,
+                                    fontSize: 8, fontWeight: FontWeight.w900,
+                                    fontFamily: 'SpaceGrotesk', letterSpacing: 1.5))),
+                              ],
+                            ]),
+                            // Teaser segunda línea — misión, evento o beneficio
+                            if (_teaserText != null) ...[
+                              const SizedBox(height: 5),
+                              Text(_teaserText!,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  color: RDSColor.textMuted.withOpacity(0.65),
+                                  fontSize: 11, fontWeight: FontWeight.w500,
+                                  fontFamily: esRock ? 'SpaceGrotesk' : null,
+                                  height: 1.3)),
+                            ],
+                          ])),
+                          const SizedBox(width: 10),
+                          if (visitada)
+                            const Icon(Icons.check_circle_rounded,
+                              color: RDSColor.green, size: 18)
+                          else
+                            Icon(
+                              esRock
+                                  ? Icons.arrow_forward_ios_rounded
+                                  : Icons.chevron_right_rounded,
+                              color: esRock
+                                  ? c.colorGradienteA.withOpacity(
+                                      esSiguiente ? 0.7 : 0.5)
+                                  : RDSColor.textMuted.withOpacity(0.5),
+                              size: esRock ? 14 : 20),
+                        ])),
+                    ]))));
+            }
+            return widgets;
+          }(),
           const SizedBox(height: 24),
         ])),
       ]));
@@ -26342,6 +27149,3270 @@ class _PasaporteDetalleScreenState extends State<PasaporteDetalleScreen> {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+//  _SushiArcadeScreen — pantalla arcade para Batalla de Sushi MDE
+//  Diseño: fondo #080810, Press Start 2P, scanlines, ticker, tabs arcade
+// ─────────────────────────────────────────────────────────────────────────────
+
+// ── Colores del skin arcade ──────────────────────────────────────────────────
+class _ArcC {
+  static const bg     = Color(0xFF080810);
+  static const bg2    = Color(0xFF0D0D1A);
+  static const panel  = Color(0xFF0F0F20);
+  static const gold   = Color(0xFFFFD700);
+  static const red    = Color(0xFFFF2200);
+  static const red2   = Color(0xFF8B0000);
+  static const cyan   = Color(0xFF00E5FF);
+  static const cyan2  = Color(0xFF00B8CC);
+  static const green  = Color(0xFF00FF44);
+  static const silver = Color(0xFFC0C0D0);
+  static const bronze = Color(0xFFCD7F32);
+  static const pink   = Color(0xFFFF44AA);
+  static const fg     = Color(0xFFF0E8FF);
+  static const fg2    = Color(0xFFA090C0);
+  static const fg3    = Color(0xFF604880);
+}
+
+// ── Google Font pixel (Press Start 2P fallback a monospace) ─────────────────
+TextStyle _pxS(double size, Color color, {double? letterSpacing, FontWeight? weight}) =>
+  TextStyle(
+    fontFamily: 'PressStart2P',
+    fontFamilyFallback: const ['Press Start 2P', 'monospace'],
+    fontSize: size,
+    color: color,
+    letterSpacing: letterSpacing ?? 0.5,
+    fontWeight: weight ?? FontWeight.normal,
+    decoration: TextDecoration.none,
+  );
+
+// ── Modelo liviano para el ranking sushi ─────────────────────────────────────
+class _SushiFighter {
+  final String id;
+  final String emoji;
+  final String nombre;
+  final String restaurante;
+  final String barrio;
+  final double powerScore;
+  final int votos;
+  final int presentacion; // 0–100
+  final int sabor;
+  final int originalidad;
+  final bool subiendo;
+  final bool esLider;
+  final double lat;
+  final double lng;
+  // Campos reales del formulario de inscripción
+  final String descripcion;
+  final String tipoSushi;
+  final String horario;
+  final String direccion;
+  final String instagram;
+  final String tiktok;
+  final String whatsapp;
+  final String encargado;
+  final String imagenUrl; // URL de Firebase Storage — foto real del plato
+
+  const _SushiFighter({
+    required this.id,
+    required this.emoji,
+    required this.nombre,
+    required this.restaurante,
+    required this.barrio,
+    this.powerScore = 0,
+    this.votos = 0,
+    this.presentacion = 50,
+    this.sabor = 50,
+    this.originalidad = 50,
+    this.subiendo = false,
+    this.esLider = false,
+    this.lat = 6.2088,
+    this.lng = -75.5679,
+    this.descripcion = '',
+    this.tipoSushi = '',
+    this.horario = '',
+    this.direccion = '',
+    this.instagram = '',
+    this.tiktok = '',
+    this.whatsapp = '',
+    this.encargado = '',
+    this.imagenUrl = '',
+  });
+
+  factory _SushiFighter.fromFirestore(String docId, Map<String, dynamic> d) {
+    return _SushiFighter(
+      id: docId,
+      emoji: d['emoji']?.toString() ?? '🍣',
+      nombre: d['nombrePlato']?.toString() ?? d['nombre']?.toString() ?? '???',
+      restaurante: d['restaurante']?.toString() ?? '',
+      barrio: d['barrio']?.toString() ?? '',
+      powerScore: (d['powerScore'] as num?)?.toDouble() ?? 0,
+      votos: (d['votos'] as num?)?.toInt() ?? 0,
+      presentacion: (d['presentacion'] as num?)?.toInt() ?? 0,
+      sabor: (d['sabor'] as num?)?.toInt() ?? 0,
+      originalidad: (d['originalidad'] as num?)?.toInt() ?? 0,
+      subiendo: d['subiendo'] as bool? ?? false,
+      esLider: d['esLider'] as bool? ?? false,
+      lat: (d['lat'] as num?)?.toDouble() ?? 0.0,
+      lng: (d['lng'] as num?)?.toDouble() ?? 0.0,
+      descripcion: d['descripcion']?.toString() ?? '',
+      tipoSushi: d['tipoSushi']?.toString() ?? '',
+      horario: d['horario']?.toString() ?? '',
+      direccion: d['direccion']?.toString() ?? '',
+      instagram: d['instagram']?.toString() ?? '',
+      tiktok: d['tiktok']?.toString() ?? '',
+      whatsapp: d['whatsapp']?.toString() ?? '',
+      encargado: d['encargado']?.toString() ?? '',
+      imagenUrl: d['fotoURL']?.toString() ?? '',
+    );
+  }
+
+  // Demo data con coordenadas reales de zonas sushi en Medellín
+  static List<_SushiFighter> get demo => [
+    const _SushiFighter(id:'f0',  emoji:'🌸', nombre:'SAKURA MÁGICO ROLL',  restaurante:'NIKKEI MDE',    barrio:'EL POBLADO', powerScore:9.3, votos:1412, presentacion:94, sabor:91, originalidad:88, esLider:true,  lat:6.2088, lng:-75.5679),
+    const _SushiFighter(id:'f1',  emoji:'🐉', nombre:'DRAGON TEMPURA',       restaurante:'UMAMI BAR',     barrio:'LAURELES',   powerScore:8.6, votos:923,  presentacion:86, sabor:89, originalidad:84, subiendo:true, lat:6.2305, lng:-75.5888),
+    const _SushiFighter(id:'f2',  emoji:'🔥', nombre:'FUEGO URAMAKI',        restaurante:'KAZAN SUSHI',   barrio:'ESTADIO',    powerScore:8.1, votos:741,  presentacion:80, sabor:83, originalidad:79,               lat:6.2514, lng:-75.5825),
+    const _SushiFighter(id:'f3',  emoji:'🌊', nombre:'MAREA ROLL',           restaurante:'SUMIOSHI MDE',  barrio:'ENVIGADO',   powerScore:7.7, votos:618,  presentacion:76, sabor:78, originalidad:76,               lat:6.1706, lng:-75.5852),
+    const _SushiFighter(id:'f4',  emoji:'⚡', nombre:'RAYO NIGIRI',          restaurante:'TENSAI SUSHI',  barrio:'POBLADO',    powerScore:7.4, votos:556,  presentacion:73, sabor:76, originalidad:72, subiendo:true, lat:6.2060, lng:-75.5658),
+    const _SushiFighter(id:'f5',  emoji:'🎋', nombre:'BAMBÚ WARRIOR',        restaurante:'YOSHI MDE',     barrio:'LAURELES',   powerScore:7.0, votos:487,  presentacion:69, sabor:71, originalidad:70,               lat:6.2350, lng:-75.5955),
+    const _SushiFighter(id:'f6',  emoji:'🐟', nombre:'KOI SASHIMI',          restaurante:'KOI MEDELLÍN', barrio:'CENTRO',     powerScore:6.7, votos:421,  presentacion:65, sabor:68, originalidad:67,               lat:6.2518, lng:-75.5636),
+    const _SushiFighter(id:'f7',  emoji:'🥑', nombre:'CALIFORNIA MDE',       restaurante:'VERDE ROLL',    barrio:'BELÉN',      powerScore:6.3, votos:378,  presentacion:61, sabor:65, originalidad:62,               lat:6.2340, lng:-75.6062),
+    const _SushiFighter(id:'f8',  emoji:'🦐', nombre:'EBI KAISEN',           restaurante:'KAISEN MDE',    barrio:'SABANETA',   powerScore:6.0, votos:312,  presentacion:58, sabor:62, originalidad:59,               lat:6.1484, lng:-75.6165),
+    const _SushiFighter(id:'f9',  emoji:'🌙', nombre:'LUNA TEMAKI',          restaurante:'TSUKI BAR',     barrio:'ARANJUEZ',   powerScore:5.6, votos:267,  presentacion:54, sabor:58, originalidad:55,               lat:6.2735, lng:-75.5542),
+    const _SushiFighter(id:'f10', emoji:'🌺', nombre:'HIBISCUS GUNKAN',      restaurante:'HANAMI MDE',    barrio:'ROBLEDO',    powerScore:5.2, votos:224,  presentacion:50, sabor:54, originalidad:51,               lat:6.2745, lng:-75.6095),
+    const _SushiFighter(id:'f11', emoji:'🏔️', nombre:'MONTAÑA BENTO',       restaurante:'YAMA SUSHI',    barrio:'BELLO',      powerScore:4.8, votos:198,  presentacion:47, sabor:49, originalidad:46,               lat:6.3380, lng:-75.5600),
+    const _SushiFighter(id:'f12', emoji:'🎯', nombre:'DIANA MAKI',           restaurante:'DIANA SUSHI',   barrio:'BOSTON',     powerScore:4.4, votos:171,  presentacion:43, sabor:45, originalidad:43,               lat:6.2401, lng:-75.5536),
+    const _SushiFighter(id:'f13', emoji:'🍃', nombre:'JADE ROLL',            restaurante:'JADE NIKKEI',   barrio:'ITAGÜÍ',     powerScore:4.0, votos:143,  presentacion:39, sabor:41, originalidad:39,               lat:6.1853, lng:-75.5985),
+    const _SushiFighter(id:'f14', emoji:'🎲', nombre:'RANDOM BOMBER',        restaurante:'SUSHI LAB MDE', barrio:'CENTRO',     powerScore:3.5, votos:112,  presentacion:34, sabor:36, originalidad:34,               lat:6.2459, lng:-75.5713),
+  ];
+}
+
+// ── Screen principal arcade ───────────────────────────────────────────────────
+class _SushiArcadeScreen extends StatefulWidget {
+  final CircuitoFestival circuito;
+  const _SushiArcadeScreen({required this.circuito});
+  @override
+  State<_SushiArcadeScreen> createState() => _SushiArcadeScreenState();
+}
+
+class _SushiArcadeScreenState extends State<_SushiArcadeScreen>
+    with TickerProviderStateMixin {
+
+  late final TabController _tabCtrl;
+  late final AnimationController _blinkCtrl;
+  late final AnimationController _tickerCtrl;
+  late final Animation<double> _blinkAnim;
+
+  List<_SushiFighter> _fighters = [];
+  bool _cargando = true;
+  _SushiFighter? _fighterSeleccionado;
+  int? _fighterSeleccionadoIdx;
+
+  @override
+  void initState() {
+    super.initState();
+    _tabCtrl = TabController(length: 4, vsync: this, initialIndex: 0);
+    _blinkCtrl = AnimationController(
+      vsync: this, duration: const Duration(milliseconds: 700))
+      ..repeat(reverse: true);
+    _tickerCtrl = AnimationController(
+      vsync: this, duration: const Duration(seconds: 18))
+      ..repeat();
+    _blinkAnim = CurvedAnimation(parent: _blinkCtrl, curve: Curves.easeInOut);
+    _cargarFighters();
+  }
+
+  @override
+  void dispose() {
+    _tabCtrl.dispose();
+    _blinkCtrl.dispose();
+    _tickerCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _cargarFighters() async {
+    // Si es demo data, usamos los estáticos
+    if (widget.circuito.esDemoData) {
+      await Future.delayed(const Duration(milliseconds: 400));
+      if (!mounted) return;
+      setState(() { _fighters = _SushiFighter.demo; _cargando = false; });
+      return;
+    }
+    // Producción: cargar desde subcolección paradas ordenadas por powerScore
+    try {
+      final snap = await FirebaseFirestore.instance
+          .collection('circuitos_festivales')
+          .doc(widget.circuito.id)
+          .collection('paradas')
+          .orderBy('powerScore', descending: true)
+          .get();
+      if (!mounted) return;
+      final list = snap.docs
+          .map((d) => _SushiFighter.fromFirestore(d.id, d.data()))
+          .toList();
+      // Si hay fighters reales (aunque sean pocos), mostrarlos.
+      // Solo caer al demo si Firestore está completamente vacío Y es demo data.
+      setState(() { _fighters = list; _cargando = false; });
+    } catch (_) {
+      if (!mounted) return;
+      // En error de red, mostrar lista vacía (no el demo inventado)
+      setState(() { _fighters = []; _cargando = false; });
+    }
+  }
+
+  _SushiFighter? get _lider =>
+      _fighters.isNotEmpty ? _fighters.first : null;
+
+  void _irAFighter(int idx) {
+    final f = _fighters[idx];
+    Navigator.push(context, MaterialPageRoute(
+      builder: (_) => _SushiFighterDetalleScreen(
+        fighter: f,
+        rank: idx + 1,
+        circuito: widget.circuito,
+      )));
+  }
+
+
+
+  // ── Ticket XP por acción ──────────────────────────────────────────────────
+  static const _xpGuia = [
+    ('📍', 'Check-in GPS en restaurante', '+100 XP'),
+    ('⭐', 'Calificar el plato (3 dimensiones)', '+150 XP'),
+    ('📸', 'Foto de tu experiencia con marca de agua', '+100 XP'),
+    ('🏁', 'Completar los 15 restaurantes', '+500 XP'),
+    ('🔗', 'Compartir en redes sociales', '+50 XP'),
+    ('🏆', 'Liderar el jurado popular', '+200 XP'),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: _ArcC.bg,
+      body: Stack(children: [
+        // ── Scanlines overlay ─────────────────────────────────────────────
+        Positioned.fill(child: IgnorePointer(child: CustomPaint(
+          painter: _ScanlinesPainter()))),
+        // ── Contenido principal ───────────────────────────────────────────
+        SafeArea(
+          child: Column(children: [
+            // Ticker animado
+            _buildTicker(),
+            // Header arcade
+            _buildHeader(),
+            // VS bar
+            _buildVsBar(),
+            // Tabs
+            _buildTabBar(),
+            // Contenido del tab
+            Expanded(child: _cargando
+                ? _buildLoading()
+                : TabBarView(
+                    controller: _tabCtrl,
+                    physics: const NeverScrollableScrollPhysics(),
+                    children: [
+                      _buildTabXP(),
+                      _buildTabArena(),
+                      _buildTabRanking(),
+                      _buildTabJurado(),
+                    ])),
+          ])),
+        // ── Botón volver ─────────────────────────────────────────────────
+        Positioned(
+          top: MediaQuery.of(context).padding.top + 4,
+          left: 8,
+          child: GestureDetector(
+            onTap: () => Navigator.pop(context),
+            child: Container(
+              width: 32, height: 32,
+              decoration: BoxDecoration(
+                color: _ArcC.bg2,
+                border: Border.all(color: _ArcC.red.withOpacity(0.6)),
+                borderRadius: BorderRadius.circular(4)),
+              child: const Icon(Icons.arrow_back_ios_new_rounded,
+                color: _ArcC.gold, size: 14)))),
+      ]));
+  }
+
+  // ── Ticker superior ───────────────────────────────────────────────────────
+  Widget _buildTicker() {
+    final nFighters = _fighters.isNotEmpty ? '${_fighters.length}' : '?';
+    final msg = '⚔ BATALLA DE SUSHI · MDE 2027 ⚔  ★ $nFighters COMPETIDORES · VOTA · GANA XP ★  ⚔ GPS + FOTO CON MARCA DE AGUA ⚔  ★ RUTERO MDE · CRÉAME ALCALDÍA ★  ';
+    return Container(
+      height: 24,
+      color: _ArcC.red,
+      child: AnimatedBuilder(
+        animation: _tickerCtrl,
+        builder: (_, __) {
+          return ClipRect(child: OverflowBox(
+            maxWidth: double.infinity,
+            child: Transform.translate(
+              offset: Offset(-_tickerCtrl.value * 800, 0),
+              child: Row(children: [
+                Text(msg + msg, style: _pxS(5.5, _ArcC.gold, letterSpacing: 1)),
+              ]))));
+        }));
+  }
+
+  // ── Header arcade ─────────────────────────────────────────────────────────
+  Widget _buildHeader() {
+    return Container(
+      color: _ArcC.bg2,
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text('⚔ RUTERO MDE · 2027 ⚔', style: _pxS(5, _ArcC.red)),
+        const SizedBox(height: 5),
+        RichText(text: TextSpan(children: [
+          TextSpan(text: 'BATALLA\nDE ', style: _pxS(18, _ArcC.fg, letterSpacing: 1)),
+          TextSpan(text: 'SUSHI', style: _pxS(18, _ArcC.gold, letterSpacing: 1)),
+        ])),
+        const SizedBox(height: 8),
+        Wrap(spacing: 5, runSpacing: 4, children: [
+          _chip('⚔ ${_fighters.length} RIVALES', _ArcC.red),
+          _chip('GPS VALIDADO', _ArcC.cyan),
+          _chip(widget.circuito.esActivo ? 'EN BATALLA' : 'PRÓXIMAMENTE', _ArcC.green, blink: true),
+          _chip('MEDELLÍN', _ArcC.gold),
+        ]),
+      ]));
+  }
+
+  Widget _chip(String label, Color color, {bool blink = false}) {
+    final txt = Text(label, style: _pxS(5, color));
+    final box = Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        border: Border.all(color: color.withOpacity(0.5))),
+      child: txt);
+    if (!blink) return box;
+    return FadeTransition(opacity: _blinkAnim, child: box);
+  }
+
+  // ── VS bar ────────────────────────────────────────────────────────────────
+  Widget _buildVsBar() {
+    return Container(
+      height: 24,
+      color: _ArcC.bg,
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Row(children: [
+        Expanded(child: Container(height: 1,
+          decoration: BoxDecoration(
+            gradient: LinearGradient(colors: [
+              Colors.transparent, _ArcC.red])))),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 10),
+          child: Text('★ VS ★', style: _pxS(7, _ArcC.gold))),
+        Expanded(child: Container(height: 1,
+          decoration: BoxDecoration(
+            gradient: LinearGradient(colors: [
+              _ArcC.red, Colors.transparent])))),
+      ]));
+  }
+
+  // ── TabBar arcade ─────────────────────────────────────────────────────────
+  Widget _buildTabBar() {
+    const labels = ['⭐ XP', '⚔ ARENA', 'RANKING', 'JURADO'];
+    return Container(
+      color: _ArcC.bg2,
+      child: TabBar(
+        controller: _tabCtrl,
+        isScrollable: true,
+        indicatorColor: _ArcC.red,
+        indicatorWeight: 2,
+        labelColor: _ArcC.gold,
+        unselectedLabelColor: _ArcC.fg3,
+        labelStyle: _pxS(7, _ArcC.gold),
+        unselectedLabelStyle: _pxS(7, _ArcC.fg3),
+        tabs: labels.map((l) => Tab(
+          height: 36,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 4),
+            child: Text(l, style: _pxS(7, _ArcC.fg))))).toList()));
+  }
+
+  // ── Loading ───────────────────────────────────────────────────────────────
+  Widget _buildLoading() {
+    return Center(child: Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        FadeTransition(opacity: _blinkAnim,
+          child: Text('CARGANDO\nBATALLA...', style: _pxS(10, _ArcC.red),
+            textAlign: TextAlign.center)),
+        const SizedBox(height: 20),
+        const CircularProgressIndicator(color: _ArcC.gold, strokeWidth: 2),
+      ]));
+  }
+
+  // ══ TAB ARENA ════════════════════════════════════════════════════════════════
+  Widget _buildTabArena() {
+    final lider = _lider;
+    // Estado vacío — aún no hay competidores registrados
+    if (_fighters.isEmpty) {
+      return Center(child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          FadeTransition(opacity: _blinkAnim,
+            child: const Text('⚔', style: TextStyle(fontSize: 48))),
+          const SizedBox(height: 16),
+          Text('INSCRIPCIONES\nABIERTAS', style: _pxS(14, _ArcC.red),
+            textAlign: TextAlign.center),
+          const SizedBox(height: 8),
+          Text('LOS FIGHTERS SE REVELARÁN\nPRÓXIMAMENTE', style: _pxS(6, _ArcC.fg3),
+            textAlign: TextAlign.center),
+        ])));
+    }
+    return ListView(padding: const EdgeInsets.only(bottom: 80), children: [
+      // Leader banner
+      if (lider != null) _buildLeaderBanner(lider),
+      // Selector "Elige tu rival"
+      Padding(
+        padding: const EdgeInsets.fromLTRB(14, 10, 14, 6),
+        child: Row(children: [
+          Text('⚔ ELIGE TU RIVAL', style: _pxS(7, _ArcC.fg)),
+          const Spacer(),
+          FadeTransition(opacity: _blinkAnim,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+              color: _ArcC.red,
+              child: Text('${_fighters.length} FIGHTERS', style: _pxS(7, _ArcC.gold)))),
+        ])),
+      // Grid 3 columnas — tap abre pantalla detalle
+      _buildCharGrid(),
+      // Instrucción tap
+      Padding(
+        padding: const EdgeInsets.fromLTRB(14, 8, 14, 4),
+        child: Text('⚔ TOCA UN RIVAL PARA VER SU FICHA Y VOTAR',
+          style: _pxS(4.5, _ArcC.fg3), textAlign: TextAlign.center)),
+      // Legal
+      _buildLegal(),
+    ]);
+  }
+
+  // ── Leader banner ─────────────────────────────────────────────────────────
+  Widget _buildLeaderBanner(_SushiFighter lider) {
+    final tieneImagen = lider.imagenUrl.isNotEmpty;
+    return GestureDetector(
+      onTap: () => Navigator.push(context, MaterialPageRoute(
+        builder: (_) => _SushiFighterDetalleScreen(
+          fighter: lider,
+          rank: 1,
+          circuito: widget.circuito))),
+      child: FadeTransition(
+        opacity: _blinkAnim,
+        child: Container(
+          margin: const EdgeInsets.fromLTRB(14, 10, 14, 0),
+          decoration: BoxDecoration(
+            color: _ArcC.bg2,
+            border: Border.all(color: _ArcC.gold, width: 1.5),
+            boxShadow: [
+              BoxShadow(color: _ArcC.gold.withOpacity(0.18),
+                blurRadius: 16, spreadRadius: 3)]),
+          child: Column(children: [
+            // — Header badge
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 7),
+              color: _ArcC.gold.withOpacity(0.12),
+              child: Text('★ LIDER DE LA BATALLA ★',
+                style: _pxS(6, _ArcC.gold), textAlign: TextAlign.center)),
+            // — Foto del plato (o emoji fallback)
+            if (tieneImagen)
+              Stack(children: [
+                // Imagen real del plato
+                ClipRect(
+                  child: SizedBox(
+                    width: double.infinity,
+                    height: 200,
+                    child: Image.network(
+                      lider.imagenUrl,
+                      fit: BoxFit.cover,
+                      loadingBuilder: (ctx, child, prog) => prog == null
+                          ? child
+                          : Container(
+                              height: 200,
+                              color: _ArcC.bg2,
+                              child: Center(child: CircularProgressIndicator(
+                                color: _ArcC.gold,
+                                value: prog.expectedTotalBytes != null
+                                    ? prog.cumulativeBytesLoaded / prog.expectedTotalBytes!
+                                    : null))),
+                      errorBuilder: (_, __, ___) => Container(
+                        height: 200, color: _ArcC.bg2,
+                        child: Center(child: Text(lider.emoji,
+                          style: const TextStyle(fontSize: 56)))),
+                    ))),
+                // Gradiente inferior sobre la imagen
+                Positioned(
+                  bottom: 0, left: 0, right: 0,
+                  child: Container(
+                    height: 90,
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          Colors.transparent,
+                          _ArcC.bg2.withOpacity(0.95),
+                        ])))),
+                // Nombre + restaurante sobre la imagen
+                Positioned(
+                  bottom: 10, left: 12, right: 12,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.center, children: [
+                    Text(lider.nombre,
+                      style: _pxS(8.5, _ArcC.gold),
+                      textAlign: TextAlign.center,
+                      maxLines: 2, overflow: TextOverflow.ellipsis),
+                    const SizedBox(height: 3),
+                    Text('${lider.restaurante} · ${lider.barrio}',
+                      style: _pxS(5, _ArcC.cyan), textAlign: TextAlign.center),
+                  ])),
+              ])
+            else
+              // Fallback: emoji grande centrado
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 20),
+                child: Column(children: [
+                  Text(lider.emoji, style: const TextStyle(fontSize: 56)),
+                  const SizedBox(height: 8),
+                  Text(lider.nombre, style: _pxS(9, _ArcC.gold),
+                    textAlign: TextAlign.center,
+                    maxLines: 2, overflow: TextOverflow.ellipsis),
+                  const SizedBox(height: 3),
+                  Text('${lider.restaurante} · ${lider.barrio}',
+                    style: _pxS(5, _ArcC.cyan)),
+                ])),
+            // — Power Score + votos
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 10),
+              color: _ArcC.gold.withOpacity(0.06),
+              child: Column(children: [
+                Text(lider.powerScore.toStringAsFixed(1),
+                  style: _pxS(20, _ArcC.gold)),
+                Text('POWER SCORE · ${_fmt(lider.votos)} VOTOS',
+                  style: _pxS(5, _ArcC.fg3)),
+              ])),
+          ]))));
+  }
+
+  // ── Char grid ─────────────────────────────────────────────────────────────
+  Widget _buildCharGrid() {
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      // Fix #2 — leyenda de bordes de color
+      Padding(
+        padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+        child: Wrap(spacing: 10, runSpacing: 4, children: [
+          _legendChip('👑 LÍDER', _ArcC.gold),
+          _legendChip('▲ SUBIENDO', _ArcC.cyan),
+          _legendChip('⚔ TOCA PARA RETAR', _ArcC.fg2),
+        ])),
+      Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      child: GridView.builder(
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
+        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: 3,
+          childAspectRatio: 0.72,
+          crossAxisSpacing: 6,
+          mainAxisSpacing: 6),
+        itemCount: _fighters.length,
+        itemBuilder: (_, i) => _buildCharSlot(i))),
+    ]);
+  }
+
+  Widget _legendChip(String label, Color color) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+    decoration: BoxDecoration(
+      border: Border.all(color: color.withOpacity(0.6)),
+      color: color.withOpacity(0.08),
+      borderRadius: BorderRadius.circular(2)),
+    child: Text(label, style: _pxS(4.5, color)));
+
+  Widget _buildCharSlot(int idx) {
+    final f = _fighters[idx];
+    final hpPct = (f.powerScore / 10).clamp(0.0, 1.0);
+    final borderColor = f.esLider
+        ? _ArcC.gold
+        : f.subiendo
+            ? _ArcC.cyan.withOpacity(0.7)
+            : _ArcC.red.withOpacity(0.25);
+    const isSelected = false; // Sin selección embebida — se abre pantalla separada
+
+    return GestureDetector(
+      onTap: () => _irAFighter(idx),
+      child: Container(
+        padding: const EdgeInsets.all(7),
+        decoration: BoxDecoration(
+          color: _ArcC.panel,
+          border: Border.all(
+            color: isSelected ? _ArcC.gold : borderColor,
+            width: isSelected ? 2 : 1),
+          boxShadow: f.esLider
+              ? [BoxShadow(color: _ArcC.gold.withOpacity(0.15),
+                  blurRadius: 8)]
+              : null),
+        child: Column(children: [
+          // Foto del plato si existe, emoji como fallback
+          if (f.imagenUrl.isNotEmpty)
+            ClipRRect(
+              borderRadius: BorderRadius.circular(4),
+              child: Image.network(f.imagenUrl,
+                width: 48, height: 48, fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) =>
+                  Text(f.emoji, style: const TextStyle(fontSize: 28))))
+          else
+            Text(f.emoji, style: const TextStyle(fontSize: 28)),
+          const SizedBox(height: 4),
+          Text(f.nombre, style: _pxS(5.5, _ArcC.fg),
+            textAlign: TextAlign.center, maxLines: 2,
+            overflow: TextOverflow.ellipsis),
+          const SizedBox(height: 2),
+          Text(f.restaurante, style: _pxS(5, _ArcC.cyan),
+            textAlign: TextAlign.center, maxLines: 1,
+            overflow: TextOverflow.ellipsis),
+          const SizedBox(height: 5),
+          // HP bar
+          Container(
+            height: 5,
+            decoration: BoxDecoration(
+              color: Colors.black,
+              border: Border.all(color: _ArcC.red.withOpacity(0.2))),
+            child: FractionallySizedBox(
+              widthFactor: hpPct,
+              alignment: Alignment.centerLeft,
+              child: Container(
+                decoration: const BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [_ArcC.red2, _ArcC.gold]))))),
+          const SizedBox(height: 4),
+          Text(f.powerScore.toStringAsFixed(1), style: _pxS(9, _ArcC.gold)),
+          Text('${_fmt(f.votos)}v', style: _pxS(5, _ArcC.fg3)),
+        ])));
+  }
+
+  // ── Fighter detail card ───────────────────────────────────────────────────
+  // ══ TAB RANKING ══════════════════════════════════════════════════════════════
+  Widget _buildTabRanking() {
+    return ListView(padding: const EdgeInsets.only(bottom: 80), children: [
+      Padding(
+        padding: const EdgeInsets.fromLTRB(14, 10, 14, 6),
+        child: Row(children: [
+          Text('⚔ POWER RANKING', style: _pxS(7, _ArcC.fg)),
+          const Spacer(),
+          FadeTransition(opacity: _blinkAnim,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+              color: _ArcC.red,
+              child: Text('LIVE', style: _pxS(5, _ArcC.gold)))),
+        ])),
+      ...List.generate(_fighters.length, (i) {
+        final f = _fighters[i];
+        final rank = i + 1;
+        Color borderLeft;
+        Color numColor;
+        if (rank == 1) { borderLeft = _ArcC.gold; numColor = _ArcC.gold; }
+        else if (rank == 2) { borderLeft = _ArcC.silver; numColor = _ArcC.silver; }
+        else if (rank == 3) { borderLeft = _ArcC.bronze; numColor = _ArcC.bronze; }
+        else { borderLeft = Colors.transparent; numColor = _ArcC.fg3; }
+
+        return GestureDetector(
+          onTap: () => _irAFighter(i),
+          child: Container(
+            margin: const EdgeInsets.fromLTRB(14, 0, 14, 6),
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: _ArcC.panel,
+              border: Border(
+                left: BorderSide(color: borderLeft, width: 4),
+                right: BorderSide(color: _ArcC.red.withOpacity(0.12)),
+                top: BorderSide(color: _ArcC.red.withOpacity(0.12)),
+                bottom: BorderSide(color: _ArcC.red.withOpacity(0.12)))),
+            child: Row(children: [
+              SizedBox(width: 32,
+                child: Text('$rank', style: _pxS(13, numColor),
+                  textAlign: TextAlign.center)),
+              const SizedBox(width: 8),
+              // Foto del plato si existe, emoji como fallback
+              if (f.imagenUrl.isNotEmpty)
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(4),
+                  child: Image.network(f.imagenUrl,
+                    width: 52, height: 52, fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) =>
+                      Text(f.emoji, style: const TextStyle(fontSize: 28))))
+              else
+                Text(f.emoji, style: const TextStyle(fontSize: 28)),
+              const SizedBox(width: 10),
+              Expanded(child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text(f.nombre, style: _pxS(7, _ArcC.fg),
+                  maxLines: 2, overflow: TextOverflow.ellipsis),
+                const SizedBox(height: 4),
+                Text(f.restaurante, style: _pxS(6, _ArcC.cyan),
+                  maxLines: 1, overflow: TextOverflow.ellipsis),
+                const SizedBox(height: 2),
+                Text(f.barrio, style: _pxS(5.5, _ArcC.fg3),
+                  maxLines: 1, overflow: TextOverflow.ellipsis),
+                const SizedBox(height: 6),
+                // Mini bar
+                Container(height: 5,
+                  color: Colors.black,
+                  child: FractionallySizedBox(
+                    widthFactor: (f.powerScore / 10).clamp(0.0, 1.0),
+                    alignment: Alignment.centerLeft,
+                    child: Container(
+                      decoration: const BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [_ArcC.red2, _ArcC.gold]))))),
+              ])),
+              const SizedBox(width: 10),
+              Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
+                Text(f.powerScore.toStringAsFixed(1), style: _pxS(13, _ArcC.gold)),
+                const SizedBox(height: 4),
+                Text('${_fmt(f.votos)} v', style: _pxS(5.5, _ArcC.fg3)),
+              ]),
+            ])));
+      }),
+      _buildLegal(),
+    ]);
+  }
+
+  // ══ TAB JURADO ═══════════════════════════════════════════════════════════════
+  Widget _buildTabJurado() {
+    final miUid = FirebaseAuth.instance.currentUser?.uid;
+
+    // Lee desde inscripciones_sushi (colección pública con datos agregados por CF)
+    // Cada doc = un restaurante con totalVotos, powerScore, etc.
+    // Para el ranking de jurado, leer la subcolección votos de cada inscripción
+    // o bien leer directamente votos_sushi agrupando por votanteUid.
+    // Usamos inscripciones_sushi/{id}/votos — subcolección generada por la CF.
+    // Si no existe, fallback: leer votos_sushi con query por circuitoId.
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance
+          .collection('votos_sushi')
+          // circuitoId no existe en el doc (lo guarda la CF sin ese campo).
+          // Leer todos los votos — el ranking sushi es de un solo circuito.
+          .snapshots(),
+      builder: (ctx, snap) {
+        // Si la query falla (permisos), intentar sin filtro de circuito
+        if (snap.hasError) {
+          debugPrint('⚠️ votos_sushi con filtro falló: ${snap.error}');
+        }
+
+        // Mientras carga
+        if (snap.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator(color: _ArcC.cyan));
+        }
+
+        // Si hay error de permisos, mostrar ranking desde inscripciones_sushi
+        if (snap.hasError) {
+          return _buildTabJuradoDesdeInscripciones(miUid);
+        }
+
+        // ── Agrupar votos por votanteUid y calcular XP ───────────────────────
+        final currentUser = FirebaseAuth.instance.currentUser;
+        final Map<String, Map<String, dynamic>> porUid = {};
+        for (final doc in snap.data?.docs ?? []) {
+          final d = doc.data() as Map<String, dynamic>;
+          // La CF guarda el UID del votante en campo 'uid' o 'votanteUid'
+          final uid = (d['uid'] ?? d['votanteUid'] ?? '').toString();
+          if (uid.isEmpty) continue;
+          if (!porUid.containsKey(uid)) {
+            // Para el usuario actual: usar displayName o email, nunca el UID crudo
+            String nickname;
+            if (uid == currentUser?.uid) {
+              nickname = currentUser?.displayName?.isNotEmpty == true
+                  ? currentUser!.displayName!
+                  : (currentUser?.email?.split('@').first ?? uid.substring(0, 8).toUpperCase());
+            } else {
+              // Para otros: usar nickname del doc, o email truncado si lo tiene la CF, o UID truncado
+              nickname = (d['nickname'] as String?)?.isNotEmpty == true
+                  ? d['nickname'] as String
+                  : (d['email'] as String?)?.split('@').first ?? uid.substring(0, 8).toUpperCase();
+            }
+            porUid[uid] = {
+              'uid': uid,
+              'nickname': nickname,
+              'emoji': d['emoji'] as String? ?? '🍣',
+              'votos': 0,
+              'fotos': 0,
+              'xp': 0,
+            };
+          }
+          porUid[uid]!['votos'] = (porUid[uid]!['votos'] as int) + 1;
+          final tieneFoto = (d['fotoUrl'] as String? ?? '').isNotEmpty;
+          if (tieneFoto) porUid[uid]!['fotos'] = (porUid[uid]!['fotos'] as int) + 1;
+          porUid[uid]!['xp'] = (porUid[uid]!['xp'] as int) + 150 + (tieneFoto ? 50 : 0);
+        }
+
+        // Si no hay datos en votos_sushi, intentar desde inscripciones
+        if (porUid.isEmpty && (snap.data?.docs.isEmpty ?? true)) {
+          return _buildTabJuradoDesdeInscripciones(miUid);
+        }
+
+        // Ordenar por XP descendente, top 10
+        final ranking = porUid.values.toList()
+          ..sort((a, b) => (b['xp'] as int).compareTo(a['xp'] as int));
+        final top10 = ranking.take(10).toList();
+
+        if (top10.isEmpty) {
+          return ListView(padding: const EdgeInsets.only(bottom: 80), children: [
+            const SizedBox(height: 60),
+            Center(child: Column(children: [
+              const Text('🍣', style: TextStyle(fontSize: 48)),
+              const SizedBox(height: 12),
+              Text('¡Sé el primero en votar!', style: _pxS(9, _ArcC.cyan)),
+              const SizedBox(height: 6),
+              Text('El ranking se genera con los votos\ndel Jurado Popular',
+                style: _pxS(6, _ArcC.fg3), textAlign: TextAlign.center),
+            ])),
+            _buildLegal(),
+          ]);
+        }
+
+        final top1 = top10.first;
+        final maxXp = (top1['xp'] as int).toDouble().clamp(1, double.infinity);
+
+        return ListView(padding: const EdgeInsets.only(bottom: 80), children: [
+          // ── Top 1 destacado ────────────────────────────────────────────
+          Container(
+            margin: const EdgeInsets.fromLTRB(14, 12, 14, 0),
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: _ArcC.panel,
+              border: Border.all(
+                color: (top1['uid'] == miUid) ? _ArcC.gold : _ArcC.cyan,
+                width: 2)),
+            child: Column(children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                color: (top1['uid'] == miUid) ? _ArcC.gold : _ArcC.cyan,
+                child: Text(
+                  (top1['uid'] == miUid) ? '⭐ JURADO #1 — TÚ' : '👾 JURADO #1',
+                  style: _pxS(7, _ArcC.bg))),
+              const SizedBox(height: 10),
+              Text(top1['emoji'] as String, style: const TextStyle(fontSize: 42)),
+              const SizedBox(height: 6),
+              Text(top1['nickname'] as String, style: _pxS(11, _ArcC.cyan)),
+              const SizedBox(height: 8),
+              Wrap(spacing: 6, runSpacing: 4, children: [
+                _juradoBadge('${top1['votos']} VOTOS ★', _ArcC.gold),
+                _juradoBadge('${top1['fotos']} FOTOS 📤', _ArcC.pink),
+              ]),
+              const SizedBox(height: 10),
+              Text('${_fmt(top1['xp'] as int)} XP', style: _pxS(22, _ArcC.cyan)),
+              const SizedBox(height: 3),
+              Text('★ LÍDER DEL JURADO POPULAR ★', style: _pxS(6, _ArcC.green)),
+            ])),
+
+          // ── Header ranking ─────────────────────────────────────────────
+          Padding(
+            padding: const EdgeInsets.fromLTRB(14, 14, 14, 8),
+            child: Row(children: [
+              Text('JURADO POPULAR', style: _pxS(8, _ArcC.fg)),
+              const Spacer(),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                color: _ArcC.gold.withOpacity(0.2),
+                child: Text('TOP ${top10.length}', style: _pxS(6, _ArcC.gold))),
+            ])),
+
+          // ── Lista ranking ──────────────────────────────────────────────
+          ...List.generate(top10.length, (i) {
+            final j = top10[i];
+            final isTop = i < 3;
+            final esMio = j['uid'] == miUid;
+            final xp = j['xp'] as int;
+            final fraccion = (xp / maxXp).clamp(0.0, 1.0);
+
+            return Container(
+              margin: const EdgeInsets.fromLTRB(14, 0, 14, 6),
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: esMio ? _ArcC.gold.withOpacity(0.07) : _ArcC.panel,
+                border: Border(
+                  left: BorderSide(
+                    color: esMio ? _ArcC.gold : (isTop ? _ArcC.cyan : Colors.transparent),
+                    width: 4),
+                  right: BorderSide(color: _ArcC.cyan.withOpacity(0.12)),
+                  top: BorderSide(color: _ArcC.cyan.withOpacity(0.12)),
+                  bottom: BorderSide(color: _ArcC.cyan.withOpacity(0.12)))),
+              child: Row(children: [
+                SizedBox(width: 32,
+                  child: Text('${i + 1}',
+                    style: _pxS(13, esMio ? _ArcC.gold : (isTop ? _ArcC.cyan : _ArcC.fg3)),
+                    textAlign: TextAlign.center)),
+                const SizedBox(width: 8),
+                Container(
+                  width: 44, height: 44,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: esMio ? _ArcC.gold.withOpacity(0.7) : _ArcC.cyan.withOpacity(0.5),
+                      width: 2)),
+                  child: Center(child: Text(j['emoji'] as String,
+                    style: const TextStyle(fontSize: 20)))),
+                const SizedBox(width: 10),
+                Expanded(child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Row(children: [
+                    Flexible(child: Text(j['nickname'] as String,
+                      style: _pxS(7, esMio ? _ArcC.gold : _ArcC.fg),
+                      overflow: TextOverflow.ellipsis)),
+                    if (esMio) ...[
+                      const SizedBox(width: 4),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                        color: _ArcC.gold.withOpacity(0.2),
+                        child: Text('TÚ', style: _pxS(5, _ArcC.gold))),
+                    ],
+                  ]),
+                  const SizedBox(height: 5),
+                  Wrap(spacing: 4, runSpacing: 3, children: [
+                    _juradoBadge('${j['votos']} ★', _ArcC.gold),
+                    _juradoBadge('📤 ${j['fotos']}', _ArcC.pink),
+                  ]),
+                  const SizedBox(height: 5),
+                  // XP bar
+                  Container(height: 4, color: Colors.black,
+                    child: FractionallySizedBox(
+                      widthFactor: fraccion,
+                      alignment: Alignment.centerLeft,
+                      child: Container(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: esMio
+                              ? [_ArcC.gold.withOpacity(0.7), _ArcC.gold]
+                              : [_ArcC.cyan2, _ArcC.cyan]))))),
+                ])),
+                const SizedBox(width: 10),
+                Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
+                  Text(_fmt(xp), style: _pxS(10, esMio ? _ArcC.gold : _ArcC.cyan)),
+                  const SizedBox(height: 3),
+                  Text('XP', style: _pxS(5.5, _ArcC.fg3)),
+                ]),
+              ]));
+          }),
+
+          // ── Posición del usuario si no está en top 10 ─────────────────
+          if (miUid != null && !top10.any((j) => j['uid'] == miUid))
+            Builder(builder: (_) {
+              final posIdx = ranking.indexWhere((j) => j['uid'] == miUid);
+              if (posIdx < 0) return const SizedBox.shrink();
+              final miData = ranking[posIdx];
+              final xpMio = miData['xp'] as int;
+              return Container(
+                margin: const EdgeInsets.fromLTRB(14, 8, 14, 6),
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: _ArcC.gold.withOpacity(0.07),
+                  border: Border.all(color: _ArcC.gold.withOpacity(0.4), width: 1)),
+                child: Row(children: [
+                  Text('· · ·', style: _pxS(10, _ArcC.fg3)),
+                  const SizedBox(width: 10),
+                  Text('#${posIdx + 1}', style: _pxS(13, _ArcC.gold)),
+                  const SizedBox(width: 10),
+                  Text(miData['emoji'] as String, style: const TextStyle(fontSize: 20)),
+                  const SizedBox(width: 8),
+                  Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                    Row(children: [
+                      Flexible(child: Text(miData['nickname'] as String,
+                        style: _pxS(7, _ArcC.gold), overflow: TextOverflow.ellipsis)),
+                      const SizedBox(width: 4),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                        color: _ArcC.gold.withOpacity(0.2),
+                        child: Text('TÚ', style: _pxS(5, _ArcC.gold))),
+                    ]),
+                    const SizedBox(height: 4),
+                    Text('Sigue votando para subir al Top 10', style: _pxS(5.5, _ArcC.fg3)),
+                  ])),
+                  Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
+                    Text(_fmt(xpMio), style: _pxS(10, _ArcC.gold)),
+                    Text('XP', style: _pxS(5.5, _ArcC.fg3)),
+                  ]),
+                ]));
+            }),
+
+          _buildLegal(),
+        ]);
+      },
+    );
+  }
+
+  // Fallback: construye ranking leyendo votos desde usuarios/{uid}/votos_sushi
+  // o mostrando solo al usuario actual si tiene votos registrados en su perfil.
+  Widget _buildTabJuradoDesdeInscripciones(String? miUid) {
+    // Leer colección usuarios/{miUid}/votos para construir la posición del usuario
+    if (miUid == null) {
+      return ListView(padding: const EdgeInsets.only(bottom: 80), children: [
+        const SizedBox(height: 60),
+        Center(child: Column(children: [
+          const Text('🍣', style: TextStyle(fontSize: 48)),
+          const SizedBox(height: 12),
+          Text('Inicia sesión para ver el ranking', style: _pxS(9, _ArcC.cyan)),
+        ])),
+        _buildLegal(),
+      ]);
+    }
+
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance
+          .collection('usuarios')
+          .doc(miUid)
+          .collection('votos_sushi')
+          .snapshots(),
+      builder: (ctx2, snap2) {
+        if (snap2.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator(color: _ArcC.cyan));
+        }
+
+        final misVotos = snap2.data?.docs.length ?? 0;
+        final tieneFotos = snap2.data?.docs
+            .where((d) => ((d.data() as Map)['fotoUrl'] as String? ?? '').isNotEmpty)
+            .length ?? 0;
+        final miXp = misVotos * 150 + tieneFotos * 50;
+        final miNick = FirebaseAuth.instance.currentUser?.displayName
+            ?? miUid.substring(0, 8).toUpperCase();
+
+        return ListView(padding: const EdgeInsets.only(bottom: 80), children: [
+          // Banner info
+          Container(
+            margin: const EdgeInsets.fromLTRB(14, 12, 14, 0),
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: _ArcC.panel,
+              border: Border.all(color: _ArcC.gold, width: 2)),
+            child: Column(children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                color: _ArcC.gold,
+                child: Text('⭐ TU POSICIÓN', style: _pxS(7, _ArcC.bg))),
+              const SizedBox(height: 10),
+              const Text('🍣', style: TextStyle(fontSize: 42)),
+              const SizedBox(height: 6),
+              Text(miNick, style: _pxS(11, _ArcC.gold)),
+              const SizedBox(height: 8),
+              Wrap(spacing: 6, runSpacing: 4, children: [
+                _juradoBadge('$misVotos VOTOS ★', _ArcC.gold),
+                _juradoBadge('$tieneFotos FOTOS 📤', _ArcC.pink),
+              ]),
+              const SizedBox(height: 10),
+              Text('${_fmt(miXp)} XP', style: _pxS(22, _ArcC.cyan)),
+              const SizedBox(height: 6),
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: _ArcC.cyan.withOpacity(0.07),
+                  border: Border.all(color: _ArcC.cyan.withOpacity(0.3))),
+                child: Text(
+                  'El ranking completo estará disponible\ncuando se habiliten los permisos de lectura\nen Firestore → votos_sushi',
+                  style: _pxS(5.5, _ArcC.fg3), textAlign: TextAlign.center)),
+            ])),
+          _buildLegal(),
+        ]);
+      },
+    );
+  }
+
+  Widget _juradoBadge(String label, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        border: Border.all(color: color.withOpacity(0.35))),
+      child: Text(label, style: _pxS(5.5, color)));
+  }
+
+  // ══ TAB MAPA ═════════════════════════════════════════════════════════════════
+  Widget _buildTabMapa() {
+    if (_fighters.isEmpty) {
+      return Center(child: Text('SIN RESTAURANTES AÚN', style: _pxS(7, _ArcC.fg3)));
+    }
+    // Límites del mapa basados en coords reales de los fighters
+    final lats = _fighters.map((f) => f.lat).toList();
+    final lngs = _fighters.map((f) => f.lng).toList();
+    final minLat = lats.reduce((a, b) => a < b ? a : b);
+    final maxLat = lats.reduce((a, b) => a > b ? a : b);
+    final minLng = lngs.reduce((a, b) => a < b ? a : b);
+    final maxLng = lngs.reduce((a, b) => a > b ? a : b);
+
+    return Stack(children: [
+      Column(children: [
+      // Cabecera
+      Container(
+        padding: const EdgeInsets.fromLTRB(14, 10, 14, 8),
+        color: _ArcC.bg2,
+        child: Row(children: [
+          Text('🗺 MAPA DE LA BATALLA', style: _pxS(7, _ArcC.gold)),
+          const Spacer(),
+          FadeTransition(opacity: _blinkAnim,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+              color: _ArcC.red,
+              child: Text('${_fighters.length} RIVALES', style: _pxS(6, _ArcC.gold)))),
+        ])),
+      // Mapa canvas con coords reales
+      Expanded(
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(4),
+            child: LayoutBuilder(
+              builder: (ctx, constraints) {
+                final size = Size(constraints.maxWidth, constraints.maxHeight);
+                return GestureDetector(
+                  onTapUp: (details) {
+                    final tap = details.localPosition;
+                    // Misma fórmula que _toCanvas en _SushiMapaPainterReal
+                    final padH = size.width  * 0.12;
+                    final padV = size.height * 0.12;
+                    final w = size.width  - padH * 2;
+                    final h = size.height - padV * 2;
+                    final latRange = (maxLat - minLat).abs() < 0.001 ? 0.05 : (maxLat - minLat);
+                    final lngRange = (maxLng - minLng).abs() < 0.001 ? 0.05 : (maxLng - minLng);
+                    int? closest;
+                    double minDist = 32; // radio de toque en px
+                    for (int i = 0; i < _fighters.length; i++) {
+                      final f = _fighters[i];
+                      final x = padH + ((f.lng - minLng) / lngRange) * w;
+                      final y = padV + ((maxLat - f.lat) / latRange) * h;
+                      final dist = (Offset(x, y) - tap).distance;
+                      if (dist < minDist) { minDist = dist; closest = i; }
+                    }
+                    if (closest != null) {
+                      setState(() {
+                        _fighterSeleccionado = _fighters[closest!];
+                        _fighterSeleccionadoIdx = closest;
+                      });
+                    }
+                  },
+                  child: CustomPaint(
+                    painter: _SushiMapaPainterReal(
+                      fighters: _fighters,
+                      minLat: minLat, maxLat: maxLat,
+                      minLng: minLng, maxLng: maxLng),
+                    child: const SizedBox.expand()));
+              })))),
+      // Lista compacta de restaurantes
+      SizedBox(
+        height: 130,
+        child: ListView.builder(
+          scrollDirection: Axis.horizontal,
+          padding: const EdgeInsets.fromLTRB(12, 0, 12, 10),
+          itemCount: _fighters.length,
+          itemBuilder: (_, i) {
+            final f = _fighters[i];
+            return GestureDetector(
+              onTap: () => _irAFighter(i),
+              child: Container(
+                width: 110,
+                margin: const EdgeInsets.only(right: 8),
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: _ArcC.panel,
+                  border: Border.all(
+                    color: f.esLider ? _ArcC.gold : _ArcC.red.withOpacity(0.3))),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(children: [
+                      if (f.imagenUrl.isNotEmpty)
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(2),
+                          child: Image.network(f.imagenUrl,
+                            width: 24, height: 24, fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) =>
+                              Text(f.emoji, style: const TextStyle(fontSize: 14))))
+                      else
+                        Text(f.emoji, style: const TextStyle(fontSize: 14)),
+                      const SizedBox(width: 4),
+                      Text('${i + 1}', style: _pxS(6,
+                        i == 0 ? _ArcC.gold : _ArcC.fg3)),
+                    ]),
+                    const SizedBox(height: 4),
+                    Text(f.nombre, style: _pxS(4.5, _ArcC.fg),
+                      maxLines: 2, overflow: TextOverflow.ellipsis),
+                    const SizedBox(height: 2),
+                    Text(f.barrio, style: _pxS(4, _ArcC.cyan),
+                      maxLines: 1, overflow: TextOverflow.ellipsis),
+                    const Spacer(),
+                    Text(f.powerScore.toStringAsFixed(1),
+                      style: _pxS(7, _ArcC.gold)),
+                  ])));
+          })),
+    ]),
+      // ── Card flotante restaurante seleccionado ──────────────────────────────
+      if (_fighterSeleccionado != null)
+        Positioned(
+          bottom: 16, left: 12, right: 12,
+          child: GestureDetector(
+            onTap: () {
+              final idx = _fighterSeleccionadoIdx!;
+              setState(() { _fighterSeleccionado = null; _fighterSeleccionadoIdx = null; });
+              _irAFighter(idx);
+            },
+            child: Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: _ArcC.panel,
+                border: Border.all(color: _ArcC.gold.withOpacity(0.5)),
+                borderRadius: BorderRadius.circular(4)),
+              child: Row(children: [
+                // Imagen o emoji
+                if (_fighterSeleccionado!.imagenUrl.isNotEmpty)
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(3),
+                    child: Image.network(
+                      _fighterSeleccionado!.imagenUrl,
+                      width: 56, height: 56, fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) =>
+                        SizedBox(width: 56, height: 56,
+                          child: Center(child: Text(_fighterSeleccionado!.emoji,
+                            style: const TextStyle(fontSize: 28))))))
+                else
+                  SizedBox(width: 56, height: 56,
+                    child: Center(child: Text(_fighterSeleccionado!.emoji,
+                      style: const TextStyle(fontSize: 28)))),
+                const SizedBox(width: 12),
+                Expanded(child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(_fighterSeleccionado!.restaurante,
+                      style: _pxS(7, _ArcC.gold)),
+                    const SizedBox(height: 2),
+                    Text(_fighterSeleccionado!.nombre,
+                      style: _pxS(5.5, _ArcC.fg),
+                      maxLines: 1, overflow: TextOverflow.ellipsis),
+                    const SizedBox(height: 4),
+                    Row(children: [
+                      Text('⚡ ${_fighterSeleccionado!.powerScore.toStringAsFixed(1)}',
+                        style: _pxS(5.5, _ArcC.cyan)),
+                      const SizedBox(width: 8),
+                      Text(_fighterSeleccionado!.barrio,
+                        style: _pxS(5, _ArcC.fg3)),
+                    ]),
+                  ])),
+                const SizedBox(width: 8),
+                const Icon(Icons.chevron_right_rounded, color: _ArcC.gold, size: 20),
+                GestureDetector(
+                  onTap: () => setState(() {
+                    _fighterSeleccionado = null;
+                    _fighterSeleccionadoIdx = null;
+                  }),
+                  child: const Icon(Icons.close_rounded,
+                    color: _ArcC.fg3, size: 18)),
+              ])))),
+    ]);
+  }
+
+  // ══ TAB XP ═══════════════════════════════════════════════════════════════════
+  Widget _buildTabXP() {
+    return ListView(padding: const EdgeInsets.only(bottom: 80), children: [
+      Padding(
+        padding: const EdgeInsets.fromLTRB(14, 12, 14, 6),
+        child: Text('⭐ GUÍA DE XP', style: _pxS(10, _ArcC.gold))),
+      Container(
+        margin: const EdgeInsets.fromLTRB(14, 0, 14, 10),
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: _ArcC.panel,
+          border: Border.all(color: _ArcC.red.withOpacity(0.25))),
+        child: Column(children: [
+          Text('⚔ CÓMO GANAR XP', style: _pxS(7, _ArcC.red)),
+          const SizedBox(height: 10),
+          ..._xpGuia.map((xp) => Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            child: Row(children: [
+              Text(xp.$1, style: const TextStyle(fontSize: 20)),
+              const SizedBox(width: 10),
+              Expanded(child: Text(xp.$2,
+                style: const TextStyle(fontSize: 13, color: _ArcC.fg2,
+                  decoration: TextDecoration.none, height: 1.4))),
+              Text(xp.$3, style: _pxS(9, _ArcC.green)),
+            ]))),
+        ])),
+      // Reglas de batalla
+      Container(
+        margin: const EdgeInsets.fromLTRB(14, 0, 14, 10),
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: _ArcC.panel,
+          border: Border.all(color: _ArcC.gold.withOpacity(0.2))),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text('⚔ REGLAS DE LA BATALLA', style: _pxS(6, _ArcC.gold)),
+          const SizedBox(height: 10),
+          _regla('1', 'GPS obligatorio — debes estar en el restaurante para votar'),
+          _regla('2', 'Un voto por restaurante — no puedes repetir'),
+          _regla('3', 'Califica las 3 dimensiones: presentación, sabor y originalidad'),
+          _regla('4', 'La foto es opcional pero suma +100 XP adicionales'),
+          _regla('5', 'El PowerScore final = promedio ponderado de todos los votos'),
+        ])),
+      _buildLegal(),
+    ]);
+  }
+
+  Widget _regla(String num, String texto) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Container(
+          width: 24, height: 24,
+          color: _ArcC.red.withOpacity(0.2),
+          child: Center(child: Text(num, style: _pxS(7, _ArcC.red)))),
+        const SizedBox(width: 10),
+        Expanded(child: Text(texto,
+          style: const TextStyle(fontSize: 13, color: _ArcC.fg2,
+            height: 1.5, decoration: TextDecoration.none))),
+      ]));
+  }
+
+  // ── Legal footer ──────────────────────────────────────────────────────────
+  Widget _buildLegal() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 8),
+      child: Text(
+        'DNDA 1-2025-110420 · CRÉAME ALCALDÍA DE MEDELLÍN\n'
+        'PARTICIPANTE BTIF 2026 · RUTERO MDE®',
+        style: _pxS(4.5, _ArcC.fg3), textAlign: TextAlign.center));
+  }
+
+  String _fmt(int n) {
+    if (n >= 1000) return '${(n / 1000).toStringAsFixed(1)}K';
+    return '$n';
+  }
+}
+
+// ── Painter: scanlines overlay ────────────────────────────────────────────────
+class _ScanlinesPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = Colors.black.withOpacity(0.06)
+      ..strokeWidth = 1;
+    for (double y = 0; y < size.height; y += 3) {
+      canvas.drawLine(Offset(0, y), Offset(size.width, y), paint);
+    }
+  }
+  @override bool shouldRepaint(_) => false;
+}
+
+// ── Painter: mapa arcade con pins ─────────────────────────────────────────────
+class _SushiMapaPainter extends CustomPainter {
+  final List<_SushiFighter> fighters;
+  _SushiMapaPainter(this.fighters);
+
+  // Posiciones normalizadas (0..1) para ~15 restaurantes en Medellín
+  static const _positions = [
+    (0.75, 0.74), // 0 El Poblado
+    (0.23, 0.46), // 1 Laureles
+    (0.33, 0.52), // 2 Estadio
+    (0.82, 0.88), // 3 Envigado
+    (0.67, 0.63), // 4 Poblado norte
+    (0.28, 0.60), // 5 Laureles sur
+    (0.57, 0.54), // 6 Centro
+    (0.21, 0.79), // 7 Belén
+    (0.63, 0.94), // 8 Sabaneta
+    (0.66, 0.24), // 9 Aranjuez
+    (0.14, 0.31), // 10 Robledo
+    (0.39, 0.80), // 11 Belén sur
+    (0.76, 0.46), // 12 Boston
+    (0.44, 0.37), // 13 Aranjuez sur
+    (0.54, 0.40), // 14 Centro norte
+  ];
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    // Fondo
+    canvas.drawRect(Rect.fromLTWH(0, 0, size.width, size.height),
+      Paint()..color = const Color(0xFF0A0005));
+
+    // Grid
+    final gridPaint = Paint()
+      ..color = _ArcC.red.withOpacity(0.06)
+      ..strokeWidth = 0.5;
+    for (double x = 0; x < size.width; x += 20) {
+      canvas.drawLine(Offset(x, 0), Offset(x, size.height), gridPaint);
+    }
+    for (double y = 0; y < size.height; y += 20) {
+      canvas.drawLine(Offset(0, y), Offset(size.width, y), gridPaint);
+    }
+
+    // Ruta circuito (línea punteada)
+    if (fighters.length >= 2) {
+      final routePaint = Paint()
+        ..color = _ArcC.red.withOpacity(0.18)
+        ..strokeWidth = 1.5
+        ..style = PaintingStyle.stroke;
+      final path = Path();
+      for (int i = 0; i < fighters.length && i < _positions.length; i++) {
+        final pos = _positions[i];
+        final x = pos.$1 * size.width;
+        final y = pos.$2 * size.height;
+        if (i == 0) path.moveTo(x, y); else path.lineTo(x, y);
+      }
+      canvas.drawPath(path, routePaint);
+    }
+
+    // Pins
+    for (int i = 0; i < fighters.length && i < _positions.length; i++) {
+      final f = fighters[i];
+      final pos = _positions[i];
+      final cx = pos.$1 * size.width;
+      final cy = pos.$2 * size.height;
+      final r = f.esLider ? 14.0 : 11.0;
+
+      // Halo líder
+      if (f.esLider) {
+        canvas.drawCircle(Offset(cx, cy), r + 5,
+          Paint()..color = _ArcC.gold.withOpacity(0.12));
+      }
+
+      // Fondo pin
+      canvas.drawCircle(Offset(cx, cy), r,
+        Paint()..color = const Color(0xFF1A000A));
+
+      // Borde
+      final borderColor = f.esLider
+          ? _ArcC.gold
+          : f.subiendo
+              ? _ArcC.cyan.withOpacity(0.7)
+              : i < 3
+                  ? _ArcC.silver
+                  : Colors.white.withOpacity((0.2 - i * 0.01).clamp(0.05, 0.2));
+      canvas.drawCircle(Offset(cx, cy), r,
+        Paint()
+          ..color = borderColor
+          ..strokeWidth = f.esLider ? 2.5 : 2
+          ..style = PaintingStyle.stroke);
+
+      // Texto rango
+      final tp = TextPainter(
+        text: TextSpan(
+          text: f.esLider ? '👑' : '${i + 1}',
+          style: TextStyle(
+            fontSize: f.esLider ? 10 : 8,
+            color: i == 0 ? _ArcC.gold : i < 3 ? _ArcC.silver : Colors.white.withOpacity(0.5),
+            fontFamily: 'Press Start 2P')),
+        textDirection: TextDirection.ltr);
+      tp.layout();
+      tp.paint(canvas, Offset(cx - tp.width / 2, cy - tp.height / 2));
+    }
+  }
+
+  @override bool shouldRepaint(_SushiMapaPainter old) =>
+      old.fighters.length != fighters.length;
+}
+
+// ── Painter: mapa con coordenadas REALES de los fighters ─────────────────────
+class _SushiMapaPainterReal extends CustomPainter {
+  final List<_SushiFighter> fighters;
+  final double minLat, maxLat, minLng, maxLng;
+
+  const _SushiMapaPainterReal({
+    required this.fighters,
+    required this.minLat, required this.maxLat,
+    required this.minLng, required this.maxLng,
+  });
+
+  Offset _toCanvas(double lat, double lng, Size size) {
+    final padH = size.width  * 0.12;
+    final padV = size.height * 0.12;
+    final w = size.width  - padH * 2;
+    final h = size.height - padV * 2;
+    final latRange = (maxLat - minLat).abs() < 0.001 ? 0.05 : (maxLat - minLat);
+    final lngRange = (maxLng - minLng).abs() < 0.001 ? 0.05 : (maxLng - minLng);
+    final x = padH + ((lng - minLng) / lngRange) * w;
+    final y = padV + ((maxLat - lat) / latRange) * h; // invertir Y (Norte arriba)
+    return Offset(x, y);
+  }
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    // Fondo
+    canvas.drawRect(Rect.fromLTWH(0, 0, size.width, size.height),
+      Paint()..color = const Color(0xFF0A0005));
+    // Grid
+    final gp = Paint()..color = _ArcC.red.withOpacity(0.07)..strokeWidth = 0.5;
+    for (double x = 0; x < size.width; x += 20) {
+      canvas.drawLine(Offset(x, 0), Offset(x, size.height), gp);
+    }
+    for (double y = 0; y < size.height; y += 20) {
+      canvas.drawLine(Offset(0, y), Offset(size.width, y), gp);
+    }
+    // Ruta entre fighters
+    if (fighters.length >= 2) {
+      final routePaint = Paint()
+        ..color = _ArcC.red.withOpacity(0.22)
+        ..strokeWidth = 1.5
+        ..style = PaintingStyle.stroke;
+      final path = Path();
+      final first = _toCanvas(fighters[0].lat, fighters[0].lng, size);
+      path.moveTo(first.dx, first.dy);
+      for (int i = 1; i < fighters.length; i++) {
+        final pt = _toCanvas(fighters[i].lat, fighters[i].lng, size);
+        path.lineTo(pt.dx, pt.dy);
+      }
+      canvas.drawPath(path, routePaint);
+    }
+    // Pins de cada fighter
+    for (int i = 0; i < fighters.length; i++) {
+      final f = fighters[i];
+      final pt = _toCanvas(f.lat, f.lng, size);
+      final isLider = f.esLider || i == 0;
+      final pinColor = isLider ? _ArcC.gold : (f.subiendo ? _ArcC.cyan : _ArcC.red);
+      final r = isLider ? 7.0 : 5.0;
+      // Glow
+      canvas.drawCircle(pt, r + 4,
+        Paint()..color = pinColor.withOpacity(0.18));
+      // Círculo principal
+      canvas.drawCircle(pt, r,
+        Paint()..color = pinColor.withOpacity(0.9));
+      // Número
+      final tp = TextPainter(
+        text: TextSpan(text: '${i + 1}',
+          style: TextStyle(
+            fontSize: isLider ? 7.0 : 6.0,
+            color: Colors.black,
+            fontWeight: FontWeight.bold,
+            decoration: TextDecoration.none)),
+        textDirection: TextDirection.ltr,
+        textAlign: TextAlign.center);
+      tp.layout();
+      tp.paint(canvas, Offset(pt.dx - tp.width / 2, pt.dy - tp.height / 2));
+    }
+  }
+
+  @override bool shouldRepaint(_SushiMapaPainterReal old) =>
+      old.fighters.length != fighters.length;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  _SushiFighterDetalleScreen — pantalla de detalle de un rival (arcade)
+//  Abre desde ARENA o RANKING al tocar cualquier fighter
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _SushiFighterDetalleScreen extends StatefulWidget {
+  final _SushiFighter fighter;
+  final int rank;
+  final CircuitoFestival circuito;
+  const _SushiFighterDetalleScreen({
+    required this.fighter,
+    required this.rank,
+    required this.circuito,
+  });
+  @override
+  State<_SushiFighterDetalleScreen> createState() =>
+      _SushiFighterDetalleScreenState();
+}
+
+class _SushiFighterDetalleScreenState
+    extends State<_SushiFighterDetalleScreen>
+    with TickerProviderStateMixin {
+
+  late final AnimationController _blinkCtrl;
+  late final Animation<double> _blinkAnim;
+
+  int _starP = 0, _starS = 0, _starO = 0;
+  bool _votoEnviado = false;
+  bool _gpsConfirmado = false;
+  bool _gpsVerificando = false;
+  String? _gpsMensaje; // null = sin intentar, '' = ok, 'TEXTO' = error
+  File? _foto;
+
+  // ── Palabra secreta de consumo ────────────────────────────────────────────
+  final TextEditingController _palabraCtrl = TextEditingController();
+  bool _palabraValida = false;
+  bool _palabraVerificando = false;
+  String? _palabraMensaje; // null = sin intentar, '' = ok, 'TEXTO' = error
+  String _palabraIngresada = '';
+
+  // ── Tips expandibles ──────────────────────────────────────────────────────
+  bool _tipsExpandido = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _blinkCtrl = AnimationController(
+      vsync: this, duration: const Duration(milliseconds: 700))
+      ..repeat(reverse: true);
+    _blinkAnim = CurvedAnimation(parent: _blinkCtrl, curve: Curves.easeInOut);
+  }
+
+  @override
+  void dispose() {
+    _blinkCtrl.dispose();
+    _palabraCtrl.dispose();
+    super.dispose();
+  }
+
+  _SushiFighter get f => widget.fighter;
+
+  /// Verifica la palabra secreta contra la PARADA específica en Firestore.
+  /// Cada restaurante tiene su propia palabraActual (generada on-demand por el mesero).
+  /// Si la parada no tiene palabra configurada aún → modo permisivo.
+  Future<void> _verificarPalabra() async {
+    final ingresada = _palabraCtrl.text.trim().toUpperCase();
+    if (ingresada.isEmpty) return;
+    setState(() { _palabraVerificando = true; _palabraMensaje = null; });
+    try {
+      // ── Leer fechas del evento global ─────────────────────────────────────
+      final eventoDoc = await FirebaseFirestore.instance
+          .collection('circuitos_festivales')
+          .doc(widget.circuito.id)
+          .get();
+
+      final eventoData = eventoDoc.data();
+      if (!eventoDoc.exists || eventoData == null || !mounted) {
+        setState(() {
+          _palabraVerificando = false;
+          _palabraMensaje = 'No se pudo verificar · intenta de nuevo';
+        });
+        return;
+      }
+
+      final fechaFin   = (eventoData['fechaFin'] as Timestamp?)?.toDate();
+
+      // ── Hard stop: evento cerrado ─────────────────────────────────────────
+      if (fechaFin != null && DateTime.now().isAfter(fechaFin)) {
+        setState(() {
+          _palabraVerificando = false;
+          _palabraMensaje = '⏰ EVENTO CERRADO · el periodo de votación terminó';
+        });
+        return;
+      }
+
+      // ── Leer palabraActual de esta PARADA específica ──────────────────────
+      final paradaDoc = await FirebaseFirestore.instance
+          .collection('circuitos_festivales')
+          .doc(widget.circuito.id)
+          .collection('paradas')
+          .doc(widget.fighter.id)
+          .get();
+
+      final paradaData = paradaDoc.data();
+      if (!paradaDoc.exists || paradaData == null || !mounted) {
+        setState(() {
+          _palabraVerificando = false;
+          _palabraMensaje = 'No se pudo verificar · intenta de nuevo';
+        });
+        return;
+      }
+
+      final palabraReal = (paradaData['palabraActual'] as String? ?? '').toUpperCase().trim();
+
+      // Si la parada aún no tiene palabra configurada → modo permisivo (solo GPS)
+      if (palabraReal.isEmpty) {
+        setState(() {
+          _palabraValida    = true;
+          _palabraIngresada = ingresada;
+          _palabraVerificando = false;
+          _palabraMensaje   = '';
+        });
+        return;
+      }
+
+      if (ingresada == palabraReal) {
+        setState(() {
+          _palabraValida    = true;
+          _palabraIngresada = ingresada;
+          _palabraVerificando = false;
+          _palabraMensaje   = '';
+        });
+      } else {
+        setState(() {
+          _palabraVerificando = false;
+          _palabraMensaje = '❌ CÓDIGO INCORRECTO · pídelo al equipo del restaurante';
+        });
+      }
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _palabraVerificando = false;
+        _palabraMensaje = 'Error de conexión · intenta de nuevo';
+      });
+    }
+  }
+
+  Future<void> _verificarGPS() async {
+    setState(() { _gpsVerificando = true; _gpsMensaje = null; });
+    try {
+      // 1 — permisos
+      var perm = await Geolocator.checkPermission();
+      if (perm == LocationPermission.denied) {
+        perm = await Geolocator.requestPermission();
+      }
+      if (perm == LocationPermission.denied ||
+          perm == LocationPermission.deniedForever) {
+        if (!mounted) return;
+        setState(() {
+          _gpsVerificando = false;
+          _gpsMensaje = 'Permiso GPS denegado · actívalo en ajustes';
+        });
+        return;
+      }
+      // 2 — posición actual
+      final pos = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high,
+        timeLimit: const Duration(seconds: 15));
+      if (!mounted) return;
+      // 3 — distancia al restaurante (en metros)
+      final distM = Geolocator.distanceBetween(
+        pos.latitude, pos.longitude, f.lat, f.lng);
+      const radioPermitidoM = 100.0; // 100m — dentro del restaurante
+      // Admin bypass: en modo demo el admin puede validar desde cualquier distancia
+      final bool adminBypass = esAdmin;
+      if (distM <= radioPermitidoM || adminBypass) {
+        setState(() {
+          _gpsConfirmado = true;
+          _gpsVerificando = false;
+          _gpsMensaje = '';
+          _gpsUltimaLat = pos.latitude;
+          _gpsUltimaLng = pos.longitude;
+        });
+      } else {
+        final distTxt = distM >= 1000
+          ? '${(distM / 1000).toStringAsFixed(1)} km'
+          : '${distM.round()} m';
+        setState(() {
+          _gpsVerificando = false;
+          _gpsMensaje = 'Estás a $distTxt del restaurante · acércate más';
+        });
+      }
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _gpsVerificando = false;
+        _gpsMensaje = 'No se pudo obtener GPS · intenta de nuevo';
+      });
+    }
+  }
+
+  Future<void> _tomarFoto() async {
+    try {
+      await SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
+      final picker = ImagePicker();
+      final raw = await picker.pickImage(
+        source: ImageSource.camera,
+        imageQuality: 85, maxWidth: 1080, maxHeight: 1920,
+        preferredCameraDevice: CameraDevice.rear);
+      await SystemChrome.setPreferredOrientations([
+        DeviceOrientation.portraitUp,
+        DeviceOrientation.landscapeLeft,
+        DeviceOrientation.landscapeRight]);
+      if (raw == null || !mounted) return;
+
+      // Mostrar snack de procesamiento mientras se aplica la marca de agua
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          backgroundColor: Color(0xFF1A1A2E),
+          duration: Duration(seconds: 5),
+          content: Row(children: [
+            SizedBox(width: 18, height: 18,
+              child: CircularProgressIndicator(
+                color: Color(0xFF00FFDD), strokeWidth: 2)),
+            SizedBox(width: 12),
+            Text('Aplicando marca de agua…',
+              style: TextStyle(color: Colors.white, fontSize: 13)),
+          ])));
+      }
+
+      final compuesta = await _componerFotoSushi(File(raw.path), f);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).hideCurrentSnackBar();
+        setState(() => _foto = compuesta ?? File(raw.path));
+      }
+    } catch (_) {
+      await SystemChrome.setPreferredOrientations([
+        DeviceOrientation.portraitUp,
+        DeviceOrientation.landscapeLeft,
+        DeviceOrientation.landscapeRight]);
+    }
+  }
+
+  Future<File?> _componerFotoSushi(File foto, _SushiFighter fighter) async {
+    try {
+      final fotoBytes = await foto.readAsBytes();
+      final fotoImg = await decodeImageFromList(fotoBytes);
+
+      // Mismo logo badge que el circuito Rock
+      final logoData = await rootBundle.load('assets/images/logo_rutero_badge.png');
+      final logoImg = await decodeImageFromList(logoData.buffer.asUint8List());
+
+      final recorder = ui.PictureRecorder();
+      final canvas = Canvas(recorder);
+      final w = fotoImg.width.toDouble();
+      final h = fotoImg.height.toDouble();
+      final escala = w / 1080;
+
+      // Foto de fondo
+      canvas.drawImage(fotoImg, Offset.zero, Paint());
+
+      // Marco inferior (20% de la altura)
+      final marcoH = h * 0.20;
+
+      // Gradiente suave de transición
+      final gradPaint = Paint()
+        ..shader = const LinearGradient(
+          begin: Alignment.topCenter, end: Alignment.bottomCenter,
+          colors: [Colors.transparent, Color(0xF0080810)],
+        ).createShader(Rect.fromLTWH(0, h - marcoH - 60 * escala, w, 60 * escala));
+      canvas.drawRect(
+        Rect.fromLTWH(0, h - marcoH - 60 * escala, w, 60 * escala), gradPaint);
+
+      // Fondo sólido del marco
+      canvas.drawRect(
+        Rect.fromLTWH(0, h - marcoH, w, marcoH),
+        Paint()..color = const Color(0xF2080810));
+
+      // Logo — esquina inferior izquierda, centrado verticalmente en el marco
+      final logoH = marcoH * 0.65;
+      final logoW = logoImg.width * (logoH / logoImg.height);
+      final logoY = h - marcoH + (marcoH - logoH) / 2;
+      canvas.drawImageRect(
+        logoImg,
+        Rect.fromLTWH(0, 0, logoImg.width.toDouble(), logoImg.height.toDouble()),
+        Rect.fromLTWH(20 * escala, logoY, logoW, logoH),
+        Paint());
+
+      // Separador vertical dorado tenue
+      canvas.drawLine(
+        Offset(logoW + 36 * escala, h - marcoH + 14 * escala),
+        Offset(logoW + 36 * escala, h - 14 * escala),
+        Paint()
+          ..color = const Color(0xFFFFD700).withOpacity(0.4)
+          ..strokeWidth = 1.5 * escala);
+
+      final textX = logoW + 52 * escala;
+
+      // Línea 1 — nombre del restaurante (blanco, grande)
+      final tpNombre = TextPainter(
+        text: TextSpan(
+          text: '${fighter.emoji} ${fighter.restaurante}',
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: 52 * escala,
+            fontWeight: FontWeight.w800,
+            decoration: TextDecoration.none)),
+        textDirection: TextDirection.ltr,
+        maxLines: 1, ellipsis: '...');
+      tpNombre.layout(maxWidth: w - textX - 20 * escala);
+      tpNombre.paint(canvas, Offset(textX, h - marcoH + marcoH * 0.10));
+
+      // Línea 2 — circuito (dorado)
+      final tpCircuito = TextPainter(
+        text: TextSpan(
+          text: 'Batalla de Sushi MDE · ${fighter.barrio}',
+          style: TextStyle(
+            color: const Color(0xFFFFD700).withOpacity(0.90),
+            fontSize: 34 * escala,
+            fontWeight: FontWeight.w600,
+            decoration: TextDecoration.none)),
+        textDirection: TextDirection.ltr,
+        maxLines: 1, ellipsis: '...');
+      tpCircuito.layout(maxWidth: w - textX - 20 * escala);
+      tpCircuito.paint(canvas, Offset(textX, h - marcoH + marcoH * 0.47));
+
+      // Línea 3 — fecha (tenue)
+      final hoy = DateTime.now();
+      final fechaStr = '${hoy.day}/${hoy.month}/${hoy.year}';
+      final tpFecha = TextPainter(
+        text: TextSpan(
+          text: fechaStr,
+          style: TextStyle(
+            color: Colors.white.withOpacity(0.55),
+            fontSize: 26 * escala,
+            decoration: TextDecoration.none)),
+        textDirection: TextDirection.ltr);
+      tpFecha.layout();
+      tpFecha.paint(canvas, Offset(textX, h - marcoH + marcoH * 0.73));
+
+      // Exportar imagen compuesta
+      final img = await recorder.endRecording().toImage(fotoImg.width, fotoImg.height);
+      final byteData = await img.toByteData(format: ui.ImageByteFormat.png);
+      final composedBytes = byteData!.buffer.asUint8List();
+
+      // Guardar en documentos persistentes (no directorio temporal)
+      final dir = await getApplicationDocumentsDirectory();
+      final ruteroDir = Directory('${dir.path}/RuteroMDE');
+      if (!await ruteroDir.exists()) await ruteroDir.create(recursive: true);
+      final ts = DateTime.now().millisecondsSinceEpoch;
+      final archivo = File('${ruteroDir.path}/sushi_$ts.png');
+      await archivo.writeAsBytes(composedBytes);
+
+      // Guardar en galería del celular (álbum Rutero MDE)
+      bool guardadaEnGaleria = false;
+      try {
+        final tieneAcceso = await Gal.hasAccess(toAlbum: true);
+        if (!tieneAcceso) await Gal.requestAccess(toAlbum: true);
+        await Gal.putImage(archivo.path, album: 'Rutero MDE');
+        guardadaEnGaleria = true;
+        debugPrint('✅ Foto Sushi guardada en galería: ${archivo.path}');
+      } catch (galError) {
+        debugPrint('⚠️ Gal.putImage Sushi falló: $galError');
+      }
+
+      // Feedback al usuario
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          backgroundColor: guardadaEnGaleria
+            ? const Color(0xFF1A6B2F)
+            : const Color(0xFF8B4513),
+          duration: const Duration(seconds: 3),
+          content: Text(
+            guardadaEnGaleria
+              ? '📸 Foto guardada en álbum "Rutero MDE" con marca de agua'
+              : '📸 Foto lista (no se pudo guardar en galería — revisa permisos)',
+            style: const TextStyle(color: Colors.white, fontSize: 13))));
+      }
+
+      return archivo;
+    } catch (e) {
+      debugPrint('❌ Error componiendo foto sushi: $e');
+      return null;
+    }
+  }
+
+  Future<void> _compartir() async {
+    final foto = _foto;
+    if (foto == null || !mounted) return;
+    final tags = _hashtagsPorContexto('sushi', restaurante: f.restaurante, barrio: f.barrio);
+    final texto = [
+      '⚔ ¡Voté en la Batalla de Sushi MDE 2027! ⚔',
+      '🍣 ${f.emoji} ${f.restaurante} · ${f.barrio}',
+      '',
+      tags,
+      '',
+      '📲 Descarga Rutero MDE y vota: rutero-mde.web.app',
+    ].join('\n');
+    await showModalBottomSheet(
+      context: context,
+      backgroundColor: _ArcC.bg2,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(12)),
+        side: BorderSide(color: _ArcC.cyan, width: 1)),
+      builder: (ctx) => Padding(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          Container(width: 36, height: 3,
+            decoration: BoxDecoration(
+              color: _ArcC.fg3, borderRadius: BorderRadius.circular(2))),
+          const SizedBox(height: 14),
+          Text('📤 COMPARTIR EN REDES', style: _pxS(7, _ArcC.gold)),
+          const SizedBox(height: 10),
+          Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(4),
+              child: Image.file(foto, width: 72, height: 72, fit: BoxFit.cover)),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: _ArcC.panel,
+                  border: Border.all(color: _ArcC.fg3.withOpacity(0.4))),
+                child: Text(texto,
+                  style: const TextStyle(
+                    fontSize: 10, color: _ArcC.fg2,
+                    decoration: TextDecoration.none, height: 1.5)))),
+          ]),
+          const SizedBox(height: 14),
+          Wrap(spacing: 6, runSpacing: 6, children: [
+            'SushiMDE', 'BatallaDeSushiMDE', 'RuteroMDE', 'Medellín',
+          ].map((h) => Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              color: _ArcC.cyan.withOpacity(0.1),
+              border: Border.all(color: _ArcC.cyan.withOpacity(0.5)),
+              borderRadius: BorderRadius.circular(4)),
+            child: Text(h, style: _pxS(4.5, _ArcC.cyan)),
+          )).toList()),
+          const SizedBox(height: 16),
+          GestureDetector(
+            onTap: () async {
+              Navigator.pop(ctx);
+              await Share.shareXFiles(
+                [XFile(foto.path)],
+                text: texto,
+                subject: '⚔ Batalla de Sushi MDE 2027');
+            },
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 14),
+              decoration: BoxDecoration(
+                color: _ArcC.red,
+                border: Border.all(color: _ArcC.gold, width: 2)),
+              child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                const Icon(Icons.share_rounded, color: _ArcC.gold, size: 16),
+                const SizedBox(width: 8),
+                Text('ABRIR REDES SOCIALES · +50 XP', style: _pxS(6, _ArcC.gold)),
+              ]))),
+        ])));
+  }
+
+  Future<void> _votar() async {
+    // ── Validaciones en cliente (doble seguridad) ─────────────────────────
+    // En modo demo se saltan GPS, código y foto — solo las estrellas son requeridas.
+    if (!kModoDemo && !_gpsConfirmado) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        backgroundColor: _ArcC.red,
+        content: Text('📍 PASO 1: verifica tu ubicación GPS primero',
+          style: _pxS(6, _ArcC.gold)),
+        duration: const Duration(seconds: 3)));
+      return;
+    }
+    if (!kModoDemo && !_palabraValida) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        backgroundColor: _ArcC.red,
+        content: Text('🔑 PASO 2: ingresa el código del restaurante',
+          style: _pxS(6, _ArcC.gold)),
+        duration: const Duration(seconds: 3)));
+      return;
+    }
+    if (_starP == 0 || _starS == 0 || _starO == 0) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        backgroundColor: _ArcC.red,
+        content: Text('⚔ PASO 3: califica las 3 dimensiones del plato',
+          style: _pxS(6, _ArcC.gold)),
+        duration: const Duration(seconds: 2)));
+      return;
+    }
+    if (!kModoDemo && _foto == null) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        backgroundColor: _ArcC.red,
+        content: Text('📸 PASO 4: capturá tu experiencia en el lugar · +100 XP',
+          style: _pxS(6, _ArcC.gold)),
+        duration: const Duration(seconds: 2)));
+      await _tomarFoto();
+      return;
+    }
+    setState(() => _votoEnviado = true);
+
+    try {
+      // ── 1. Subir foto a Storage ──────────────────────────────────────────
+      // Sube la foto CON marca de agua (_foto ya viene de _componerFotoSushi)
+      String? fotoVotoUrl;    // ruta en votos_sushi/ (para la CF)
+      String? fotoPerfilUrl;  // ruta en fotos_usuarios/ (para Mis Fotos)
+      final userId = FirebaseAuth.instance.currentUser?.uid ?? 'anon';
+      try {
+        final ts = DateTime.now().millisecondsSinceEpoch;
+        // Subir a votos_sushi/ para la CF
+        final refVoto = FirebaseStorage.instance
+            .ref('votos_sushi/${f.id}/${userId}_$ts.jpg');
+        await refVoto.putFile(_foto!);
+        fotoVotoUrl = await refVoto.getDownloadURL();
+        // Subir también a fotos_usuarios/ para que aparezca en Mis Fotos
+        final refPerfil = FirebaseStorage.instance
+            .ref('fotos_usuarios/$userId/sushi_$ts.jpg');
+        await refPerfil.putFile(_foto!);
+        fotoPerfilUrl = await refPerfil.getDownloadURL();
+      } catch (e) {
+        debugPrint('⚠️ Error subiendo foto de voto: $e');
+      }
+
+      // ── 2. Llamar Cloud Function votarSushi ──────────────────────────────
+      final myUid = FirebaseAuth.instance.currentUser?.uid ?? 'anon';
+      debugPrint('🔑 UID actual para adminsUids en Firestore: $myUid');
+      debugPrint('🧪 kModoDemo=$kModoDemo esAdmin=$esAdmin GPS=($_gpsUltimaLat,$_gpsUltimaLng)');
+      final callable = FirebaseFunctions.instanceFor(region: 'us-central1')
+          .httpsCallable('votarSushi');
+      final result = await callable.call({
+        'restauranteId': f.id,
+        'paradaId':      f.id,   // ← mismo ID: la parada ES el restaurante en sushi
+        'palabraSecreta': _palabraIngresada,
+        'calificacion': {
+          'presentacion': _starP,
+          'sabor': _starS,
+          'originalidad': _starO,
+        },
+        'gpsLat': _gpsUltimaLat,
+        'gpsLng': _gpsUltimaLng,
+        'fotoVotoUrl': fotoVotoUrl ?? '',
+        if (kModoDemo || esAdmin) 'esDemo': true,
+      });
+
+      if (!mounted) return;
+
+      final codigo = result.data?['codigo'] as String? ?? 'OK';
+      final xpGanado = result.data?['xp'] as int? ?? 150;
+
+      if (codigo == 'EVENTO_CERRADO') {
+        setState(() => _votoEnviado = false);
+        _mostrarError('⏰ EVENTO CERRADO',
+          'El periodo de votación ya terminó. Los votos solo son válidos dentro de las fechas del evento.');
+        return;
+      }
+      if (codigo == 'VOTO_DUPLICADO') {
+        setState(() => _votoEnviado = false);
+        _mostrarError('⚔ YA VOTASTE AQUÍ',
+          'Solo se permite un voto por restaurante. Tu voto anterior sigue contando.');
+        return;
+      }
+      if (codigo == 'PALABRA_INVALIDA') {
+        setState(() => _votoEnviado = false);
+        _mostrarError('🔑 CÓDIGO INCORRECTO',
+          'El código del restaurante no coincide. Pídelo nuevamente al equipo del restaurante.');
+        return;
+      }
+      if (codigo == 'GPS_REQUERIDO') {
+        setState(() => _votoEnviado = false);
+        _mostrarError('📍 GPS REQUERIDO',
+          'Debes tener el GPS activo para votar. Actívalo y vuelve a intentarlo.');
+        return;
+      }
+      if (codigo == 'FUERA_DE_RANGO') {
+        setState(() => _votoEnviado = false);
+        final dist = result.data?['distanciaMetros'] as int?;
+        final distMsg = dist != null ? ' (estás a ${dist}m del restaurante)' : '';
+        _mostrarError('📍 ESTÁS LEJOS DEL RESTAURANTE',
+          'Debes estar físicamente en el restaurante para votar$distMsg. Los votos a distancia no son válidos.');
+        return;
+      }
+
+      // ── 3. Registrar foto en colección fotos (para MisFotosScreen) ─────────
+      // Usa fotoPerfilUrl (fotos_usuarios/) para que Mis Fotos la muestre
+      // La foto ya tiene marca de agua (viene de _componerFotoSushi)
+      final uid = FirebaseAuth.instance.currentUser?.uid;
+      if (uid != null && _foto != null) {
+        FirebaseFirestore.instance
+          .collection('usuarios').doc(uid).collection('fotos')
+          .add({
+            'sitio':      f.restaurante,
+            'ruta':       'Batalla de Sushi MDE',
+            'emoji':      f.emoji,
+            'rutaEmoji':  '🍣',
+            'acento':     const Color(0xFF00FFDD).value,
+            'fecha':      FieldValue.serverTimestamp(),
+            'localPath':  _foto!.path,
+            'storageUrl': fotoPerfilUrl ?? fotoVotoUrl ?? '',
+          }).catchError((e) => debugPrint('⚠️ fotos sushi Firestore: $e'));
+      }
+
+      // ── 4. Éxito — mostrar pantalla de XP ───────────────────────────────
+      if (!mounted) return;
+      await _mostrarExitoVoto(xpGanado);
+      if (mounted) Navigator.pop(context);
+
+    } on FirebaseFunctionsException catch (e) {
+      if (!mounted) return;
+      setState(() => _votoEnviado = false);
+      final msg = e.code == 'failed-precondition'
+          ? e.message ?? 'No se pudo registrar el voto'
+          : 'Error al enviar voto · revisa tu conexión';
+      _mostrarError('ERROR ⚔', msg);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _votoEnviado = false);
+      _mostrarError('ERROR DE CONEXIÓN',
+        'No se pudo enviar tu voto. Verifica tu internet e intenta de nuevo.');
+    }
+  }
+
+  // GPS coords guardadas al verificar (para enviar a CF)
+  double _gpsUltimaLat = 0;
+  double _gpsUltimaLng = 0;
+
+  void _mostrarError(String titulo, String mensaje) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: _ArcC.bg2,
+        shape: const RoundedRectangleBorder(
+          side: BorderSide(color: _ArcC.red, width: 2),
+          borderRadius: BorderRadius.zero),
+        title: Text(titulo, style: _pxS(8, _ArcC.red)),
+        content: Text(mensaje,
+          style: const TextStyle(fontSize: 14, color: _ArcC.fg,
+            decoration: TextDecoration.none, height: 1.5)),
+        actions: [
+          GestureDetector(
+            onTap: () => Navigator.pop(ctx),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+              color: _ArcC.red,
+              child: Text('OK', style: _pxS(7, _ArcC.gold)))),
+        ]));
+  }
+
+  Future<void> _mostrarExitoVoto(int xp) async {
+    await showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: _ArcC.bg2,
+        shape: const RoundedRectangleBorder(
+          side: BorderSide(color: _ArcC.gold, width: 2),
+          borderRadius: BorderRadius.zero),
+        content: Column(mainAxisSize: MainAxisSize.min, children: [
+          const Text('⚔', style: TextStyle(fontSize: 48)),
+          const SizedBox(height: 10),
+          Text('¡VOTO REGISTRADO!', style: _pxS(10, _ArcC.gold),
+            textAlign: TextAlign.center),
+          const SizedBox(height: 8),
+          Text('${f.emoji} ${f.restaurante}', style: _pxS(7, _ArcC.cyan),
+            textAlign: TextAlign.center),
+          const SizedBox(height: 14),
+          Container(
+            padding: const EdgeInsets.symmetric(vertical: 12),
+            decoration: const BoxDecoration(
+              border: Border(top: BorderSide(color: _ArcC.gold, width: 1),
+                            bottom: BorderSide(color: _ArcC.gold, width: 1))),
+            child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+              Text('+$xp', style: _pxS(22, _ArcC.gold)),
+              const SizedBox(width: 8),
+              Text('XP', style: _pxS(10, _ArcC.fg3)),
+            ])),
+          const SizedBox(height: 10),
+          Text('Tu opinión cuenta en la\nBatalla de Sushi MDE 2027',
+            style: _pxS(5.5, _ArcC.fg2), textAlign: TextAlign.center),
+          const SizedBox(height: 14),
+          GestureDetector(
+            onTap: () => Navigator.pop(ctx),
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              color: _ArcC.red,
+              child: Text('⚔ VOLVER A LA ARENA', style: _pxS(6.5, _ArcC.gold),
+                textAlign: TextAlign.center))),
+        ])));
+  }
+
+  Widget _statBar(String label, int value, LinearGradient gradient) {
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+        Text(label, style: _pxS(4.5, _ArcC.fg2)),
+        Text('$value', style: _pxS(4.5, _ArcC.fg2)),
+      ]),
+      const SizedBox(height: 3),
+      Container(
+        height: 7,
+        decoration: BoxDecoration(
+          color: Colors.black,
+          border: Border.all(color: _ArcC.red.withOpacity(0.15))),
+        child: FractionallySizedBox(
+          widthFactor: value / 100.0,
+          alignment: Alignment.centerLeft,
+          child: Container(decoration: BoxDecoration(gradient: gradient)))),
+    ]);
+  }
+
+  Widget _starRow(String label, int val, void Function(int) onSet) {
+    return Row(children: [
+      Expanded(child: Text(label, style: _pxS(5, _ArcC.fg2))),
+      Row(children: List.generate(5, (i) => GestureDetector(
+        onTap: () => onSet(i + 1),
+        child: Padding(
+          padding: const EdgeInsets.only(right: 6),
+          child: Text('⭐', style: TextStyle(
+            fontSize: 22,
+            color: i < val ? Colors.white : Colors.white.withOpacity(0.2)))))),
+    )]);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final rank = widget.rank;
+    final fotoLista = kModoDemo || _foto != null;
+    final calificacionLista = _starP > 0 && _starS > 0 && _starO > 0;
+    final votoListo = (kModoDemo || (_gpsConfirmado && _palabraValida)) && calificacionLista && fotoLista;
+
+    return Scaffold(
+      backgroundColor: _ArcC.bg,
+      body: Stack(children: [
+        Positioned.fill(child: IgnorePointer(child: CustomPaint(
+          painter: _ScanlinesPainter()))),
+        SafeArea(
+          child: ListView(padding: const EdgeInsets.only(bottom: 90), children: [
+            // ── Barra superior con rank y nombre ──
+            Stack(children: [
+              Container(
+                color: _ArcC.bg2,
+                padding: const EdgeInsets.fromLTRB(50, 10, 14, 10),
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text('#$rank ${rank == 1 ? "★ LÍDER DE LA BATALLA ★" : ""}',
+                    style: _pxS(5, rank == 1 ? _ArcC.gold : _ArcC.red)),
+                  const SizedBox(height: 4),
+                  Text(f.nombre, style: _pxS(10, _ArcC.gold),
+                    maxLines: 2, overflow: TextOverflow.ellipsis),
+                  Text('${f.restaurante} · ${f.barrio}', style: _pxS(5, _ArcC.cyan)),
+                ])),
+              // ── Botón admin: solo visible para administradores ──────────────
+              if (esAdmin)
+                Positioned(
+                  top: 6, right: 6,
+                  child: GestureDetector(
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => _SushiAdminParadaScreen(
+                        paradaId: f.id,
+                        restauranteNombre: f.restaurante,
+                        circuitoId: widget.circuito.id,
+                      ))),
+                    child: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF9B59B6).withOpacity(0.85),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: _ArcC.gold.withOpacity(0.5))),
+                      child: const Text('⚙', style: TextStyle(fontSize: 16))))),
+            ]),
+            // Línea roja/dorada
+            Container(height: 3,
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(colors: [_ArcC.red, _ArcC.gold, _ArcC.red]))),
+            // ── Portrait + Power Score ──
+            Container(
+              margin: const EdgeInsets.fromLTRB(14, 14, 14, 0),
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: _ArcC.bg2,
+                border: Border.all(
+                  color: rank == 1 ? _ArcC.gold : _ArcC.red.withOpacity(0.4)),
+                boxShadow: rank == 1
+                  ? [BoxShadow(color: _ArcC.gold.withOpacity(0.1), blurRadius: 16)]
+                  : null),
+              child: Row(children: [
+                FadeTransition(
+                  opacity: rank == 1 ? _blinkAnim : const AlwaysStoppedAnimation(1.0),
+                  child: f.imagenUrl.isNotEmpty
+                    ? ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: Image.network(f.imagenUrl,
+                          width: 80, height: 80, fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) =>
+                            Text(f.emoji, style: const TextStyle(fontSize: 56))))
+                    : Text(f.emoji, style: const TextStyle(fontSize: 56))),
+                const SizedBox(width: 16),
+                Expanded(child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Row(children: [
+                    Text(f.powerScore.toStringAsFixed(1),
+                      style: _pxS(22, _ArcC.gold)),
+                    const SizedBox(width: 8),
+                    if (f.subiendo)
+                      Text('▲', style: _pxS(10, _ArcC.cyan)),
+                  ]),
+                  Text('POWER SCORE', style: _pxS(4.5, _ArcC.fg3)),
+                  const SizedBox(height: 6),
+                  Text('${_fmtN(f.votos)} VOTOS', style: _pxS(5, _ArcC.fg2)),
+                ])),
+              ])),
+            // ── Stats de batalla ──
+            Container(
+              margin: const EdgeInsets.fromLTRB(14, 10, 14, 0),
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: _ArcC.panel,
+                border: Border.all(color: _ArcC.red.withOpacity(0.2))),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text('⚔ STATS DE BATALLA', style: _pxS(5.5, _ArcC.red)),
+                const SizedBox(height: 10),
+                _statBar('🎨 PRESENTACIÓN', f.presentacion,
+                  const LinearGradient(colors: [Color(0xFFCC1100), _ArcC.gold])),
+                const SizedBox(height: 8),
+                _statBar('👅 SABOR', f.sabor,
+                  const LinearGradient(colors: [Color(0xFF9900FF), _ArcC.pink])),
+                const SizedBox(height: 8),
+                _statBar('💡 ORIGINALIDAD', f.originalidad,
+                  const LinearGradient(colors: [_ArcC.cyan2, _ArcC.cyan])),
+              ])),
+            // ── Info del restaurante ──
+            Container(
+              margin: const EdgeInsets.fromLTRB(14, 10, 14, 0),
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: _ArcC.panel,
+                border: Border.all(color: _ArcC.cyan.withOpacity(0.25))),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text('🍣 INFO DEL RESTAURANTE', style: _pxS(7, _ArcC.cyan)),
+                const SizedBox(height: 14),
+                _infoRow('🏯 LUGAR', f.restaurante),
+                const SizedBox(height: 6),
+                _infoRow('📍 BARRIO', f.barrio),
+                if (f.direccion.isNotEmpty) ...[
+                  const SizedBox(height: 6),
+                  _infoRow('🗺 DIRECCIÓN', f.direccion),
+                ],
+                const SizedBox(height: 6),
+                _infoRow('🌸 PLATO', f.nombre),
+                if (f.tipoSushi.isNotEmpty) ...[
+                  const SizedBox(height: 6),
+                  _infoRow('🍱 TIPO', f.tipoSushi),
+                ],
+                if (f.descripcion.isNotEmpty) ...[
+                  const SizedBox(height: 14),
+                  Text('📜 DESCRIPCIÓN', style: _pxS(5.5, _ArcC.fg3)),
+                  const SizedBox(height: 6),
+                  Text(f.descripcion,
+                    style: const TextStyle(fontSize: 15, color: _ArcC.fg2,
+                      decoration: TextDecoration.none, height: 1.6)),
+                ],
+                const SizedBox(height: 10),
+                _infoRow('⚔ CATEGORÍA', 'BATALLA DE SUSHI MDE 2027'),
+                const SizedBox(height: 6),
+                _infoRow('🏆 POSICIÓN', '#$rank'),
+              ])),
+            // ── Horarios ──
+            if (f.horario.isNotEmpty)
+              Container(
+                margin: const EdgeInsets.fromLTRB(14, 10, 14, 0),
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: _ArcC.panel,
+                  border: Border.all(color: _ArcC.gold.withOpacity(0.35))),
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Row(children: [
+                    const Text('🕐', style: TextStyle(fontSize: 18)),
+                    const SizedBox(width: 8),
+                    Text('HORARIOS DE ATENCIÓN', style: _pxS(6.5, _ArcC.gold)),
+                  ]),
+                  const SizedBox(height: 12),
+                  _buildHorariosGrid(f.horario),
+                ])),
+            // ── Cómo llegar ──
+            Container(
+              margin: const EdgeInsets.fromLTRB(14, 10, 14, 0),
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: _ArcC.panel,
+                border: Border.all(color: _ArcC.cyan.withOpacity(0.35))),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text('🗺 CÓMO LLEGAR', style: _pxS(7, _ArcC.cyan)),
+                const SizedBox(height: 6),
+                Text('${f.barrio.toUpperCase()} · MEDELLÍN',
+                  style: _pxS(5, _ArcC.fg3)),
+                if (f.direccion.isNotEmpty) ...[
+                  const SizedBox(height: 10),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: _ArcC.cyan.withOpacity(0.06),
+                      border: Border.all(color: _ArcC.cyan.withOpacity(0.2))),
+                    child: Row(children: [
+                      const Icon(Icons.place_rounded, color: _ArcC.cyan, size: 20),
+                      const SizedBox(width: 10),
+                      Expanded(child: Text(f.direccion,
+                        style: const TextStyle(fontSize: 15, color: _ArcC.fg,
+                          decoration: TextDecoration.none, height: 1.5,
+                          fontWeight: FontWeight.w600))),
+                    ])),
+                ],
+                const SizedBox(height: 16),
+                // ── Tips de viaje (expandible) ─────────────────────────────
+                GestureDetector(
+                  onTap: () => setState(() => _tipsExpandido = !_tipsExpandido),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                    decoration: BoxDecoration(
+                      color: _ArcC.panel,
+                      border: Border.all(color: _ArcC.fg3.withOpacity(0.25))),
+                    child: Row(children: [
+                      const Text('🧳', style: TextStyle(fontSize: 18)),
+                      const SizedBox(width: 10),
+                      Text('TIPS DE VIAJE', style: _pxS(6.5, _ArcC.fg3)),
+                      const Spacer(),
+                      Icon(
+                        _tipsExpandido
+                          ? Icons.keyboard_arrow_up_rounded
+                          : Icons.keyboard_arrow_down_rounded,
+                        color: _ArcC.fg3, size: 22),
+                    ]))),
+                if (_tipsExpandido) ...[
+                  const SizedBox(height: 8),
+                  _buildTipsViaje(f.barrio),
+                ],
+                const SizedBox(height: 14),
+                // ── Botón navegación Google Maps ───────────────────────────
+                GestureDetector(
+                  onTap: () async {
+                    // Abre Google Maps en modo navegación con coordenadas exactas
+                    final url = Uri.parse(
+                      'https://www.google.com/maps/dir/?api=1'
+                      '&destination=${f.lat},${f.lng}'
+                      '&travelmode=transit');
+                    if (await canLaunchUrl(url)) launchUrl(url,
+                      mode: LaunchMode.externalApplication);
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    decoration: BoxDecoration(
+                      color: _ArcC.cyan.withOpacity(0.1),
+                      border: Border.all(color: _ArcC.cyan.withOpacity(0.6))),
+                    child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                      const Icon(Icons.directions_rounded, color: _ArcC.cyan, size: 20),
+                      const SizedBox(width: 10),
+                      Text('CÓMO LLEGAR — NAVEGACIÓN', style: _pxS(6.5, _ArcC.cyan)),
+                    ]))),
+              ])),
+            // ── Redes sociales ──
+            if (f.instagram.isNotEmpty || f.tiktok.isNotEmpty || f.whatsapp.isNotEmpty)
+              Container(
+                margin: const EdgeInsets.fromLTRB(14, 10, 14, 0),
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: _ArcC.panel,
+                  border: Border.all(color: _ArcC.pink.withOpacity(0.45))),
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Row(children: [
+                    const Text('📲', style: TextStyle(fontSize: 18)),
+                    const SizedBox(width: 8),
+                    Text('REDES SOCIALES', style: _pxS(6.5, _ArcC.pink)),
+                  ]),
+                  const SizedBox(height: 12),
+                  if (f.instagram.isNotEmpty)
+                    GestureDetector(
+                      onTap: () async {
+                        final url = Uri.parse(
+                          'https://instagram.com/${f.instagram.replaceAll("@", "")}');
+                        if (await canLaunchUrl(url)) launchUrl(url,
+                          mode: LaunchMode.externalApplication);
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                        margin: const EdgeInsets.only(bottom: 10),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF1A0A2E),
+                          border: Border.all(color: _ArcC.pink.withOpacity(0.5))),
+                        child: Row(children: [
+                          const Text('📸', style: TextStyle(fontSize: 22)),
+                          const SizedBox(width: 12),
+                          Expanded(child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start, children: [
+                            Text('INSTAGRAM', style: _pxS(5.5, _ArcC.fg3)),
+                            const SizedBox(height: 2),
+                            Text(f.instagram, style: _pxS(7, _ArcC.pink)),
+                          ])),
+                          const Icon(Icons.open_in_new_rounded,
+                            color: _ArcC.pink, size: 18),
+                        ]))),
+                  if (f.tiktok.isNotEmpty)
+                    GestureDetector(
+                      onTap: () async {
+                        final url = Uri.parse(
+                          'https://tiktok.com/@${f.tiktok.replaceAll("@", "")}');
+                        if (await canLaunchUrl(url)) launchUrl(url,
+                          mode: LaunchMode.externalApplication);
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                        margin: const EdgeInsets.only(bottom: 10),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF0A1A1A),
+                          border: Border.all(color: _ArcC.cyan.withOpacity(0.5))),
+                        child: Row(children: [
+                          const Text('🎵', style: TextStyle(fontSize: 22)),
+                          const SizedBox(width: 12),
+                          Expanded(child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start, children: [
+                            Text('TIKTOK', style: _pxS(5.5, _ArcC.fg3)),
+                            const SizedBox(height: 2),
+                            Text(f.tiktok, style: _pxS(7, _ArcC.cyan)),
+                          ])),
+                          const Icon(Icons.open_in_new_rounded,
+                            color: _ArcC.cyan, size: 18),
+                        ]))),
+                  if (f.whatsapp.isNotEmpty)
+                    GestureDetector(
+                      onTap: () async {
+                        final num = f.whatsapp.replaceAll(RegExp(r'\D'), '');
+                        final msg = Uri.encodeComponent(
+                          '¡Hola! 👋 Vengo de Rutero MDE y me gustaría más info sobre ${f.restaurante}. 🍣');
+                        final url = Uri.parse('https://wa.me/57$num?text=$msg');
+                        if (await canLaunchUrl(url)) launchUrl(url,
+                          mode: LaunchMode.externalApplication);
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF0A1A0A),
+                          border: Border.all(color: _ArcC.green.withOpacity(0.5))),
+                        child: Row(children: [
+                          const Text('💬', style: TextStyle(fontSize: 22)),
+                          const SizedBox(width: 12),
+                          Expanded(child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start, children: [
+                            Text('WHATSAPP', style: _pxS(5.5, _ArcC.fg3)),
+                            const SizedBox(height: 2),
+                            Text(f.whatsapp, style: _pxS(7, _ArcC.green)),
+                          ])),
+                          const Icon(Icons.open_in_new_rounded,
+                            color: _ArcC.green, size: 18),
+                        ]))),   // Row + Container + GestureDetector
+                ])),            // Column children + Column + Container-card redes
+            // ── Flujo para votar — narrativa gamificada ──
+            Container(
+              margin: const EdgeInsets.fromLTRB(14, 10, 14, 0),
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: _ArcC.panel,
+                border: Border.all(color: _ArcC.gold.withOpacity(0.3))),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Row(children: [
+                  FadeTransition(opacity: _blinkAnim,
+                    child: Text('⚔', style: TextStyle(fontSize: 16))),
+                  const SizedBox(width: 8),
+                  Text('MISIÓN: JUZGAR AL FIGHTER', style: _pxS(6.5, _ArcC.gold)),
+                ]),
+                const SizedBox(height: 4),
+                Text('Completa los 5 pasos · gana hasta +450 XP · entra al sorteo del premio mayor 🏆',
+                  style: const TextStyle(fontSize: 12, color: _ArcC.fg2,
+                    decoration: TextDecoration.none, height: 1.5)),
+                const SizedBox(height: 10),
+                _flujoStep(1, '📍 CONFIRMAR UBICACIÓN',
+                  _gpsConfirmado
+                    ? '✅ GPS verificado · estás en el restaurante · +50 XP'
+                    : 'Debes estar dentro del restaurante para activar la misión',
+                  active: !_gpsConfirmado,
+                  done: _gpsConfirmado),
+                const SizedBox(height: 4),
+                _flujoStep(2, '🔑 CÓDIGO DEL COMBATE',
+                  _palabraValida
+                    ? '✅ Código válido · consumo verificado · +50 XP'
+                    : 'Pide el código al equipo del restaurante al momento de pagar',
+                  active: _gpsConfirmado && !_palabraValida,
+                  done: _palabraValida),
+                const SizedBox(height: 4),
+                _flujoStep(3, '⭐ CALIFICAR AL FIGHTER',
+                  calificacionLista
+                    ? '✅ Calificación enviada · +50 XP'
+                    : 'Presentación · Sabor · Originalidad',
+                  active: _palabraValida && !calificacionLista,
+                  done: calificacionLista),
+                const SizedBox(height: 4),
+                _flujoStep(4, '📸 CAPTURAR LA EXPERIENCIA',
+                  fotoLista
+                    ? '✅ Foto con marca de agua lista · +100 XP'
+                    : 'Foto del ambiente / lugar · se guarda en tu galería',
+                  active: calificacionLista && !fotoLista,
+                  done: fotoLista),
+                const SizedBox(height: 4),
+                _flujoStep(5, '🏆 LANZAR VOTO',
+                  votoListo
+                    ? '¡Todo listo! Toca el botón para registrar tu voto'
+                    : 'Completa los pasos anteriores',
+                  active: votoListo,
+                  done: _votoEnviado),
+              ])),
+            // ── Sección de voto ──
+            Container(
+              margin: const EdgeInsets.fromLTRB(14, 10, 14, 0),
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: _ArcC.bg2,
+                border: Border.all(color: _ArcC.red.withOpacity(0.4))),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text('⚔ LANZA TU VOTO', style: _pxS(6, _ArcC.gold)),
+                const SizedBox(height: 10),
+
+                // ── PASO 1: Verificar GPS ──────────────────────────────────
+                if (!_gpsConfirmado) ...[
+                  GestureDetector(
+                    onTap: _gpsVerificando ? null : _verificarGPS,
+                    child: Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF0A1500),
+                        border: Border.all(
+                          color: _gpsMensaje != null && _gpsMensaje!.isNotEmpty
+                            ? _ArcC.red : _ArcC.green, width: 2)),
+                      child: _gpsVerificando
+                        ? Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                            const SizedBox(width: 16, height: 16,
+                              child: CircularProgressIndicator(color: _ArcC.green, strokeWidth: 2)),
+                            const SizedBox(width: 10),
+                            Text('VERIFICANDO UBICACIÓN...', style: _pxS(6, _ArcC.green)),
+                          ])
+                        : Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                            const Icon(Icons.gps_fixed_rounded, color: _ArcC.green, size: 18),
+                            const SizedBox(width: 10),
+                            Text('📍 PASO 1 · VERIFICAR QUE ESTOY AQUÍ', style: _pxS(6, _ArcC.green)),
+                          ]))),
+                  if (_gpsMensaje != null && _gpsMensaje!.isNotEmpty) ...[
+                    const SizedBox(height: 6),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: _ArcC.red.withOpacity(0.1),
+                        border: Border.all(color: _ArcC.red.withOpacity(0.4))),
+                      child: Text(_gpsMensaje!,
+                        style: _pxS(5.5, _ArcC.red), textAlign: TextAlign.center)),
+                  ],
+                  const SizedBox(height: 10),
+                  // Bloqueo visual pasos siguientes
+                  Opacity(opacity: 0.25,
+                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      Container(height: 48, color: _ArcC.panel,
+                        child: Center(child: Text('🔑 PASO 2 · CÓDIGO DEL COMBATE', style: _pxS(6, _ArcC.fg3)))),
+                      const SizedBox(height: 8),
+                      _starRow('🎨 PRESENTACIÓN', 0, (_) {}),
+                      const SizedBox(height: 10),
+                      _starRow('👅 SABOR', 0, (_) {}),
+                      const SizedBox(height: 10),
+                      _starRow('💡 ORIGINALIDAD', 0, (_) {}),
+                      const SizedBox(height: 10),
+                      Container(height: 60, color: _ArcC.panel,
+                        child: Center(child: Text('📸 FOTO DEL PLATO', style: _pxS(6, _ArcC.fg3)))),
+                    ])),
+
+                ] else ...[
+                  // ── GPS OK badge ───────────────────────────────────────
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    margin: const EdgeInsets.only(bottom: 10),
+                    decoration: BoxDecoration(
+                      color: _ArcC.green.withOpacity(0.08),
+                      border: Border.all(color: _ArcC.green, width: 1.5)),
+                    child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                      const Icon(Icons.gps_fixed_rounded, color: _ArcC.green, size: 14),
+                      const SizedBox(width: 8),
+                      Text('✅ UBICACIÓN CONFIRMADA · +50 XP', style: _pxS(5.5, _ArcC.green)),
+                    ])),
+
+                  // ── PASO 2: Código de consumo ──────────────────────────
+                  if (!_palabraValida) ...[
+                    Container(
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF0A0A1A),
+                        border: Border.all(color: _ArcC.gold.withOpacity(0.6), width: 2)),
+                      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                        Row(children: [
+                          const Text('🔑', style: TextStyle(fontSize: 20)),
+                          const SizedBox(width: 8),
+                          Text('PASO 2 · CÓDIGO DEL COMBATE', style: _pxS(6.5, _ArcC.gold)),
+                        ]),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Al momento de pagar tu pedido, pide el código secreto al equipo del restaurante. '
+                          'Este código confirma que eres un jurado real de la batalla 🍣⚔',
+                          style: const TextStyle(fontSize: 13, color: _ArcC.fg2,
+                            decoration: TextDecoration.none, height: 1.5)),
+                        const SizedBox(height: 12),
+                        Row(children: [
+                          Expanded(
+                            child: TextField(
+                              controller: _palabraCtrl,
+                              textCapitalization: TextCapitalization.characters,
+                              style: const TextStyle(
+                                fontFamily: 'PressStart2P',
+                                fontSize: 13, color: _ArcC.gold,
+                                decoration: TextDecoration.none),
+                              decoration: InputDecoration(
+                                hintText: 'INGRESA EL CÓDIGO',
+                                hintStyle: const TextStyle(
+                                  fontFamily: 'PressStart2P',
+                                  fontSize: 10, color: _ArcC.fg3),
+                                filled: true,
+                                fillColor: _ArcC.bg2,
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.zero,
+                                  borderSide: BorderSide(color: _ArcC.gold.withOpacity(0.4))),
+                                focusedBorder: const OutlineInputBorder(
+                                  borderRadius: BorderRadius.zero,
+                                  borderSide: BorderSide(color: _ArcC.gold, width: 2)),
+                                contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 12, vertical: 14)),
+                              onChanged: (v) => setState(() => _palabraIngresada = v),
+                              onSubmitted: (_) => _verificarPalabra(),
+                            )),
+                          const SizedBox(width: 8),
+                          GestureDetector(
+                            onTap: _palabraVerificando ? null : _verificarPalabra,
+                            child: Container(
+                              height: 52, width: 52,
+                              color: _ArcC.gold,
+                              child: _palabraVerificando
+                                ? const Center(child: SizedBox(width: 20, height: 20,
+                                    child: CircularProgressIndicator(
+                                      color: Colors.black, strokeWidth: 2)))
+                                : const Icon(Icons.check_rounded,
+                                    color: Colors.black, size: 26))),
+                        ]),
+                        if (_palabraMensaje != null && _palabraMensaje!.isNotEmpty) ...[
+                          const SizedBox(height: 8),
+                          Container(
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              color: _ArcC.red.withOpacity(0.1),
+                              border: Border.all(color: _ArcC.red.withOpacity(0.5))),
+                            child: Text(_palabraMensaje!,
+                              style: _pxS(5.5, _ArcC.red), textAlign: TextAlign.center)),
+                        ],
+                      ])),
+                    const SizedBox(height: 10),
+                    // Pasos siguientes bloqueados visualmente
+                    Opacity(opacity: 0.25,
+                      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                        _starRow('🎨 PRESENTACIÓN', 0, (_) {}),
+                        const SizedBox(height: 10),
+                        _starRow('👅 SABOR', 0, (_) {}),
+                        const SizedBox(height: 10),
+                        _starRow('💡 ORIGINALIDAD', 0, (_) {}),
+                        const SizedBox(height: 10),
+                        Container(height: 60, color: _ArcC.panel,
+                          child: Center(child: Text('📸 FOTO DEL PLATO', style: _pxS(6, _ArcC.fg3)))),
+                      ])),
+                  ] else ...[
+                    // ── Código OK badge ──────────────────────────────────
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      margin: const EdgeInsets.only(bottom: 12),
+                      decoration: BoxDecoration(
+                        color: _ArcC.gold.withOpacity(0.08),
+                        border: Border.all(color: _ArcC.gold, width: 1.5)),
+                      child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                        const Text('🔑', style: TextStyle(fontSize: 14)),
+                        const SizedBox(width: 8),
+                        Text('✅ CÓDIGO VALIDADO · consumo confirmado · +50 XP',
+                          style: _pxS(5.5, _ArcC.gold)),
+                      ])),
+
+                    // ── PASO 3: Calificar ─────────────────────────────────
+                    _starRow('🎨 PRESENTACIÓN', _starP, (v) => setState(() => _starP = v)),
+                    const SizedBox(height: 10),
+                    _starRow('👅 SABOR', _starS, (v) => setState(() => _starS = v)),
+                    const SizedBox(height: 10),
+                    _starRow('💡 ORIGINALIDAD', _starO, (v) => setState(() => _starO = v)),
+                    const SizedBox(height: 14),
+                    // ── PASO 4: Foto ──────────────────────────────────────
+                    GestureDetector(
+                      onTap: _tomarFoto,
+                      child: Container(
+                        width: double.infinity,
+                        height: 90,
+                        decoration: BoxDecoration(
+                          color: fotoLista ? _ArcC.green.withOpacity(0.1) : _ArcC.panel,
+                          border: Border.all(
+                            color: fotoLista ? _ArcC.green : _ArcC.cyan, width: 2)),
+                        child: fotoLista
+                          ? Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                              if (_foto != null) ClipRRect(
+                                borderRadius: BorderRadius.circular(2),
+                                child: Image.file(_foto!,
+                                  width: 70, height: 70, fit: BoxFit.cover)),
+                              const SizedBox(width: 10),
+                              Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+                                Text('✅ EXPERIENCIA CAPTURADA', style: _pxS(6, _ArcC.green)),
+                                Text('+100 XP · toca para retomar',
+                                  style: _pxS(4.5, _ArcC.fg2)),
+                              ]),
+                            ])
+                          : Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+                              Text('📸 CAPTURÁ TU EXPERIENCIA', style: _pxS(6, _ArcC.cyan)),
+                              const SizedBox(height: 4),
+                              Text('ambiente · lugar · momento · +100 XP',
+                                style: const TextStyle(fontSize: 10, color: _ArcC.fg2,
+                                  decoration: TextDecoration.none)),
+                            ]))),
+                    // Botón compartir
+                    if (fotoLista) ...[
+                      const SizedBox(height: 8),
+                      GestureDetector(
+                        onTap: _compartir,
+                        child: Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.symmetric(vertical: 10),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF1A0A2E),
+                            border: Border.all(color: _ArcC.cyan.withOpacity(0.7), width: 1.5)),
+                          child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                            const Icon(Icons.share_rounded, color: _ArcC.cyan, size: 15),
+                            const SizedBox(width: 8),
+                            Text('COMPARTIR EN REDES · +50 XP', style: _pxS(5.5, _ArcC.cyan)),
+                          ]))),
+                    ],
+                  ],  // end else _palabraValida
+                ], // end else _gpsConfirmado
+                const SizedBox(height: 10),
+                // Botón votar — siempre visible, bloqueado hasta completar todo
+                GestureDetector(
+                  onTap: votoListo && !_votoEnviado ? _votar : null,
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    decoration: BoxDecoration(
+                      color: votoListo ? _ArcC.red : _ArcC.panel,
+                      border: Border.all(
+                        color: votoListo ? _ArcC.gold : _ArcC.fg3.withOpacity(0.3),
+                        width: votoListo ? 2 : 1)),
+                    child: _votoEnviado
+                      ? Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                          const SizedBox(width: 16, height: 16,
+                            child: CircularProgressIndicator(
+                              color: _ArcC.gold, strokeWidth: 2)),
+                          const SizedBox(width: 10),
+                          Text('ENVIANDO VOTO...', style: _pxS(6, _ArcC.gold)),
+                        ])
+                      : Text(
+                          votoListo ? '⚔ ENVIAR VOTO · +150 XP' : 'COMPLETA LOS 5 PASOS',
+                          style: _pxS(6.5, votoListo ? _ArcC.gold : _ArcC.fg3),
+                          textAlign: TextAlign.center))),
+              ])),
+            // Legal
+            Padding(
+              padding: const EdgeInsets.fromLTRB(14, 12, 14, 8),
+              child: Text(
+                'DNDA 1-2025-110420 · CRÉAME ALCALDÍA DE MEDELLÍN\n'
+                'PARTICIPANTE BTIF 2026 · RUTERO MDE®',
+                style: _pxS(4.5, _ArcC.fg3), textAlign: TextAlign.center)),
+          ])),
+        // ── Botón volver ──
+        Positioned(
+          top: MediaQuery.of(context).padding.top + 4,
+          left: 8,
+          child: GestureDetector(
+            onTap: () => Navigator.pop(context),
+            child: Container(
+              width: 32, height: 32,
+              decoration: BoxDecoration(
+                color: _ArcC.bg2,
+                border: Border.all(color: _ArcC.red.withOpacity(0.6)),
+                borderRadius: BorderRadius.circular(4)),
+              child: const Icon(Icons.arrow_back_ios_new_rounded,
+                color: _ArcC.gold, size: 14)))),
+      ]));
+  }
+
+  /// Widget visual de horarios — parsea texto libre y lo muestra como filas
+  /// Soporta separadores: coma, punto y coma, salto de línea, pipe
+  Widget _buildHorariosGrid(String horarioRaw) {
+    // Separar las franjas por delimitadores comunes
+    final franjas = horarioRaw
+        .split(RegExp(r'[,;\n|]'))
+        .map((s) => s.trim())
+        .where((s) => s.isNotEmpty)
+        .toList();
+
+    // Días de la semana en español para detectar si la franja es "hoy"
+    final diasSemana = ['', 'lun', 'mar', 'mié', 'jue', 'vie', 'sáb', 'dom'];
+    final hoy = diasSemana[DateTime.now().weekday]; // 1=lun...7=dom
+
+    bool _esHoy(String franja) {
+      final f = franja.toLowerCase();
+      // Detecta "lun", "lunes", "lun-vie" etc.
+      return f.contains(hoy) ||
+          (hoy == 'sáb' && (f.contains('sab') || f.contains('sáb'))) ||
+          (hoy == 'mié' && (f.contains('mie') || f.contains('mié')));
+    }
+
+    if (franjas.length == 1) {
+      // Texto simple — mostrar en un solo bloque limpio
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: BoxDecoration(
+          color: _ArcC.gold.withOpacity(0.07),
+          border: Border.all(color: _ArcC.gold.withOpacity(0.3))),
+        child: Row(children: [
+          const Icon(Icons.access_time_rounded, color: _ArcC.gold, size: 20),
+          const SizedBox(width: 10),
+          Expanded(child: Text(franjas.first,
+            style: const TextStyle(fontSize: 15, color: _ArcC.fg,
+              decoration: TextDecoration.none, height: 1.5,
+              fontWeight: FontWeight.w600))),
+        ]));
+    }
+
+    // Múltiples franjas — mostrar como lista de filas
+    return Column(children: franjas.asMap().entries.map((entry) {
+      final i = entry.key;
+      final franja = entry.value;
+      final esHoy = _esHoy(franja);
+
+      // Intentar separar "días: horario" si tiene un patrón de dos partes
+      String diasParte = '';
+      String horaParte = franja;
+      final sepIdx = franja.indexOf(RegExp(r'\d'));
+      if (sepIdx > 1) {
+        diasParte = franja.substring(0, sepIdx).trim().replaceAll(RegExp(r'[-–:]+$'), '').trim();
+        horaParte = franja.substring(sepIdx).trim();
+      }
+
+      return Container(
+        margin: EdgeInsets.only(bottom: i < franjas.length - 1 ? 6 : 0),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+          color: esHoy ? _ArcC.gold.withOpacity(0.12) : _ArcC.gold.withOpacity(0.04),
+          border: Border.all(
+            color: esHoy ? _ArcC.gold.withOpacity(0.7) : _ArcC.gold.withOpacity(0.18),
+            width: esHoy ? 1.5 : 1.0)),
+        child: Row(children: [
+          Icon(
+            esHoy ? Icons.today_rounded : Icons.access_time_outlined,
+            color: esHoy ? _ArcC.gold : _ArcC.fg3,
+            size: 18),
+          const SizedBox(width: 10),
+          Expanded(child: diasParte.isNotEmpty
+            ? Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text(diasParte.toUpperCase(),
+                  style: TextStyle(fontSize: 11, color: _ArcC.fg3,
+                    decoration: TextDecoration.none, fontWeight: FontWeight.w700,
+                    letterSpacing: 0.5)),
+                const SizedBox(height: 2),
+                Text(horaParte,
+                  style: TextStyle(fontSize: 14,
+                    color: esHoy ? _ArcC.gold : _ArcC.fg,
+                    decoration: TextDecoration.none, height: 1.3,
+                    fontWeight: esHoy ? FontWeight.w700 : FontWeight.w500)),
+              ])
+            : Text(franja,
+                style: TextStyle(fontSize: 14,
+                  color: esHoy ? _ArcC.gold : _ArcC.fg,
+                  decoration: TextDecoration.none, height: 1.3,
+                  fontWeight: esHoy ? FontWeight.w700 : FontWeight.w500))),
+          if (esHoy)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              decoration: BoxDecoration(
+                color: _ArcC.gold, borderRadius: BorderRadius.circular(2)),
+              child: const Text('HOY',
+                style: TextStyle(fontSize: 9, color: Colors.black,
+                  fontWeight: FontWeight.w900, decoration: TextDecoration.none))),
+        ]));
+    }).toList());
+  }
+
+  /// Tarjeta individual de transporte
+  Widget _transporteCard({
+    required String emoji,
+    required String medio,
+    required String detalle,
+    required Color color,
+  }) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.07),
+        border: Border.all(color: color.withOpacity(0.35))),
+      child: Row(children: [
+        Text(emoji, style: const TextStyle(fontSize: 24)),
+        const SizedBox(width: 12),
+        Expanded(child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(medio, style: TextStyle(
+            fontSize: 13, color: color, fontWeight: FontWeight.w700,
+            decoration: TextDecoration.none)),
+          const SizedBox(height: 2),
+          Text(detalle, style: const TextStyle(
+            fontSize: 13, color: _ArcC.fg2,
+            decoration: TextDecoration.none, height: 1.4)),
+        ])),
+      ]));
+  }
+
+  /// Opciones de transporte basadas en el barrio del restaurante
+  Widget _buildTransporteOptions(String barrio, double lat, double lng) {
+    final b = barrio.toLowerCase();
+
+    // Metro más cercano según zona
+    String metroLinea = '';
+    String metroEstacion = '';
+    String metroInstrucciones = '';
+
+    if (b.contains('poblado') || b.contains('envigado')) {
+      metroLinea = 'Línea A';
+      metroEstacion = 'El Poblado';
+      metroInstrucciones = 'Sal por la salida principal · sube por la carrera 43A';
+    } else if (b.contains('laureles') || b.contains('estadio')) {
+      metroLinea = 'Línea B';
+      metroEstacion = 'Suramericana o Estadio';
+      metroInstrucciones = 'Baja hacia la carrera 70 · zona gastronómica';
+    } else if (b.contains('centro') || b.contains('boston') || b.contains('la candelaria')) {
+      metroLinea = 'Línea A';
+      metroEstacion = 'San Antonio o Parque Berrío';
+      metroInstrucciones = 'Estás en el corazón de Medellín · todo a pie';
+    } else if (b.contains('sabaneta') || b.contains('itagüí')) {
+      metroLinea = 'Línea A Sur';
+      metroEstacion = 'Sabaneta';
+      metroInstrucciones = 'Última estación del metro · zona parque El Vergel';
+    } else if (b.contains('bello') || b.contains('aranjuez')) {
+      metroLinea = 'Línea A Norte';
+      metroEstacion = 'Bello';
+      metroInstrucciones = 'Zona norte · pide un taxi desde la estación';
+    } else if (b.contains('robledo')) {
+      metroLinea = 'Línea B';
+      metroEstacion = 'San Javier';
+      metroInstrucciones = 'Desde San Javier toma la ruta 102 hacia Robledo';
+    } else {
+      metroLinea = 'Línea A o B';
+      metroEstacion = 'Más cercana al barrio';
+      metroInstrucciones = 'Consulta el sistema Metro de Medellín · app Metro';
+    }
+
+    // Whoosh disponible en zonas clave
+    final whooshZona = b.contains('poblado') || b.contains('laureles') ||
+        b.contains('envigado') || b.contains('estadio') || b.contains('centro');
+
+    return Column(children: [
+      // Metro
+      _transporteCard(
+        emoji: '🚇',
+        medio: 'METRO · $metroLinea',
+        detalle: 'Estación $metroEstacion\n$metroInstrucciones',
+        color: _ArcC.cyan),
+      // Bus integrado
+      _transporteCard(
+        emoji: '🚌',
+        medio: 'TRANSPORTE MASIVO',
+        detalle: 'Sistema Integrado de Transporte — SITVA\nBuses + Metro + Tranvía · paga con tarjeta cívica',
+        color: const Color(0xFF4CAF50)),
+      // Whoosh / patineta eléctrica
+      if (whooshZona) _transporteCard(
+        emoji: '🛴',
+        medio: 'WHOOSH / PATINETA ELÉCTRICA',
+        detalle: 'Disponible en $barrio\nDescarga la app Whoosh · ~\$3.000/min · ideal turismo',
+        color: _ArcC.gold),
+      // A pie
+      _transporteCard(
+        emoji: '🚶',
+        medio: 'A PIE — RECOMENDADO',
+        detalle: 'Medellín es una ciudad muy caminable\nExplora el barrio antes o después del sushi 🍣',
+        color: const Color(0xFFFF9800)),
+      // Taxi / app
+      _transporteCard(
+        emoji: '🚗',
+        medio: 'TAXI / INDRIVER / UBER',
+        detalle: 'Fácil disponibilidad en toda la ciudad\nComparte la dirección exacta al conductor',
+        color: const Color(0xFF9C27B0)),
+    ]);
+  }
+
+  /// Tips de viaje: seguridad, qué llevar, consejo local
+  Widget _buildTipsViaje(String barrio) {
+    final b = barrio.toLowerCase();
+
+    // Tip de seguridad por zona
+    String tipSeguridad;
+    if (b.contains('poblado') || b.contains('laureles') || b.contains('envigado')) {
+      tipSeguridad = 'Zona turística segura · guarda tu celular en bolsillos internos · evita mostrarlo en la calle de noche';
+    } else if (b.contains('centro') || b.contains('boston')) {
+      tipSeguridad = 'Centro activo · mantén tus pertenencias cerca · usa mochilas al frente · evita caminar solo de noche';
+    } else if (b.contains('sabaneta') || b.contains('itagüí')) {
+      tipSeguridad = 'Zona sur tranquila · cuida tu celular en transporte público · viaja en grupos en horas nocturnas';
+    } else {
+      tipSeguridad = 'Zona residencial · confía en los locales · si necesitas ayuda pregunta en tiendas o farmacias cercanas';
+    }
+
+    // Tip de qué llevar
+    String tipLlevar;
+    if (b.contains('poblado') || b.contains('laureles') || b.contains('estadio')) {
+      tipLlevar = 'Lleva agüita · bloqueador solar si es de día · tarjeta cívica para el metro · efectivo para propinas';
+    } else {
+      tipLlevar = 'Lleva agüita · tarjeta cívica Metro · efectivo · ropa cómoda para caminar · paraguas si está nublado';
+    }
+
+    // Tip del barrio (gastronómico / turístico)
+    final tipBarrio = _getTipTuristico(barrio);
+
+    return Column(children: [
+      _tipCard(emoji: '🛡️', titulo: 'SEGURIDAD', texto: tipSeguridad, color: _ArcC.red),
+      const SizedBox(height: 8),
+      _tipCard(emoji: '🎒', titulo: 'QUÉ LLEVAR', texto: tipLlevar, color: _ArcC.gold),
+      const SizedBox(height: 8),
+      _tipCard(emoji: '💡', titulo: 'CONSEJO LOCAL', texto: tipBarrio, color: _ArcC.cyan),
+    ]);
+  }
+
+  Widget _tipCard({required String emoji, required String titulo, required String texto, required Color color}) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.07),
+        border: Border.all(color: color.withOpacity(0.3))),
+      child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text(emoji, style: const TextStyle(fontSize: 20, decoration: TextDecoration.none)),
+        const SizedBox(width: 10),
+        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(titulo, style: _pxS(5, color)),
+          const SizedBox(height: 4),
+          Text(texto, style: const TextStyle(fontSize: 13, color: _ArcC.fg2,
+            decoration: TextDecoration.none, height: 1.5)),
+        ])),
+      ]));
+  }
+
+  /// Tip turístico personalizado por barrio
+  String _getTipTuristico(String barrio) {
+    final b = barrio.toLowerCase();
+    if (b.contains('poblado')) {
+      return 'El Poblado es el epicentro gastronómico de Medellín. Después del sushi, explora el Parque Lleras, lleno de bares, restaurantes y vida nocturna internacional.';
+    } else if (b.contains('laureles')) {
+      return 'Laureles es el barrio más tranquilo y residencial de la ciudad. La carrera 70 es una de las calles gastronómicas más queridas por los locales.';
+    } else if (b.contains('estadio')) {
+      return 'Zona Estadio tiene una energía única. Si hay partido del Nacional o Medellín, la vibra en las calles es indescriptible. ¡Bienvenido al corazón futbolero de Colombia!';
+    } else if (b.contains('envigado')) {
+      return 'Envigado es un municipio con identidad propia dentro del Área Metropolitana. Tranquilo, seguro y con una escena gastronómica en crecimiento.';
+    } else if (b.contains('sabaneta')) {
+      return 'Sabaneta es conocida por su Parque El Vergel y artesanías. Un destino familiar perfecto para complementar tu experiencia sushi.';
+    } else if (b.contains('centro') || b.contains('boston')) {
+      return 'El centro de Medellín es historia viva. El Parque de las Luces, el Museo de Antioquia y el Pasaje Junín están a minutos. ¡Medellín en su esencia!';
+    } else if (b.contains('bello')) {
+      return 'Bello te da la perspectiva del norte metropolitano. Un barrio en transformación con mucha autenticidad y sabor local.';
+    } else if (b.contains('robledo')) {
+      return 'Robledo tiene una vista espectacular de la ciudad. Un barrio popular con mucho sabor paisa y cercanía al campus universitario de la UPB.';
+    } else if (b.contains('itagüí')) {
+      return 'Itagüí es el municipio industrial del sur. Su Parque de las Aguas y su plaza principal son excelentes puntos de visita complementaria.';
+    } else if (b.contains('aranjuez')) {
+      return 'Aranjuez es uno de los barrios más tradicionales del norte. Su mercado y su Parque Aranjuez son parada obligatoria para el turista auténtico.';
+    }
+    return 'Medellín tiene más de 200 barrios con historias únicas. Este restaurante es tu punto de partida para explorar una zona auténtica de la ciudad.';
+  }
+
+  Widget _infoRow(String label, String value) {
+    return Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      SizedBox(width: 110,
+        child: Text(label, style: _pxS(5, _ArcC.fg3))),
+      Expanded(child: Text(value,
+        style: const TextStyle(
+          fontSize: 15, color: _ArcC.fg, fontWeight: FontWeight.w600,
+          decoration: TextDecoration.none, height: 1.4),
+        maxLines: 3, overflow: TextOverflow.ellipsis)),
+    ]);
+  }
+
+  Widget _flujoStep(int num, String title, String desc,
+      {bool done = false, bool active = false}) {
+    final borderColor = done
+        ? _ArcC.green.withOpacity(0.4)
+        : active ? _ArcC.cyan : _ArcC.fg3.withOpacity(0.2);
+    final numColor = done ? _ArcC.green : active ? _ArcC.cyan : _ArcC.fg3;
+    final titleColor = done ? _ArcC.green : active ? _ArcC.cyan : _ArcC.fg3;
+    return Container(
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        border: Border.all(color: borderColor),
+        color: done ? _ArcC.green.withOpacity(0.04) : Colors.transparent),
+      child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text('$num', style: _pxS(9, numColor)),
+        const SizedBox(width: 10),
+        Expanded(child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(title, style: _pxS(5.5, titleColor)),
+          const SizedBox(height: 2),
+          Text(desc, style: const TextStyle(
+            fontSize: 11, color: _ArcC.fg2,
+            height: 1.5, decoration: TextDecoration.none)),
+        ])),
+        if (done) const Text('✅', style: TextStyle(fontSize: 14)),
+      ]));
+  }
+
+  String _fmtN(int n) {
+    if (n >= 1000) return '${(n / 1000).toStringAsFixed(1)}K';
+    return '$n';
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 //  _MapaPasaporteScreen — mapa de pines del pasaporte (gris=pendiente / color=visitado)
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -26363,6 +30434,13 @@ class _MapaPasaporteScreenState extends State<_MapaPasaporteScreen> {
   // ── Sponsor del circuito — viene de Firestore, nulo = no mostrar ──
   Map<String, dynamic>? _sponsor;
 
+  // ── Carrusel Sushi: lista de fighters con imagenUrl para el strip inferior ──
+  List<_SushiFighter> _fightersCarrusel = [];
+  // ── Lista completa de fighters (para navegar al detalle desde el mapa) ──
+  List<_SushiFighter> _fightersTodos = [];
+  final PageController _carruselCtrl = PageController(viewportFraction: 0.72);
+  int _carruselIdx = 0;
+
   @override
   void initState() {
     super.initState();
@@ -26371,22 +30449,41 @@ class _MapaPasaporteScreenState extends State<_MapaPasaporteScreen> {
     _cargarSponsor();
   }
 
+  @override
+  void dispose() {
+    _carruselCtrl.dispose();
+    super.dispose();
+  }
+
   /// Carga el sponsor desde Firestore.
   /// Doc: circuitos/{circuitoId}/config/sponsor
   /// Campos esperados: nombre (String), tagline (String), logoUrl (String, opcional),
   ///                   urlExterna (String, opcional), activo (bool)
   Future<void> _cargarSponsor() async {
     try {
+      final coleccion = widget.circuito.esSushi ? 'circuitos_festivales' : 'circuitos';
       final doc = await FirebaseFirestore.instance
-          .collection('circuitos').doc(widget.circuito.id)
+          .collection(coleccion).doc(widget.circuito.id)
           .collection('config').doc('sponsor')
           .get();
       if (!mounted) return;
       final data = doc.data();
       if (data != null && data['activo'] == true) {
         setState(() => _sponsor = data);
+        // Reaplicar estilo tras el setState — el rebuild del GoogleMap puede borrar el estilo
+        Future.microtask(() { if (mounted) _reaplicarEstilo(); });
       }
     } catch (_) {} // falla silenciosamente — el mapa sigue funcionando
+  }
+
+  Future<void> _reaplicarEstilo() async {
+    final ctrl = _mapaCtrl;
+    if (ctrl == null) return;
+    try {
+      await ctrl.setMapStyle(kRuteroMapStyle);
+    } catch (e) {
+      debugPrint('⚠️ setMapStyle (pasaporte) falló: $e');
+    }
   }
 
   Future<void> _pedirPermisoUbicacion() async {
@@ -26568,20 +30665,111 @@ class _MapaPasaporteScreenState extends State<_MapaPasaporteScreen> {
     // con un emoji genérico de museo; luego se usa por parada
     final markers = <Marker>{};
 
+    // ── Sushi: usar fighters como pines del mapa ──────────────────────────────
+    if (widget.circuito.esSushi) {
+      List<_SushiFighter> fighters;
+      try {
+        final snap = await FirebaseFirestore.instance
+            .collection('circuitos_festivales').doc(widget.circuito.id)
+            .collection('paradas').orderBy('powerScore', descending: true)
+            .get();
+        final list = snap.docs
+            .map((d) => _SushiFighter.fromFirestore(d.id, d.data()))
+            .where((f) => f.lat != 0 && f.lng != 0)
+            .toList();
+        fighters = list.isNotEmpty ? list : _SushiFighter.demo;
+      } catch (_) {
+        fighters = _SushiFighter.demo;
+      }
+
+      for (int idx = 0; idx < fighters.length; idx++) {
+        final f = fighters[idx];
+        final String cacheKey = 'sushi_${f.emoji}';
+        if (!_pinCache.containsKey(cacheKey)) {
+          try {
+            _pinCache[cacheKey] = await _crearPinMuseo(
+              emoji: f.emoji,
+              visitado: f.esLider,
+              esMuseo: false,
+              colorVisitado: const Color(0xFFFFD700),
+            );
+          } catch (_) {
+            _pinCache[cacheKey] = f.esLider
+                ? BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueYellow)
+                : BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed);
+          }
+        }
+        final localIdx = idx;
+        markers.add(Marker(
+          markerId: MarkerId(f.id),
+          position: LatLng(f.lat, f.lng),
+          icon: _pinCache[cacheKey]!,
+          infoWindow: InfoWindow(
+            title: '${f.emoji} ${f.restaurante}',
+            snippet: '${f.nombre} · ${f.barrio} · ⚡${f.powerScore.toStringAsFixed(1)}',
+          ),
+          onTap: () {
+            final parada = ParadaCircuito(
+              id: f.id,
+              sitioId: f.id,
+              nombre: f.restaurante,
+              descripcion: f.nombre,
+              emoji: f.emoji,
+              lat: f.lat, lng: f.lng,
+              barrio: f.barrio,
+              zona: 'sushi',
+              puntosCheckin: 150,
+            );
+            setState(() => _paradaSeleccionada = parada);
+          },
+        ));
+      }
+
+      // ── Carrusel: fighters con imagenUrl (foto del plato), cualquiera sirve ──
+      final conFoto = fighters.where((f) => f.imagenUrl.isNotEmpty).toList();
+
+      // Centro: centroide de los fighters con coords reales (lat != 0)
+      final conCoords = fighters.where((f) => f.lat != 0).toList();
+      final LatLng centroSushi;
+      if (conCoords.isNotEmpty) {
+        final double sumLat = conCoords.map((f) => f.lat).reduce((a, b) => a + b);
+        final double sumLng = conCoords.map((f) => f.lng).reduce((a, b) => a + b);
+        centroSushi = LatLng(sumLat / conCoords.length, sumLng / conCoords.length);
+      } else {
+        centroSushi = const LatLng(6.2200, -75.5750);
+      }
+
+      if (mounted) {
+        setState(() {
+          _markers = markers;
+          _cargando = false;
+          _fightersCarrusel = conFoto;
+          _fightersTodos = fighters;
+        });
+        await Future.delayed(const Duration(milliseconds: 400));
+        _mapaCtrl?.animateCamera(CameraUpdate.newLatLngZoom(centroSushi, 12.5));
+      }
+      return;
+    }
+    // ── Fin bloque Sushi ──────────────────────────────────────────────────────
+
     // Circuitos de museos usan el ícono arquitectónico; los demás usan el emoji
     final bool esCircuitoMuseo = widget.circuito.tipo == 'museo' ||
         widget.circuito.tipo == 'museos' ||
         widget.circuito.id.contains('museo');
+    final bool esCircuitoCerveza = widget.circuito.esCerveza;
 
     for (final parada in widget.circuito.paradas) {
       final visitado = widget.progreso[parada.id] ?? false;
-      // Incluir tipo en cacheKey para diferenciar museo vs rock
-      final cacheKey = '${esCircuitoMuseo ? 'museo' : parada.emoji}_${visitado ? 'v' : 'p'}';
+      // Cerveza: forzar emoji 🍺 en todos los pines
+      final String pinEmoji = esCircuitoCerveza ? '🍺' : parada.emoji;
+      // Incluir tipo en cacheKey para diferenciar museo vs rock vs cerveza
+      final cacheKey = '${esCircuitoMuseo ? 'museo' : pinEmoji}_${visitado ? 'v' : 'p'}';
 
       if (!_pinCache.containsKey(cacheKey)) {
         try {
           _pinCache[cacheKey] = await _crearPinMuseo(
-            emoji: parada.emoji,
+            emoji: pinEmoji,
             visitado: visitado,
             esMuseo: esCircuitoMuseo,
             colorVisitado: widget.circuito.colorGradienteA);
@@ -26604,11 +30792,19 @@ class _MapaPasaporteScreenState extends State<_MapaPasaporteScreen> {
       ));
     }
 
-    if (mounted) setState(() { _markers = markers; _cargando = false; });
+    if (mounted) {
+      setState(() { _markers = markers; _cargando = false; });
+      // El GoogleMap aparece por primera vez aquí (_cargando false → widget visible).
+      // Dar tiempo al SDK para inicializarse y luego aplicar el estilo.
+      Future.delayed(const Duration(milliseconds: 600), () {
+        if (mounted) _reaplicarEstilo();
+      });
+    }
   }
 
-  /// Centro del mapa = centroide de todas las paradas
+  /// Centro del mapa = centroide de todas las paradas (o Medellín para Sushi)
   LatLng get _centroMapa {
+    if (widget.circuito.esSushi) return const LatLng(6.2200, -75.5750); // centroide MDE
     if (widget.circuito.paradas.isEmpty) return const LatLng(6.2442, -75.5812);
     double sumLat = 0, sumLng = 0;
     for (final p in widget.circuito.paradas) {
@@ -26640,7 +30836,16 @@ class _MapaPasaporteScreenState extends State<_MapaPasaporteScreen> {
               zoomControlsEnabled: false,
               mapToolbarEnabled: false,
               style: kRuteroMapStyle,
-              onMapCreated: (ctrl) => _mapaCtrl = ctrl,
+              onMapCreated: (ctrl) {
+                _mapaCtrl = ctrl;
+                Future.delayed(const Duration(milliseconds: 400), () {
+                  if (mounted) _reaplicarEstilo();
+                });
+                Future.delayed(const Duration(milliseconds: 1200), () {
+                  if (mounted) _reaplicarEstilo();
+                });
+              },
+              onCameraIdle: () { if (_mapaCtrl != null) _reaplicarEstilo(); },
               onTap: (_) => setState(() => _paradaSeleccionada = null),
             ),
 
@@ -26675,11 +30880,11 @@ class _MapaPasaporteScreenState extends State<_MapaPasaporteScreen> {
                         style: TextStyle(
                           color: RDSColor.textPrimary,
                           fontSize: 14, fontWeight: FontWeight.w800,
-                          fontFamily: c.tipo == 'musico' ? 'SpaceGrotesk' : null)),
+                          fontFamily: (c.tipo == 'musico' || c.esCerveza) ? 'SpaceGrotesk' : null)),
                       Text('$_visitadas / ${c.paradasTotal} '
-                        '${c.tipo == "musico" ? "bares" : "paradas"} visitados',
+                        '${c.tipo == "musico" ? "bares" : c.esCerveza ? "cervecerías" : "paradas"} visitados',
                         style: TextStyle(
-                          color: c.tipo == 'musico'
+                          color: (c.tipo == 'musico' || c.esCerveza)
                               ? acento.withOpacity(0.65)
                               : RDSColor.textMuted,
                           fontSize: 11,
@@ -26712,7 +30917,9 @@ class _MapaPasaporteScreenState extends State<_MapaPasaporteScreen> {
 
         // ── Botón "Mi ubicación" — esquina inferior IZQUIERDA (SOS ocupa la derecha) ──
         Positioned(
-          bottom: _paradaSeleccionada != null ? 170 : 32,
+          bottom: _paradaSeleccionada != null
+              ? 190
+              : (c.esSushi && _fightersCarrusel.isNotEmpty ? 160 : 32),
           left: 16,
           child: GestureDetector(
             onTap: () async {
@@ -26737,6 +30944,153 @@ class _MapaPasaporteScreenState extends State<_MapaPasaporteScreen> {
           ),
         ),
 
+        // ── Carrusel de fotos de restaurantes Sushi (parte inferior del mapa) ──
+        if (c.esSushi && _fightersCarrusel.isNotEmpty)
+          Positioned(
+            bottom: _paradaSeleccionada != null ? 180 : 24,
+            left: 0, right: 0,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                SizedBox(
+                  height: 118,
+                  child: PageView.builder(
+                    controller: _carruselCtrl,
+                    itemCount: _fightersCarrusel.length,
+                    onPageChanged: (i) => setState(() => _carruselIdx = i),
+                    itemBuilder: (ctx, i) {
+                      final f = _fightersCarrusel[i];
+                      return GestureDetector(
+                        onTap: () {
+                          // Centrar mapa en el restaurante seleccionado
+                          if (f.lat != 0) {
+                            _mapaCtrl?.animateCamera(
+                              CameraUpdate.newLatLngZoom(LatLng(f.lat, f.lng), 15.5));
+                          }
+                          setState(() => _paradaSeleccionada = ParadaCircuito(
+                            id: f.id, sitioId: f.id,
+                            nombre: f.restaurante,
+                            descripcion: f.nombre,
+                            emoji: f.emoji,
+                            lat: f.lat, lng: f.lng,
+                            barrio: f.barrio, zona: 'sushi',
+                            puntosCheckin: 150,
+                          ));
+                        },
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 200),
+                          margin: EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: _carruselIdx == i ? 0 : 8),
+                          decoration: BoxDecoration(
+                            color: RDSColor.card,
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(
+                              color: _carruselIdx == i
+                                  ? acento.withOpacity(0.7)
+                                  : RDSColor.surface,
+                              width: _carruselIdx == i ? 1.5 : 1),
+                            boxShadow: [BoxShadow(
+                              color: Colors.black.withOpacity(0.4),
+                              blurRadius: 10, offset: const Offset(0, 4))]),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(15),
+                            child: Stack(children: [
+                              // Foto del plato
+                              Positioned.fill(
+                                child: Image.network(
+                                  f.imagenUrl,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (_, __, ___) => Container(
+                                    color: RDSColor.surface,
+                                    child: Center(child: Text(f.emoji,
+                                      style: const TextStyle(fontSize: 36)))),
+                                )),
+                              // Gradiente + info en la parte inferior
+                              Positioned(
+                                bottom: 0, left: 0, right: 0,
+                                child: Container(
+                                  padding: const EdgeInsets.fromLTRB(10, 20, 10, 8),
+                                  decoration: BoxDecoration(
+                                    gradient: LinearGradient(
+                                      colors: [
+                                        Colors.transparent,
+                                        Colors.black.withOpacity(0.78)],
+                                      begin: Alignment.topCenter,
+                                      end: Alignment.bottomCenter)),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Text(f.restaurante,
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w800),
+                                        maxLines: 1, overflow: TextOverflow.ellipsis),
+                                      const SizedBox(height: 2),
+                                      Row(children: [
+                                        Text('${f.emoji} ',
+                                          style: const TextStyle(fontSize: 10)),
+                                        Expanded(child: Text(f.nombre,
+                                          style: const TextStyle(
+                                            color: Colors.white70,
+                                            fontSize: 10),
+                                          maxLines: 1, overflow: TextOverflow.ellipsis)),
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 5, vertical: 2),
+                                          decoration: BoxDecoration(
+                                            color: const Color(0xFFFFD700).withOpacity(0.2),
+                                            borderRadius: BorderRadius.circular(6),
+                                            border: Border.all(
+                                              color: const Color(0xFFFFD700).withOpacity(0.5))),
+                                          child: Text('⚡${f.powerScore.toStringAsFixed(1)}',
+                                            style: const TextStyle(
+                                              color: Color(0xFFFFD700),
+                                              fontSize: 9,
+                                              fontWeight: FontWeight.w700))),
+                                      ]),
+                                    ]))),
+                              // Badge barrio top-right
+                              Positioned(
+                                top: 8, right: 8,
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 7, vertical: 3),
+                                  decoration: BoxDecoration(
+                                    color: Colors.black.withOpacity(0.55),
+                                    borderRadius: BorderRadius.circular(8)),
+                                  child: Text(f.barrio,
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 9,
+                                      fontWeight: FontWeight.w600)))),
+                            ]))),
+                      );
+                    },
+                  ),
+                ),
+                // Indicadores de página (dots)
+                const SizedBox(height: 6),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: List.generate(_fightersCarrusel.length, (i) =>
+                    AnimatedContainer(
+                      duration: const Duration(milliseconds: 200),
+                      margin: const EdgeInsets.symmetric(horizontal: 2),
+                      width: _carruselIdx == i ? 16 : 5,
+                      height: 5,
+                      decoration: BoxDecoration(
+                        color: _carruselIdx == i
+                            ? acento
+                            : Colors.white.withOpacity(0.3),
+                        borderRadius: BorderRadius.circular(3)))),
+                ),
+              ],
+            ),
+          ),
+
         // Tarjeta info parada seleccionada — toca para abrir detalle, X para cerrar
         if (_paradaSeleccionada != null)
           Positioned(
@@ -26745,6 +31099,21 @@ class _MapaPasaporteScreenState extends State<_MapaPasaporteScreen> {
               onTap: () async {
                 final parada   = _paradaSeleccionada!;
                 final visitada = widget.progreso[parada.id] ?? false;
+                // Sushi: ir directo a la pantalla de detalle del fighter
+                if (widget.circuito.esSushi) {
+                  final idx = _fightersTodos.indexWhere((f) => f.id == parada.id);
+                  if (idx >= 0) {
+                    await RuteroNav.push(
+                      context,
+                      _SushiFighterDetalleScreen(
+                        fighter: _fightersTodos[idx],
+                        rank: idx + 1,
+                        circuito: widget.circuito,
+                      ),
+                    );
+                    return;
+                  }
+                }
                 await RuteroNav.push(
                   context,
                   PasaporteParadaScreen(
@@ -27041,6 +31410,11 @@ class _PasaporteParadaScreenState extends State<PasaporteParadaScreen> {
   bool _triviaCompletada = false;
   bool _triviaAcertada = false;
 
+  // Votación sushi (solo circuitos con esSushi == true)
+  bool _votoSushiDisponible = false;
+  bool _votoSushiCompletado = false;
+  Map<String, int>? _votoSushiDimensiones; // {presentacion, sabor, originalidad}
+
   // Parada local — se recarga desde Firestore al volver de gestión
   ParadaCircuito? _paradaLocal;
   ParadaCircuito get p => _paradaLocal ?? widget.parada;
@@ -27071,6 +31445,7 @@ class _PasaporteParadaScreenState extends State<PasaporteParadaScreen> {
     _cargarKeywordSemana();
     if (_checkinHecho) _verificarTrivia();
     _verificarMisionCumplida();
+    if (_checkinHecho && widget.circuito.esSushi) _verificarVotoSushi();
   }
 
   /// Verifica si el usuario ya cumplió la misión épica de esta parada.
@@ -27510,8 +31885,251 @@ class _PasaporteParadaScreenState extends State<PasaporteParadaScreen> {
     if (widget.parada.trivia != null) {
       setState(() => _triviaDisponible = true);
     }
+    // Habilitar votación sushi si aplica
+    if (widget.circuito.esSushi) {
+      setState(() => _votoSushiDisponible = true);
+    }
     // Verificar si el usuario acaba de completar el circuito
     _verificarCircuitoCompletado();
+  }
+
+  // ── Votación Sushi ──────────────────────────────────────────────────────────
+
+  /// Verifica si el usuario ya votó esta parada (para no mostrar el botón dos veces).
+  Future<void> _verificarVotoSushi() async {
+    final uid = FirebaseAuth.instance.currentUser?.uid ?? '';
+    if (uid.isEmpty) return;
+    try {
+      final doc = await FirebaseFirestore.instance
+          .collection('usuarios').doc(uid)
+          .collection('pasaportes').doc(widget.circuito.id)
+          .collection('paradas').doc(widget.parada.id)
+          .get();
+      final yaVoto = doc.data()?['votoSushi'] != null;
+      if (mounted && yaVoto) {
+        final dims = Map<String, dynamic>.from(
+            doc.data()?['votoSushi'] as Map? ?? {});
+        setState(() {
+          _votoSushiCompletado = true;
+          _votoSushiDisponible = false;
+          _votoSushiDimensiones = {
+            'presentacion': (dims['presentacion'] as num?)?.toInt() ?? 0,
+            'sabor':        (dims['sabor']        as num?)?.toInt() ?? 0,
+            'originalidad': (dims['originalidad'] as num?)?.toInt() ?? 0,
+          };
+        });
+      } else if (mounted && !_votoSushiDisponible) {
+        // ya hizo check-in pero aún no votó → habilitar
+        setState(() => _votoSushiDisponible = true);
+      }
+    } catch (e) {
+      debugPrint('⚠️ _verificarVotoSushi: $e');
+    }
+  }
+
+  /// Dialog de votación con 3 dimensiones + guardado en Firestore.
+  Future<void> _mostrarVotacionSushi() async {
+    final c = widget.circuito;
+    final Color acento = c.colorGradienteA;
+
+    // Valores iniciales de los sliders
+    int presentacion = 5;
+    int sabor        = 5;
+    int originalidad = 5;
+
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => StatefulBuilder(builder: (ctx, setDlg) {
+        final powerScore = ((presentacion + sabor + originalidad) / 3).round();
+        return Dialog(
+          backgroundColor: Colors.transparent,
+          insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 32),
+          child: Container(
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [c.colorGradienteA, c.colorGradienteB],
+                begin: Alignment.topLeft, end: Alignment.bottomRight),
+              borderRadius: BorderRadius.circular(24)),
+            child: Column(mainAxisSize: MainAxisSize.min, children: [
+              const Text('⚔️', style: TextStyle(fontSize: 42)),
+              const SizedBox(height: 8),
+              const Text('Calificá el plato',
+                style: TextStyle(color: Colors.white, fontSize: 20,
+                  fontWeight: FontWeight.w900)),
+              const SizedBox(height: 4),
+              Text(widget.parada.nombre,
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: Colors.white70, fontSize: 13,
+                  fontWeight: FontWeight.w600)),
+              const SizedBox(height: 20),
+
+              // ── Slider Presentación ──────────────────────────────────────
+              _SushiSlider(
+                label: '🍱 Presentación',
+                valor: presentacion,
+                acento: acento,
+                onChange: (v) => setDlg(() => presentacion = v),
+              ),
+              const SizedBox(height: 14),
+
+              // ── Slider Sabor ─────────────────────────────────────────────
+              _SushiSlider(
+                label: '🌊 Sabor',
+                valor: sabor,
+                acento: acento,
+                onChange: (v) => setDlg(() => sabor = v),
+              ),
+              const SizedBox(height: 14),
+
+              // ── Slider Originalidad ──────────────────────────────────────
+              _SushiSlider(
+                label: '✨ Originalidad',
+                valor: originalidad,
+                acento: acento,
+                onChange: (v) => setDlg(() => originalidad = v),
+              ),
+              const SizedBox(height: 20),
+
+              // ── PowerScore preview ───────────────────────────────────────
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                decoration: BoxDecoration(
+                  color: Colors.black26,
+                  borderRadius: BorderRadius.circular(14)),
+                child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                  const Text('⚡', style: TextStyle(fontSize: 20)),
+                  const SizedBox(width: 8),
+                  Text('PowerScore: $powerScore / 10',
+                    style: const TextStyle(color: Colors.white,
+                      fontSize: 15, fontWeight: FontWeight.w800)),
+                ])),
+              const SizedBox(height: 20),
+
+              // ── Botones ──────────────────────────────────────────────────
+              Row(children: [
+                Expanded(
+                  child: GestureDetector(
+                    onTap: () => Navigator.pop(ctx),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      decoration: BoxDecoration(
+                        color: Colors.black26,
+                        borderRadius: BorderRadius.circular(12)),
+                      child: const Center(
+                        child: Text('Cancelar',
+                          style: TextStyle(color: Colors.white70,
+                            fontSize: 14, fontWeight: FontWeight.w600)))))),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: GestureDetector(
+                    onTap: () async {
+                      Navigator.pop(ctx);
+                      await _registrarVotoSushi(
+                        presentacion: presentacion,
+                        sabor: sabor,
+                        originalidad: originalidad,
+                      );
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(12)),
+                      child: Center(
+                        child: Text('Votar +100 XP',
+                          style: TextStyle(
+                            color: c.colorGradienteA,
+                            fontSize: 14, fontWeight: FontWeight.w900)))))),
+              ]),
+            ])));
+      }),
+    );
+  }
+
+  /// Guarda el voto en Firestore y suma 100 XP al usuario.
+  Future<void> _registrarVotoSushi({
+    required int presentacion,
+    required int sabor,
+    required int originalidad,
+  }) async {
+    final uid = FirebaseAuth.instance.currentUser?.uid ?? '';
+    if (uid.isEmpty) return;
+    final db = FirebaseFirestore.instance;
+    final powerScore = ((presentacion + sabor + originalidad) / 3).round();
+    const xpVoto = 100;
+
+    try {
+      final batch = db.batch();
+
+      // 1. Guardar voto en la subcolección del usuario
+      final paradaRef = db.collection('usuarios').doc(uid)
+          .collection('pasaportes').doc(widget.circuito.id)
+          .collection('paradas').doc(widget.parada.id);
+      batch.set(paradaRef, {
+        'votoSushi': {
+          'presentacion': presentacion,
+          'sabor':        sabor,
+          'originalidad': originalidad,
+          'powerScore':   powerScore,
+          'timestamp':    FieldValue.serverTimestamp(),
+        },
+        'xpVoto': xpVoto,
+      }, SetOptions(merge: true));
+
+      // 2. Acumular puntos en el doc del circuito del usuario
+      final circRef = db.collection('usuarios').doc(uid)
+          .collection('pasaportes').doc(widget.circuito.id);
+      batch.set(circRef, {
+        'puntosTotal':    FieldValue.increment(xpVoto),
+        'ultimaActividad': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+
+      // 3. Sumar al perfil global
+      batch.set(db.collection('usuarios').doc(uid), {
+        'puntosTotal': FieldValue.increment(xpVoto),
+      }, SetOptions(merge: true));
+
+      // 4. Acumular powerScore en la parada del circuito (para ranking público)
+      final paradaCircRef = db.collection('circuitos_festivales')
+          .doc(widget.circuito.id)
+          .collection('paradas').doc(widget.parada.id);
+      batch.set(paradaCircRef, {
+        'votosCount':       FieldValue.increment(1),
+        'powerScoreTotal':  FieldValue.increment(powerScore),
+        'presentacionTotal':FieldValue.increment(presentacion),
+        'saborTotal':       FieldValue.increment(sabor),
+        'originalidadTotal':FieldValue.increment(originalidad),
+      }, SetOptions(merge: true));
+
+      await batch.commit();
+
+      if (mounted) {
+        setState(() {
+          _votoSushiDisponible  = false;
+          _votoSushiCompletado  = true;
+          _votoSushiDimensiones = {
+            'presentacion': presentacion,
+            'sabor':        sabor,
+            'originalidad': originalidad,
+          };
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('⚡ ¡Voto registrado! +$xpVoto XP — PowerScore: $powerScore/10'),
+            backgroundColor: widget.circuito.colorGradienteA,
+            duration: const Duration(seconds: 3)));
+      }
+    } catch (e) {
+      debugPrint('⚠️ _registrarVotoSushi error: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Error al registrar el voto. Intentá de nuevo.'),
+            backgroundColor: Colors.redAccent));
+      }
+    }
   }
 
   Future<void> _verificarCircuitoCompletado() async {
@@ -28178,6 +32796,64 @@ class _PasaporteParadaScreenState extends State<PasaporteParadaScreen> {
                 ])),
           ],  // ← cierre bloque if(checkinHecho && trivia != null)
 
+          // ── VOTACIÓN SUSHI (solo circuitos esSushi) ───────────────────────────
+          if (_checkinHecho && c.esSushi) ...[
+            const SizedBox(height: 10),
+            if (_votoSushiDisponible && !_votoSushiCompletado)
+              GestureDetector(
+                onTap: _mostrarVotacionSushi,
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [acento.withOpacity(0.18), acento.withOpacity(0.06)],
+                      begin: Alignment.topLeft, end: Alignment.bottomRight),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: acento.withOpacity(0.5))),
+                  child: Row(children: [
+                    const Text('⚔️', style: TextStyle(fontSize: 28)),
+                    const SizedBox(width: 12),
+                    Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      const Text('¡Calificá el plato!',
+                        style: TextStyle(color: Colors.white, fontSize: 15,
+                          fontWeight: FontWeight.w800)),
+                      const SizedBox(height: 2),
+                      Text('Presentación · Sabor · Originalidad  •  +100 XP',
+                        style: TextStyle(color: acento.withOpacity(0.8),
+                          fontSize: 12, fontWeight: FontWeight.w600)),
+                    ])),
+                    Icon(Icons.chevron_right_rounded, color: acento, size: 22),
+                  ]))),
+            if (_votoSushiCompletado && _votoSushiDimensiones != null)
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: RDSColor.card,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: acento.withOpacity(0.3))),
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Row(children: [
+                    const Text('⚡', style: TextStyle(fontSize: 20)),
+                    const SizedBox(width: 8),
+                    Text('Voto registrado',
+                      style: TextStyle(color: acento, fontSize: 14,
+                        fontWeight: FontWeight.w800)),
+                    const Spacer(),
+                    Text(
+                      'PowerScore: ${((_votoSushiDimensiones!['presentacion']! + _votoSushiDimensiones!['sabor']! + _votoSushiDimensiones!['originalidad']!) / 3).round()}/10',
+                      style: const TextStyle(color: Colors.white70, fontSize: 12,
+                        fontWeight: FontWeight.w700)),
+                  ]),
+                  const SizedBox(height: 10),
+                  Row(mainAxisAlignment: MainAxisAlignment.spaceAround, children: [
+                    _SushiVotoBadge('🍱', 'Presentación', _votoSushiDimensiones!['presentacion']!),
+                    _SushiVotoBadge('🌊', 'Sabor',        _votoSushiDimensiones!['sabor']!),
+                    _SushiVotoBadge('✨', 'Originalidad', _votoSushiDimensiones!['originalidad']!),
+                  ]),
+                ])),
+          ],
 
           // ── Botones de validación (solo cuando aún no hay check-in) ─────────────
           if (!_checkinHecho) ...[
@@ -28583,10 +33259,18 @@ class _PasaporteParadaScreenState extends State<PasaporteParadaScreen> {
       await archivo.writeAsBytes(composedBytes);
 
       // Guardar en galería del sistema
-      await Gal.putImage(archivo.path, album: 'Rutero MDE');
+      try {
+        // Android 14+ requiere solicitar acceso antes de escribir en galería
+        final tieneAcceso = await Gal.hasAccess(toAlbum: true);
+        if (!tieneAcceso) await Gal.requestAccess(toAlbum: true);
+        await Gal.putImage(archivo.path, album: 'Rutero MDE');
+        debugPrint('✅ Foto misión guardada en galería: ${archivo.path}');
+      } catch (galError) {
+        debugPrint('⚠️ Gal.putImage misión falló (foto igual disponible localmente): $galError');
+      }
       return archivo;
     } catch (e) {
-      debugPrint('Error componiendo foto misión: $e');
+      debugPrint('❌ Error componiendo foto misión: $e');
       return null;
     }
   }
@@ -28595,10 +33279,12 @@ class _PasaporteParadaScreenState extends State<PasaporteParadaScreen> {
     if (!mounted) return;
     final nombreCircuito = widget.circuito.nombre;
     // Texto sugerido para compartir (hashtags aquí, no en la imagen)
+    final tags = _hashtagsPorContexto(nombreCircuito);
     final textoCompartir =
         '¡Cumplí la misión épica en ${p.nombre}! 🤘\n'
         '$nombreCircuito · Rutero MDE\n'
-        '#CircuitoRockMDE #RuteroMDE #${p.nombre.replaceAll(' ', '')}';
+        '\n$tags\n'
+        '📲 rutero-mde.web.app';
 
     await showModalBottomSheet<void>(
       context: context,
@@ -28820,6 +33506,292 @@ class _PasBtnCheckIn extends StatelessWidget {
                   fontFamily: esRock ? 'SpaceGrotesk' : null))));
   }
 }
+// ─── SUSHI SLIDER ─────────────────────────────────────────────────────────────
+/// Slider de votación para una dimensión de sushi (1-10).
+class _SushiSlider extends StatelessWidget {
+  final String label;
+  final int valor;
+  final Color acento;
+  final ValueChanged<int> onChange;
+  const _SushiSlider({
+    required this.label, required this.valor,
+    required this.acento, required this.onChange,
+  });
+  @override
+  Widget build(BuildContext context) {
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+        Text(label,
+          style: const TextStyle(color: Colors.white70, fontSize: 13,
+            fontWeight: FontWeight.w700)),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+          decoration: BoxDecoration(
+            color: Colors.black26,
+            borderRadius: BorderRadius.circular(8)),
+          child: Text('$valor / 10',
+            style: const TextStyle(color: Colors.white,
+              fontSize: 13, fontWeight: FontWeight.w900))),
+      ]),
+      SliderTheme(
+        data: SliderTheme.of(context).copyWith(
+          activeTrackColor: Colors.white,
+          inactiveTrackColor: Colors.white24,
+          thumbColor: Colors.white,
+          overlayColor: Colors.white24,
+          trackHeight: 3,
+          thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 10),
+        ),
+        child: Slider(
+          value: valor.toDouble(),
+          min: 1, max: 10, divisions: 9,
+          onChanged: (v) => onChange(v.round()),
+        )),
+    ]);
+  }
+}
+
+// ─── SUSHI VOTO BADGE ─────────────────────────────────────────────────────────
+/// Badge pequeño que muestra el puntaje votado por dimensión.
+class _SushiVotoBadge extends StatelessWidget {
+  final String emoji;
+  final String label;
+  final int valor;
+  const _SushiVotoBadge(this.emoji, this.label, this.valor, {super.key});
+  @override
+  Widget build(BuildContext context) {
+    return Column(mainAxisSize: MainAxisSize.min, children: [
+      Text(emoji, style: const TextStyle(fontSize: 22)),
+      const SizedBox(height: 4),
+      Text('$valor/10',
+        style: const TextStyle(color: Colors.white,
+          fontSize: 14, fontWeight: FontWeight.w900)),
+      Text(label,
+        style: const TextStyle(color: Colors.white54, fontSize: 10)),
+    ]);
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// _SushiAdminParadaScreen — Panel del restaurante para generar la palabra
+//                           secreta on-demand.
+//
+// Acceso: solo admins (esAdmin == true, es decir paulflopezp@gmail.com en dev,
+//         o adminUids[] en Firestore para los meseros del restaurante).
+//
+// Uso:
+//   Navigator.push(context, MaterialPageRoute(
+//     builder: (_) => _SushiAdminParadaScreen(
+//       paradaId: fighter.id,
+//       restauranteNombre: fighter.restaurante,
+//       circuitoId: 'sushi_mde_2027',
+//     )));
+// ─────────────────────────────────────────────────────────────────────────────
+class _SushiAdminParadaScreen extends StatefulWidget {
+  final String paradaId;
+  final String restauranteNombre;
+  final String circuitoId;
+  const _SushiAdminParadaScreen({
+    required this.paradaId,
+    required this.restauranteNombre,
+    required this.circuitoId,
+  });
+  @override
+  State<_SushiAdminParadaScreen> createState() => _SushiAdminParadaScreenState();
+}
+
+class _SushiAdminParadaScreenState extends State<_SushiAdminParadaScreen> {
+  String? _palabraActual;
+  String? _updatedAt;
+  bool    _cargando    = false;
+  bool    _generando   = false;
+  String? _errorMsg;
+
+  @override
+  void initState() {
+    super.initState();
+    _cargarPalabraActual();
+  }
+
+  /// Lee la palabraActual actual desde Firestore (sin generar una nueva)
+  Future<void> _cargarPalabraActual() async {
+    setState(() { _cargando = true; _errorMsg = null; });
+    try {
+      final snap = await FirebaseFirestore.instance
+          .collection('circuitos_festivales')
+          .doc(widget.circuitoId)
+          .collection('paradas')
+          .doc(widget.paradaId)
+          .get();
+      if (!mounted) return;
+      final data = snap.data() ?? {};
+      final ts   = data['palabraActualUpdatedAt'] as Timestamp?;
+      setState(() {
+        _cargando     = false;
+        _palabraActual = (data['palabraActual'] as String?) ?? null;
+        _updatedAt     = ts != null
+            ? _formatTs(ts.toDate())
+            : null;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _cargando  = false;
+        _errorMsg  = 'Error al cargar · revisa tu conexión';
+      });
+    }
+  }
+
+  /// Llama la Cloud Function generarPalabraSecreta para obtener una nueva clave
+  Future<void> _generarNuevaPalabra() async {
+    setState(() { _generando = true; _errorMsg = null; });
+    try {
+      final callable = FirebaseFunctions.instanceFor(region: 'us-central1')
+          .httpsCallable('generarPalabraSecreta');
+      final result = await callable.call({
+        'paradaId': widget.paradaId,
+      });
+      if (!mounted) return;
+      final data     = result.data as Map<String, dynamic>;
+      final palabra  = data['palabraActual'] as String? ?? '';
+      final updatedAt = data['updatedAt'] as String? ?? '';
+      setState(() {
+        _generando     = false;
+        _palabraActual = palabra;
+        _updatedAt     = updatedAt.isNotEmpty
+            ? _formatTs(DateTime.tryParse(updatedAt) ?? DateTime.now())
+            : _formatTs(DateTime.now());
+      });
+    } on FirebaseFunctionsException catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _generando = false;
+        _errorMsg  = e.message ?? 'No tienes permisos para generar la clave';
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _generando = false;
+        _errorMsg  = 'Error de conexión · intenta de nuevo';
+      });
+    }
+  }
+
+  String _formatTs(DateTime dt) {
+    final h = dt.hour.toString().padLeft(2, '0');
+    final m = dt.minute.toString().padLeft(2, '0');
+    final d = dt.day.toString().padLeft(2, '0');
+    final mo = dt.month.toString().padLeft(2, '0');
+    return '$d/$mo ${h}:$m';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    const bg    = Color(0xFF0A0A14);
+    const gold  = Color(0xFFFFD700);
+    const purple = Color(0xFF9B59B6);
+
+    return Scaffold(
+      backgroundColor: bg,
+      appBar: AppBar(
+        backgroundColor: bg,
+        foregroundColor: gold,
+        title: Text('⚔ ADMIN · ${widget.restauranteNombre}',
+          style: const TextStyle(color: gold, fontSize: 14,
+            fontWeight: FontWeight.w900, letterSpacing: 1.5)),
+        centerTitle: true,
+      ),
+      body: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            // ── Título ──────────────────────────────────────────────────────
+            const Text('CLAVE SECRETA ACTIVA',
+              style: TextStyle(color: Colors.white54, fontSize: 12,
+                letterSpacing: 2, fontWeight: FontWeight.w700)),
+            const SizedBox(height: 16),
+
+            // ── Palabra actual ───────────────────────────────────────────────
+            if (_cargando)
+              const CircularProgressIndicator(color: gold)
+            else if (_palabraActual != null && _palabraActual!.isNotEmpty)
+              Column(children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 20),
+                  decoration: BoxDecoration(
+                    border: Border.all(color: gold, width: 2),
+                    borderRadius: BorderRadius.circular(12),
+                    color: gold.withOpacity(0.08),
+                  ),
+                  child: Text(_palabraActual!,
+                    style: const TextStyle(
+                      color: gold, fontSize: 42,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 6)),
+                ),
+                if (_updatedAt != null) ...[
+                  const SizedBox(height: 10),
+                  Text('Generada: $_updatedAt',
+                    style: const TextStyle(color: Colors.white38, fontSize: 12)),
+                ],
+              ])
+            else
+              const Text('Sin clave configurada · genera una nueva',
+                style: TextStyle(color: Colors.white38, fontSize: 14),
+                textAlign: TextAlign.center),
+
+            const SizedBox(height: 40),
+
+            // ── Error ────────────────────────────────────────────────────────
+            if (_errorMsg != null) ...[
+              Text(_errorMsg!,
+                style: const TextStyle(color: Color(0xFFE74C3C), fontSize: 13),
+                textAlign: TextAlign.center),
+              const SizedBox(height: 20),
+            ],
+
+            // ── Botón generar ────────────────────────────────────────────────
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: _generando ? null : _generarNuevaPalabra,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: purple,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 18),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12)),
+                  textStyle: const TextStyle(
+                    fontSize: 16, fontWeight: FontWeight.w900,
+                    letterSpacing: 2),
+                ),
+                child: _generando
+                    ? const SizedBox(
+                        height: 20, width: 20,
+                        child: CircularProgressIndicator(
+                          color: Colors.white, strokeWidth: 2))
+                    : const Text('⚡ GENERAR NUEVA CLAVE'),
+              ),
+            ),
+
+            const SizedBox(height: 16),
+
+            // ── Instrucciones ────────────────────────────────────────────────
+            const Text(
+              'Di esta clave al comensal DESPUÉS de que haya pagado.\n'
+              'Puedes cambiarla cuando quieras — el sistema se actualiza al instante.',
+              style: TextStyle(color: Colors.white38, fontSize: 12,
+                height: 1.6),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 // ─── PAINTER FERIA ─────────────────────────────────────────────────────────────
 class _FeriaPatternPainter extends CustomPainter {
   @override
@@ -28837,6 +33809,296 @@ class _FeriaPatternPainter extends CustomPainter {
 }
 
 // ─────────────────────────────────────────
+// ─────────────────────────────────────────
+//  WIDGET VASO CERVEZA
+// ─────────────────────────────────────────
+
+/// CustomPainter que dibuja un vaso de cerveza llenándose según [progreso] (0.0 – 1.0).
+class _VasoCervezaPainter extends CustomPainter {
+  final double progreso;
+  final Color colorCerveza;
+  final Color colorEspuma;
+  _VasoCervezaPainter({
+    required this.progreso,
+    this.colorCerveza = const Color(0xFFE8A020),
+    this.colorEspuma = const Color(0xFFF5E6C0),
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final w = size.width;
+    final h = size.height;
+
+    // ── Vaso: trapecio (más ancho arriba que abajo) ──
+    final vasoPath = Path()
+      ..moveTo(w * 0.12, h * 0.05)       // esquina sup-izq
+      ..lineTo(w * 0.88, h * 0.05)       // esquina sup-der
+      ..lineTo(w * 0.80, h * 0.95)       // esquina inf-der
+      ..lineTo(w * 0.20, h * 0.95)       // esquina inf-izq
+      ..close();
+
+    // ── Clip al interior del vaso ──
+    canvas.save();
+    canvas.clipPath(vasoPath);
+
+    // Fondo transparente del vaso
+    canvas.drawPaint(Paint()..color = Colors.transparent);
+
+    // Líquido (de abajo hacia arriba)
+    final nivelLiquido = h * 0.95 - (h * 0.85 * progreso.clamp(0.0, 1.0));
+    final liquidoRect = Rect.fromLTRB(0, nivelLiquido, w, h * 0.95);
+    canvas.drawRect(
+      liquidoRect,
+      Paint()..color = colorCerveza.withOpacity(0.85),
+    );
+
+    // Efecto de brillo vertical en el líquido
+    if (progreso > 0.05) {
+      final brilloRect = Rect.fromLTRB(w * 0.14, nivelLiquido, w * 0.19, h * 0.95);
+      canvas.drawRect(
+        brilloRect,
+        Paint()
+          ..color = Colors.white.withOpacity(0.18)
+          ..blendMode = BlendMode.overlay,
+      );
+    }
+
+    // Espuma encima del líquido (solo si hay algo de progreso)
+    if (progreso > 0.05) {
+      final espumaH = h * 0.06;
+      final espumaRect = Rect.fromLTRB(0, nivelLiquido - espumaH * 0.6, w, nivelLiquido + espumaH * 0.4);
+      // Burbujas de espuma con path ondulado
+      final espumaPath = Path();
+      const int nBurbujas = 8;
+      final bW = w / nBurbujas;
+      espumaPath.moveTo(0, nivelLiquido);
+      for (int i = 0; i < nBurbujas; i++) {
+        espumaPath.arcToPoint(
+          Offset((i + 1) * bW, nivelLiquido),
+          radius: Radius.circular(bW * 0.6),
+          clockwise: false,
+        );
+      }
+      espumaPath.lineTo(w, espumaRect.top);
+      espumaPath.lineTo(0, espumaRect.top);
+      espumaPath.close();
+      canvas.drawPath(espumaPath, Paint()..color = colorEspuma.withOpacity(0.90));
+    }
+
+    canvas.restore();
+
+    // ── Contorno del vaso ──
+    final vasoStroke = Paint()
+      ..color = Colors.white.withOpacity(0.55)
+      ..strokeWidth = 2.0
+      ..style = PaintingStyle.stroke;
+    canvas.drawPath(vasoPath, vasoStroke);
+
+    // ── Reflejo izquierdo ──
+    final reflejoPaint = Paint()
+      ..color = Colors.white.withOpacity(0.12)
+      ..strokeWidth = 3.5
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round;
+    final reflejoPath = Path()
+      ..moveTo(w * 0.17, h * 0.12)
+      ..lineTo(w * 0.22, h * 0.88);
+    canvas.drawPath(reflejoPath, reflejoPaint);
+  }
+
+  @override
+  bool shouldRepaint(_VasoCervezaPainter old) => old.progreso != progreso;
+}
+
+/// Widget animado de vaso de cerveza para el pasaporte del circuito cerveza.
+class _VasoCerveza extends StatefulWidget {
+  final int visitadas;
+  final int total;
+  final Color colorAccent;
+
+  const _VasoCerveza({
+    required this.visitadas,
+    required this.total,
+    required this.colorAccent,
+  });
+
+  @override
+  State<_VasoCerveza> createState() => _VasoCervezaState();
+}
+
+class _VasoCervezaState extends State<_VasoCerveza>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _ctrl;
+  late Animation<double> _anim;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1200),
+    );
+    _anim = CurvedAnimation(parent: _ctrl, curve: Curves.easeOut);
+    _ctrl.forward();
+  }
+
+  @override
+  void didUpdateWidget(_VasoCerveza old) {
+    super.didUpdateWidget(old);
+    if (old.visitadas != widget.visitadas) {
+      _ctrl.forward(from: old.visitadas / (old.total > 0 ? old.total : 1));
+    }
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  double get _progresoFinal =>
+      widget.total > 0 ? (widget.visitadas / widget.total).clamp(0.0, 1.0) : 0.0;
+
+  @override
+  Widget build(BuildContext context) {
+    // Hitos de recompensa (cada ~25% aprox)
+    final hitos = <Map<String, dynamic>>[
+      {'min': 1,  'emoji': '🍺', 'label': 'Primer sorbo'},
+      {'min': (widget.total * 0.25).ceil(), 'emoji': '🌟', 'label': '25% — Explorador'},
+      {'min': (widget.total * 0.50).ceil(), 'emoji': '🔥', 'label': '50% — Medio lleno'},
+      {'min': (widget.total * 0.75).ceil(), 'emoji': '⚡', 'label': '75% — Casi listo'},
+      {'min': widget.total, 'emoji': '🏆', 'label': '¡Circuito completo!'},
+    ];
+
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1A0A00),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: widget.colorAccent.withOpacity(0.35), width: 1.2),
+        boxShadow: [
+          BoxShadow(
+            color: widget.colorAccent.withOpacity(0.12),
+            blurRadius: 12, offset: const Offset(0, 4)),
+        ]),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        // ── Título ──
+        Row(children: [
+          Text('🍺', style: const TextStyle(fontSize: 18)),
+          const SizedBox(width: 8),
+          Text(
+            'Tu pola va llenándose',
+            style: TextStyle(
+              color: widget.colorAccent,
+              fontSize: 13,
+              fontWeight: FontWeight.w800,
+              fontFamily: 'SpaceGrotesk',
+              letterSpacing: -0.3,
+            )),
+          const Spacer(),
+          Text(
+            '${widget.visitadas}/${widget.total}',
+            style: TextStyle(
+              color: widget.colorAccent,
+              fontSize: 15,
+              fontWeight: FontWeight.w900,
+              fontFamily: 'SpaceGrotesk',
+            )),
+        ]),
+        const SizedBox(height: 14),
+        // ── Vaso + hitos de recompensa ──
+        Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
+          // Vaso animado
+          AnimatedBuilder(
+            animation: _anim,
+            builder: (_, __) {
+              final progresoAnimado = _anim.value * _progresoFinal;
+              return SizedBox(
+                width: 72,
+                height: 110,
+                child: CustomPaint(
+                  painter: _VasoCervezaPainter(
+                    progreso: progresoAnimado,
+                    colorCerveza: widget.colorAccent,
+                    colorEspuma: const Color(0xFFF5E6C0),
+                  ),
+                ),
+              );
+            },
+          ),
+          const SizedBox(width: 16),
+          // Hitos verticales
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: hitos.map((h) {
+                final int min = h['min'] as int;
+                final bool alcanzado = widget.visitadas >= min;
+                final bool esSiguiente =
+                    !alcanzado && widget.visitadas < min &&
+                    hitos.indexWhere((x) => !(widget.visitadas >= (x['min'] as int))) ==
+                        hitos.indexOf(h);
+                return Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 3),
+                  child: Row(children: [
+                    Text(
+                      h['emoji'] as String,
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: alcanzado ? null : Colors.white24,
+                      )),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        h['label'] as String,
+                        style: TextStyle(
+                          color: alcanzado
+                              ? Colors.white
+                              : esSiguiente
+                                  ? widget.colorAccent.withOpacity(0.65)
+                                  : Colors.white24,
+                          fontSize: 10,
+                          fontWeight: alcanzado
+                              ? FontWeight.w700
+                              : FontWeight.w400,
+                        ))),
+                    if (alcanzado)
+                      const Text('✓',
+                        style: TextStyle(color: Color(0xFF5BAD6F),
+                          fontSize: 11, fontWeight: FontWeight.w900)),
+                  ]),
+                );
+              }).toList(),
+            )),
+        ]),
+        // ── Mensaje motivador ──
+        const SizedBox(height: 10),
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+          decoration: BoxDecoration(
+            color: widget.colorAccent.withOpacity(0.08),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: widget.colorAccent.withOpacity(0.20))),
+          child: Text(
+            widget.visitadas == 0
+                ? '¡Arrancá tu recorrido por las mejores cervezas de Medellín!'
+                : widget.visitadas >= widget.total
+                    ? '🏆 ¡Circuito completado! Sos un verdadero Loco por la Pola.'
+                    : '¡Vas bien! Todavía te quedan ${widget.total - widget.visitadas} cervecerías por explorar.',
+            style: TextStyle(
+              color: widget.colorAccent.withOpacity(0.80),
+              fontSize: 11,
+              fontStyle: FontStyle.italic,
+              height: 1.4,
+            ))),
+      ]),
+    );
+  }
+}
+
 //  PAINTERS
 // ─────────────────────────────────────────
 
